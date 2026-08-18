@@ -665,22 +665,35 @@ const SUPABASE_URL='';                 // e.g. 'https://abcd1234.supabase.co'
 const SUPABASE_ANON_KEY='';            // Settings → API → anon public key
 const BOARD_EMAIL='board@mgamm.app';   // the shared user you create in Supabase Auth
 const CLOUD=!!(SUPABASE_URL&&SUPABASE_ANON_KEY&&window.supabase);
-let sb=null,saveT=null,suppressRealtime=false,pendingRemote=null;
+let sb=null,saveT=null,suppressRealtime=false,pendingRemote=null,savePending=false;
 function setSync(s){ const d=$('syncDot'); if(!CLOUD){d.style.display='none';return;}
   d.style.display='inline-block'; d.className='sync-dot '+s;
   d.title=s==='synced'?'Saved to cloud':s==='saving'?'Saving…':'Offline — changes saved on this device only'; }
 function queueCloudSave(){
   if(!CLOUD||!sb) return;
+  savePending=true;
   setSync('saving'); clearTimeout(saveT);
   saveT=setTimeout(async()=>{
     suppressRealtime=true;
     const {error}=await sb.from('mm_tournament')
       .update({data:db,updated_at:new Date().toISOString()}).eq('id','main');
-    suppressRealtime=false;
+    suppressRealtime=false; savePending=false;
     setSync(error?'offline':'synced');
     if(error) toast('Cloud save failed — kept on this device, will retry on next change');
   },800);
 }
+/* pull-on-focus: even if realtime is down, coming back to the app refreshes from cloud */
+async function refetchCloud(){
+  if(!CLOUD||!sb||savePending) return;
+  const {data:{session}}=await sb.auth.getSession(); if(!session) return;
+  const {data:row,error}=await sb.from('mm_tournament').select('data').eq('id','main').maybeSingle();
+  if(error||!row||!row.data) return;
+  if(JSON.stringify(row.data)===JSON.stringify(db)) return;
+  if(document.querySelector('.sheet.show')){ pendingRemote=row.data; return; }
+  db=row.data; store.save(db); render(); setSync('synced');
+}
+document.addEventListener('visibilitychange',()=>{ if(!document.hidden) refetchCloud(); });
+window.addEventListener('focus',()=>refetchCloud());
 
 /* ============ load + migrate v1 data ============ */
 let db=store.load();
