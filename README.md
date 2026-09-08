@@ -57,3 +57,20 @@ Year selector (top) → **New year**. Carries over sponsors and prospects with
 contact info (statuses reset, deposits cleared), budget structure, misc expense
 lines, F&B menu, tiers, and the schedule — with all actuals zeroed. Declined
 prospects stay declined.
+
+## Keeping free tiers awake
+
+- **Render static sites never sleep** — they're CDN-served. Nothing to do.
+- **Supabase free tier pauses after 7 days of no API activity** (off-season risk).
+  This repo includes `.github/workflows/supabase-keepalive.yml`, which pings the
+  `keepalive` table every 3 days. To activate it:
+  1. Repo → Settings → Secrets and variables → Actions → add two secrets:
+     `SUPABASE_URL` and `SUPABASE_ANON_KEY` (same values as in index.html).
+  2. Actions tab → enable workflows → run **Supabase keep-alive** once manually
+     to confirm it goes green.
+  The workflow also commits a timestamp to a `keepalive` side branch each run so
+  GitHub's 60-day inactive-schedule rule never disables it, without triggering
+  Render deploys (Render only watches `main`).
+- **If it ever pauses anyway:** Supabase dashboard → Restore. Data isn't lost on
+  pause, but don't leave it paused for months — and keep occasional JSON backups
+  from the app menu regardless.

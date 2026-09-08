@@ -25,3 +25,15 @@ create policy "board can update"
 
 -- realtime so open devices see each other's changes live
 alter publication supabase_realtime add table public.mm_tournament;
+
+-- Keep-alive target: a zero-sensitivity table the GitHub Action pings every
+-- 3 days so the free project never pauses for inactivity. Safe to expose to anon.
+create table public.keepalive (
+  id        int primary key default 1,
+  pinged_at timestamptz not null default now()
+);
+insert into public.keepalive (id) values (1) on conflict do nothing;
+alter table public.keepalive enable row level security;
+create policy "keepalive is public read"
+  on public.keepalive for select
+  to anon, authenticated using (true);

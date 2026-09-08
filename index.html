@@ -84,6 +84,19 @@ input,select,textarea{font-family:inherit;font-size:16px}
   padding:7px 10px;border-radius:8px;min-width:82px;text-align:center}
 .status-btn.pledged{background:#FBF3DC;color:var(--brass-dark);border:1px solid #EAD9A6}
 .status-btn.deposited{background:var(--dep);color:#fff;border:1px solid var(--dep)}
+.status-btn.partial{background:#F5E9C3;color:#8a6d00;border:1px solid #E0C878}
+.srow.partial{background:#FDF9EC;border-color:#EAD9A6}
+.srow .paid-sub{font-size:11px;color:var(--dep);font-weight:700;margin-top:1px}
+.pay-row{display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--line);font-size:13.5px}
+.pay-row:last-child{border-bottom:none}
+.pay-row .amt{font-weight:700;min-width:70px}
+.pay-row .meta{flex:1;color:var(--muted)}
+.pay-row .x{color:var(--danger);font-size:15px;padding:2px 6px}
+.pay-add{display:flex;gap:6px;margin-top:8px}
+.pay-add input{flex:1;padding:10px;border:1px solid var(--line);border-radius:9px;background:var(--card);min-width:0}
+.method-seg{display:flex;background:var(--card);border:1px solid var(--line);border-radius:9px;overflow:hidden}
+.method-seg button{flex:1;padding:10px 6px;font-weight:600;font-size:13px;color:var(--muted)}
+.method-seg button.on{background:var(--green);color:#fff}
 .pill{font-size:10.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;padding:5px 9px;border-radius:7px;flex-shrink:0}
 .pill.Prospect{background:#EFEDE4;color:var(--muted)}
 .pill.Contacted{background:#E1ECF8;color:var(--blue)}
@@ -262,13 +275,19 @@ input,select,textarea{font-family:inherit;font-size:16px}
       <select id="fPledgedSel"></select>
       <input id="fPledgedCustom" inputmode="decimal" placeholder="Custom amount" style="margin-top:8px;display:none">
     </div>
-    <div class="f-field"><label>Deposited $</label><input id="fDeposited" inputmode="decimal" placeholder="auto"></div>
-    <div class="f-field full"><label>Status</label>
-      <div class="seg">
-        <button id="segPledged" class="pl">Pledged</button>
-        <button id="segDeposited" class="dp">Deposited</button>
+    <div class="f-field"><label>Status</label>
+      <input id="fStatusRO" disabled style="background:#EFEDE4;font-weight:700">
+    </div>
+    <div class="f-field full"><label>Payments</label>
+      <div id="payList"></div>
+      <div class="pay-add">
+        <input id="payAmt" inputmode="decimal" placeholder="Amount">
+        <div class="method-seg" id="payMethodSeg" style="flex:1.4">
+          <button data-m="Zelle">Zelle</button><button data-m="Check" class="on">Check</button><button data-m="Cash">Cash</button>
+        </div>
+        <button class="btn primary" id="payAddBtn" style="flex:0 0 64px;padding:10px">Add</button>
       </div>
-      <div class="hint">Switching to Deposited fills Deposited $ from the pledge. Override it above if the check came in different.</div>
+      <div class="hint">Log each payment as it lands — full or partial. Status and totals update themselves.</div>
     </div>
     <div class="f-field full"><label>Notes</label><textarea id="fNotes"></textarea></div>
   </div>
@@ -313,6 +332,26 @@ input,select,textarea{font-family:inherit;font-size:16px}
     <button class="btn primary" id="orSave">Save</button>
   </div>
   <button class="btn danger" id="orDelete" style="width:100%">Delete prospect</button>
+</div>
+
+<!-- quick payment -->
+<div class="sheet" id="paySheet">
+  <div class="grab"></div>
+  <h3 id="payTitle">Log payment</h3>
+  <div class="hint" id="payRemain" style="margin:-6px 0 12px;font-size:13px"></div>
+  <div class="f-grid">
+    <div class="f-field"><label>Amount $</label><input id="qpAmt" inputmode="decimal"></div>
+    <div class="f-field"><label>Date</label><input id="qpDate"></div>
+    <div class="f-field full"><label>How'd they pay?</label>
+      <div class="method-seg" id="qpMethodSeg">
+        <button data-m="Zelle">Zelle</button><button data-m="Check" class="on">Check</button><button data-m="Cash">Cash</button>
+      </div>
+    </div>
+  </div>
+  <div class="btn-row">
+    <button class="btn ghost" id="qpCancel">Cancel</button>
+    <button class="btn primary" id="qpSave">Log payment</button>
+  </div>
 </div>
 
 <!-- generic small editor (misc expense / F&B item / schedule item) -->
@@ -374,7 +413,7 @@ input,select,textarea{font-family:inherit;font-size:16px}
   <div class="grab"></div>
   <h3>How this works</h3>
   <div class="help-step"><div class="n">1</div><p><b>Five tabs at the bottom.</b> Home is the dashboard. Sponsors tracks confirmed pledges. Outreach is everyone you're targeting. Budget is all the money. Event is the schedule and food & beverage.</p></div>
-  <div class="help-step"><div class="n">2</div><p><b>A check comes in?</b> On Sponsors, tap the gold <b>Got the check</b> button. The row turns green and every total in the app updates. Tapped by mistake? Hit Undo.</p></div>
+  <div class="help-step"><div class="n">2</div><p><b>Money comes in?</b> On Sponsors, tap the gold <b>Log payment</b> button — full or partial, Zelle/Check/Cash. Rows turn gold when partially paid, green when paid in full, and every total updates. Tapped by mistake? Hit Undo.</p></div>
   <div class="help-step"><div class="n">3</div><p><b>Working a prospect?</b> On Outreach, tap them for one-tap Call/Text/Email and a <b>Log contact today</b> button. When they commit, tap <b>Add to Sponsors</b> and they move over automatically.</p></div>
   <div class="help-step"><div class="n">4</div><p><b>Budgeting?</b> Blue boxes are the numbers you enter — golfer count, entry fee, expense lines. Everything else calculates itself, including sponsor revenue which pulls live from the Sponsors tab.</p></div>
   <div class="help-step"><div class="n">5</div><p><b>Next year's tournament?</b> Tap the year at the top → <b>New year</b>. Sponsors, prospects, budget structure, and schedule all carry over with the money reset to zero.</p></div>
@@ -709,6 +748,22 @@ else{
 }
 
 let tab='home', filter='all', query='', editId=null, orId=null, nyCarryMode=true;
+/* payments: deposited & status are derived from the payment log */
+const payTotal=s=>(s.payments||[]).reduce((a,p)=>a+(+p.amount||0),0);
+function syncPay(s){
+  if(!s.payments) s.payments=[];
+  s.deposited=payTotal(s);
+  s.status=s.deposited<=0?'Pledged':(s.deposited>=(+s.pledged||0)?'Deposited':'Partial');
+}
+const spLeft=s=>Math.max(0,(+s.pledged||0)-payTotal(s));
+const today=()=>{const d=new Date();return (d.getMonth()+1)+'/'+d.getDate();};
+for(const data of Object.values(db.years)){
+  (data.sponsors||[]).forEach(sp=>{
+    if(!sp.payments) sp.payments=(+sp.deposited>0)?[{id:uid(),amount:+sp.deposited,method:'Check',date:''}]:[];
+    syncPay(sp);
+  });
+}
+store.save(db);
 const $=id=>document.getElementById(id);
 const fmt=n=>'$'+Math.round(n).toLocaleString('en-US');
 const yr=()=>db.years[db.activeYear];
@@ -750,7 +805,7 @@ function toast(msg,undoFn){ const t=$('toast'); t.innerHTML='';
   clearTimeout(toastT); toastT=setTimeout(()=>t.classList.remove('show'),undoFn?4000:2200); }
 
 /* ============ sheets ============ */
-const sheets=['editSheet','orSheet','gSheet','tierSheet','yearSheet','newYearSheet','menuSheet','helpSheet'];
+const sheets=['editSheet','orSheet','gSheet','paySheet','tierSheet','yearSheet','newYearSheet','menuSheet','helpSheet'];
 function openSheet(id){ sheets.forEach(s=>$(s).classList.toggle('show',s===id)); $('scrim').classList.add('show'); }
 function closeSheets(){ sheets.forEach(s=>$(s).classList.remove('show')); $('scrim').classList.remove('show');
   if(pendingRemote){ db=pendingRemote; pendingRemote=null; store.save(db); render(); toast('Updated from another device'); } }
@@ -865,7 +920,7 @@ function renderSponsors(w){
     <svg viewBox="0 0 16 16"><path d="M11.7 10.3a6 6 0 10-1.4 1.4l3 3 1.4-1.4-3-3zM6 10a4 4 0 110-8 4 4 0 010 8z"/></svg>
     <input id="searchIn" placeholder="Search company or contact" value="${esc(query)}" autocomplete="off"></div></div>
   <div class="chips" id="chips">
-    ${['all','Pledged','Deposited'].map(f=>`<button class="chip ${filter===f?'on':''}" data-f="${f}">${f==='all'?'All':f}</button>`).join('')}
+    ${['all','Pledged','Partial','Deposited'].map(f=>`<button class="chip ${filter===f?'on':''}" data-f="${f}">${f==='all'?'All':f}</button>`).join('')}
   </div><div class="page">`;
   if(!vis.length) html+=`<div class="empty"><b>${y.sponsors.length?'No matches':'No sponsors yet'}</b>${y.sponsors.length?'Try a different search or filter.':'Tap + to add the first sponsor.'}</div>`;
   tiers.forEach(t=>{
@@ -873,10 +928,13 @@ function renderSponsors(w){
     html+=`<div class="tier-hdr"><h2>${esc(t)}</h2><span>${g.length} · ${fmt(gTotal)}</span></div>`;
     g.forEach(s=>{
       const sub=[s.contact,s.committee].filter(Boolean).join(' · ');
-      html+=`<div class="srow ${s.status==='Deposited'?'dep':''}" data-id="${s.id}">
+      const cls=s.status==='Deposited'?'dep':(s.status==='Partial'?'partial':'');
+      const btn=s.status==='Pledged'?'Log payment':(s.status==='Partial'?fmt(spLeft(s))+' to go':'✓ Paid');
+      const paidSub=s.status==='Partial'?`<div class="paid-sub">${fmt(payTotal(s))} paid</div>`:'';
+      html+=`<div class="srow ${cls}" data-id="${s.id}">
         <div class="srow-main"><div class="co">${esc(s.company)}</div><div class="sub">${esc(sub)||'&nbsp;'}</div></div>
-        <div class="srow-amt"><div class="money">${fmt(s.pledged)}</div></div>
-        <button class="status-btn ${s.status.toLowerCase()}">${s.status==='Pledged'?'Got the check':'✓ Deposited'}</button></div>`;
+        <div class="srow-amt"><div class="money">${fmt(s.pledged)}</div>${paidSub}</div>
+        <button class="status-btn ${s.status.toLowerCase()}">${btn}</button></div>`;
     });
   });
   w.innerHTML=html+'</div>';
@@ -885,20 +943,42 @@ function renderSponsors(w){
   w.querySelectorAll('.chip').forEach(c=>c.onclick=()=>{filter=c.dataset.f; render();});
   w.querySelectorAll('.srow').forEach(row=>{
     const id=row.dataset.id;
-    row.querySelector('.status-btn').onclick=e=>{e.stopPropagation();toggleStatus(id)};
+    row.querySelector('.status-btn').onclick=e=>{e.stopPropagation();openPay(id)};
     row.querySelector('.srow-main').onclick=()=>openEdit(id);
     row.querySelector('.srow-amt').onclick=()=>openEdit(id);
   });
 }
-function toggleStatus(id){
-  const s=yr().sponsors.find(x=>x.id===id); if(!s)return;
-  const prev={status:s.status,deposited:s.deposited};
-  const undo=()=>{ Object.assign(s,prev); persist(); render(); };
-  if(s.status==='Pledged'){ s.status='Deposited'; s.deposited=+s.pledged||0;
-    toast(fmt(s.deposited)+' deposited — '+s.company,undo); }
-  else{ s.status='Pledged'; s.deposited=0; toast(s.company+' back to Pledged',undo); }
-  persist(); render();
+/* quick payment sheet */
+let payId=null,qpMethod='Check';
+function setSegMethod(segId,m,varSet){
+  $(segId).querySelectorAll('button').forEach(b=>b.classList.toggle('on',b.dataset.m===m));
+  varSet(m);
 }
+$('qpMethodSeg').querySelectorAll('button').forEach(b=>b.onclick=()=>setSegMethod('qpMethodSeg',b.dataset.m,m=>qpMethod=m));
+function openPay(id){
+  const s=yr().sponsors.find(x=>x.id===id); if(!s)return;
+  payId=id;
+  const left=spLeft(s);
+  $('payTitle').textContent=s.status==='Deposited'?s.company+' — paid in full':'Log payment — '+s.company;
+  $('payRemain').textContent=s.status==='Deposited'
+    ? 'Fully paid ('+fmt(payTotal(s))+' of '+fmt(s.pledged)+'). Extra payments still log if they hand you more.'
+    : fmt(payTotal(s))+' paid so far · '+fmt(left)+' outstanding of '+fmt(s.pledged);
+  $('qpAmt').value=left>0?left:'';
+  $('qpDate').value=today();
+  setSegMethod('qpMethodSeg','Check',m=>qpMethod=m);
+  openSheet('paySheet');
+}
+$('qpCancel').onclick=closeSheets;
+$('qpSave').onclick=()=>{
+  const s=yr().sponsors.find(x=>x.id===payId); if(!s)return;
+  const amt=parseFloat($('qpAmt').value)||0;
+  if(amt<=0){ toast('Enter the amount they paid'); return; }
+  const pay={id:uid(),amount:amt,method:qpMethod,date:$('qpDate').value.trim()||today()};
+  s.payments.push(pay); syncPay(s);
+  const undo=()=>{ s.payments=s.payments.filter(p=>p.id!==pay.id); syncPay(s); persist(); render(); };
+  persist(); closeSheets(); render();
+  toast(fmt(amt)+' '+qpMethod.toLowerCase()+' — '+(s.status==='Deposited'?'paid in full ✓':fmt(spLeft(s))+' to go'),undo);
+};
 
 /* ---- outreach ---- */
 function renderOutreach(w){
@@ -1051,7 +1131,6 @@ function wireInputs(w){
 }
 
 /* ============ sponsor edit sheet ============ */
-let formStatus='Pledged';
 function fillTierSelects(){
   $('fTier').innerHTML=tiers().map(t=>`<option>${esc(t.name)}</option>`).join('');
   $('fPledgedSel').innerHTML=tiers().map((t,i)=>`<option value="${i}">${esc(t.name)} — ${fmt(t.amt)}</option>`).join('')
@@ -1071,13 +1150,28 @@ function setPledgedUI(tierName,amount){
     $('fPledgedCustom').value=amount||'';
   }
 }
-function setFormStatus(st){ formStatus=st;
-  $('segPledged').classList.toggle('on',st==='Pledged');
-  $('segDeposited').classList.toggle('on',st==='Deposited');
-  if(st==='Deposited' && !$('fDeposited').value) $('fDeposited').value=getPledgedValue()||'';
-  if(st==='Pledged') $('fDeposited').value=''; }
-$('segPledged').onclick=()=>setFormStatus('Pledged');
-$('segDeposited').onclick=()=>setFormStatus('Deposited');
+let editPays=[],editMethod='Check';
+function renderPayList(){
+  const pledged=getPledgedValue();
+  const t=editPays.reduce((a,p)=>a+(+p.amount||0),0);
+  const st=t<=0?'Pledged':(t>=pledged?'Deposited':'Partial');
+  $('fStatusRO').value=st+(editPays.length?' — '+fmt(t)+' of '+fmt(pledged)+' paid':'');
+  $('payList').innerHTML=editPays.map(p=>`
+    <div class="pay-row" data-id="${p.id}">
+      <span class="amt">${fmt(p.amount)}</span>
+      <span class="meta">${esc(p.method)}${p.date?' · '+esc(p.date):''}</span>
+      <button class="x">✕</button>
+    </div>`).join('')||'<div class="hint" style="margin:2px 0 0">No payments logged yet.</div>';
+  $('payList').querySelectorAll('.x').forEach(b=>b.onclick=()=>{
+    editPays=editPays.filter(p=>p.id!==b.closest('.pay-row').dataset.id); renderPayList(); });
+}
+$('payMethodSeg').querySelectorAll('button').forEach(b=>b.onclick=()=>setSegMethod('payMethodSeg',b.dataset.m,m=>editMethod=m));
+$('payAddBtn').onclick=()=>{
+  const amt=parseFloat($('payAmt').value)||0;
+  if(amt<=0){ toast('Enter a payment amount'); return; }
+  editPays.push({id:uid(),amount:amt,method:editMethod,date:today()});
+  $('payAmt').value=''; renderPayList();
+};
 $('fTier').onchange=()=>{
   const idx=tiers().findIndex(t=>t.name===$('fTier').value);
   if(idx>-1){ $('fPledgedSel').value=String(idx); $('fPledgedCustom').style.display='none'; }
@@ -1086,7 +1180,9 @@ $('fPledgedSel').onchange=()=>{
   const v=$('fPledgedSel').value;
   if(v==='custom'){ $('fPledgedCustom').style.display='block'; $('fPledgedCustom').focus(); }
   else{ $('fPledgedCustom').style.display='none'; $('fTier').value=tiers()[+v].name; }
+  renderPayList();
 };
+$('fPledgedCustom').oninput=()=>renderPayList();
 function setQa(id,href,on){ const a=$(id); a.href=on?href:'#'; a.classList.toggle('off',!on); }
 function openEdit(id,prefill){
   editId=id;
@@ -1104,9 +1200,11 @@ function openEdit(id,prefill){
   $('fEmail').value=s?.email||prefill?.email||'';
   const pl=s?(+s.pledged||0):(prefill?.pledged??(tiers().find(t=>t.name===tierName)?.amt||0));
   setPledgedUI($('fTier').value,pl);
-  $('fDeposited').value=s&&s.deposited?+s.deposited:'';
   $('fNotes').value=s?.notes||prefill?.notes||'';
-  setFormStatus(s?.status||'Pledged');
+  editPays=s?JSON.parse(JSON.stringify(s.payments||[])):[];
+  setSegMethod('payMethodSeg','Check',m=>editMethod=m);
+  $('payAmt').value='';
+  renderPayList();
   $('qaRow').style.display=s?'flex':'none';
   if(s){ const tel=(s.phone||'').replace(/[^\d+]/g,'');
     setQa('qaCall','tel:'+tel,!!tel); setQa('qaText','sms:'+tel,!!tel);
@@ -1118,14 +1216,13 @@ $('btnSave').onclick=()=>{
   const co=$('fCompany').value.trim();
   if(!co){ toast('Company name is required'); return; }
   const pledged=getPledgedValue();
-  let deposited=parseFloat($('fDeposited').value)||0;
-  if(formStatus==='Deposited'&&!deposited) deposited=pledged;
-  if(formStatus==='Pledged') deposited=0;
   const data={company:co,tier:$('fTier').value,contact:$('fContact').value.trim(),
     committee:$('fCommittee').value.trim(),phone:$('fPhone').value.trim(),email:$('fEmail').value.trim(),
-    pledged,deposited,status:formStatus,notes:$('fNotes').value.trim()};
-  if(editId){ Object.assign(yr().sponsors.find(x=>x.id===editId),data); toast('Saved '+co); }
-  else{ yr().sponsors.push({id:uid(),...data}); toast('Added '+co); }
+    pledged,payments:editPays,notes:$('fNotes').value.trim()};
+  let sp;
+  if(editId){ sp=yr().sponsors.find(x=>x.id===editId); Object.assign(sp,data); toast('Saved '+co); }
+  else{ sp={id:uid(),...data}; yr().sponsors.push(sp); toast('Added '+co); }
+  syncPay(sp);
   persist(); closeSheets(); render();
 };
 $('btnDelete').onclick=()=>{
@@ -1357,7 +1454,7 @@ $('nyCreate').onclick=()=>{
     ny=JSON.parse(JSON.stringify(cur));
     ny.goal=goal;
     ny.info={...cur.info,dates:cur.info.dates.replace(/\d{4}/,ystr)};
-    ny.sponsors=cur.sponsors.map(s=>({...s,id:uid(),status:'Pledged',deposited:0}));
+    ny.sponsors=cur.sponsors.map(s=>({...s,id:uid(),status:'Pledged',deposited:0,payments:[]}));
     ny.outreach=cur.outreach.map(o=>({...o,id:uid(),
       status:o.status==='Declined'?'Declined':'Prospect',lastContact:''}));
     ny.actuals={entryFees:0,skins:0,carry:0,mga:0,raffles:0,flight:0,proShop:0,skinsPay:0};
@@ -1400,9 +1497,10 @@ function csvOut(rows,name){
   dl(csv,'text/csv',name);
 }
 $('miCsv').onclick=()=>{
-  const rows=[['Tier','Company','Contact','Phone','Email','Pledged $','Deposited $','Status','Committee','Notes']];
+  const rows=[['Tier','Company','Contact','Phone','Email','Pledged $','Deposited $','Status','Payments','Committee','Notes']];
   [...yr().sponsors].sort((a,b)=>tierOrder(a.tier)-tierOrder(b.tier))
-    .forEach(s=>rows.push([s.tier,s.company,s.contact,s.phone,s.email,s.pledged,s.deposited,s.status,s.committee,s.notes]));
+    .forEach(s=>rows.push([s.tier,s.company,s.contact,s.phone,s.email,s.pledged,s.deposited,s.status,
+      (s.payments||[]).map(p=>'$'+p.amount+' '+p.method+(p.date?' '+p.date:'')).join('; '),s.committee,s.notes]));
   csvOut(rows,db.activeYear+'_sponsors.csv'); closeSheets(); toast('Sponsors CSV exported');
 };
 $('miCsvO').onclick=()=>{
