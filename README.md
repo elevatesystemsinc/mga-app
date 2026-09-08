@@ -17,16 +17,14 @@ board password, live sync across devices.
 4. Authentication → Sign In / Providers → Email → turn **off** "Allow new users to sign up."
 
 ### 2. Configure the app
-In `index.html`, near the top of the main `<script>` block:
-
-```js
-const SUPABASE_URL='https://<your-ref>.supabase.co';  // Settings → API
-const SUPABASE_ANON_KEY='eyJ...';                      // anon public key
-const BOARD_EMAIL='board@mgamm.app';                   // the user from step 1.3
-```
+Copy `config.example.js` to `config.js`, fill in your Supabase URL, anon key, and
+board email, and commit it. **Credentials live only in config.js** — replacing
+index.html during app updates can never disconnect the database again.
 
 The anon key is safe to commit — RLS blocks everything without a signed-in session.
-Leave the constants blank and the app runs local-only (handy for testing).
+No config.js (or blank values) = the app runs local-only per device: no password
+screen, no sync dot next to the year pill. If you ever see that on the deployed
+site, config.js is missing or empty.
 
 ### 3. Render
 1. Push this repo to GitHub (private is fine).

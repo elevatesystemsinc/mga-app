@@ -14,6 +14,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="config.js"></script><!-- optional: window.MM_CONFIG = {url, anonKey, boardEmail}. Missing file = local-only mode. -->
 <style>
 :root{
   --green:#0E3B2E; --green-2:#155941; --paper:#F7F5EF; --card:#FFFFFF;
@@ -699,10 +700,12 @@ function seeded2026(){
   return y;
 }
 
-/* ============ cloud sync (Supabase) — fill in and redeploy ============ */
-const SUPABASE_URL='';                 // e.g. 'https://abcd1234.supabase.co'
-const SUPABASE_ANON_KEY='';            // Settings → API → anon public key
-const BOARD_EMAIL='board@mgamm.app';   // the shared user you create in Supabase Auth
+/* ============ cloud sync (Supabase) ============ */
+/* Config lives in config.js (window.MM_CONFIG) so app updates never overwrite it. */
+const _CFG=window.MM_CONFIG||{};
+const SUPABASE_URL=_CFG.url||'';
+const SUPABASE_ANON_KEY=_CFG.anonKey||'';
+const BOARD_EMAIL=_CFG.boardEmail||'board@mgamm.app';
 const CLOUD=!!(SUPABASE_URL&&SUPABASE_ANON_KEY&&window.supabase);
 let sb=null,saveT=null,suppressRealtime=false,pendingRemote=null,savePending=false;
 function setSync(s){ const d=$('syncDot'); if(!CLOUD){d.style.display='none';return;}
