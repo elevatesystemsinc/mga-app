@@ -703,8 +703,9 @@ function seeded2026(){
 /* ============ cloud sync (Supabase) ============ */
 /* Config lives in config.js (window.MM_CONFIG) so app updates never overwrite it. */
 const _CFG=window.MM_CONFIG||{};
-const SUPABASE_URL=_CFG.url||'';
-const SUPABASE_ANON_KEY=_CFG.anonKey||'';
+const _placeholder=v=>!v||/YOUR-PROJECT-REF|^eyJ\.\.\.$/.test(v);
+const SUPABASE_URL=_placeholder(_CFG.url)?'':_CFG.url;
+const SUPABASE_ANON_KEY=_placeholder(_CFG.anonKey)?'':_CFG.anonKey;
 const BOARD_EMAIL=_CFG.boardEmail||'board@mgamm.app';
 const CLOUD=!!(SUPABASE_URL&&SUPABASE_ANON_KEY&&window.supabase);
 let sb=null,saveT=null,suppressRealtime=false,pendingRemote=null,savePending=false;
@@ -1548,9 +1549,19 @@ async function doLogin(){
   const pw=$('loginPw').value;
   if(!pw){ $('loginErr').textContent='Enter the board password'; return; }
   $('loginBtn').textContent='Signing in…'; $('loginErr').textContent='';
-  const {error}=await sb.auth.signInWithPassword({email:BOARD_EMAIL,password:pw});
+  let error;
+  try{ ({error}=await sb.auth.signInWithPassword({email:BOARD_EMAIL,password:pw})); }
+  catch(e){ error=e; }
   $('loginBtn').textContent='Sign in';
-  if(error){ $('loginErr').textContent='Wrong password — ask the tournament chair'; return; }
+  if(error){
+    const m=String(error.message||error);
+    $('loginErr').textContent=/invalid login credentials/i.test(m)
+      ? 'Wrong password — ask the tournament chair'
+      : /email not confirmed/i.test(m)
+      ? 'The board account isn\u2019t confirmed — fix it in Supabase (Auth \u2192 Users)'
+      : 'Can\u2019t reach the database ('+m+') — check config.js values';
+    return;
+  }
   await startCloud();
 }
 
