@@ -16,15 +16,32 @@ board password, live sync across devices.
    - Password: this becomes the board password.
 4. Authentication → Sign In / Providers → Email → turn **off** "Allow new users to sign up."
 
-### 2. Configure the app
-Copy `config.example.js` to `config.js`, fill in your Supabase URL, anon key, and
-board email, and commit it. **Credentials live only in config.js** — replacing
-index.html during app updates can never disconnect the database again.
+### 2. Configure the app (Render environment variables)
+The app reads `window.MM_CONFIG` from a `config.js` file that **Render generates
+at build time from environment variables** — nothing credential-related lives in
+the repo (config.js is gitignored).
 
-The anon key is safe to commit — RLS blocks everything without a signed-in session.
-No config.js (or blank values) = the app runs local-only per device: no password
-screen, no sync dot next to the year pill. If you ever see that on the deployed
-site, config.js is missing or empty.
+1. Render → your static site → **Environment** → add:
+   - `SUPABASE_URL` — e.g. `https://abcd1234.supabase.co`
+   - `SUPABASE_ANON_KEY` — Settings → API → anon public key
+   - `BOARD_EMAIL` — the shared Auth user's email (must match Supabase exactly)
+2. Render → **Settings → Build Command**, paste:
+
+   ```
+   printf "window.MM_CONFIG={url:'%s',anonKey:'%s',boardEmail:'%s'};" "$SUPABASE_URL" "$SUPABASE_ANON_KEY" "$BOARD_EMAIL" > config.js
+   ```
+
+3. **Manual Deploy → Clear build cache & deploy.**
+4. Verify: `https://<your-site>/config.js` should show your real values, and the
+   site should now open with the board password screen.
+
+Changing any value later = edit the env var in Render and redeploy. No commits.
+
+For **local testing** without Render: copy `config.example.js` to `config.js`
+in the folder and fill it in, or skip it entirely — no config.js means the app
+runs local-only per device (no password screen, no sync dot next to the year
+pill). If the deployed site ever shows that, the build command or env vars are
+missing.
 
 ### 3. Render
 1. Push this repo to GitHub (private is fine).
