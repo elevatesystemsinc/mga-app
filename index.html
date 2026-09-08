@@ -96,7 +96,7 @@ input,select,textarea{font-family:inherit;font-size:16px}
 .pay-add{display:flex;gap:6px;margin-top:8px}
 .pay-add input{flex:1;padding:10px;border:1px solid var(--line);border-radius:9px;background:var(--card);min-width:0}
 .method-seg{display:flex;background:var(--card);border:1px solid var(--line);border-radius:9px;overflow:hidden}
-.method-seg button{flex:1;padding:10px 6px;font-weight:600;font-size:13px;color:var(--muted)}
+.method-seg button{flex:1;padding:10px 4px;font-weight:600;font-size:13px;color:var(--muted)}
 .method-seg button.on{background:var(--green);color:#fff}
 .pill{font-size:10.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;padding:5px 9px;border-radius:7px;flex-shrink:0}
 .pill.Prospect{background:#EFEDE4;color:var(--muted)}
@@ -284,7 +284,7 @@ input,select,textarea{font-family:inherit;font-size:16px}
       <div class="pay-add">
         <input id="payAmt" inputmode="decimal" placeholder="Amount">
         <div class="method-seg" id="payMethodSeg" style="flex:1.4">
-          <button data-m="Zelle">Zelle</button><button data-m="Check" class="on">Check</button><button data-m="Cash">Cash</button>
+          <button data-m="Zelle">Zelle</button><button data-m="Check" class="on">Check</button><button data-m="Cash">Cash</button><button data-m="CC">CC</button>
         </div>
         <button class="btn primary" id="payAddBtn" style="flex:0 0 64px;padding:10px">Add</button>
       </div>
@@ -345,7 +345,7 @@ input,select,textarea{font-family:inherit;font-size:16px}
     <div class="f-field"><label>Date</label><input id="qpDate"></div>
     <div class="f-field full"><label>How'd they pay?</label>
       <div class="method-seg" id="qpMethodSeg">
-        <button data-m="Zelle">Zelle</button><button data-m="Check" class="on">Check</button><button data-m="Cash">Cash</button>
+        <button data-m="Zelle">Zelle</button><button data-m="Check" class="on">Check</button><button data-m="Cash">Cash</button><button data-m="CC">CC</button>
       </div>
     </div>
   </div>
