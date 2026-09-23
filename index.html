@@ -134,6 +134,12 @@ input,select,textarea{font-family:inherit;font-size:16px}
 .bva.h{font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);font-weight:700;border-bottom:2px solid var(--line)}
 .bva .r{text-align:right;font-variant-numeric:tabular-nums;font-weight:600}
 .bva input{width:100%;padding:6px 7px;font-size:13px}
+.dn{display:grid;grid-template-columns:1fr 60px 76px 72px;gap:6px;align-items:center;padding:7px 0;border-bottom:1px solid var(--line);font-size:13.5px}
+.dn.h{font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);font-weight:700;border-bottom:2px solid var(--line);padding:4px 0}
+.dn .it{cursor:pointer;min-width:0}
+.dn .it small{display:block;font-size:11px;color:var(--muted);line-height:1.3}
+.dn .r{text-align:right;font-variant-numeric:tabular-nums;font-weight:700}
+.dn input.num-in{width:100%;padding:6px 7px;font-size:13px}
 .bva .auto{color:var(--muted);font-weight:600;text-align:right;font-size:12.5px}
 .sched-day h2{font-family:'Bebas Neue',sans-serif;font-size:19px;letter-spacing:.06em;color:var(--green);font-weight:400;margin:16px 2px 8px}
 .ev{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:12px 14px;margin-bottom:8px;display:flex;gap:12px}
@@ -647,6 +653,14 @@ const SEED_FB={
   F(5,'Bloody Mary Bar',50,'Carson Gooch sponsoring')]
 };
 
+/* Saturday dinner menu (WCCC quote). Feeds the Saturday "Dinner (WCCC)" F&B line via costLink:'dinner'. */
+const DN=(qty,item,unitCost,notes)=>({id:uid(),qty,item,unitCost,notes:notes||''});
+const SEED_DINNER=()=>[
+  DN(5,'17lb Roasted Ribeye',840),DN(4,'Pork Loin',180),DN(3,'Turkey',200),DN(2,'Ham',90),
+  DN(110,'Rice Pilaf',8),DN(110,'Mashed Potatoes',8),DN(110,'Steamed Beans',8),
+  DN(110,'Traditional Salad',8),DN(150,'Seasonal Cobbler + Ice Cream',8),DN(110,'Mac & Cheese',8)
+];
+
 const SEED_SCHEDULE=[
 {day:'Friday, October 2',items:[
   {id:uid(),event:'Registration & Pro Shop Shopping',time:'12:00pm - 3:00pm',notes:'Putting contest (by pool), registration, pro shop in person and online'},
@@ -686,7 +700,7 @@ function defaultYear(){
     actuals:{entryFees:0,skins:0,carry:0,mga:0,raffles:0,flight:0,proShop:0,skinsPay:0},
     misc:[], fb:{'Friday':[],'Saturday':[],'Sunday':[]},
     flightCalc:{flights:5,p1:400,p2:300,p3:200,p4:100},
-    schedule:[], decisions:[]
+    schedule:[], decisions:[], dinner:[]
   };
 }
 function seeded2026(){
@@ -696,7 +710,8 @@ function seeded2026(){
   y.rev={carry:7063,mga:5000,raffles:4000};
   y.flightPrizeBudget=5650;
   y.actuals={entryFees:0,skins:0,carry:0,mga:0,raffles:3280,flight:0,proShop:0,skinsPay:0};
-  y.misc=SEED_MISC; y.fb=SEED_FB; y.schedule=SEED_SCHEDULE; y.decisions=SEED_DECISIONS;
+  y.misc=SEED_MISC; y.fb=SEED_FB; y.schedule=SEED_SCHEDULE; y.decisions=SEED_DECISIONS; y.dinner=SEED_DINNER();
+  const dl0=y.fb.Saturday.find(i=>i.qtyLink==='satHeadcount'); if(dl0){ dl0.costLink='dinner'; dl0.qtyLink=''; dl0.notes='Priced from the Saturday dinner menu on the Budget tab'; }
   return y;
 }
 
@@ -733,23 +748,34 @@ async function refetchCloud(){
   if(error||!row||!row.data) return;
   if(JSON.stringify(row.data)===JSON.stringify(db)) return;
   if(document.querySelector('.sheet.show')){ pendingRemote=row.data; return; }
-  db=row.data; store.save(db); render(); setSync('synced');
+  const ch=migrate(row.data); db=row.data; store.save(db); render(); setSync('synced'); if(ch) queueCloudSave();
 }
 document.addEventListener('visibilitychange',()=>{ if(!document.hidden) refetchCloud(); });
 window.addEventListener('focus',()=>refetchCloud());
 
-/* ============ load + migrate v1 data ============ */
+/* ============ load + migrate ============ */
+/* Runs on local load AND on anything arriving from the cloud / a restore, so older state always gets new sections. Returns true if it changed anything. */
+function migrate(d){
+  let changed=false;
+  for(const [y,data] of Object.entries(d.years||{})){
+    const wasV1 = data.outreach===undefined;
+    // Saturday dinner menu (added 2026-09): pre-fill and link the existing headcount-based dinner line
+    if(data.dinner===undefined && !wasV1){
+      data.dinner=SEED_DINNER(); changed=true;
+      const sat=(data.fb&&data.fb.Saturday)||[];
+      if(!sat.some(i=>i.costLink==='dinner')){
+        const line=sat.find(i=>i.qtyLink==='satHeadcount')||sat.find(i=>/^dinner/i.test(i.item||''));
+        if(line){ line.costLink='dinner'; line.qtyLink=''; line.notes='Priced from the Saturday dinner menu on the Budget tab'; }
+      }
+    }
+    const base = (y==='2026'&&wasV1) ? seeded2026() : defaultYear();
+    for(const k of Object.keys(base)) if(data[k]===undefined){ data[k]=base[k]; changed=true; }
+  }
+  return changed;
+}
 let db=store.load();
 if(!db){ db={activeYear:'2026',years:{'2026':seeded2026()}}; store.save(db); }
-else{
-  // migrate: any year missing the new sections gets them filled in
-  for(const [y,data] of Object.entries(db.years)){
-    const wasV1 = data.outreach===undefined;
-    const base = (y==='2026'&&wasV1) ? seeded2026() : defaultYear();
-    for(const k of Object.keys(base)) if(data[k]===undefined) data[k]=base[k];
-  }
-  store.save(db);
-}
+else{ migrate(db); store.save(db); }
 
 let tab='home', filter='all', query='', editId=null, orId=null, nyCarryMode=true;
 /* payments: deposited & status are derived from the payment log */
@@ -775,8 +801,9 @@ const persist=()=>{ store.save(db); queueCloudSave(); };
 const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 
 /* ============ computed budget ============ */
-function fbDayTotal(day){ const y=yr();
-  return y.fb[day].reduce((a,i)=>a+resQty(i)*(+i.unitCost||0),0); }
+function dinnerTotal(){ return (yr().dinner||[]).reduce((a,i)=>a+(+i.qty||0)*(+i.unitCost||0),0); }
+function fbLineTotal(i){ return i.costLink==='dinner' ? dinnerTotal() : resQty(i)*(+i.unitCost||0); }
+function fbDayTotal(day){ return yr().fb[day].reduce((a,i)=>a+fbLineTotal(i),0); }
 function fbDayActual(day){ return yr().fb[day].reduce((a,i)=>a+(+i.actual||0),0); }
 function resQty(i){ return i.qtyLink?(+yr().inputs[i.qtyLink]||0):(+i.qty||0); }
 function calc(){
@@ -812,7 +839,7 @@ function toast(msg,undoFn){ const t=$('toast'); t.innerHTML='';
 const sheets=['editSheet','orSheet','gSheet','paySheet','tierSheet','yearSheet','newYearSheet','menuSheet','helpSheet'];
 function openSheet(id){ sheets.forEach(s=>$(s).classList.toggle('show',s===id)); $('scrim').classList.add('show'); }
 function closeSheets(){ sheets.forEach(s=>$(s).classList.remove('show')); $('scrim').classList.remove('show');
-  if(pendingRemote){ db=pendingRemote; pendingRemote=null; store.save(db); render(); toast('Updated from another device'); } }
+  if(pendingRemote){ migrate(pendingRemote); db=pendingRemote; pendingRemote=null; store.save(db); render(); toast('Updated from another device'); } }
 $('scrim').onclick=closeSheets;
 
 /* ============ header board ============ */
@@ -1016,6 +1043,7 @@ function renderOutreach(w){
 function numIn(path,val,step){ return `<input class="num-in" data-path="${path}" inputmode="decimal" value="${val}" ${step?'step="'+step+'"':''}>`; }
 function renderBudget(w){
   const c=calc(), y=yr(), n=y.inputs, a=y.actuals, fc=y.flightCalc;
+  const dT=dinnerTotal(), linked=y.fb.Saturday.some(i=>i.costLink==='dinner'), hc=+n.satHeadcount||0;
   const D=(v,exp)=>{ const d=exp?v:-v; return `<span class="r ${d>0?'pos':d<0?'neg':''}" style="font-weight:700">${d===0?'—':(d>0?'+':'−')+fmt(Math.abs(d)).slice(1)}</span>`; };
   w.innerHTML=`<div class="page">
   <div class="card"><h2>Planning inputs</h2>
@@ -1037,7 +1065,7 @@ function renderBudget(w){
   </div>
   <div class="card"><h2>Expenses</h2>
     <div class="frow"><div class="l">Food & Bev — Friday<small>Live from the Event tab</small></div><div class="v">${fmt(c.fbF)}</div></div>
-    <div class="frow"><div class="l">Food & Bev — Saturday</div><div class="v">${fmt(c.fbS)}</div></div>
+    <div class="frow"><div class="l">Food & Bev — Saturday${linked?`<small>Includes dinner menu ${fmt(dT)}</small>`:''}</div><div class="v">${fmt(c.fbS)}</div></div>
     <div class="frow"><div class="l">Food & Bev — Sunday</div><div class="v">${fmt(c.fbU)}</div></div>
     <div class="frow"><div class="l">Flight prize money<small>Calculator says ${fmt(c.flightCalcT)} — open board decision</small></div>${numIn('flightPrizeBudget',y.flightPrizeBudget)}</div>
     <div class="frow"><div class="l">Pro shop shopping spree<small>${n.golfers} × ${fmt(n.proCredit)}</small></div><div class="v">${fmt(c.proShop)}</div></div>
@@ -1063,6 +1091,17 @@ function renderBudget(w){
     <div class="bva"><span>Misc & event</span><span class="r">${fmt(c.miscT)}</span><span class="auto">${fmt(c.miscA)} auto</span>${D(c.miscT-c.miscA,true)}</div>
     <div class="frow total"><div class="l">Actual net so far</div><div class="v ${c.netA>=0?'pos':'neg'}">${fmt(c.netA)}</div></div>
   </div>
+  <div class="card"><h2>Saturday dinner menu</h2>
+    <div class="note">${linked?'Total feeds the Saturday dinner line in Event → Food & Bev.':'<b style="color:var(--neg,#b33)">Not feeding the Event tab</b> — the Saturday dinner line was deleted.'} Edit quantity and unit price in place; tap an item to rename, add a note, or delete it.</div>
+    <div class="dn h"><span>Item</span><span class="r">Qty</span><span class="r">Unit $</span><span class="r">Total</span></div>
+    ${(y.dinner||[]).map((d,i)=>`<div class="dn">
+      <div class="it" data-dn="${d.id}">${esc(d.item)}${d.notes?`<small>${esc(d.notes)}</small>`:''}</div>
+      ${numIn('dinner.'+i+'.qty',d.qty)}${numIn('dinner.'+i+'.unitCost',d.unitCost)}
+      <span class="r">${fmt((+d.qty||0)*(+d.unitCost||0))}</span></div>`).join('')}
+    <div class="frow total"><div class="l">Dinner total${hc?`<small style="text-transform:none;letter-spacing:0;font-weight:400">${'$'+(dT/hc).toFixed(2)} per person at ${hc} headcount</small>`:''}</div><div class="v">${fmt(dT)}</div></div>
+    <button class="mini-add" id="dnAdd">+ Add menu item</button>
+    ${linked?'':'<button class="mini-add" id="dnLink" style="margin-top:8px">Add dinner line to Saturday F&B</button>'}
+  </div>
   <div class="card"><h2>Misc & event expenses</h2>
     <div class="note">Gifts, signage, entertainment, contests. Total feeds the budget automatically. Tap a line to edit.</div>
     ${y.misc.map(m=>`<div class="exp-row" data-id="${m.id}">
@@ -1082,6 +1121,11 @@ function renderBudget(w){
   </div></div>`;
   w.querySelectorAll('.exp-row').forEach(r=>r.onclick=()=>openMisc(r.dataset.id));
   const ma=w.querySelector('#miscAdd'); if(ma) ma.onclick=()=>openMisc(null);
+  w.querySelectorAll('[data-dn]').forEach(r=>r.onclick=()=>openDinner(r.dataset.dn));
+  w.querySelector('#dnAdd').onclick=()=>openDinner(null);
+  const lk=w.querySelector('#dnLink'); if(lk) lk.onclick=()=>{
+    yr().fb.Saturday.unshift({id:uid(),qty:0,item:'Dinner (WCCC)',unitCost:0,actual:0,notes:'Priced from the Saturday dinner menu on the Budget tab',qtyLink:'',costLink:'dinner'});
+    persist(); render(); toast('Dinner line added to Saturday F&B'); };
 }
 
 /* ---- event (schedule + F&B) ---- */
@@ -1105,6 +1149,13 @@ function renderEvent(w){
       const items=y.fb[day], total=fbDayTotal(day), act=fbDayActual(day);
       html+=`<div class="sched-day"><h2>${day} — ${fmt(total)}${act?` <span style="color:var(--dep);font-size:13px">(${fmt(act)} billed)</span>`:''}</h2>`;
       items.forEach(it=>{
+        if(it.costLink==='dinner'){
+          html+=`<div class="ev" data-fbday="${day}" data-id="${it.id}">
+          <div class="time">Menu</div>
+          <div class="body"><b>${esc(it.item)}</b>
+          <p>${fmt(dinnerTotal())} total from the Budget tab dinner menu (${(y.dinner||[]).length} items)${it.actual?` · <span style="color:var(--dep)">WCCC billed ${fmt(it.actual)}</span>`:''}</p></div></div>`;
+          return;
+        }
         const qty=resQty(it);
         html+=`<div class="ev" data-fbday="${day}" data-id="${it.id}">
           <div class="time">${qty}×</div>
@@ -1129,7 +1180,10 @@ function setPath(obj,path,val){ const p=path.split('.'); let o=obj;
   for(let i=0;i<p.length-1;i++) o=o[p[i]]; o[p[p.length-1]]=val; }
 function wireInputs(w){
   w.querySelectorAll('.num-in').forEach(inp=>{
-    inp.onchange=()=>{ setPath(yr(),inp.dataset.path,parseFloat(inp.value)||0); persist(); render(); };
+    inp.onchange=()=>{ setPath(yr(),inp.dataset.path,parseFloat(inp.value)||0); persist();
+      // re-render after focus settles so Tab lands in the next box instead of being wiped by the redraw
+      setTimeout(()=>{ const a=document.activeElement, nxt=a&&a.classList&&a.classList.contains('num-in')?a.dataset.path:null;
+        render(); if(nxt){ const e=document.querySelector('.num-in[data-path="'+nxt+'"]'); if(e){ e.focus(); e.select(); } } },0); };
     inp.onkeydown=e=>{ if(e.key==='Enter') inp.blur(); };
   });
 }
@@ -1311,12 +1365,24 @@ function openFb(day,id){
   gCtx={kind:'fb',day,id};
   $('gTitle').textContent=(it?'Edit ':'Add ')+day+' item';
   $('gDelete').style.display=it?'block':'none';
+  const menu=it&&it.costLink==='dinner';
   $('gFields').innerHTML=gField('Item','g1',it?.item||'')+
-    gField('Quantity','g2',it?resQty(it):'','num')+
-    gField('Unit cost $','g3',it?(+it.unitCost||''):'','num')+
+    (menu?`<div class="hint">Cost comes from the Saturday dinner menu on the Budget tab (currently ${fmt(dinnerTotal())}). Edit items there.</div>`
+      :gField('Quantity','g2',it?resQty(it):'','num')+gField('Unit cost $','g3',it?(+it.unitCost||''):'','num'))+
     gField('WCCC bill (actual) $','g5',it&&it.actual?+it.actual:'','num')+
     gField('Notes','g4',it?.notes||'','area')+
     (it&&it.qtyLink?'<div class="hint">Quantity is linked to the Saturday headcount planning input — changing it here breaks the link.</div>':'');
+  openSheet('gSheet');
+}
+function openDinner(id){
+  const d=id?(yr().dinner||[]).find(x=>x.id===id):null;
+  gCtx={kind:'dinner',id};
+  $('gTitle').textContent=d?'Edit dinner item':'Add dinner item';
+  $('gDelete').style.display=d?'block':'none';
+  $('gFields').innerHTML=gField('Item','g1',d?.item||'')+
+    gField('Quantity','g2',d?(+d.qty||''):'','num')+
+    gField('Unit price $','g3',d?(+d.unitCost||''):'','num')+
+    gField('Notes','g4',d?.notes||'','area');
   openSheet('gSheet');
 }
 function openSched(dayIdx,id){
@@ -1338,6 +1404,14 @@ $('gSave').onclick=()=>{
     const data={desc:v1,budget:parseFloat($('g2').value)||0,actual:parseFloat($('g3').value)||0,notes:$('g4').value.trim()};
     if(gCtx.id) Object.assign(y.misc.find(x=>x.id===gCtx.id),data);
     else y.misc.push({id:uid(),...data});
+  }else if(gCtx.kind==='dinner'){
+    const data={item:v1,qty:parseFloat($('g2').value)||0,unitCost:parseFloat($('g3').value)||0,notes:$('g4').value.trim()};
+    if(!y.dinner) y.dinner=[];
+    if(gCtx.id) Object.assign(y.dinner.find(x=>x.id===gCtx.id),data);
+    else y.dinner.push({id:uid(),...data});
+  }else if(gCtx.kind==='fb' && !$('g2')){
+    const it=y.fb[gCtx.day].find(x=>x.id===gCtx.id);
+    Object.assign(it,{item:v1,actual:parseFloat($('g5').value)||0,notes:$('g4').value.trim()});
   }else if(gCtx.kind==='fb'){
     const newQty=parseFloat($('g2').value)||0;
     const data={item:v1,qty:newQty,unitCost:parseFloat($('g3').value)||0,
@@ -1359,6 +1433,7 @@ $('gDelete').onclick=()=>{
   const y=yr();
   if(gCtx.kind==='misc') y.misc=y.misc.filter(x=>x.id!==gCtx.id);
   else if(gCtx.kind==='fb') y.fb[gCtx.day]=y.fb[gCtx.day].filter(x=>x.id!==gCtx.id);
+  else if(gCtx.kind==='dinner') y.dinner=y.dinner.filter(x=>x.id!==gCtx.id);
   else{ const d=y.schedule[gCtx.dayIdx]; d.items=d.items.filter(x=>x.id!==gCtx.id); }
   persist(); closeSheets(); render(); toast('Deleted');
 };
@@ -1440,7 +1515,7 @@ $('btnNewYearOpen').onclick=()=>{
 function setCarry(v){ nyCarryMode=v;
   $('nyCarry').classList.toggle('on',v); $('nyBlank').classList.toggle('on',!v);
   $('nyHint').textContent=v
-    ?'Sponsors and prospects carry over with contact info (statuses reset, deposits cleared). Budget structure, expense lines, F&B menu, and schedule copy across with all actuals zeroed. Decisions start fresh.'
+    ?'Sponsors and prospects carry over with contact info (statuses reset, deposits cleared). Budget structure, expense lines, F&B and Saturday dinner menus, and schedule copy across with all actuals zeroed. Decisions start fresh.'
     :'Creates a completely empty year.'; }
 $('nyCarry').onclick=()=>setCarry(true);
 $('nyBlank').onclick=()=>setCarry(false);
@@ -1464,6 +1539,7 @@ $('nyCreate').onclick=()=>{
     ny.actuals={entryFees:0,skins:0,carry:0,mga:0,raffles:0,flight:0,proShop:0,skinsPay:0};
     ny.misc=cur.misc.map(m=>({...m,id:uid(),actual:0}));
     for(const d of ['Friday','Saturday','Sunday']) ny.fb[d]=cur.fb[d].map(i=>({...i,id:uid(),actual:0}));
+    ny.dinner=(cur.dinner||[]).map(i=>({...i,id:uid()}));
     ny.schedule=cur.schedule.map(d=>({day:d.day,items:d.items.map(i=>({...i,id:uid()}))}));
     ny.decisions=[];
   } else { ny=defaultYear(); ny.goal=goal; ny.info.dates=ystr; }
@@ -1523,7 +1599,7 @@ $('restoreFile').onchange=e=>{
   r.onload=()=>{ try{
       const d=JSON.parse(r.result);
       if(!d.years||!d.activeYear) throw 0;
-      db=d; persist(); closeSheets(); render(); toast('Backup restored');
+      migrate(d); db=d; persist(); closeSheets(); render(); toast('Backup restored');
     }catch(_){ toast('Not a valid backup file'); } };
   r.readAsText(f); e.target.value='';
 };
@@ -1569,7 +1645,7 @@ async function startCloud(){
   setSync('saving');
   const {data:row,error}=await sb.from('mm_tournament').select('data').eq('id','main').maybeSingle();
   if(error){ setSync('offline'); toast('Cloud unreachable — working from this device'); }
-  else if(row&&row.data){ db=row.data; store.save(db); setSync('synced'); }
+  else if(row&&row.data){ const ch=migrate(row.data); db=row.data; store.save(db); setSync('synced'); if(ch) queueCloudSave(); }
   else{
     const {error:insErr}=await sb.from('mm_tournament').insert({id:'main',data:db});
     setSync(insErr?'offline':'synced');
@@ -1580,7 +1656,7 @@ async function startCloud(){
       const remote=payload.new&&payload.new.data; if(!remote) return;
       if(JSON.stringify(remote)===JSON.stringify(db)) return;
       if(document.querySelector('.sheet.show')){ pendingRemote=remote; return; }
-      db=remote; store.save(db); render(); toast('Updated from another device');
+      migrate(remote); db=remote; store.save(db); render(); toast('Updated from another device');
     }).subscribe();
   $('miSignOut').style.display='flex';
   hideLogin(); boot();

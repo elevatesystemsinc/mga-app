@@ -66,11 +66,26 @@ cloud is the source of truth on every load.
   Fine for a small board; if two people edit the same field in the same second,
   one edit wins.
 
+## Saturday dinner menu
+
+Budget tab → **Saturday dinner menu** holds the WCCC dinner quote as line items
+(quantity × unit price, both editable in place; tap an item name to rename, add a
+note, or delete). The menu total is the cost of the Saturday *Dinner (WCCC)* line
+in Event → Food & Bev, so it flows into the Saturday F&B total and the budget.
+That line shows "Menu" instead of a quantity; its WCCC actual bill is still
+entered on the Event line. If the linked line is ever deleted, the Budget card
+shows a button to add it back. The per-person figure uses the Saturday dinner
+headcount planning input for reference only — it doesn't drive the quantities.
+
+Existing data picks this up automatically on first load: the menu is pre-filled
+from the WCCC quote and the old headcount × per-plate dinner line is converted to
+the menu-linked line.
+
 ## New tournament year
 
 Year selector (top) → **New year**. Carries over sponsors and prospects with
 contact info (statuses reset, deposits cleared), budget structure, misc expense
-lines, F&B menu, tiers, and the schedule — with all actuals zeroed. Declined
+lines, F&B menu, Saturday dinner menu, tiers, and the schedule — with all actuals zeroed. Declined
 prospects stay declined.
 
 ## Keeping free tiers awake
