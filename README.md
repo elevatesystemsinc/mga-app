@@ -70,7 +70,8 @@ cloud is the source of truth on every load.
 
 Budget tab → **Saturday dinner menu** holds the WCCC dinner quote as line items
 (quantity × unit price, both editable in place; tap an item name to rename, add a
-note, or delete). The menu total is the cost of the Saturday *Dinner (WCCC)* line
+note, or delete), plus an editable tax & service % (default 28%) applied to the
+menu subtotal. The dinner total (subtotal + tax & service) is the cost of the Saturday *Dinner (WCCC)* line
 in Event → Food & Bev, so it flows into the Saturday F&B total and the budget.
 That line shows "Menu" instead of a quantity; its WCCC actual bill is still
 entered on the Event line. If the linked line is ever deleted, the Budget card

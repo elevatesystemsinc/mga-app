@@ -700,7 +700,7 @@ function defaultYear(){
     actuals:{entryFees:0,skins:0,carry:0,mga:0,raffles:0,flight:0,proShop:0,skinsPay:0},
     misc:[], fb:{'Friday':[],'Saturday':[],'Sunday':[]},
     flightCalc:{flights:5,p1:400,p2:300,p3:200,p4:100},
-    schedule:[], decisions:[], dinner:[]
+    schedule:[], decisions:[], dinner:[], dinnerSvc:28
   };
 }
 function seeded2026(){
@@ -801,7 +801,10 @@ const persist=()=>{ store.save(db); queueCloudSave(); };
 const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 
 /* ============ computed budget ============ */
-function dinnerTotal(){ return (yr().dinner||[]).reduce((a,i)=>a+(+i.qty||0)*(+i.unitCost||0),0); }
+function dinnerSubtotal(){ return (yr().dinner||[]).reduce((a,i)=>a+(+i.qty||0)*(+i.unitCost||0),0); }
+function dinnerCharge(){ return dinnerSubtotal()*((+yr().dinnerSvc||0)/100); }
+/* what WCCC bills: menu subtotal + tax & service charge */
+function dinnerTotal(){ return dinnerSubtotal()+dinnerCharge(); }
 function fbLineTotal(i){ return i.costLink==='dinner' ? dinnerTotal() : resQty(i)*(+i.unitCost||0); }
 function fbDayTotal(day){ return yr().fb[day].reduce((a,i)=>a+fbLineTotal(i),0); }
 function fbDayActual(day){ return yr().fb[day].reduce((a,i)=>a+(+i.actual||0),0); }
@@ -1098,6 +1101,8 @@ function renderBudget(w){
       <div class="it" data-dn="${d.id}">${esc(d.item)}${d.notes?`<small>${esc(d.notes)}</small>`:''}</div>
       ${numIn('dinner.'+i+'.qty',d.qty)}${numIn('dinner.'+i+'.unitCost',d.unitCost)}
       <span class="r">${fmt((+d.qty||0)*(+d.unitCost||0))}</span></div>`).join('')}
+    <div class="frow"><div class="l">Menu subtotal</div><div class="v">${fmt(dinnerSubtotal())}</div></div>
+    <div class="frow"><div class="l">Tax & service %<small>${fmt(dinnerCharge())} added on top of the menu</small></div>${numIn('dinnerSvc',y.dinnerSvc)}</div>
     <div class="frow total"><div class="l">Dinner total${hc?`<small style="text-transform:none;letter-spacing:0;font-weight:400">${'$'+(dT/hc).toFixed(2)} per person at ${hc} headcount</small>`:''}</div><div class="v">${fmt(dT)}</div></div>
     <button class="mini-add" id="dnAdd">+ Add menu item</button>
     ${linked?'':'<button class="mini-add" id="dnLink" style="margin-top:8px">Add dinner line to Saturday F&B</button>'}
@@ -1153,7 +1158,7 @@ function renderEvent(w){
           html+=`<div class="ev" data-fbday="${day}" data-id="${it.id}">
           <div class="time">Menu</div>
           <div class="body"><b>${esc(it.item)}</b>
-          <p>${fmt(dinnerTotal())} total from the Budget tab dinner menu (${(y.dinner||[]).length} items)${it.actual?` · <span style="color:var(--dep)">WCCC billed ${fmt(it.actual)}</span>`:''}</p></div></div>`;
+          <p>${fmt(dinnerTotal())} total from the Budget tab dinner menu (${(y.dinner||[]).length} items, incl. ${+y.dinnerSvc||0}% tax & service)${it.actual?` · <span style="color:var(--dep)">WCCC billed ${fmt(it.actual)}</span>`:''}</p></div></div>`;
           return;
         }
         const qty=resQty(it);
