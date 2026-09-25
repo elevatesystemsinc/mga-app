@@ -51,6 +51,10 @@ and choose it when the import asks.
   or "every player"), plus catered menus (line items + tax & service %). Tournament-
   wide expenses are fixed amounts (prizes, gifts, misc) or per-player (pro shop credit).
   "Start from" copies another tournament's structure with actuals and payments cleared.
+- **Members:** Members → Import member list takes the Golf Genius contact list export
+  (.xlsx) or any spreadsheet/CSV with name columns. Preview first; re-uploading a newer
+  export updates people (matched by Golf Genius ID, GHIN, email, then name) and blank
+  cells never erase existing data. Optionally mark people missing from the file Inactive.
 - **Field:** teams picked from Members, entry paid and skins per player. The budget
   uses the planned player count until you switch it to the field in Tournament details.
 - **Season budget:** all tournaments + annual dues (active members × dues, not

@@ -188,7 +188,8 @@ textarea.inp{height:auto;min-height:84px;padding:10px 12px;resize:vertical}
     <div class="season"><label for="seasonSel">Season</label><select id="seasonSel"></select></div>
     <nav class="navlist" id="nav" aria-label="Main"></nav>
     <div class="sidefoot">
-      <div class="sync"><span class="dot local" id="syncDot"></span><span id="syncTxt">This device only</span></div>
+      <button class="sync linkbtn" id="syncBtn" style="text-decoration:none"><span class="dot local" id="syncDot"></span><span id="syncTxt">This device only</span></button>
+      <p id="syncErr" hidden style="margin:0;font-size:11.5px;color:#F0B8A8;word-break:break-word"></p>
       <div style="display:flex;gap:14px;flex-wrap:wrap"><button class="linkbtn" id="btnBackup">Backup</button><button class="linkbtn" id="btnRestore">Restore</button><button class="linkbtn" id="btnSignOut" hidden>Sign out</button></div>
       <input type="file" id="fileRestore" accept="application/json" hidden>
     </div>
@@ -412,9 +413,13 @@ let saveT=null, pendingRemote=null, lastPushed='';
 function stable(o){ if(Array.isArray(o)) return '['+o.map(stable).join(',')+']';
   if(o&&typeof o==='object') return '{'+Object.keys(o).filter(k=>k!=='_w'&&k!=='_at').sort().map(k=>JSON.stringify(k)+':'+stable(o[k])).join(',')+'}';
   return JSON.stringify(o); }
-function setSync(s){
+let lastSyncErr='';
+function setSync(s,err){
   const d=$('syncDot'), t=$('syncTxt'); d.className='dot '+s;
-  t.textContent={synced:'All changes saved',saving:'Saving…',offline:'Offline — saved on this device',local:'This device only'}[s]||s;
+  t.textContent={synced:'All changes saved',saving:'Saving…',offline:'Not saving to cloud — tap to retry',local:'This device only'}[s]||s;
+  if(s==='offline'){ const m=err?(err.message||String(err))+(err.code?' ('+err.code+')':''):'Cloud unreachable';
+    if(m!==lastSyncErr) toast('Cloud save failed: '+m); lastSyncErr=m; $('syncErr').textContent=m; $('syncErr').hidden=false; }
+  else { lastSyncErr=''; $('syncErr').hidden=true; }
 }
 function persist(){
   db._w=CLIENT; db._at=Date.now(); store.save(db);
@@ -424,7 +429,7 @@ function persist(){
 async function pushCloud(){
   const snap=stable(db);
   const {error}=await sb.from('mga_hub').upsert({id:'main',data:db,updated_at:new Date().toISOString()});
-  if(error){ setSync('offline'); return; }
+  if(error){ setSync('offline',error); return; }
   lastPushed=snap; setSync('synced');
 }
 function applyRemote(remote){
@@ -433,11 +438,12 @@ function applyRemote(remote){
   if(drawerOpen()){ pendingRemote=remote; return; }
   db=remote; store.save(db); render(); toast('Updated from another device');
 }
-let sessionOK=false;
+let sessionOK=false, cloudReady=false;
 async function startCloud(){
   setSync('saving');
   const {data:row,error}=await sb.from('mga_hub').select('data').eq('id','main').maybeSingle();
-  if(error){ setSync('offline'); toast(/relation|does not exist/i.test(error.message)?'Run hub-setup.sql in Supabase first':'Cloud unreachable — working on this device'); render(); return; }
+  if(error){ setSync('offline',/relation|does not exist/i.test(error.message)?{message:'The mga_hub table is missing — run hub-setup.sql in Supabase'}:error); render(); return; }
+  cloudReady=true;
   if(row&&row.data){ db=normalize(row.data); store.save(db); setSync('synced'); }
   else await pushCloud();
   render();
@@ -542,7 +548,7 @@ function vDash(m){
     if(t.source&&t.source.kind==='mm-app') attention.push(['Verify',`${esc(t.name)} was imported from the current app — check the Verify tab`,'gold',t.id]);
   }
   const unpaid=db.members.filter(x=>x.status!=='Inactive'&&memberDues(Y(),x.id)<n0(sc.s.dues.amount)).length;
-  if(db.members.length&&unpaid) attention.push([String(unpaid),`member${unpaid>1?'s have':' has'} not paid full ${Y()} dues`,'warn',null]);
+  if(db.members.length&&unpaid&&sc.s.duesPayments.length) attention.push([String(unpaid),`member${unpaid>1?'s have':' has'} not paid full ${Y()} dues`,'warn',null]);
   m.innerHTML=head(`${Y()} Season`,'Walnut Creek Country Club Men’s Golf Association',btn('New tournament','dNew','pri',I.plus))+`
   <div class="grid g4">
     ${kpi('Season net (budgeted)',fmtS(sc.net),`${withBudget} of ${sc.ts.length} tournament budgets started`,netCls(sc.net))}
@@ -949,23 +955,23 @@ function vMembers(m){
   const boardOf=id=>db.board.filter(b=>b.memberId===id).map(b=>b.role);
   let list=db.members.slice().sort((a,b)=>(a.last||'').localeCompare(b.last||'')||(a.first||'').localeCompare(b.first||''));
   const q=view.mq.toLowerCase();
-  if(q) list=list.filter(x=>[memberName(x),x.email,x.phone,x.memberNo].join(' ').toLowerCase().includes(q));
+  if(q) list=list.filter(x=>[memberName(x),x.email,x.phone,x.memberNo,x.ghin,x.city].join(' ').toLowerCase().includes(q));
   const f=view.mfilter;
   if(f==='Active') list=list.filter(x=>x.status!=='Inactive'); if(f==='Inactive') list=list.filter(x=>x.status==='Inactive');
   if(f==='Board') list=list.filter(x=>boardOf(x.id).length); if(f==='Dues unpaid') list=list.filter(x=>x.status!=='Inactive'&&memberDues(y,x.id)<amt);
   const cols='grid-template-columns:40px minmax(0,1.5fr) minmax(0,1.5fr) 130px 70px 150px 120px 90px 40px';
-  m.innerHTML=head('Members','Everyone in the MGA. Board seats and tournament fields are picked from this list.',btn('Dues settings','mDues','')+btn('Import CSV','mCsv','',I.down)+btn('Add member','mAdd','pri',I.plus))+`
-  <div class="toolbar"><div class="search">${I.search}<input class="inp" id="mq" placeholder="Search name, email, phone or member #" value="${esc(view.mq)}" aria-label="Search members"></div>
+  m.innerHTML=head('Members','Everyone in the MGA. Board seats and tournament fields are picked from this list.',btn('Dues settings','mDues','')+btn('Import member list','mCsv','',I.down)+btn('Add member','mAdd','pri',I.plus))+`
+  <div class="toolbar"><div class="search">${I.search}<input class="inp" id="mq" placeholder="Search name, email, phone or GHIN" value="${esc(view.mq)}" aria-label="Search members"></div>
     <div class="seg">${['All','Active','Board','Dues unpaid','Inactive'].map(x=>`<button class="${f===x?'on':''}" data-mf="${x}">${x}</button>`).join('')}</div>
     <span class="muted" style="margin-left:auto;font-size:13px">${db.members.filter(x=>x.status!=='Inactive').length} active · ${y} dues ${fmt(amt)}${n0(s.dues.installments)>1?` (${s.dues.installments} × ${fmt(amt/s.dues.installments)})`:''}</span></div>
   <div class="card" style="overflow:hidden">${list.length?`<div class="tw"><div class="t" style="min-width:980px"><div class="tr th" style="${cols}"><span></span><span>Name</span><span>Email</span><span>Phone</span><span>Hcp</span><span>Board</span><span>${y} dues</span><span>Status</span><span></span></div>
-  ${list.map(x=>{const paid=memberDues(y,x.id), br=boardOf(x.id); const du=x.status==='Inactive'?['—','']:paid>=amt?['Paid '+fmt(paid),'ok']:paid>0?[fmt(paid)+' of '+fmt(amt),'gold']:['Unpaid','warn'];
-    return `<div class="tr num click" data-m="${x.id}" style="${cols}"><span class="av">${initials(x)}</span><div class="cell2"><b class="trunc">${esc(memberName(x))}</b>${x.memberNo?`<small>#${esc(x.memberNo)}</small>`:''}</div><span class="trunc muted">${esc(x.email||'')}</span><span class="muted">${esc(x.phone||'')}</span><span>${esc(x.hcp??'')}</span><span>${br.map(r=>`<span class="chip navy">${esc(r)}</span>`).join(' ')}</span><span><span class="chip ${du[1]}">${du[0]}</span></span><span><span class="chip ${x.status==='Inactive'?'':'ok'}">${esc(x.status||'Active')}</span></span><span class="ib">${I.edit}</span></div>`;}).join('')}</div></div>`
-  :`<div class="empty"><b>${db.members.length?'No members match':'No members yet'}</b><span>${db.members.length?'Try a different search or filter.':'Add members one at a time or import a CSV (first, last, email, phone). Golf Genius sync can fill this later.'}</span></div>`}</div>`;
+  ${list.map(x=>{const paid=memberDues(y,x.id), br=boardOf(x.id); const du=x.status==='Inactive'?['—','']:paid>=amt?['Paid '+fmt(paid),'ok']:paid>0?[fmt(paid)+' of '+fmt(amt),'gold']:s.duesPayments.length?['Unpaid','warn']:['Not recorded',''];
+    return `<div class="tr num click" data-m="${x.id}" style="${cols}"><span class="av">${initials(x)}</span><div class="cell2"><b class="trunc">${esc(memberName(x))}</b>${(x.ghin||x.memberNo)?`<small>${x.ghin?'GHIN '+esc(x.ghin):'#'+esc(x.memberNo)}</small>`:''}</div><span class="trunc muted">${esc(x.email||'')}</span><span class="muted">${esc(x.phone||'')}</span><span>${esc(x.hcp??'')}</span><span>${br.map(r=>`<span class="chip navy">${esc(r)}</span>`).join(' ')}</span><span><span class="chip ${du[1]}">${du[0]}</span></span><span><span class="chip ${x.status==='Inactive'?'':'ok'}">${esc(x.status||'Active')}</span></span><span class="ib">${I.edit}</span></div>`;}).join('')}</div></div>`
+  :`<div class="empty"><b>${db.members.length?'No members match':'No members yet'}</b><span>${db.members.length?'Try a different search or filter.':'Import the Golf Genius contact list export, or add members one at a time.'}</span></div>`}</div>`;
   const qi=$('mq'); qi.oninput=()=>{ view.mq=qi.value; const pos=qi.selectionStart; render(); const n=$('mq'); n.focus(); n.setSelectionRange(pos,pos); };
   m.querySelectorAll('[data-mf]').forEach(b=>b.onclick=()=>{view.mfilter=b.dataset.mf;render();});
   m.querySelectorAll('[data-m]').forEach(r=>r.onclick=()=>editMember(db.members.find(x=>x.id===r.dataset.m)));
-  $('mAdd').onclick=()=>editMember(null); $('mDues').onclick=editDues; $('mCsv').onclick=importMembersCSV;
+  $('mAdd').onclick=()=>editMember(null); $('mDues').onclick=editDues; $('mCsv').onclick=importRoster;
 }
 function editMember(mm){
   const y=Y(), s=db.seasons[y]; const pays=mm?clone(s.duesPayments.filter(p=>p.memberId===mm.id)):[];
@@ -973,13 +979,13 @@ function editMember(mm){
   const inT=mm?db.tournaments.filter(t=>t.field.some(p=>p.memberId===mm.id)):[];
   openDrawer({kicker:'Member',title:mm?memberName(mm):'Add member',
     body:pair(field('First name','mfF',mm?.first||''),field('Last name','mfL',mm?.last||''))+pair(field('Email','mfE',mm?.email||''),field('Phone','mfP',mm?.phone||''))+
-      pair(field('Member #','mfN',mm?.memberNo||''),field('Handicap','mfH',mm?.hcp??'',{type:'number'}))+pair(field('Status','mfS',mm?.status||'Active',{type:'select',options:['Active','Inactive']}),field('Joined','mfJ',mm?.joined||'',{type:'date'}))+
+      pair(field('Handicap index','mfH',mm?.hcp??''),field('GHIN','mfG',mm?.ghin||''))+field('Address','mfA',mm?.address1||'')+`<div style="display:grid;grid-template-columns:minmax(0,2fr) 70px minmax(0,1fr);gap:12px">${field('City','mfC',mm?.city||'')}${field('State','mfSt',mm?.state||'')}${field('Zip','mfZ',mm?.zip||'')}</div>`+pair(field('Status','mfS',mm?.status||'Active',{type:'select',options:['Active','Inactive']}),field('Joined','mfJ',mm?.joined||'',{type:'date'}))+
       `<div class="fld"><div style="display:flex;justify-content:space-between;align-items:center"><span class="lbl">${y} dues · ${fmt(s.dues.amount)}, not prorated</span><button class="btn sm" id="dAdd" type="button">${I.plus}Record payment</button></div><div class="mini"><div id="dRows">${payHTML()}</div></div></div>`+
-      (inT.length?`<div class="fld"><span class="lbl">Tournaments</span><span>${inT.map(t=>esc(t.name)+' ('+t.season+')').join(', ')}</span></div>`:'')+field('Notes','mfNt',mm?.notes||'',{type:'textarea'}),
+      (mm&&mm.ggId?`<p class="hint">Golf Genius ID ${esc(mm.ggId)}${mm.memberType?' · member type '+esc(mm.memberType):''}</p>`:'')+(inT.length?`<div class="fld"><span class="lbl">Tournaments</span><span>${inT.map(t=>esc(t.name)+' ('+t.season+')').join(', ')}</span></div>`:'')+field('Notes','mfNt',mm?.notes||'',{type:'textarea'}),
     wire:r=>{ const bind=()=>{ r.querySelectorAll('[data-di]').forEach(e=>e.oninput=()=>pays[+e.dataset.di][e.dataset.k]=e.value); r.querySelectorAll('[data-ddel]').forEach(b=>b.onclick=()=>{pays.splice(+b.dataset.ddel,1);r.querySelector('#dRows').innerHTML=payHTML();bind();}); };
       bind(); r.querySelector('#dAdd').onclick=()=>{ const inst=n0(s.dues.amount)/Math.max(1,n0(s.dues.installments)); const d=new Date(); pays.push({id:uid(),amount:inst,date:(d.getMonth()+1)+'/'+d.getDate()}); r.querySelector('#dRows').innerHTML=payHTML(); bind(); }; },
     save:()=>{ const first=fv('mfF'), last=fv('mfL'); if(!first&&!last){ toast('Enter a name'); return false; }
-      const data={first,last,email:fv('mfE'),phone:fv('mfP'),memberNo:fv('mfN'),hcp:fv('mfH'),status:fv('mfS'),joined:fv('mfJ'),notes:fv('mfNt')};
+      const data={first,last,email:fv('mfE'),phone:fv('mfP'),hcp:fv('mfH'),ghin:fv('mfG'),address1:fv('mfA'),city:fv('mfC'),state:fv('mfSt'),zip:fv('mfZ'),status:fv('mfS'),joined:fv('mfJ'),notes:fv('mfNt')};
       let target=mm; if(mm) Object.assign(mm,data); else { target=Object.assign({id:uid()},data); db.members.push(target); }
       s.duesPayments=s.duesPayments.filter(p=>p.memberId!==target.id).concat(pays.filter(p=>n0(p.amount)).map(p=>({id:p.id||uid(),memberId:target.id,amount:n0(p.amount),date:p.date||''}))); },
     del:mm?()=>{ if(inT.length&&!confirm(`${memberName(mm)} is in ${inT.length} tournament field(s). Remove anyway?`)) return false;
@@ -991,29 +997,100 @@ function editDues(){
   openDrawer({kicker:Y()+' season',title:'Dues settings',body:pair(field('Annual dues $','duA',s.dues.amount,{type:'number'}),field('Charged in','duI',s.dues.installments,{type:'select',options:[[1,'1 payment'],[2,'2 payments'],[4,'4 payments']]}))+'<p class="hint">Not prorated: members who join late still owe the full year. The season budget counts active members × annual dues.</p>',
     save:()=>{ s.dues={amount:fnum('duA'),installments:+fv('duI')||1}; }});
 }
-function importMembersCSV(){
-  openDrawer({kicker:'Members',title:'Import CSV',body:`<p class="muted" style="margin:0">A header row with any of: <b>first</b>, <b>last</b> (or <b>name</b>), <b>email</b>, <b>phone</b>, <b>member</b> #, <b>handicap</b>. Members with an email already on file are updated, not duplicated.</p><input type="file" id="csvF" accept=".csv,text/csv" class="inp" style="padding-top:8px"><p class="hint" id="csvMsg"></p>`,
-    wire:r=>{ r.querySelector('#csvF').onchange=e=>{ const f=e.target.files[0]; if(!f) return; const rd=new FileReader(); rd.onload=()=>{ const n=csvToMembers(rd.result); closeDrawer(); persist(); render(); toast(n.added+' added · '+n.updated+' updated'); }; rd.readAsText(f); }; }});
+/* ---------- Member roster import (Golf Genius export, any .xlsx/.xls/.csv) ----------
+   Finds the header row itself, maps columns by name, previews new vs. updated,
+   and matches existing members by Golf Genius ID → GHIN → email → name so a newer
+   export updates people instead of duplicating them. */
+function loadXLSX(){ if(window.XLSX) return Promise.resolve();
+  return new Promise((ok,bad)=>{ const s=document.createElement('script'); s.src='https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js'; s.onload=ok; s.onerror=()=>bad(new Error('Couldn’t load the spreadsheet reader — check your connection')); document.head.appendChild(s); }); }
+const ROSTER_COLS={
+  ggId:/^(id\b|id \(|golf ?genius( player)? id)/, email:/^e-?mail( address)?$/, first:/^first( name)?$/, last:/^last( name)?$/,
+  full:/^(full ?name|name|player|golfer)$/, handle:/^handle$/, phone:/(cell|mobile)( phone)?$|^phone( number)?$/, hcp:/^(index|handicap( index)?|hcp|hi)$/,
+  ghin:/^ghin( ?(id|#|no\.?|number))?$/, memberNo:/^member ?(#|no\.?|number|id)$/, addr1:/^address ?1?$/, addr2:/^address ?2$/, city:/^city$/, state:/^state$/,
+  zip:/^(zip|zip ?code|postal( code)?)$/, dob:/(date of )?birth|^dob$/, memberType:/^member ?type$/, mg:/member or guest|^guest$/, gender:/^gender$/
+};
+async function readRosterFile(f){
+  const ext=(f.name.split('.').pop()||'').toLowerCase(); let rows;
+  if(ext==='csv'&&!window.XLSX){ try{ await loadXLSX(); }catch(_){ rows=parseCSV(await f.text()); } }
+  if(!rows){ await loadXLSX(); const wb=XLSX.read(await f.arrayBuffer(),{type:'array'});
+    let best=null; for(const n of wb.SheetNames){ const r=XLSX.utils.sheet_to_json(wb.Sheets[n],{header:1,raw:false,defval:''}); if(!best||r.length>best.length) best=r; } rows=best||[]; }
+  return rows.map(r=>r.map(c=>String(c??'').trim()));
+}
+function mapRoster(rows){
+  let hi=-1, map={};
+  for(let i=0;i<Math.min(rows.length,30)&&hi<0;i++){
+    const m={}; rows[i].forEach((h,ci)=>{ const k=h.toLowerCase().replace(/\s+/g,' ').trim(); for(const [key,re] of Object.entries(ROSTER_COLS)) if(m[key]===undefined&&re.test(k)){ m[key]=ci; break; } });
+    if((m.first!==undefined&&m.last!==undefined)||m.full!==undefined||m.handle!==undefined){ hi=i; map=m; }
+  }
+  if(hi<0) throw new Error('Couldn’t find a header row with First Name and Last Name (or Name)');
+  const people=[]; let skippedGuests=0, skippedBlank=0;
+  for(const r of rows.slice(hi+1)){
+    const g=k=>map[k]!==undefined?(r[map[k]]||'').trim():'';
+    let first=g('first'), last=g('last');
+    if(!first&&!last){ const h=g('handle'); if(h.includes(',')){ [last,first]=h.split(',').map(s=>s.trim()); } else { const p=(g('full')||h).split(/\s+/).filter(Boolean); first=p.shift()||''; last=p.join(' '); } }
+    if(!first&&!last){ if(r.some(c=>c)) skippedBlank++; continue; }
+    if(/guest/i.test(g('mg'))){ skippedGuests++; continue; }
+    people.push({ggId:g('ggId').replace(/\D/g,'')?g('ggId'):'',first,last,email:g('email').toLowerCase(),phone:g('phone'),hcp:g('hcp'),ghin:g('ghin'),memberNo:g('memberNo'),
+      address1:g('addr1'),address2:g('addr2'),city:g('city'),state:g('state'),zip:g('zip'),dob:g('dob'),memberType:g('memberType')});
+  }
+  return {people,skippedGuests,skippedBlank,columns:Object.keys(map)};
+}
+const ROSTER_FIELDS=[['first','First name'],['last','Last name'],['email','Email'],['phone','Phone'],['hcp','Handicap'],['ghin','GHIN'],['memberNo','Member #'],['ggId','Golf Genius ID'],
+  ['address1','Address'],['address2','Address 2'],['city','City'],['state','State'],['zip','Zip'],['dob','Date of birth'],['memberType','Member type']];
+function matchMember(p,used){
+  const key=s=>(s||'').toLowerCase().replace(/[^a-z]/g,'');
+  const tries=[x=>p.ggId&&x.ggId===p.ggId, x=>p.ghin&&x.ghin===p.ghin, x=>p.email&&(x.email||'').toLowerCase()===p.email, x=>key(x.first)===key(p.first)&&key(x.last)===key(p.last)];
+  for(const t of tries){ const m=db.members.find(x=>!used.has(x.id)&&t(x)); if(m) return m; }
+  return null;
+}
+function planRoster(people){
+  const used=new Set(), plan={add:[],update:[],same:[]};
+  for(const p of people){
+    const m=matchMember(p,used);
+    if(!m){ plan.add.push(p); continue; }
+    used.add(m.id);
+    const changes=ROSTER_FIELDS.filter(([k])=>p[k]&&String(m[k]??'')!==p[k]).map(([k,l])=>({k,l,from:m[k]??'',to:p[k]}));
+    (changes.length?plan.update:plan.same).push({m,p,changes});
+  }
+  plan.missing=db.members.filter(x=>!used.has(x.id)&&x.status!=='Inactive');
+  return plan;
+}
+function importRoster(){
+  openDrawer({kicker:'Members',title:'Import member list',
+    body:`<p style="margin:0">Upload the Golf Genius contact list export (<b>.xlsx</b>) or any spreadsheet or CSV with first and last name columns.</p>
+      <p class="hint">Picks up email, handicap index, GHIN, Golf Genius ID, phone and address. People already in the hub are matched by Golf Genius ID, GHIN, email, then name, so uploading a newer export updates them instead of adding duplicates. You’ll see a preview before anything is saved.</p>
+      <input type="file" id="rosterF" accept=".xlsx,.xls,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv" class="inp" style="padding-top:8px"><p class="hint" id="rosterMsg" aria-live="polite"></p>`,
+    wire:r=>{ r.querySelector('#rosterF').onchange=async e=>{ const f=e.target.files[0]; if(!f) return; const msg=r.querySelector('#rosterMsg'); msg.style.color=''; msg.textContent='Reading '+f.name+'…';
+      try{ const res=mapRoster(await readRosterFile(f)); if(!res.people.length) throw new Error('No people found under the header row'); closeDrawer(); previewRoster(res,f.name); }
+      catch(err){ msg.style.color='var(--neg)'; msg.textContent=err.message||'Couldn’t read that file'; } }; }});
+}
+function previewRoster(res,fname){
+  const plan=planRoster(res.people);
+  const li=(t,sub)=>`<div class="mr" style="grid-template-columns:minmax(0,1fr)"><div class="cell2"><b>${t}</b>${sub?`<small>${sub}</small>`:''}</div></div>`;
+  const more=(n,shown)=>n>shown?`<div class="mr"><span class="muted">+ ${n-shown} more</span></div>`:'';
+  const SHOW=8;
+  openDrawer({kicker:'Import · '+fname,title:'Review import',saveLabel:`Import ${plan.add.length+plan.update.length} change${plan.add.length+plan.update.length===1?'':'s'}`,
+    body:`<div class="grid g3" style="gap:10px">${[['New',plan.add.length],['Updated',plan.update.length],['No change',plan.same.length]].map(([l,v])=>`<div class="card pad kpi" style="padding:14px"><span class="lbl">${l}</span><span class="v num" style="font-size:30px">${v}</span></div>`).join('')}</div>
+      <p class="hint">${res.people.length} people read from the file${res.skippedGuests?` · ${res.skippedGuests} guests skipped`:''}${res.skippedBlank?` · ${res.skippedBlank} rows without a name skipped`:''}.</p>
+      ${plan.add.length?`<div class="fld"><span class="lbl">New members</span><div class="mini">${plan.add.slice(0,SHOW).map(p=>li(esc(p.first+' '+p.last),esc([p.email,p.hcp&&'Index '+p.hcp,p.ghin&&'GHIN '+p.ghin].filter(Boolean).join(' · ')))).join('')}${more(plan.add.length,SHOW)}</div></div>`:''}
+      ${plan.update.length?`<div class="fld"><span class="lbl">Updates to existing members</span><div class="mini">${plan.update.slice(0,SHOW).map(u=>li(esc(memberName(u.m)),u.changes.map(c=>esc(c.l)+': '+(c.from?esc(c.from)+' → ':'')+esc(c.to)).join(' · '))).join('')}${more(plan.update.length,SHOW)}</div><p class="hint">Blank cells in the file never erase what’s already in the hub.</p></div>`:''}
+      ${plan.missing.length?`<label class="check" style="align-items:flex-start;font-weight:400"><input type="checkbox" id="rosterInact"><span>Mark the ${plan.missing.length} active member${plan.missing.length===1?'':'s'} not in this file as Inactive <span class="muted">(${esc(plan.missing.slice(0,4).map(memberName).join(', '))}${plan.missing.length>4?'…':''})</span></span></label>`:''}`,
+    save:()=>{
+      const inact=$('rosterInact')&&$('rosterInact').checked;
+      if(!plan.add.length&&!plan.update.length&&!inact){ toast('Nothing to change — the hub already matches this file'); return; }
+      const before=clone(db.members);
+      for(const p of plan.add){ const m={id:uid(),status:'Active',joined:'',notes:''}; ROSTER_FIELDS.forEach(([k])=>{ m[k]=p[k]||''; }); m.source='roster'; db.members.push(m); }
+      for(const u of plan.update){ u.changes.forEach(c=>{ u.m[c.k]=c.to; }); if(u.m.status==='Inactive') u.m.status='Active'; }
+      if(inact) plan.missing.forEach(m=>m.status='Inactive');
+      db.rosterImportedAt=new Date().toISOString(); db.rosterFile=fname;
+      toast(`${plan.add.length} added · ${plan.update.length} updated${inact?` · ${plan.missing.length} marked inactive`:''}`,()=>{ db.members=before; persist(); render(); });
+    }});
 }
 function parseCSV(txt){ const rows=[]; let row=[],cur='',q=false;
   for(let i=0;i<txt.length;i++){ const ch=txt[i];
     if(q){ if(ch==='"'&&txt[i+1]==='"'){cur+='"';i++;} else if(ch==='"') q=false; else cur+=ch; }
     else if(ch==='"') q=true; else if(ch===','){row.push(cur);cur='';} else if(ch==='\n'||ch==='\r'){ if(ch==='\r'&&txt[i+1]==='\n') i++; row.push(cur); rows.push(row); row=[]; cur=''; } else cur+=ch; }
   if(cur||row.length){ row.push(cur); rows.push(row); } return rows.filter(r=>r.some(c=>c.trim())); }
-function csvToMembers(txt){
-  const rows=parseCSV(txt); if(rows.length<2) return {added:0,updated:0};
-  const h=rows[0].map(x=>x.trim().toLowerCase()); const col=re=>h.findIndex(x=>re.test(x));
-  const cF=col(/^first/),cL=col(/^last/),cN=col(/^(full ?)?name$/),cE=col(/mail/),cP=col(/phone|mobile|cell/),cM=col(/member|number|#/),cH=col(/hcp|handicap|index/);
-  let added=0,updated=0;
-  for(const r of rows.slice(1)){ const g=i=>i>=0?(r[i]||'').trim():'';
-    let first=g(cF), last=g(cL); if(!first&&!last&&cN>=0){ const p=g(cN).split(/\s+/); first=p.shift()||''; last=p.join(' '); }
-    if(!first&&!last) continue;
-    const data={first,last,email:g(cE),phone:g(cP),memberNo:g(cM),hcp:g(cH)};
-    const ex=data.email&&db.members.find(x=>(x.email||'').toLowerCase()===data.email.toLowerCase());
-    if(ex){ for(const k in data) if(data[k]) ex[k]=data[k]; updated++; } else { db.members.push(Object.assign({id:uid(),status:'Active',joined:'',notes:''},data)); added++; } }
-  return {added,updated};
-}
-
 /* ---------- Board ---------- */
 function vBoard(m){
   m.innerHTML=head('Board',`${Y()} MGA board. Each seat is filled from the member list.`,btn('Add seat','bAdd','',I.plus))+`
@@ -1094,6 +1171,7 @@ function wireChrome(){
   $('fileRestore').onchange=e=>{ const f=e.target.files[0]; if(!f) return; const r=new FileReader();
     r.onload=()=>{ try{ const d=JSON.parse(r.result); if(!d.tournaments||!d.seasons) throw 0; if(!confirm('Replace everything in the hub with this backup?')) return; db=normalize(d); persist(); go('dash'); toast('Backup restored'); }catch(_){ toast('That isn’t an MGA Hub backup'); } };
     r.readAsText(f); e.target.value=''; };
+  $('syncBtn').onclick=()=>{ if(!CLOUD||!sessionOK) return; if(!cloudReady) startCloud(); else { setSync('saving'); pushCloud(); } };
   $('btnSignOut').onclick=async()=>{ await sb.auth.signOut(); location.reload(); };
 }
 async function doLogin(){
