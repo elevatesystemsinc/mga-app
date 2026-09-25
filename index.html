@@ -91,6 +91,16 @@ a{color:var(--gold)}
 .seg button{height:34px;padding:0 14px;border-radius:999px;border:1px solid var(--line);background:#fff;color:var(--muted);font-weight:600;font-size:13px}
 .seg button.on{background:var(--navy);border-color:var(--navy);color:#fff}
 .av{width:32px;height:32px;border-radius:50%;background:var(--paper);border:1px solid var(--line);display:inline-flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:var(--navy);flex-shrink:0}
+.seat{padding:16px 16px 16px 20px;display:flex;flex-direction:column;gap:14px;min-width:0;min-height:168px}
+.seat-top{display:flex;align-items:center;justify-content:space-between;gap:8px;min-width:0}
+.seat-top .ib{margin-right:-4px}
+.seat-who{display:flex;align-items:center;gap:12px;min-width:0;padding-right:4px}
+.seat-who .av{width:44px;height:44px;font-size:14px}
+.seat-who b{font-size:15px;display:block}
+.seat-who small{display:block}
+.seat-act{display:flex;gap:8px;margin-top:auto}
+.seat-empty{margin-top:auto;height:76px;border-style:dashed;color:var(--gold);width:100%}
+.trunc{display:block}
 .empty{padding:36px 22px;text-align:center;color:var(--muted);display:flex;flex-direction:column;gap:12px;align-items:center}
 .empty b{font-family:var(--serif);font-size:22px;color:var(--navy)}
 
@@ -178,6 +188,7 @@ textarea.inp{height:auto;min-height:84px;padding:10px 12px;resize:vertical}
   .side{height:100%}
   .dhead,.dbody,.dfoot{padding-left:18px;padding-right:18px}
 }
+@media (max-width:640px){ .grid.board{grid-template-columns:minmax(0,1fr)} .seat{min-height:0} }
 @media (prefers-reduced-motion:reduce){ *{transition:none!important} }
 </style>
 </head>
@@ -1094,9 +1105,11 @@ function parseCSV(txt){ const rows=[]; let row=[],cur='',q=false;
 /* ---------- Board ---------- */
 function vBoard(m){
   m.innerHTML=head('Board',`${Y()} MGA board. Each seat is filled from the member list.`,btn('Add seat','bAdd','',I.plus))+`
-  <div class="grid g4">${db.board.map(b=>{const mm=memberById(b.memberId);return `<div class="card pad" style="display:flex;flex-direction:column;gap:12px"><div style="display:flex;justify-content:space-between;align-items:center"><span class="lbl">${esc(b.role)}</span><button class="ib" data-bs="${b.id}" aria-label="Edit ${esc(b.role)} seat">${I.edit}</button></div>
-    ${mm?`<div style="display:flex;align-items:center;gap:12px"><span class="av" style="width:44px;height:44px;font-size:14px">${initials(mm)}</span><div class="cell2"><b style="font-size:15px">${esc(memberName(mm))}</b><small>${b.term?'Term through '+esc(b.term):esc(mm.email||'')}</small></div></div><div class="actions"><button class="btn sm" data-bp="${b.id}">Change</button><button class="btn sm" data-bc="${b.id}">Vacate</button></div>`
-    :`<button class="btn" data-bp="${b.id}" style="border-style:dashed;height:76px;color:var(--gold)">${I.plus}Fill seat from members</button>`}</div>`;}).join('')}</div>`;
+  <div class="grid g4 board">${db.board.map(b=>{const mm=memberById(b.memberId);const sub=b.term?'Term through '+b.term:(mm&&mm.email)||'';return `<div class="card seat">
+    <div class="seat-top"><span class="lbl trunc">${esc(b.role)}</span><button class="ib" data-bs="${b.id}" aria-label="Edit ${esc(b.role)} seat">${I.edit}</button></div>
+    ${mm?`<div class="seat-who"><span class="av">${initials(mm)}</span><div class="cell2"><b class="trunc" title="${esc(memberName(mm))}">${esc(memberName(mm))}</b><small class="trunc" title="${esc(sub)}">${esc(sub)}</small></div></div>
+    <div class="seat-act"><button class="btn sm" data-bp="${b.id}">Change</button><button class="btn sm" data-bc="${b.id}">Vacate</button></div>`
+    :`<button class="btn seat-empty" data-bp="${b.id}">${I.plus}Fill seat from members</button>`}</div>`;}).join('')}</div>`;
   m.querySelectorAll('[data-bp]').forEach(x=>x.onclick=()=>pickMember(db.board.find(b=>b.id===x.dataset.bp)));
   m.querySelectorAll('[data-bc]').forEach(x=>x.onclick=()=>{ const b=db.board.find(s=>s.id===x.dataset.bc), was=b.memberId; b.memberId=''; persist(); render(); toast('Seat vacated',()=>{b.memberId=was;persist();render();}); });
   m.querySelectorAll('[data-bs]').forEach(x=>x.onclick=()=>editSeat(db.board.find(b=>b.id===x.dataset.bs)));
