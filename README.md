@@ -41,6 +41,14 @@ Optional: give it its own subdomain (e.g. `hub.wcccmga.org`). The current site o
    **Re-import** replaces the hub copy with a fresh one (use it while the board keeps
    working in the current app this week).
 
+**Push back to the current app:** on an imported tournament, **Push to current app** (header or
+Verify tab) sends the hub's edits to the Member-Member app so the board can keep using it. It shows
+every total before and after, checks the result matches the hub, downloads a backup of the current
+app's data first, and only replaces that year (other years, outreach and event info stay). If someone
+edited that year in the current app since the hub's copy was taken, it warns and names the changes —
+re-import first to keep both. The current app holds one catered menu and three income lines, so
+anything beyond that is listed in the preview before you push.
+
 No Supabase access? Download a backup from the current app (⋯ → Backup all data)
 and choose it when the import asks.
 
