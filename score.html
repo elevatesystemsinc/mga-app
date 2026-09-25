@@ -62,6 +62,8 @@ h1{font-family:var(--serif);font-weight:700;color:var(--navy);font-size:32px;mar
 .sc tr.tot td{font-weight:800;background:var(--ivory)}
 .banner{background:#F6ECCF;border:1px solid #E5CF8E;color:#5C4410;border-radius:10px;padding:12px 14px;font-size:14px;margin-bottom:14px}
 .big .lb{grid-template-columns:70px minmax(0,1fr) 90px 110px;font-size:26px;padding:16px 24px}
+.chips{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px}.chips button{height:36px;padding:0 14px;border-radius:999px;border:1px solid var(--line);background:#fff;font-weight:700;font-size:13px;color:var(--muted)}.chips button.on{background:var(--navy);border-color:var(--navy);color:#fff}
+.pop{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--gold);margin-left:6px;vertical-align:2px}
 .big .lb .tp{font-size:30px} .big main{max-width:1100px}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
@@ -80,16 +82,16 @@ const WCCC_COURSES=[
   {id:'oak',name:'Oak Course',
    par:{M:[5,4,5,3,4,3,4,4,4, 4,3,5,4,3,4,4,4,4], W:[5,4,5,3,4,3,4,4,5, 4,3,5,4,3,4,4,4,4]},
    hcp:{M:[17,1,9,13,11,15,5,7,3, 6,18,16,12,14,8,2,10,4], W:[17,3,9,15,1,11,7,5,13, 6,14,16,4,18,12,2,8,10]},
-   tees:[{name:'Gold',yards:[525,379,523,174,462,142,398,428,439, 375,138,546,339,180,411,433,408,453]},
+   tees:[{name:'Gold',rating:{M:{cr:72.7,slope:127}},yards:[525,379,523,174,462,142,398,428,439, 375,138,546,339,180,411,433,408,453]},
          {name:'Blue',yards:[468,369,506,155,431,133,373,369,406, 363,138,464,327,168,391,394,374,444]},
          {name:'White',yards:[402,339,482,140,402,121,321,330,371, 328,124,440,315,153,332,356,347,385]},
          {name:'Red',yards:[347,297,381,109,327,104,267,294,371, 251,122,386,245,98,285,336,320,325]}]},
   {id:'pecan',name:'Pecan Course',
    par:{M:[5,4,4,3,4,4,4,3,4, 4,4,4,3,4,4,3,4,5], W:[5,4,4,3,4,4,4,3,4, 4,5,4,3,4,4,3,4,5]},
    hcp:{M:[17,15,1,9,5,13,7,11,3, 12,2,14,10,4,8,16,6,18], W:[9,7,1,17,5,13,11,15,3, 6,14,10,16,2,8,12,4,18]},
-   tees:[{name:'Gold',yards:[457,391,434,153,373,339,381,200,404, 432,446,366,213,445,450,191,412,531]},
-         {name:'Blue',yards:[448,367,415,141,352,318,375,169,388, 414,437,346,197,418,402,186,398,496]},
-         {name:'White',yards:[433,344,380,122,310,292,356,146,355, 394,428,330,182,365,391,176,374,478]},
+   tees:[{name:'Gold',rating:{M:{cr:73.1,slope:137},W:{cr:79.5,slope:149}},yards:[457,391,434,153,373,339,381,200,404, 432,446,366,213,445,450,191,412,531]},
+         {name:'Blue',rating:{M:{cr:71.5,slope:133},W:{cr:77.5,slope:145}},yards:[448,367,415,141,352,318,375,169,388, 414,437,346,197,418,402,186,398,496]},
+         {name:'White',rating:{M:{cr:70.2,slope:125},W:{cr:75.2,slope:139}},yards:[433,344,380,122,310,292,356,146,355, 394,428,330,182,365,391,176,374,478]},
          {name:'Red',yards:[410,324,353,107,288,259,304,124,328, 343,407,319,152,301,305,159,324,392]},
          {name:'Green',yards:[316,220,219,80,208,176,184,85,221, 260,243,200,96,226,222,98,229,336]}]}
 ];
@@ -98,28 +100,44 @@ const G_SUM=a=>a.reduce((x,y)=>x+(+y||0),0);
 function playOrder(start){ const s=Math.min(18,Math.max(1,+start||1)); return Array.from({length:18},(_,i)=>((s-1+i)%18)+1); }
 function toParTxt(v){ return v===0?'E':(v>0?'+'+v:'−'+Math.abs(v)); }
 /* stroke-play leaderboard. pub = public event, scores = {playerId:{hole:strokes}} */
-function leaderboard(pub,scores){
+function leaderboard(pub,scores,opt){ opt=opt||{};
   const rows=[];
   for(const g of pub.groups||[]){ const c=pub.courses[g.course]; if(!c) continue;
     for(const p of g.players||[]){ const par=c.par[p.set||'M']||c.par.M, sc=scores[p.id]||{};
-      let n=0,gross=0,parPlayed=0,out=0,inn=0;
-      for(let h=1;h<=18;h++){ const s=+sc[h]; if(!s) continue; n++; gross+=s; parPlayed+=par[h-1]; if(h<=9) out+=s; else inn+=s; }
-      rows.push({id:p.id,name:p.name,group:g.label||'',groupId:g.id,course:g.course,courseName:c.name,tee:p.tee,n,gross,toPar:gross-parPlayed,out,inn,thru:n===18?'F':String(n),par});
+      const hc=c.hcp[p.set||'M']||c.hcp.M, ph=typeof p.ph==='number'?p.ph:null;
+      let n=0,gross=0,parPlayed=0,out=0,inn=0,got=0;
+      for(let h=1;h<=18;h++){ const s=+sc[h]; if(!s) continue; n++; gross+=s; parPlayed+=par[h-1]; if(h<=9) out+=s; else inn+=s; if(ph!=null) got+=strokesOn(ph,hc[h-1]); }
+      rows.push({id:p.id,name:p.name,group:g.label||'',groupId:g.id,course:g.course,courseName:c.name,tee:p.tee,n,gross,toPar:gross-parPlayed,out,inn,thru:n===18?'F':String(n),par,ph,flight:p.flight||'',net:ph==null?null:gross-got,netToPar:ph==null?null:gross-got-parPlayed});
     } }
-  const played=rows.filter(r=>r.n>0).sort((a,b)=>a.toPar-b.toPar||b.n-a.n||a.gross-b.gross||a.name.localeCompare(b.name));
-  const idle=rows.filter(r=>!r.n).sort((a,b)=>a.name.localeCompare(b.name));
-  let pos=0,prev=null; played.forEach((r,i)=>{ if(prev===null||r.toPar!==prev){ pos=i+1; prev=r.toPar; } r.pos=pos; });
+  const byNet=opt.sort==='net';
+  const key=r=>byNet?(r.netToPar==null?9999:r.netToPar):r.toPar;
+  const pool=opt.flight?rows.filter(r=>r.flight===opt.flight):rows;
+  const played=pool.filter(r=>r.n>0).sort((a,b)=>key(a)-key(b)||b.n-a.n||a.gross-b.gross||a.name.localeCompare(b.name));
+  const idle=pool.filter(r=>!r.n).sort((a,b)=>a.name.localeCompare(b.name));
+  let pos=0,prev=null; played.forEach((r,i)=>{ const k=key(r); if(prev===null||k!==prev){ pos=i+1; prev=k; } r.pos=pos; });
   played.forEach(r=>{ r.posTxt=(played.filter(x=>x.pos===r.pos).length>1?'T':'')+r.pos; });
   idle.forEach(r=>{ r.posTxt='—'; });
   return played.concat(idle);
 }
+
+/* ---------- handicaps (World Handicap System) ----------
+   Course Handicap = Index × Slope ÷ 113 + (Course Rating − Par), rounded (.5 up).
+   Playing Handicap = Course Handicap × allowance %, rounded. */
+function parseIndex(v){ if(v==null) return null; const s=String(v).trim(); if(!s) return null; const plus=/^\+/.test(s); const n=parseFloat(s.replace('+','')); if(!isFinite(n)) return null; return plus?-Math.abs(n):n; }
+const idxTxt=n=>n==null?'—':(n<0?'+'+Math.abs(n).toFixed(1):n.toFixed(1));
+const whsRound=x=>Math.sign(x)*Math.floor(Math.abs(x)+0.5);
+function teeRating(course,teeName,set){ const t=(course.tees||[]).find(x=>x.name===teeName); const r=t&&t.rating&&t.rating[set||'M']; return r&&+r.cr&&+r.slope?{cr:+r.cr,slope:+r.slope}:null; }
+function courseHcp(index,course,teeName,set){ if(index==null) return null; const r=teeRating(course,teeName,set); if(!r) return null;
+  const par=G_SUM(course.par[set||'M']||course.par.M); return whsRound(index*r.slope/113+(r.cr-par)); }
+/* strokes a player gets on one hole from a playing handicap (plus handicaps give strokes back, from hcp 18 up) */
+function strokesOn(ph,holeHcp){ if(!ph) return 0; if(ph>0) return Math.floor(ph/18)+(holeHcp<=ph%18?1:0); const g=-ph; return -(Math.floor(g/18)+(holeHcp>18-(g%18)?1:0)); }
 
 const $=id=>document.getElementById(id);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const CFG=window.MM_CONFIG||{}; const sb=(CFG.url&&CFG.anonKey&&window.supabase)?window.supabase.createClient(CFG.url,CFG.anonKey,{auth:{persistSession:false}}):null;
 const qs=new URLSearchParams(location.search), SLUG=(qs.get('e')||'').trim(), BIG=qs.get('view')==='board';
 if(BIG) document.body.classList.add('big');
-let pub=null, scores={}, groupId=null, code='', tab=BIG?'board':'score', holeIdx=0;
+let pub=null, scores={}, groupId=null, code='', tab=BIG?'board':'score', holeIdx=0, lbFlight=qs.get('flight')||'', lbSort=null;
 const KEY='mga_score_'+SLUG, QKEY='mga_scoreq_'+SLUG;
 let queue=[]; try{ queue=JSON.parse(localStorage.getItem(QKEY)||'[]'); }catch(_){}
 const saveQ=()=>{ try{ localStorage.setItem(QKEY,JSON.stringify(queue)); }catch(_){} };
@@ -211,7 +229,9 @@ function renderHole(){
      <button class="nav" id="next" aria-label="Next hole"${holeIdx===17?' disabled':''}>›</button></div>
      <div class="muted" style="text-align:center;font-size:13px">${esc(c.name)}${g.label?' · '+esc(g.label):''} · Group ${esc(code)} · ${holeIdx+1} of 18</div></div>
    ${g.players.map(p=>{ const v=(scores[p.id]||{})[h], pr=par(p); const tot=Object.entries(scores[p.id]||{}); const rel=tot.reduce((a,[hh,s])=>a+s-(c.par[p.set||'M']||c.par.M)[hh-1],0);
-     return `<div class="pl"><div style="min-width:0"><div class="nm">${esc(p.name)}</div><div class="sub">${tot.length?toParTxt(rel)+' thru '+tot.length:'Not started'}</div></div>
+     const hc=(c.hcp[p.set||'M']||c.hcp.M), k=typeof p.ph==='number'?strokesOn(p.ph,hc[h-1]):0;
+     const netRel=typeof p.ph==='number'?rel-tot.reduce((a,[hh])=>a+strokesOn(p.ph,hc[hh-1]),0):null;
+     return `<div class="pl"><div style="min-width:0"><div class="nm">${esc(p.name)}${k>0?'<span class="pop" title="Gets a stroke"></span>'.repeat(k):''}</div><div class="sub">${tot.length?toParTxt(rel)+(netRel!=null?' · net '+toParTxt(netRel):'')+' thru '+tot.length:'Not started'}${p.flight?' · Flight '+esc(p.flight):''}</div></div>
       <button class="step" data-m="${p.id}" aria-label="One less for ${esc(p.name)}"${live?'':' disabled'}>−</button>
       <div class="val num ${v?(v<pr?'under':v>pr?'over':''):'empty'}" aria-live="polite">${v||pr}</div>
       <button class="step" data-p="${p.id}" aria-label="One more for ${esc(p.name)}"${live?'':' disabled'}>+</button></div>`; }).join('')}
@@ -244,12 +264,20 @@ function renderCard(){
   document.querySelectorAll('.sc tbody tr').forEach(tr=>{ const h=+tr.firstElementChild.textContent; if(h>=1&&h<=18){ tr.style.cursor='pointer'; tr.onclick=()=>{ holeIdx=order.indexOf(h); tab='score'; render(); }; } });
 }
 function renderBoard(fromJoin){
-  const lb=leaderboard(pub,scores), mine=new Set((group()||{players:[]}).players.map(p=>p.id));
-  $('main').innerHTML=`${BIG?`<h1 style="font-size:44px;margin:6px 4px 16px">${esc(pub.name)}</h1>`:''}<div class="card" style="overflow:hidden">
-   <div class="lb h"><span>Pos</span><span>Player</span><span class="r">Thru</span><span class="r">To par</span></div>
-   ${lb.map(r=>`<div class="lb num${mine.has(r.id)?' me':''}"><b>${r.posTxt}</b><div style="min-width:0"><div style="font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(r.name)}</div>${BIG?'':`<div class="muted" style="font-size:12px">${esc(r.courseName.replace(' Course',''))}${r.n?' · '+r.gross:''}</div>`}</div><span class="r muted">${r.n?r.thru:'—'}</span><span class="tp ${r.n?(r.toPar<0?'pos':''):'muted'}">${r.n?toParTxt(r.toPar):'—'}</span></div>`).join('')||'<div class="lb"><span></span><span class="muted">No players yet.</span></div>'}
-  </div><p class="muted" style="text-align:center;font-size:12.5px">Gross stroke play · updates live</p>${fromJoin?'<p style="text-align:center"><button class="btn" id="backJoin">Back</button></p>':''}`;
+  if(lbSort==null) lbSort=pub.scoring||'gross';
+  const flights=pub.flights||[], hasNet=(pub.groups||[]).some(g=>g.players.some(p=>typeof p.ph==='number')), net=lbSort==='net'&&hasNet;
+  const mine=new Set((group()||{players:[]}).players.map(p=>p.id));
+  if(!BIG&&!lbFlight&&group()&&flights.length){ const me=group().players.find(p=>p.flight); if(me&&renderBoard.first!==false){ lbFlight=me.flight; renderBoard.first=false; } }
+  const lb=leaderboard(pub,scores,{flight:lbFlight,sort:net?'net':'gross'});
+  $('main').innerHTML=`${BIG?`<h1 style="font-size:44px;margin:6px 4px 16px">${esc(pub.name)}${lbFlight?' · Flight '+esc(lbFlight):''}</h1>`:''}
+   ${!BIG&&(flights.length||hasNet)?`<div class="chips">${hasNet?['gross','net'].map(x=>`<button data-sort="${x}" class="${(net?'net':'gross')===x?'on':''}">${x==='net'?'Net':'Gross'}</button>`).join(''):''}${flights.length?['',...flights].map(f=>`<button data-fl="${f}" class="${lbFlight===f?'on':''}">${f?'Flight '+f:'All'}</button>`).join(''):''}</div>`:''}
+   <div class="card" style="overflow:hidden">
+   <div class="lb h"><span>Pos</span><span>Player</span><span class="r">Thru</span><span class="r">${net?'Net':'To par'}</span></div>
+   ${lb.map(r=>`<div class="lb num${mine.has(r.id)?' me':''}"><b>${r.posTxt}</b><div style="min-width:0"><div style="font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(r.name)}</div>${BIG?'':`<div class="muted" style="font-size:12px">${esc(r.courseName.replace(' Course',''))}${r.flight&&!lbFlight?' · Flt '+esc(r.flight):''}${r.n?' · '+r.gross+(net&&r.net!=null?' / net '+r.net:''):''}</div>`}</div><span class="r muted">${r.n?r.thru:'—'}</span>${(()=>{ const v=net?r.netToPar:r.toPar; return `<span class="tp ${r.n&&v<0?'pos':r.n?'':'muted'}">${r.n&&v!=null?toParTxt(v):'—'}</span>`; })()}</div>`).join('')||'<div class="lb"><span></span><span class="muted">No players yet.</span></div>'}
+  </div><p class="muted" style="text-align:center;font-size:12.5px">${net?'Net':'Gross'} stroke play${lbFlight?' · Flight '+esc(lbFlight):''} · updates live</p>${fromJoin?'<p style="text-align:center"><button class="btn" id="backJoin">Back</button></p>':''}`;
   const bj=$('backJoin'); if(bj) bj.onclick=()=>renderJoin();
+  document.querySelectorAll('[data-fl]').forEach(b=>b.onclick=()=>{ lbFlight=b.dataset.fl; renderBoard.first=false; renderBoard(fromJoin); });
+  document.querySelectorAll('[data-sort]').forEach(b=>b.onclick=()=>{ lbSort=b.dataset.sort; renderBoard(fromJoin); });
 }
 boot();
 </script>

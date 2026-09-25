@@ -62,6 +62,17 @@ One-time: Supabase → SQL Editor → run `golf-setup.sql`. Upload `score.html` 
 - **Leaderboard:** gross stroke play, to par for holes played, both courses combined. It's in the
   event page, on the Dashboard, and a live link sits in the sidebar while scoring is open.
   Click any player to correct a group's scores from the hub.
+- **Handicaps:** each player's Handicap Index comes from their member profile (the Golf Genius
+  import); override it in the group for guests. Course handicap = Index × Slope ÷ 113 + (Course
+  Rating − Par), using the player's course, tee and men's/women's set, at the event's allowance %.
+  Ratings are edited on Golf → Courses (pre-filled only where a published value matched the card —
+  confirm the rest from the club's GHIN course listing).
+- **Flights:** event → Flights → enter how many. Filled evenly by course handicap (or Index),
+  lowest in A, sizes differ by at most one. For team events linked to a tournament, teams stay
+  together on combined handicap. Ties at a split are flagged; move anyone by hand afterward.
+- **Net scoring:** strokes are given by hole handicap (plus handicaps give strokes back). The
+  leaderboard ranks gross or net, filters by flight, and the phone shows a dot on holes where a
+  player gets a stroke. `…&view=board&flight=A` puts one flight on the TV.
 - **Close scoring** locks it: the public page can no longer change scores.
 - Security: the public page can only read an event's public info, look up a group by its ID, and
   save scores for that group's players while the event is open. Group IDs are never exposed.
