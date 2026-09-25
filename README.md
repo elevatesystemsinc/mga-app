@@ -105,7 +105,9 @@ One-time: Supabase → SQL Editor → run `golf-setup.sql`. Upload `score.html` 
   totals at the end. Best ball adds a team row per team (the counting score each hole, net or gross
   per the event) and underlines the ball that counted. Final rounds are stamped FINAL; Print gives
   a landscape copy. On phones the card stacks front and back nines.
-- **Printed scorecards:** event → Groups → **Print scorecards**. One tournament card per group:
+- **Printed scorecards:** event → Groups → **Print scorecards**. Team events print **one card per team**
+  (team name, and the other team in the group as Marker — teams swap cards), two to a page so each page
+  is one group; or one card per group. Tee-time groups show the tee time as the headline. Each card:
   event, date, course, format and flight; the group ID and starting hole in a box; yardage, par and
   handicap rows; each player with their playing handicap and a dot on every hole they get a stroke
   (+ where a plus handicap gives one back); a blank best-ball line per team; scorer/attest lines;

@@ -2509,8 +2509,10 @@ let CREST_DATA='';
 function crestSrc(){ if(CREST_DATA) return CREST_DATA; const abs=location.href.split('#')[0].split('?')[0].replace(/[^/]*$/,'')+'crest.png?v=2';
   try{ const im=document.querySelector('.brand img'); if(im&&im.complete&&im.naturalWidth){ const c=document.createElement('canvas'); c.width=im.naturalWidth; c.height=im.naturalHeight; c.getContext('2d').drawImage(im,0,0); CREST_DATA=c.toDataURL('image/png'); return CREST_DATA; } }catch(_){}
   return abs; }
-function printCardHTML(ev,pub,grp){
-  const pg=pub.groups.find(x=>x.id===grp.id), c=pub.courses[grp.course]; if(!pg||!c) return '';
+function printCardHTML(ev,pub,grp,teamKeyOnly){
+  const pg0=pub.groups.find(x=>x.id===grp.id), c=pub.courses[grp.course]; if(!pg0||!c) return '';
+  const allTeams=isTeamEvent(pub)?groupTeams(pg0):[], mine=teamKeyOnly?allTeams.find(t=>t.key===teamKeyOnly):null;
+  const pg=mine?{...pg0,players:mine.members}:pg0, markers=mine?allTeams.filter(t=>t!==mine):[];
   const TEAM=isTeamEvent(pub), net=pub.scoring==='net', start=+grp.startHole||1, split=pub.format==='split', A=allowOf(pub);
   const hc=p=>c.hcp[p.set||'M']||c.hcp.M;
   const tees=[...new Set(pg.players.map(p=>p.tee))].filter(t=>c.tees&&c.tees[t]);
@@ -2528,13 +2530,15 @@ function printCardHTML(ev,pub,grp){
   const teams=TEAM?groupTeams(pg):[];
   const tRow=(t,i)=>{ const tph=eventFormats(pub).includes('scramble')?scrambleTeamPH(pub,t.members):null;
     const what=split?`${FORMAT_LABEL[pub.front]} score front · ${pub.back==='scramble'?'team':'best'} ${net?'net':''} ball back`:(pub.format==='scramble'?'One team score each hole':(net?'Lowest net score each hole':'Lowest score each hole'));
-    return `<tr class="tb"><th><b>Team ${i+1}${split?'':' '+FORMAT_LABEL[pub.format].toLowerCase()}</b><span>${esc(what)}</span></th>${cellsX((h,st)=>`<td class="${st?'st':''}">${scr(h)&&tph!=null?dots(strokesOn(tph,hc(t.captain)[h-1])):''}</td>`)}<td class="sum hc">${tph!=null?phTxt(tph):''}</td><td class="sum"></td></tr>`; };
+    return `<tr class="tb"><th><b>${mine?'Team':'Team '+(i+1)}${split?'':' '+FORMAT_LABEL[pub.format].toLowerCase()}</b><span>${esc(what)}</span></th>${cellsX((h,st)=>`<td class="${st?'st':''}">${scr(h)&&tph!=null?dots(strokesOn(tph,hc(t.captain)[h-1])):''}</td>`)}<td class="sum hc">${tph!=null?phTxt(tph):''}</td><td class="sum"></td></tr>`; };
   const fmtRow=split?`<tr class="fm"><th>Format</th><td colspan="10">${esc(FORMAT_LABEL[pub.front])}${pub.front==='scramble'?' — one team score':''}</td><td colspan="11">${esc(FORMAT_LABEL[pub.back])}${pub.back==='scramble'?' — one team score':' — everyone plays their own ball'}</td><td colspan="2"></td></tr>`:'';
   const allowTxt=eventFormats(pub).map(f=>f==='scramble'?`scramble ${(A['scramble'+(teams[0]?teams[0].members.length:2)]||A.scramble2).join('/')}%`:`${f==='stroke'?'stroke play':FORMAT_LABEL[f].toLowerCase()} ${A[f]}%`).join(' · ');
-  const startTxt=grp.teeTime?`Tee time ${fmtTime(grp.teeTime)}${start!==1?' · hole '+start:''}`:`Starts hole ${start}${grp.label&&/ B /.test(grp.label)?' (B)':''}`;
-  return `<section class="pc">
+  const startBig=grp.teeTime?fmtTime(grp.teeTime):'Hole '+start+(grp.label&&/ B /.test(grp.label)?'B':'');
+  const startSub=grp.teeTime?(start!==1?'Tee time · off hole '+start:'Tee time'):'Shotgun start';
+  return `<section class="pc${mine?' team':''}">
   <header><img src="${crestSrc()}" alt=""><div class="ttl"><b>${esc(pub.name)}</b><span>${esc([pub.date?new Date(pub.date+'T12:00').toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric',year:'numeric'}):'',c.name].filter(Boolean).join(' · '))}</span><span>${esc(formatSummary(pub))} · ${net?'Net':'Gross'}${pg.players[0]&&pg.players[0].flight?' · Flight '+esc(pg.players[0].flight):''}</span></div>
-    <div class="grp"><span>Group</span><b>${esc(grp.code)}</b><em>${esc(startTxt)}</em></div></header>
+    <div class="grp"><span>${esc(startSub)}</span><b class="when">${esc(startBig)}</b><em>Group ${esc(grp.code)}</em></div></header>
+  ${mine?`<div class="who"><div><span>Team</span><b>${esc(mine.members.map(p=>p.name).join(' & '))}</b></div><div><span>Marker — keeps this card</span><b>${esc(markers.map(t=>t.members.map(p=>p.name).join(' & ')).join(' · ')||'—')}</b></div></div>`:''}
   <table>
     ${fmtRow}
     <tr class="hd"><th>Hole</th>${cells(h=>typeof h==='number'?h:h==='out'?'Out':h==='in'?'In':'Tot')}<td class="sum">Hcp</td><td class="sum">Net</td></tr>
@@ -2545,7 +2549,7 @@ function printCardHTML(ev,pub,grp){
     ${anyW?`<tr class="si"><th>Women’s hcp</th>${cells(h=>typeof h==='number'?c.hcp.W[h-1]:'')}<td class="sum"></td><td class="sum"></td></tr>`:''}
   </table>
   <footer><div class="notes"><span><i></i> Stroke received${pg.players.some(p=>typeof p.ph==='number'&&p.ph<0)?' · <i class="plus">+</i> stroke given back':''}${eventFormats(pub).includes('scramble')?' · <b class="xk"></b> scramble hole — team score only':''} · <b class="stk">▌</b> first hole${net?` · Allowances: ${esc(allowTxt)}`:''}</span>
-      <div class="sig"><span>Scorer</span><span>Attest</span></div></div>
+      <div class="sig">${mine?mine.members.map(p=>`<span>${esc(p.name)}</span>`).join('')+'<span>Marker</span>':'<span>Scorer</span><span>Attest</span>'}</div></div>
     <div class="qr"><div class="qrc" data-qr="${esc(groupLink(ev,grp))}"></div><div><b>Live scoring</b><span>Scan with your phone camera — opens group ${esc(grp.code)} ready to score.</span></div></div></footer>
 </section>`;
 }
@@ -2565,6 +2569,9 @@ const PRINT_CSS=`
 .pc .grp{display:flex;flex-direction:column;align-items:center;background:#fff;color:#0F2A38;border-radius:4px;padding:3px 10px;min-width:112px}
 .pc .grp span{font-size:8px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:#8C6A1F}
 .pc .grp b{font-size:20px;letter-spacing:.12em;line-height:1.05}
+.pc .grp b.when{letter-spacing:.02em;font-size:21px}
+.pc .who{display:flex;gap:18px;padding:5px 12px;border-bottom:1px solid #9AA3A8;background:#FBFAF5}
+.pc .who div{display:flex;flex-direction:column;min-width:0}.pc .who span{font-size:7.5px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#8C6A1F}.pc .who b{font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .pc .grp em{font-style:normal;font-size:8.5px;font-weight:600}
 .pc table{border-collapse:collapse;width:100%;table-layout:fixed;font-variant-numeric:tabular-nums;flex:1}
 .pc th,.pc td{border:1px solid #9AA3A8;text-align:center;font-size:9px;padding:0}
@@ -2576,6 +2583,7 @@ const PRINT_CSS=`
 .pc tr.pa td,.pc tr.pa th{height:14px;font-weight:700;background:#E8EDF0}
 .pc tr.si td,.pc tr.si th{height:12px;font-size:7.5px;color:#56626A}
 .pc tr.pr th{height:31px;line-height:1.15}
+.pc.team tr.pr th,.pc.team tr.pr td{height:44px}.pc.team tr.tb th,.pc.team tr.tb td{height:34px}
 .pc tr.pr th b{display:block;font-size:9.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .pc tr.pr th span,.pc tr.tb th span{display:block;font-size:7px;color:#56626A;font-weight:500}
 .pc tr.pr td{position:relative;height:31px}
@@ -2609,7 +2617,8 @@ function printScorecards(ev){
   if(ev.status==='draft') toast('Tip: open scoring before the round so the QR codes work on the course');
   const flights=(ev.flights&&ev.flights.names)||[];
   openDrawer({kicker:ev.name,title:'Print scorecards',saveLabel:'Open print preview',
-    body:`<p style="margin:0">One tournament card per group: event, flight, group ID and starting hole up top; each player’s playing handicap with dots on the holes they get strokes${ev.format==='bestball'?'; a blank best-ball line per team':''}; and a QR code that opens live scoring with that group already joined.</p>`+
+    body:`<p style="margin:0">Tournament cards with the event, flight, tee time or starting hole and group ID up top; each player’s playing handicap with dots on the holes they get strokes${ev.format==='bestball'?'; a blank best-ball line per team':''}; and a QR code that opens live scoring with that group already joined.</p>`+
+      (evTeam(ev)?field('Cards','pcU','team',{type:'select',options:[['team','One per team — teams swap cards and keep each other’s score'],['group','One per group']],hint:'Team cards print in group order, two to a page, so each page is one group.'}):'')+
       field('Layout','pcL','two',{type:'select',options:[['two','Two cards per letter page (cart size, cut in half)'],['one','One large card per page']]})+
       (flights.length?field('Groups','pcF','',{type:'select',options:[['','All '+ev.groups.length+' groups']].concat(flights.map(f=>[f,'Flight '+f+' only']))}):'')+
       field('Order','pcO','hole',{type:'select',options:[['hole','By course and starting hole'],['flight','By flight'],['code','By group ID']]})+
@@ -2619,14 +2628,16 @@ function printScorecards(ev){
       let gs=ev.groups.filter(g=>!fsel||g.players.some(p=>p.flight===fsel));
       gs=gs.slice().sort(order==='code'?(a,b)=>a.code.localeCompare(b.code):order==='flight'?(a,b)=>((a.players[0]||{}).flight||'~').localeCompare((b.players[0]||{}).flight||'~')||(a.course+a.startHole).localeCompare(b.course+b.startHole,undefined,{numeric:true}):(a,b)=>a.course.localeCompare(b.course)||(+a.startHole-+b.startHole)||a.label.localeCompare(b.label));
       const base=location.href.split('#')[0].split('?')[0].replace(/[^/]*$/,'');
+      const team=isTeamEvent(pub)&&fv('pcU')!=='group';
+      const cards=gs.flatMap(g=>{ const pg=pub.groups.find(x=>x.id===g.id); return team&&pg?groupTeams(pg).map(t=>printCardHTML(ev,pub,g,t.key)):[printCardHTML(ev,pub,g)]; });
       const html=(`<!doctype html><html><head><meta charset="utf-8"><base href="${base}"><title>${esc(ev.name)} · Scorecards</title>
         <style>${PRINT_CSS}</style></head>
-        <body><div class="bar"><button onclick="print()">Print</button><span id="st">Preparing ${gs.length} cards…</span></div><div class="sheet ${layout}">${gs.map(g=>printCardHTML(ev,pub,g)).join('')}</div>
+        <body><div class="bar"><button onclick="print()">Print</button><span id="st">Preparing ${cards.length} cards…</span></div><div class="sheet ${layout}">${cards.join('')}</div>
         <script>
         (function(){ var srcs=${JSON.stringify(QR_SRC)}, i=0;
           var fl=document.createElement('link'); fl.rel='stylesheet'; fl.href='https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@700&family=Public+Sans:wght@400;600;700;800&display=swap'; document.head.appendChild(fl);
           function draw(){ document.querySelectorAll('[data-qr]').forEach(function(el){ var q=qrcode(0,'M'); q.addData(el.getAttribute('data-qr')); q.make(); el.innerHTML=q.createSvgTag({cellSize:4,margin:0,scalable:true}); });
-            document.getElementById('st').textContent='${gs.length} cards ready'; setTimeout(function(){ print(); },500); }
+            document.getElementById('st').textContent='${cards.length} cards ready'; setTimeout(function(){ print(); },500); }
           function load(){ if(i>=srcs.length){ document.getElementById('st').textContent='QR codes couldn’t load — check the connection, then reload'; return; }
             var s=document.createElement('script'); s.src=srcs[i++]; s.onload=draw; s.onerror=load; document.head.appendChild(s); }
           var go=false; function once(){ if(go) return; go=true; load(); }
