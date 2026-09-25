@@ -75,6 +75,11 @@ One-time: Supabase → SQL Editor → run `golf-setup.sql`. Upload `score.html` 
 - **Flights:** event → Flights → enter how many. Filled evenly by course handicap (or Index),
   lowest in A, sizes differ by at most one. For team events linked to a tournament, teams stay
   together on combined handicap. Ties at a split are flagged; move anyone by hand afterward.
+- **Groups by flight:** with "Build groups by flight" on, flights are sized in whole groups
+  (two 2-person teams per foursome, so every flight has an even number of teams) and groups are
+  formed inside each flight. Whole flights go to one course (split Oak/Pecan, or all on one).
+  Starting holes go 1, 2, 3… from the lowest combined handicap up; extra groups double on par 5s.
+  Players are re-rated on the course they'll actually play before holes are ordered.
 - **Net scoring:** strokes are given by hole handicap (plus handicaps give strokes back). The
   leaderboard ranks gross or net, filters by flight, and the phone shows a dot on holes where a
   player gets a stroke. `…&view=board&flight=A` puts one flight on the TV.
