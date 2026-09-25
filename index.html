@@ -788,7 +788,7 @@ function editMenu(t,di,it){
 }
 
 /* Field */
-const inactiveBadge=m=>m&&m.status==='Inactive'?' <span class="chip inact">Inactive Member</span>':'';
+const inactiveBadge=m=>m&&m.status==='Inactive'?' <span class="chip inact" title="Not on the active MGA member list">Not Active</span>':'';
 function tField(el,t){
   const size=t.teamSize||2, teams={};
   t.field.forEach(p=>{ (teams[p.team||0]=teams[p.team||0]||[]).push(p); });
@@ -798,7 +798,7 @@ function tField(el,t){
   const rs=fieldRSVP(t), qs=t.fieldQuestions||[];
   const ansLine=p=>qs.filter(q=>yes((p.answers||{})[q.key])).map(q=>q.short||qShort(q.label)).join(' · ');
   const nInact=t.field.filter(p=>{const m=memberById(p.memberId);return m&&m.status==='Inactive';}).length;
-  el.innerHTML=`<div class="grid g4">${kpi('Players in field',String(t.field.length),(size>1?`${nums.length} team${nums.length===1?'':'s'} of ${size}`:'individual')+(nInact?` · ${nInact} inactive member${nInact>1?'s':''}`:''))}${kpi('Entry fee',fmt(t.entryFee),'per player')}${kpi('Entry fees paid',String(paid),`of ${t.field.length} · ${fmt(paid*n0(t.entryFee))} collected`)}${rs.headcount!=null?kpi('Dinner headcount',String(rs.headcount),`${rs.dinner} players${rs.guests!=null?' + '+rs.guests+' plus-ones':''}`):kpi('Skins entered',String(skins),n0(t.skinsFee)?'× '+fmt(t.skinsFee):'no skins fee set')}</div>
+  el.innerHTML=`<div class="grid g4">${kpi('Players in field',String(t.field.length),(size>1?`${nums.length} team${nums.length===1?'':'s'} of ${size}`:'individual')+(nInact?` · ${nInact} not active`:''))}${kpi('Entry fee',fmt(t.entryFee),'per player')}${kpi('Entry fees paid',String(paid),`of ${t.field.length} · ${fmt(paid*n0(t.entryFee))} collected`)}${rs.headcount!=null?kpi('Dinner headcount',String(rs.headcount),`${rs.dinner} players${rs.guests!=null?' + '+rs.guests+' plus-ones':''}`):kpi('Skins entered',String(skins),n0(t.skinsFee)?'× '+fmt(t.skinsFee):'no skins fee set')}</div>
   ${qs.length?`<div class="card pad" style="display:flex;gap:10px 24px;flex-wrap:wrap;align-items:center;font-size:13.5px"><span class="lbl">RSVPs</span>${qs.map(q=>`<span><b class="num">${t.field.filter(p=>yes((p.answers||{})[q.key])).length}</b> <span class="muted">${esc(q.label)}</span></span>`).join('')}${t.rosterFile?`<span class="muted" style="margin-left:auto;font-size:12.5px">From ${esc(t.rosterFile)} · ${new Date(t.rosterImportedAt).toLocaleDateString()}</span>`:''}</div>`:''}
   ${t.budgetBasis!=='field'?`<div class="banner">The budget uses ${n0(t.plannedPlayers)} planned players. Switch it to the field in Tournament details once signups close.</div>`:''}
   <div class="toolbar"><div class="actions"><button class="btn pri" id="fImp">${I.down}Import roster</button><button class="btn" id="fAdd">${I.plus}Add ${size>1?'team':'player'}</button></div><span class="muted" style="margin-left:auto;font-size:13px">Players are picked from Members${db.members.length?'':' — add members first'}.</span></div>
@@ -811,13 +811,13 @@ function editTeam(t,num){
   const size=t.teamSize||2, existing=num!=null?t.field.filter(p=>(p.team||0)===num):[];
   const next=num!=null?num:(Math.max(0,...t.field.map(p=>p.team||0))+1);
   const taken=new Set(t.field.filter(p=>(p.team||0)!==num).map(p=>p.memberId));
-  const opts=[['','— Choose member —'],['__new','+ New player (adds an Inactive member)']].concat(db.members.slice().sort((a,b)=>memberName(a).localeCompare(memberName(b))).map(m=>[m.id,memberName(m)+(m.status==='Inactive'?' — Inactive Member':'')+(taken.has(m.id)?' (already in field)':'')]));
+  const opts=[['','— Choose member —'],['__new','+ New player (not an MGA member — added as Not Active)']].concat(db.members.slice().sort((a,b)=>memberName(a).localeCompare(memberName(b))).map(m=>[m.id,memberName(m)+(m.status==='Inactive'?' — Not Active':'')+(taken.has(m.id)?' (already in field)':'')]));
   openDrawer({kicker:t.name+' · Field',title:size>1?(num!=null?'Team '+num:'Add team'):(num!=null?'Edit player':'Add player'),
-    body:(size>1?field('Team number','tmNum',next,{type:'number'}):'')+Array.from({length:size},(_,i)=>{const p=existing[i]||{};return `<div class="card pad" style="display:flex;flex-direction:column;gap:10px">${field('Player '+(i+1),'tmM'+i,p.memberId||'',{type:'select',options:opts})}<div id="tmB${i}">${inactiveBadge(memberById(p.memberId))?`<span class="chip inact">Inactive Member</span>`:''}</div>
+    body:(size>1?field('Team number','tmNum',next,{type:'number'}):'')+Array.from({length:size},(_,i)=>{const p=existing[i]||{};return `<div class="card pad" style="display:flex;flex-direction:column;gap:10px">${field('Player '+(i+1),'tmM'+i,p.memberId||'',{type:'select',options:opts})}<div id="tmB${i}">${inactiveBadge(memberById(p.memberId))?`<span class="chip inact">Not Active</span>`:''}</div>
       <div id="tmN${i}" hidden style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px"><input class="inp" id="tmNF${i}" placeholder="First name" aria-label="New player first name"><input class="inp" id="tmNL${i}" placeholder="Last name" aria-label="New player last name"><input class="inp" id="tmNE${i}" placeholder="Email (optional)" aria-label="New player email"></div><div style="display:flex;gap:10px 18px;flex-wrap:wrap"><label class="check"><input type="checkbox" id="tmP${i}"${p.paid?' checked':''}>Entry paid</label><label class="check"><input type="checkbox" id="tmS${i}"${p.skins?' checked':''}>In skins</label>${(t.fieldQuestions||[]).map((q,qi)=>`<label class="check"><input type="checkbox" id="tmQ${i}_${qi}"${yes((p.answers||{})[q.key])?' checked':''}>${esc(q.short||qShort(q.label))}</label>`).join('')}</div></div>`;}).join('')+
-      '<p class="hint">Players who aren’t current members can still play. Pick “New player” to add them to Members as Inactive; they’re marked Inactive Member in the field.</p>',
+      '<p class="hint">Players who aren’t active MGA members can still play. Pick “New player” to add them to Members as Inactive; they show as Not Active in the field.</p>',
     wire:r=>{ for(let i=0;i<size;i++){ const s=r.querySelector('#tmM'+i); const upd=()=>{ const n=r.querySelector('#tmN'+i); n.hidden=s.value!=='__new'; n.style.display=s.value==='__new'?'grid':'none';
-        r.querySelector('#tmB'+i).innerHTML=(s.value==='__new'||inactiveBadge(memberById(s.value)))?'<span class="chip inact">Inactive Member</span>':''; if(s.value==='__new') r.querySelector('#tmNF'+i).focus(); }; s.onchange=upd; upd(); } },
+        r.querySelector('#tmB'+i).innerHTML=(s.value==='__new'||inactiveBadge(memberById(s.value)))?'<span class="chip inact">Not Active</span>':''; if(s.value==='__new') r.querySelector('#tmNF'+i).focus(); }; s.onchange=upd; upd(); } },
     save:()=>{ const team=size>1?(+fv('tmNum')||next):next; const picks=[], created=[];
       for(let i=0;i<size;i++){ let mid=fv('tmM'+i); if(!mid) continue;
         if(mid==='__new'){ const f=fv('tmNF'+i), l=fv('tmNL'+i); if(!f&&!l){ toast('Enter the new player’s name'); return false; }
@@ -1070,10 +1070,10 @@ function previewField(t,res,fname){
       <p class="hint">${rows.length-newMembers.length} matched to existing members${rows.filter(r=>r.m&&r.m.status==='Inactive').length?` (${rows.filter(r=>r.m&&r.m.status==='Inactive').length} Inactive)`:''}${newMembers.length?` · <b>${newMembers.length} not in Members</b>`:''}${moved.length?` · ${moved.length} changing teams`:''}${res.skippedGuests?` · ${res.skippedGuests} guests skipped`:''}.</p>
       ${qs.length?`<div class="fld"><span class="lbl">RSVP questions found</span><span style="font-size:13.5px">${tally}</span></div>`:''}
       ${odd.length?`<div class="banner">${odd.length} team${odd.length>1?'s don’t':' doesn’t'} have ${size} players: ${odd.slice(0,6).map(([n,c])=>'Team '+n+' ('+c+')').join(', ')}${odd.length>6?'…':''}. They’ll import as-is so you can fix them on the Field tab.</div>`:''}
-      ${newMembers.length?`<div class="fld"><span class="lbl">Not in Members — will play as Inactive Members</span><div class="mini">${newMembers.slice(0,6).map(r=>`<div class="mr"><div class="cell2"><b>${pn(r)}</b><small>${esc([r.p.email,r.p.ghin&&'GHIN '+r.p.ghin].filter(Boolean).join(' · '))}</small></div></div>`).join('')}${newMembers.length>6?`<div class="mr"><span class="muted">+ ${newMembers.length-6} more</span></div>`:''}</div></div>`:''}
+      ${newMembers.length?`<div class="fld"><span class="lbl">Not on the MGA member list — will play as Not Active</span><div class="mini">${newMembers.slice(0,6).map(r=>`<div class="mr"><div class="cell2"><b>${pn(r)}</b><small>${esc([r.p.email,r.p.ghin&&'GHIN '+r.p.ghin].filter(Boolean).join(' · '))}</small></div></div>`).join('')}${newMembers.length>6?`<div class="mr"><span class="muted">+ ${newMembers.length-6} more</span></div>`:''}</div></div>`:''}
       ${removed.length?`<div class="fld"><span class="lbl">In the field now but not in this roster</span><div class="mini">${removed.slice(0,6).map(x=>`<div class="mr"><b>${esc(memberName(memberById(x.memberId))||'Unknown')}</b></div>`).join('')}${removed.length>6?`<div class="mr"><span class="muted">+ ${removed.length-6} more</span></div>`:''}</div></div>`:''}
       <div class="fld" style="gap:10px">
-        ${newMembers.length?`<label class="check"><input type="checkbox" id="fiAdd" checked>Add the ${newMembers.length} player${newMembers.length>1?'s':''} who aren’t members to Members as <b>Inactive</b></label>`:''}
+        ${newMembers.length?`<label class="check"><input type="checkbox" id="fiAdd" checked>Add the ${newMembers.length} player${newMembers.length>1?'s':''} who aren’t on the MGA member list to Members as <b>Inactive</b> (they still play, marked Not Active)</label>`:''}
         ${hcpChanges||fills?`<label class="check" style="align-items:flex-start"><input type="checkbox" id="fiUpd" checked><span>Update members from this roster <span class="muted">(${hcpChanges} handicap index${hcpChanges===1?'':'es'}${fills?`, fill in ${fills} missing phone/email/GHIN`:''})</span></span></label>`:''}
         ${removed.length?`<label class="check"><input type="checkbox" id="fiRem" checked>Remove the ${removed.length} player${removed.length>1?'s':''} not in this roster from the field</label>`:''}
         <label class="check"><input type="checkbox" id="fiPaid">Mark every imported player’s entry fee as paid</label>
@@ -1175,20 +1175,21 @@ function importRoster(){
       <p class="hint">Picks up email, handicap index, GHIN, Golf Genius ID, phone and address. People already in the hub are matched by Golf Genius ID, GHIN, email, then name, so uploading a newer export updates them instead of adding duplicates. You’ll see a preview before anything is saved.</p>
       <input type="file" id="rosterF" accept=".xlsx,.xls,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv" class="inp" style="padding-top:8px"><p class="hint" id="rosterMsg" aria-live="polite"></p>`,
     wire:r=>{ r.querySelector('#rosterF').onchange=async e=>{ const f=e.target.files[0]; if(!f) return; const msg=r.querySelector('#rosterMsg'); msg.style.color=''; msg.textContent='Reading '+f.name+'…';
-      try{ const res=mapRoster(await readRosterFile(f)); if(!res.people.length) throw new Error('No people found under the header row'); closeDrawer(); previewRoster(res,f.name); }
+      try{ const res=mapRoster(await readRosterFile(f)); if(!res.people.length) throw new Error('No people found under the header row');
+        closeDrawer(); previewRoster(res,f.name); }
       catch(err){ msg.style.color='var(--neg)'; msg.textContent=err.message||'Couldn’t read that file'; } }; }});
 }
-function previewRoster(res,fname){
+function previewRoster(res,fname,eventFile){
   const plan=planRoster(res.people,res.fileDate);
   const li=(t,sub)=>`<div class="mr" style="grid-template-columns:minmax(0,1fr)"><div class="cell2"><b>${t}</b>${sub?`<small>${sub}</small>`:''}</div></div>`;
   const more=(n,shown)=>n>shown?`<div class="mr"><span class="muted">+ ${n-shown} more</span></div>`:'';
   const SHOW=8;
   openDrawer({kicker:'Import · '+fname,title:'Review import',saveLabel:`Import ${plan.add.length+plan.update.length} change${plan.add.length+plan.update.length===1?'':'s'}`,
     body:`<div class="grid g3" style="gap:10px">${[['New',plan.add.length],['Updated',plan.update.length],['No change',plan.same.length]].map(([l,v])=>`<div class="card pad kpi" style="padding:14px"><span class="lbl">${l}</span><span class="v num" style="font-size:30px">${v}</span></div>`).join('')}</div>
-      <p class="hint">${res.people.length} people read from the file${res.skippedGuests?` · ${res.skippedGuests} guests skipped`:''}${res.skippedBlank?` · ${res.skippedBlank} rows without a name skipped`:''}.</p>
+      <p class="hint">Everyone in this file is imported as an <b>Active</b> MGA member. ${res.people.length} people read from the file${res.skippedGuests?` · ${res.skippedGuests} guests skipped`:''}${res.skippedBlank?` · ${res.skippedBlank} rows without a name skipped`:''}.</p>
       ${plan.add.length?`<div class="fld"><span class="lbl">New members</span><div class="mini">${plan.add.slice(0,SHOW).map(p=>li(esc(p.first+' '+p.last),esc([p.email,p.hcp&&'Index '+p.hcp,p.ghin&&'GHIN '+p.ghin].filter(Boolean).join(' · ')))).join('')}${more(plan.add.length,SHOW)}</div></div>`:''}
       ${plan.update.length?`<div class="fld"><span class="lbl">Updates to existing members</span><div class="mini">${plan.update.slice(0,SHOW).map(u=>li(esc(memberName(u.m)),u.changes.map(c=>esc(c.l)+': '+(c.from?esc(c.from)+' → ':'')+esc(c.to)).join(' · '))).join('')}${more(plan.update.length,SHOW)}</div><p class="hint">Blank cells in the file never erase what’s already in the hub.</p></div>`:''}
-      ${plan.missing.length?`<label class="check" style="align-items:flex-start;font-weight:400"><input type="checkbox" id="rosterInact"><span>Mark the ${plan.missing.length} active member${plan.missing.length===1?'':'s'} not in this file as Inactive <span class="muted">(${esc(plan.missing.slice(0,4).map(memberName).join(', '))}${plan.missing.length>4?'…':''})</span></span></label>`:''}`,
+      ${plan.missing.length?`<label class="check" style="align-items:flex-start;font-weight:400"><input type="checkbox" id="rosterInact"${(plan.update.length+plan.same.length)>=0.6*(plan.update.length+plan.same.length+plan.missing.length)?' checked':''}><span>Mark the ${plan.missing.length} active member${plan.missing.length===1?'':'s'} not on this MGA roster as Inactive <span class="muted">(${esc(plan.missing.slice(0,4).map(memberName).join(', '))}${plan.missing.length>4?'…':''})</span></span></label>`:''}`,
     save:()=>{
       const inact=$('rosterInact')&&$('rosterInact').checked;
       if(!plan.add.length&&!plan.update.length&&!inact){ toast('Nothing to change — the hub already matches this file'); return; }
