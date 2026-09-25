@@ -310,6 +310,8 @@ function normalize(d){
     t.dayItems=t.dayItems||[[],[],[]]; while(t.dayItems.length<3) t.dayItems.push([]);
     for(const k of ['field','sponsors','tiers','income','perPlayer','lines','schedule','decisions','fieldQuestions']) t[k]=t[k]||[];
     t.actuals=Object.assign({entryFees:0,skins:0,skinsPaid:0},t.actuals||{}); if(!t.budgetBasis) t.budgetBasis='planned';
+    (t.dayItems||[]).forEach(d=>(d||[]).forEach(it=>{ if(it.menu) it.menu.svcPct=0; }));
+    if(t.source&&t.source.raw) t.source.raw.dinnerSvc=0;
     if(!d.seasons[t.season]) d.seasons[t.season]=newSeason();
   }
   return d;
@@ -317,8 +319,9 @@ function normalize(d){
 
 /* ---------- calculations (single source of truth for every number on screen) ---------- */
 function menuSubtotal(m){ return sum(m&&m.items,i=>n0(i.qty)*n0(i.unitCost)); }
-function menuCharge(m){ return menuSubtotal(m)*n0(m&&m.svcPct)/100; }
-function menuTotal(m){ return menuSubtotal(m)+menuCharge(m); }
+/* catered menus use the club's all-in prices — nothing is added on top */
+function menuCharge(m){ return 0; }
+function menuTotal(m){ return menuSubtotal(m); }
 /* Budget uses the planned player count unless the board switches it to the field (so a half-filled field doesn't sink the budget). */
 function playersUsed(t){ return t.budgetBasis==='field'?t.field.length:n0(t.plannedPlayers); }
 function itemQty(t,it){ return it.qtyLink==='players'?playersUsed(t):n0(it.qty); }
@@ -398,7 +401,7 @@ function convertMM(y,year){
   t.tiers=(y.tiers||[]).map(x=>({id:x.id||uid(),name:x.name,amt:n0(x.amt)}));
   t.sponsors=(y.sponsors||[]).map(s=>({id:s.id||uid(),company:s.company||'',contact:s.contact||'',phone:s.phone||'',email:s.email||'',tier:s.tier||'',
     pledged:n0(s.pledged),committee:s.committee||'',notes:s.notes||'',payments:(s.payments||[]).map(p=>({id:p.id||uid(),amount:n0(p.amount),method:p.method||'',date:p.date||''}))}));
-  const dinnerMenu={items:(y.dinner||[]).map(d=>({id:d.id||uid(),item:d.item||'',qty:n0(d.qty),unitCost:n0(d.unitCost),notes:d.notes||''})),svcPct:n0(y.dinnerSvc),guests:n0(inp.satHeadcount)};
+  const dinnerMenu={items:(y.dinner||[]).map(d=>({id:d.id||uid(),item:d.item||'',qty:n0(d.qty),unitCost:n0(d.unitCost),notes:d.notes||''})),svcPct:0,guests:n0(inp.satHeadcount)};
   ['Friday','Saturday','Sunday'].forEach((day,di)=>{
     t.dayItems[di]=((y.fb||{})[day]||[]).map(i=>{
       const it={id:i.id||uid(),item:i.item||'',kind:guessKind(i.item||''),qty:oldResQty(y,i),unitCost:n0(i.unitCost),actual:n0(i.actual),notes:i.notes||'',qtyLink:''};
@@ -422,7 +425,7 @@ function convertMM(y,year){
    deposited figure), so the comparison is against what the old app shows. */
 function oldCalc(y){
   const n=y.inputs||{}, rev=y.rev||{}, a=y.actuals||{};
-  const dinnerSub=sum(y.dinner,i=>n0(i.qty)*n0(i.unitCost)), dinnerTot=dinnerSub+dinnerSub*n0(y.dinnerSvc)/100;
+  const dinnerSub=sum(y.dinner,i=>n0(i.qty)*n0(i.unitCost)), dinnerTot=dinnerSub;
   const lt=i=>i.costLink==='dinner'?dinnerTot:oldResQty(y,i)*n0(i.unitCost);
   const fb=d=>sum((y.fb||{})[d],lt), fbA=d=>sum((y.fb||{})[d],i=>i.actual);
   const pledged=sum(y.sponsors,s=>s.pledged), deposited=sum(y.sponsors,s=>s.deposited);
@@ -784,7 +787,7 @@ function editSched(t,di,id){
 
 /* Meals & events (per day) */
 function itemRow(t,it,di){
-  const q=it.menu?`Menu ${fmt(menuSubtotal(it.menu))} + ${n0(it.menu.svcPct)}%`:`${itemQty(t,it)}${it.qtyLink==='players'?' (players)':''} × ${fmt2(it.unitCost).replace('.00','')}`;
+  const q=it.menu?`Menu · ${it.menu.items.length} items`:`${itemQty(t,it)}${it.qtyLink==='players'?' (players)':''} × ${fmt2(it.unitCost).replace('.00','')}`;
   return `<div class="tr num click bl" data-item="${di}|${it.id}"><div class="cell2"><span style="font-weight:500">${esc(it.item)} <span class="chip" style="height:20px;font-size:11px;margin-left:4px">${esc(it.kind||'Other')}</span></span>${it.menu?`<small>${it.menu.items.length} menu items · ${n0(it.menu.guests)} guests</small>`:it.notes?`<small class="trunc">${esc(it.notes)}</small>`:''}</div><span class="muted" style="font-size:13px">${q}</span><b class="r">${fmt(itemTotal(t,it))}</b><span class="r muted" style="font-size:12.5px">${tA(t,'item',it.id,it.actual)?fmt(tA(t,'item',it.id,it.actual))+' act.':''}</span><span class="ib" aria-hidden="true">${I.edit}</span></div>`;
 }
 function tMeals(el,t){
@@ -814,14 +817,14 @@ function editItem(t,di,it){
       const nd=+fv('iDay'); if(it){ t.dayItems[di]=t.dayItems[di].filter(x=>x!==it); t.dayItems[nd].push(Object.assign(it,data)); } else t.dayItems[nd].push(Object.assign({id:uid()},data)); },
     del:it?()=>{ const i=t.dayItems[di].indexOf(it); t.dayItems[di].splice(i,1); toast('Removed',()=>{t.dayItems[di].splice(i,0,it);persist();render();}); }:null});
 }
-/* Catered menu: line items × qty × price, plus tax & service % */
+/* Catered menu: line items × qty × all-in price */
 function editMenu(t,di,it){
-  const menu=it?clone(it.menu):{items:[],svcPct:28,guests:playersUsed(t)};
+  const menu=it?clone(it.menu):{items:[],svcPct:0,guests:playersUsed(t)}; menu.svcPct=0;
   const rowsHTML=()=>menu.items.map((x,i)=>`<div class="mr num" style="grid-template-columns:minmax(0,1fr) 64px 84px 76px 28px"><input class="inp" data-mi="${i}" data-k="item" value="${esc(x.item)}" aria-label="Menu item"><input class="inp r" data-mi="${i}" data-k="qty" inputmode="decimal" value="${esc(x.qty)}" aria-label="${esc(x.item)} quantity"><input class="inp r" data-mi="${i}" data-k="unitCost" inputmode="decimal" value="${esc(x.unitCost)}" aria-label="${esc(x.item)} unit price"><b class="r" data-mt="${i}">${fmt(n0(x.qty)*n0(x.unitCost))}</b><button class="ib" data-mdel="${i}" aria-label="Remove ${esc(x.item)}">${I.x}</button></div>`).join('')||'<div class="mr"><span class="muted">No menu items yet.</span></div>';
   const totals=()=>{ const g=n0(menu.guests), tot=menuTotal(menu);
-    return `<div><span class="muted">Menu subtotal</span><span>${fmt(menuSubtotal(menu))}</span></div><div><span class="muted">Tax &amp; service (${n0(menu.svcPct)}%)</span><span>${fmt(menuCharge(menu))}</span></div><div class="big"><span>Total</span><span>${fmt(tot)}</span></div><div><span class="muted">Per guest</span><span>${g?fmt2(tot/g):'—'}</span></div>`; };
+    return `<div class="big"><span>Total <small class="muted" style="font-weight:500">all-in prices</small></span><span>${fmt(tot)}</span></div><div><span class="muted">Per guest</span><span>${g?fmt2(tot/g):'—'}</span></div>`; };
   openDrawer({kicker:dayLabel(t,di)+' · Catered menu',title:it?it.item:'New catered menu',
-    body:field('Name','mName',it?.item||'Dinner',{ph:'e.g. Dinner (WCCC)'})+pair(field('Guests','mGuests',menu.guests,{type:'number'}),field('Tax & service %','mSvc',menu.svcPct,{type:'number'}))+
+    body:field('Name','mName',it?.item||'Dinner',{ph:'e.g. Dinner (WCCC)'})+field('Guests','mGuests',menu.guests,{type:'number',hint:'Prices are all-in from the club — nothing is added on top.'})+
       (fieldRSVP(t).headcount!=null&&fieldRSVP(t).headcount!==n0(menu.guests)?`<div class="banner" style="justify-content:space-between"><span>Field RSVPs: <b>${fieldRSVP(t).headcount}</b> (${fieldRSVP(t).dinner} players + ${fieldRSVP(t).guests||0} plus-ones)</span><button class="btn sm" type="button" id="mUseRsvp">Use ${fieldRSVP(t).headcount}</button></div>`:'')+
       `<div class="fld"><div style="display:flex;justify-content:space-between;align-items:center"><span class="lbl">Menu</span><button class="btn sm" id="mAdd" type="button">${I.plus}Add item</button></div>
        <div class="mini"><div class="mr h" style="grid-template-columns:minmax(0,1fr) 64px 84px 76px 28px"><span>Item</span><span class="r">Qty</span><span class="r">Unit $</span><span class="r">Total</span><span></span></div><div id="mRows">${rowsHTML()}</div></div></div>
@@ -835,10 +838,9 @@ function editMenu(t,di,it){
       r.querySelector('#mAdd').onclick=()=>{ menu.items.push({id:uid(),item:'',qty:0,unitCost:0,notes:''}); rewire(); const ins=r.querySelectorAll('[data-k=item]'); ins[ins.length-1].focus(); };
       const ur=r.querySelector('#mUseRsvp'); if(ur) ur.onclick=()=>{ menu.guests=fieldRSVP(t).headcount; r.querySelector('#mGuests').value=menu.guests; r.querySelector('#mTot').innerHTML=totals(); ur.closest('.banner').remove(); };
       r.querySelector('#mGuests').oninput=e=>{ menu.guests=n0(e.target.value); r.querySelector('#mTot').innerHTML=totals(); };
-      r.querySelector('#mSvc').oninput=e=>{ menu.svcPct=n0(e.target.value); r.querySelector('#mTot').innerHTML=totals(); };
     },
     save:()=>{ menu.items=menu.items.filter(x=>x.item.trim()||n0(x.qty)||n0(x.unitCost)).map(x=>({...x,qty:n0(x.qty),unitCost:n0(x.unitCost)}));
-      menu.guests=fnum('mGuests'); menu.svcPct=fnum('mSvc');
+      menu.guests=fnum('mGuests'); menu.svcPct=0;
       const data={item:fv('mName')||'Catered menu',kind:'Meal',menu,qty:menu.guests,unitCost:0,qtyLink:'',actual:fnum('mAct'),notes:fv('mNotes')};
       if(it) Object.assign(it,data); else t.dayItems[di].push(Object.assign({id:uid()},data)); },
     del:it?()=>{ const i=t.dayItems[di].indexOf(it); t.dayItems[di].splice(i,1); toast('Menu removed',()=>{t.dayItems[di].splice(i,0,it);persist();render();}); }:null});
@@ -948,7 +950,7 @@ function tBudget(el,t){
     (n0(t.skinsFee)||c.skins?row('Skins / day money',`${c.players} × ${fmt(t.skinsFee)} · paid back out`,c.skins,tA(t,'skins','',t.actuals.skins),'a:skins'):'')+
     row('Sponsors',`${t.sponsors.length} sponsors · Sponsors tab`,c.pledged,c.received,'go:sponsors')+
     t.income.map(i=>row(esc(i.desc),i.source==='raffle'?'Season raffle':'',i.budget,tA(t,'inc',i.id,i.actual),'inc:'+i.id,i.notes?esc(i.notes):'')).join(''),'inc');
-  const days=[0,1,2].slice(0,t.days).map(di=>grp(dayLabel(t,di),c.dayTot[di],dayShort(t,di),t.dayItems[di].map(it=>row(esc(it.item),it.menu?`Menu ${fmt(menuSubtotal(it.menu))} + ${n0(it.menu.svcPct)}% service`:`${itemQty(t,it)} × ${fmt2(it.unitCost).replace('.00','')}`,itemTotal(t,it),tA(t,'item',it.id,it.actual),`it:${di}:${it.id}`,it.menu?`${it.menu.items.length} menu items · ${n0(it.menu.guests)} guests`:'')).join('')||'<div class="tr"><span class="muted">No meals or events.</span></div>','day'+di)).join('');
+  const days=[0,1,2].slice(0,t.days).map(di=>grp(dayLabel(t,di),c.dayTot[di],dayShort(t,di),t.dayItems[di].map(it=>row(esc(it.item),it.menu?`Menu · ${it.menu.items.length} items · all-in`:`${itemQty(t,it)} × ${fmt2(it.unitCost).replace('.00','')}`,itemTotal(t,it),tA(t,'item',it.id,it.actual),`it:${di}:${it.id}`,it.menu?`${it.menu.items.length} menu items · ${n0(it.menu.guests)} guests`:'')).join('')||'<div class="tr"><span class="muted">No meals or events.</span></div>','day'+di)).join('');
   const groups=[...new Set(t.lines.map(l=>l.group||'Other'))];
   const wide=grp('Tournament-wide',c.perPlayer+c.skinsPayout+c.lineTot,'',
     t.perPlayer.map(p=>row(esc(p.desc),`${c.players} × ${fmt(p.perPlayer)} per player`,c.players*n0(p.perPlayer),tA(t,'pp',p.id,p.actual),'pp:'+p.id)).join('')+
@@ -2677,7 +2679,7 @@ function hubToMM(t,base){
   const main=menus.find(m=>m.di===1)||menus[0];
   const pp0=t.perPlayer[0];
   y.inputs=Object.assign({},y.inputs||{},{golfers:players,entryFee:n0(t.entryFee),skins:n0(t.skinsFee),proCredit:pp0?n0(pp0.perPlayer):0});
-  if(main){ y.dinner=main.it.menu.items.map(x=>({id:x.id,qty:n0(x.qty),item:x.item,unitCost:n0(x.unitCost),notes:x.notes||''})); y.dinnerSvc=n0(main.it.menu.svcPct); y.inputs.satHeadcount=n0(main.it.menu.guests); }
+  if(main){ y.dinner=main.it.menu.items.map(x=>({id:x.id,qty:n0(x.qty),item:x.item,unitCost:n0(x.unitCost),notes:x.notes||''})); y.dinnerSvc=0; y.inputs.satHeadcount=n0(main.it.menu.guests); }
   else { y.dinner=[]; }
   const DAYS=['Friday','Saturday','Sunday'];
   y.fb={Friday:[],Saturday:[],Sunday:[]};

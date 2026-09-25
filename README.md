@@ -137,7 +137,7 @@ One-time: Supabase → SQL Editor → run `golf-setup.sql`. Upload `score.html` 
 
 - **Editing:** screens are read-only; every change happens in one side panel.
 - **Tournaments:** 1, 2 or 3 days. Each day holds meals and events (fixed quantity,
-  or "every player"), plus catered menus (line items + tax & service %). Tournament-
+  or "every player"), plus catered menus (line items at the club's all-in prices). Tournament-
   wide expenses are fixed amounts (prizes, gifts, misc) or per-player (pro shop credit).
   "Start from" copies another tournament's structure with actuals and payments cleared.
 - **Members:** Members → Import member list takes the Golf Genius contact list export
