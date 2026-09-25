@@ -94,6 +94,13 @@ One-time: Supabase → SQL Editor → run `golf-setup.sql`. Upload `score.html` 
   totals at the end. Best ball adds a team row per team (the counting score each hole, net or gross
   per the event) and underlines the ball that counted. Final rounds are stamped FINAL; Print gives
   a landscape copy. On phones the card stacks front and back nines.
+- **Printed scorecards:** event → Groups → **Print scorecards**. One tournament card per group:
+  event, date, course, format and flight; the group ID and starting hole in a box; yardage, par and
+  handicap rows; each player with their playing handicap and a dot on every hole they get a stroke
+  (+ where a plus handicap gives one back); a blank best-ball line per team; scorer/attest lines;
+  and a QR code that opens live scoring with that group already joined. Two cards per letter page
+  (cut in half for the cart) or one large card per page; all groups or one flight. Open scoring
+  before the round so the QR codes work.
 - **Close scoring** locks it: the public page can no longer change scores.
 - Security: the public page can only read an event's public info, look up a group by its ID, and
   save scores for that group's players while the event is open. Group IDs are never exposed.

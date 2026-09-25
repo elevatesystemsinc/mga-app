@@ -2333,12 +2333,13 @@ function gFlights(el,ev){
 function gGroups(el,ev){
   const cols='grid-template-columns:100px minmax(0,1.1fr) 110px 70px minmax(0,2fr) 40px';
   const F=ev.flights||{}, pool=ev.pool||[];
-  el.innerHTML=`<div class="toolbar"><div class="actions">${F.count?`<button class="btn pri" id="ggFl">Build groups from flights</button>`:`<button class="btn pri" id="ggFld"${evPlayers(ev).length?'':' disabled'}>Build groups from field</button>`}<button class="btn" id="ggAdd">${I.plus}Add group</button></div><span class="muted" style="margin-left:auto;font-size:13px">Each group gets its own group ID. Players enter it on the scoring page.</span></div>
+  el.innerHTML=`<div class="toolbar"><div class="actions">${F.count?`<button class="btn pri" id="ggFl">Build groups from flights</button>`:`<button class="btn pri" id="ggFld"${evPlayers(ev).length?'':' disabled'}>Build groups from field</button>`}<button class="btn" id="ggAdd">${I.plus}Add group</button>${ev.groups.length?`<button class="btn" id="ggPrint">Print scorecards</button>`:''}</div><span class="muted" style="margin-left:auto;font-size:13px">Each group gets its own group ID. Players enter it on the scoring page.</span></div>
   ${pool.length?`<div class="banner">${pool.length} player${pool.length===1?' isn’t':'s aren’t'} in a group yet. ${F.count?'Build groups from flights':'Build groups from the field'} to place them.</div>`:''}
   <div class="card" style="overflow:hidden">${ev.groups.length?`<div class="tw"><div class="t" style="min-width:820px"><div class="tr th" style="${cols}"><span>Group ID</span><span>Group</span><span>Course</span><span>Starts</span><span>Players</span><span></span></div>
    ${ev.groups.map(g=>`<div class="tr click" data-gg="${g.id}" style="${cols}"><b style="letter-spacing:.06em;color:var(--navy)">${esc(g.code)}</b>${(()=>{ const hs=g.players.map(p=>playerHcp(ev,g,p).ch); const tot=hs.every(v=>v!=null)&&hs.length?hs.reduce((a,v)=>a+v,0):null; return `<div class="cell2"><span class="trunc">${esc(g.label||'—')}</span>${tot!=null?`<small>Combined ${fmtH(tot,'course')}</small>`:''}</div>`; })()}<span class="muted">${esc(courseById(g.course)?.name||'')}</span><span class="num">Hole ${+g.startHole||1}</span><span class="trunc">${g.players.map(p=>{ const h=playerHcp(ev,g,p); return esc(p.name)+(h.ch!=null?` <span class="muted">(${fmtH(h.ch,'course')})</span>`:''); }).join(', ')||'<span class="muted">No players</span>'}</span><span class="ib">${I.edit}</span></div>`).join('')}</div></div>`
    :`<div class="empty"><b>No groups yet</b><span>${F.count?'Build groups from the flights — groups stay inside each flight, and starting holes follow combined handicap.':'Build groups from the field, or add them by hand.'}</span></div>`}</div>`;
   $('ggAdd').onclick=()=>editGroup(ev,null);
+  const pr=$('ggPrint'); if(pr) pr.onclick=()=>printScorecards(ev);
   const a=$('ggFl'); if(a) a.onclick=()=>buildGroupsFromFlights(ev);
   const b=$('ggFld'); if(b) b.onclick=()=>buildGroupsFromField(ev);
   el.querySelectorAll('[data-gg]').forEach(r=>r.onclick=()=>editGroup(ev,ev.groups.find(g=>g.id===r.dataset.gg)));
@@ -2384,9 +2385,127 @@ function viewCard(ev,grp,highlight){
   const pub=publicEvent(ev), pg=pub.groups.find(x=>x.id===grp.id);
   openDrawer({kicker:ev.name+' · Group '+grp.code,title:'Scorecard',wide:'x',saveLabel:'Correct scores',
     body:scorecardHTML(pub,pg,scoresFor(ev),{highlight})+`<div class="actions" style="justify-content:flex-end"><button class="btn sm" type="button" id="vcPrint">Print</button></div>`,
-    wire:r=>{ r.querySelector('#vcPrint').onclick=()=>{ const w=window.open('','_blank'); if(!w){ toast('Allow pop-ups to print'); return; }
-      w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>${esc(ev.name)} · ${esc(grp.code)}</title><link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@1,700&family=Public+Sans:wght@400;600;700;800&display=swap" rel="stylesheet"><style>${WC_CSS} body{margin:24px} .wc th:first-child,.wc td:first-child{position:static} @page{size:landscape;margin:12mm}</style></head><body>${scorecardHTML(pub,pg,scoresFor(ev),{})}<script>setTimeout(()=>print(),400)<\/script></body></html>`); w.document.close(); }; },
+    wire:r=>{ r.querySelector('#vcPrint').onclick=()=>{ const html=(`<!doctype html><html><head><meta charset="utf-8"><title>${esc(ev.name)} · ${esc(grp.code)}</title><style>${WC_CSS} body{margin:24px} .wc th:first-child,.wc td:first-child{position:static} @page{size:landscape;margin:12mm}</style></head><body>${scorecardHTML(pub,pg,scoresFor(ev),{})}<script>setTimeout(()=>print(),400)<\/script></body></html>`); const w=window.open(URL.createObjectURL(new Blob([html],{type:'text/html'})),'_blank'); if(!w) toast('Allow pop-ups to print'); }; },
     save:()=>{ setTimeout(()=>scoreSheet(ev,grp),0); }});
+}
+
+/* ============ Printed tournament scorecards (one per group, QR for live scoring) ============ */
+const QR_SRC=['https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js','https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.js'];
+const groupLink=(ev,grp)=>scoringLink(ev)+'&g='+encodeURIComponent(grp.code);
+/* the crest embedded as data so the print page never depends on loading a file */
+let CREST_DATA='';
+function crestSrc(){ if(CREST_DATA) return CREST_DATA; const abs=location.href.split('#')[0].split('?')[0].replace(/[^/]*$/,'')+'crest.png?v=2';
+  try{ const im=document.querySelector('.brand img'); if(im&&im.complete&&im.naturalWidth){ const c=document.createElement('canvas'); c.width=im.naturalWidth; c.height=im.naturalHeight; c.getContext('2d').drawImage(im,0,0); CREST_DATA=c.toDataURL('image/png'); return CREST_DATA; } }catch(_){}
+  return abs; }
+function printCardHTML(ev,pub,grp){
+  const pg=pub.groups.find(x=>x.id===grp.id), c=pub.courses[grp.course]; if(!pg||!c) return '';
+  const BB=pub.format==='bestball', net=pub.scoring==='net', start=+grp.startHole||1;
+  const hc=p=>c.hcp[p.set||'M']||c.hcp.M, par=p=>c.par[p.set||'M']||c.par.M;
+  const tees=[...new Set(pg.players.map(p=>p.tee))].filter(t=>c.tees&&c.tees[t]);
+  const holes=Array.from({length:18},(_,i)=>i+1);
+  const cells=(fn,cls='')=>holes.slice(0,9).map(h=>`<td class="${cls}${h===start?' st':''}">${fn(h)}</td>`).join('')+`<td class="sum">${fn('out')}</td>`+holes.slice(9).map(h=>`<td class="${cls}${h===start?' st':''}">${fn(h)}</td>`).join('')+`<td class="sum">${fn('in')}</td><td class="sum">${fn('tot')}</td>`;
+  const sumP=(arr,k)=>k==='out'?arr.slice(0,9).reduce((a,b)=>a+b,0):k==='in'?arr.slice(9).reduce((a,b)=>a+b,0):arr.reduce((a,b)=>a+b,0);
+  const phTxt=p=>typeof p.ph==='number'?(p.ph<0?'+'+(-p.ph):p.ph):'';
+  const anyW=pg.players.some(p=>p.set==='W');
+  const teams=BB?[...new Set(pg.players.map(p=>p.team||p.id))].map(tk=>pg.players.filter(p=>(p.team||p.id)===tk)):[];
+  const pRow=p=>`<tr class="pr"><th><b>${esc(p.name)}</b><span>${esc(p.tee)}${p.flight?' · Flight '+esc(p.flight):''}</span></th>${cells(h=>{ if(typeof h!=='number') return ''; const k=typeof p.ph==='number'?strokesOn(p.ph,hc(p)[h-1]):0; return k>0?'<i></i>'.repeat(Math.min(k,2)):k<0?'<i class="plus">+</i>':''; })}<td class="sum hc">${phTxt(p)}</td><td class="sum"></td></tr>`;
+  return `<section class="pc">
+  <header><img src="${crestSrc()}" alt=""><div class="ttl"><b>${esc(pub.name)}</b><span>${esc([pub.date?new Date(pub.date+'T12:00').toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric',year:'numeric'}):'',c.name].filter(Boolean).join(' · '))}</span><span>${esc(FORMAT_LABEL[pub.format]||'Stroke play')} · ${net?'Net':'Gross'}${pg.players[0]&&pg.players[0].flight?' · Flight '+esc(pg.players[0].flight):''}</span></div>
+    <div class="grp"><span>Group</span><b>${esc(grp.code)}</b><em>Starts hole ${start}${grp.label&&/ B /.test(grp.label)?' (B)':''}</em></div></header>
+  <table>
+    <tr class="hd"><th>Hole</th>${cells(h=>typeof h==='number'?h:h==='out'?'Out':h==='in'?'In':'Tot')}<td class="sum">Hcp</td><td class="sum">Net</td></tr>
+    ${tees.map(t=>`<tr class="yd"><th>${esc(t)}</th>${cells(h=>typeof h==='number'?c.tees[t][h-1]:sumP(c.tees[t],h))}<td class="sum"></td><td class="sum"></td></tr>`).join('')}
+    <tr class="pa"><th>Par</th>${cells(h=>typeof h==='number'?(anyW&&c.par.W[h-1]!==c.par.M[h-1]?c.par.M[h-1]+'/'+c.par.W[h-1]:c.par.M[h-1]):sumP(c.par.M,h))}<td class="sum"></td><td class="sum"></td></tr>
+    <tr class="si"><th>Handicap</th>${cells(h=>typeof h==='number'?c.hcp.M[h-1]:'')}<td class="sum"></td><td class="sum"></td></tr>
+    ${BB?teams.map((t,i)=>t.map(pRow).join('')+`<tr class="tb"><th><b>Team ${i+1} best ball</b><span>${net?'Lowest net score each hole':'Lowest score each hole'}</span></th>${cells(()=>'')}<td class="sum"></td><td class="sum"></td></tr>`).join(''):pg.players.map(pRow).join('')}
+    ${anyW?`<tr class="si"><th>Women’s hcp</th>${cells(h=>typeof h==='number'?c.hcp.W[h-1]:'')}<td class="sum"></td><td class="sum"></td></tr>`:''}
+  </table>
+  <footer><div class="notes"><span><i></i> Stroke received${pg.players.some(p=>typeof p.ph==='number'&&p.ph<0)?' · <i class="plus">+</i> stroke given back':''} · <b class="stk">▌</b> starting hole${net?` · ${ev.allowance||100}% handicap allowance`:''}</span>
+      <div class="sig"><span>Scorer</span><span>Attest</span></div></div>
+    <div class="qr"><div class="qrc" data-qr="${esc(groupLink(ev,grp))}"></div><div><b>Live scoring</b><span>Scan with your phone camera — opens group ${esc(grp.code)} ready to score.</span></div></div></footer>
+</section>`;
+}
+const PRINT_CSS=`
+@page{size:letter portrait;margin:.3in}
+*{box-sizing:border-box} body{margin:0;font-family:'Public Sans',Arial,sans-serif;color:#14222B;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+.sheet{display:flex;flex-direction:column}
+.pc{height:4.98in;border:1.5px solid #0F2A38;border-radius:6px;overflow:hidden;display:flex;flex-direction:column;break-inside:avoid;page-break-inside:avoid;margin-bottom:.2in}
+.one .pc{height:auto;min-height:7.4in} .one .pc{break-after:page;page-break-after:always;margin:0}
+.two .pc:nth-of-type(2n){break-after:page;page-break-after:always}
+.pc header{display:flex;align-items:center;gap:10px;background:#0F2A38;color:#fff;padding:7px 12px;border-bottom:3px solid #C7A13A}
+.pc header img{width:30px;height:39px;object-fit:contain;background:#fff;border-radius:3px;padding:1px}
+.pc .ttl{flex:1;min-width:0;display:flex;flex-direction:column;line-height:1.2}
+.pc .ttl b{font-family:'Cormorant Garamond',Georgia,serif;font-size:20px;font-weight:700;letter-spacing:.01em}
+.pc .ttl span{font-size:9.5px;color:#D8C79A}
+.pc .grp{display:flex;flex-direction:column;align-items:center;background:#fff;color:#0F2A38;border-radius:4px;padding:3px 10px;min-width:112px}
+.pc .grp span{font-size:8px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:#8C6A1F}
+.pc .grp b{font-size:20px;letter-spacing:.12em;line-height:1.05}
+.pc .grp em{font-style:normal;font-size:8.5px;font-weight:600}
+.pc table{border-collapse:collapse;width:100%;table-layout:fixed;font-variant-numeric:tabular-nums;flex:1}
+.pc th,.pc td{border:1px solid #9AA3A8;text-align:center;font-size:9px;padding:0}
+.pc th{width:1.22in;text-align:left;padding:0 5px;font-weight:600}
+.pc td.sum{background:#F2EEE3;font-weight:700;width:.34in}
+.pc tr.hd th,.pc tr.hd td{background:#0F2A38;color:#fff;font-weight:700;height:15px}
+.pc tr.hd td.sum{background:#1F3F55}
+.pc tr.yd td,.pc tr.yd th{height:13px;font-size:8px;color:#56626A}
+.pc tr.pa td,.pc tr.pa th{height:14px;font-weight:700;background:#E8EDF0}
+.pc tr.si td,.pc tr.si th{height:12px;font-size:7.5px;color:#56626A}
+.pc tr.pr th{height:31px;line-height:1.15}
+.pc tr.pr th b{display:block;font-size:9.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pc tr.pr th span,.pc tr.tb th span{display:block;font-size:7px;color:#56626A;font-weight:500}
+.pc tr.pr td{position:relative;height:31px}
+.pc tr.pr td i{position:absolute;top:2px;width:4.5px;height:4.5px;border-radius:50%;background:#14222B;left:2px}
+.pc tr.pr td i+i{left:8px}
+.pc tr.pr td i.plus{background:none;font-style:normal;font-size:8px;font-weight:800;width:auto;height:auto;top:0}
+.pc tr.pr td.hc{font-size:11px}
+.pc tr.tb th,.pc tr.tb td{height:24px;background:#FBF4E0}
+.pc tr.tb th b{font-size:8.5px}
+.pc td.st{box-shadow:inset 3px 0 0 #C7A13A}
+.pc tr.hd td.st{background:#C7A13A;color:#0F2A38}
+.pc footer{display:flex;gap:12px;align-items:stretch;padding:6px 10px;border-top:1px solid #9AA3A8}
+.pc .notes{flex:1;display:flex;flex-direction:column;justify-content:space-between;font-size:8px;color:#56626A}
+.pc .notes i{display:inline-block;width:5px;height:5px;border-radius:50%;background:#14222B;vertical-align:1px}
+.pc .notes i.plus{background:none;font-style:normal;font-weight:800;color:#14222B;width:auto;height:auto}
+.pc .notes .stk{color:#C7A13A}
+.pc .sig{display:flex;gap:18px}.pc .sig span{flex:1;border-top:1px solid #14222B;padding-top:2px;font-size:8px;margin-top:14px}
+.pc .qr{display:flex;align-items:center;gap:7px;width:2.1in}
+.pc .qrc{width:.78in;height:.78in;flex-shrink:0}.pc .qrc svg,.pc .qrc img{width:100%;height:100%;display:block}
+.pc .qr b{display:block;font-size:9.5px;color:#0F2A38}.pc .qr span{font-size:7.5px;color:#56626A;line-height:1.25;display:block}
+.one .pc th,.one .pc td{font-size:11px}.one .pc tr.pr td,.one .pc tr.pr th{height:44px}.one .pc .qrc{width:1in;height:1in}
+@media screen{ body{background:#E9E4D6;padding:20px} .sheet{max-width:8.1in;margin:0 auto} .pc{background:#fff} .bar{max-width:8.1in;margin:0 auto 14px;display:flex;gap:10px;align-items:center;font:14px 'Public Sans',sans-serif} .bar button{height:38px;padding:0 16px;border-radius:8px;border:1px solid #0F2A38;background:#0F2A38;color:#fff;font-weight:700;cursor:pointer} }
+@media print{ .bar{display:none} }
+`;
+function printScorecards(ev){
+  if(!ev.groups.length){ toast('Build groups first'); return; }
+  if(ev.status==='draft') toast('Tip: open scoring before the round so the QR codes work on the course');
+  const flights=(ev.flights&&ev.flights.names)||[];
+  openDrawer({kicker:ev.name,title:'Print scorecards',saveLabel:'Open print preview',
+    body:`<p style="margin:0">One tournament card per group: event, flight, group ID and starting hole up top; each player’s playing handicap with dots on the holes they get strokes${ev.format==='bestball'?'; a blank best-ball line per team':''}; and a QR code that opens live scoring with that group already joined.</p>`+
+      field('Layout','pcL','two',{type:'select',options:[['two','Two cards per letter page (cart size, cut in half)'],['one','One large card per page']]})+
+      (flights.length?field('Groups','pcF','',{type:'select',options:[['','All '+ev.groups.length+' groups']].concat(flights.map(f=>[f,'Flight '+f+' only']))}):'')+
+      field('Order','pcO','hole',{type:'select',options:[['hole','By course and starting hole'],['flight','By flight'],['code','By group ID']]})+
+      `<p class="hint">Printing uses your browser’s print dialog — choose “Save as PDF” to send it to the pro shop. The QR codes point to ${esc(scoringLink(ev).replace(/^https?:\/\//,''))}.</p>`,
+    save:()=>{
+      const fsel=$('pcF')?fv('pcF'):'', order=fv('pcO'), layout=fv('pcL'), pub=publicEvent(ev);
+      let gs=ev.groups.filter(g=>!fsel||g.players.some(p=>p.flight===fsel));
+      gs=gs.slice().sort(order==='code'?(a,b)=>a.code.localeCompare(b.code):order==='flight'?(a,b)=>((a.players[0]||{}).flight||'~').localeCompare((b.players[0]||{}).flight||'~')||(a.course+a.startHole).localeCompare(b.course+b.startHole,undefined,{numeric:true}):(a,b)=>a.course.localeCompare(b.course)||(+a.startHole-+b.startHole)||a.label.localeCompare(b.label));
+      const base=location.href.split('#')[0].split('?')[0].replace(/[^/]*$/,'');
+      const html=(`<!doctype html><html><head><meta charset="utf-8"><base href="${base}"><title>${esc(ev.name)} · Scorecards</title>
+        <style>${PRINT_CSS}</style></head>
+        <body><div class="bar"><button onclick="print()">Print</button><span id="st">Preparing ${gs.length} cards…</span></div><div class="sheet ${layout}">${gs.map(g=>printCardHTML(ev,pub,g)).join('')}</div>
+        <script>
+        (function(){ var srcs=${JSON.stringify(QR_SRC)}, i=0;
+          var fl=document.createElement('link'); fl.rel='stylesheet'; fl.href='https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@700&family=Public+Sans:wght@400;600;700;800&display=swap'; document.head.appendChild(fl);
+          function draw(){ document.querySelectorAll('[data-qr]').forEach(function(el){ var q=qrcode(0,'M'); q.addData(el.getAttribute('data-qr')); q.make(); el.innerHTML=q.createSvgTag({cellSize:4,margin:0,scalable:true}); });
+            document.getElementById('st').textContent='${gs.length} cards ready'; setTimeout(function(){ print(); },500); }
+          function load(){ if(i>=srcs.length){ document.getElementById('st').textContent='QR codes couldn’t load — check the connection, then reload'; return; }
+            var s=document.createElement('script'); s.src=srcs[i++]; s.onload=draw; s.onerror=load; document.head.appendChild(s); }
+          var go=false; function once(){ if(go) return; go=true; load(); }
+          if(document.fonts&&document.fonts.ready) document.fonts.ready.then(once); setTimeout(once,1200);
+        })();
+        <\/script></body></html>`);
+      const w=window.open(URL.createObjectURL(new Blob([html],{type:'text/html'})),'_blank'); if(!w){ toast('Allow pop-ups for this site to print'); return false; }
+      return undefined; }});
 }
 
 boot();

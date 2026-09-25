@@ -310,7 +310,9 @@ async function boot(){
     if(tab!=='score') render(); }).subscribe();
   setInterval(async()=>{ if(tab==='board'&&document.visibilityState==='visible'){ await loadScores(); render(); } },30000);
   const saved=(()=>{ try{ return JSON.parse(localStorage.getItem(KEY)||'null'); }catch(_){ return null; } })();
-  if(saved&&saved.code&&!BIG) await join(saved.code,true);
+  const qg=(qs.get('g')||'').trim();
+  if(qg&&!BIG){ const ok=await join(qg,true); if(ok) history.replaceState(null,'',location.pathname+'?e='+encodeURIComponent(SLUG)); }
+  else if(saved&&saved.code&&!BIG) await join(saved.code,true);
   render(); flush();
 }
 async function join(c,silent){
