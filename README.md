@@ -55,7 +55,11 @@ and choose it when the import asks.
   (.xlsx) or any spreadsheet/CSV with name columns. Preview first; re-uploading a newer
   export updates people (matched by Golf Genius ID, GHIN, email, then name) and blank
   cells never erase existing data. Optionally mark people missing from the file Inactive.
-- **Field:** teams picked from Members, entry paid and skins per player. The budget
+- **Field:** Field tab → Import roster takes the Golf Genius registration export for the
+  event. Team Id sets the teams, RSVP questions (dinner, plus one, Par 3, anything else)
+  are kept per player, and the dinner headcount (players + plus-ones) can be applied to
+  a catered menu in one click. Re-uploading a newer export updates the field. Teams can
+  also be picked by hand from Members, entry paid and skins per player. The budget
   uses the planned player count until you switch it to the field in Tournament details.
 - **Season budget:** all tournaments + annual dues (active members × dues, not
   prorated, recorded per member) + any MGA-level lines. The 50/50 raffle is counted
