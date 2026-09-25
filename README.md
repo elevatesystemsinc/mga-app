@@ -60,6 +60,11 @@ cloud is the source of truth on every load.
 - **Backups:** app menu (⋯) → *Backup all data* downloads a JSON of every year.
   Creating a new year auto-downloads one first. *Restore backup* loads it back
   (and syncs up to the cloud).
+- **Budget workbook:** app menu (⋯) → *Export budget workbook* downloads an .xlsx
+  of the active year: every input, sponsor, payment, F&B line, dinner menu item and
+  misc line, plus Excel formulas that recompute each budget total next to the value
+  the app shows. The **Check** column should be 0 everywhere; anything else is a
+  mismatch worth looking at. (Loads the SheetJS library from jsDelivr on first use.)
 - **Sync status:** dot in the header — green saved, gold saving, red offline
   (offline changes are kept on-device and pushed on the next edit).
 - **Conflict model:** last-write-wins on the whole state, debounced 800ms.

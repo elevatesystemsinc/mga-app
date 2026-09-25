@@ -438,6 +438,7 @@ input,select,textarea{font-family:inherit;font-size:16px}
   <button class="menu-item" id="miGoal"><span class="ic">🎯</span><span>Edit sponsorship goal<small>Change this year's target</small></span></button>
   <button class="menu-item" id="miCsv"><span class="ic">⬇</span><span>Export sponsors CSV<small>Current year, opens in Excel</small></span></button>
   <button class="menu-item" id="miCsvO"><span class="ic">⬇</span><span>Export outreach CSV<small>Full prospecting log</small></span></button>
+  <button class="menu-item" id="miReview"><span class="ic">📊</span><span>Export budget workbook<small>Excel file with every number and how it's calculated</small></span></button>
   <button class="menu-item" id="miBackup"><span class="ic">💾</span><span>Backup all data<small>Download JSON of every year</small></span></button>
   <button class="menu-item" id="miRestore"><span class="ic">📂</span><span>Restore backup<small>Load a JSON backup file</small></span></button>
   <button class="menu-item" id="miDeleteYear" style="color:var(--danger)"><span class="ic" style="background:#F6E4E0;color:var(--danger)">✕</span><span>Delete this year<small>Removes the active year permanently</small></span></button>
@@ -1593,6 +1594,125 @@ $('miCsvO').onclick=()=>{
   yr().outreach.forEach(o=>rows.push([o.company,o.contact,o.phone,o.email,o.target,o.committee,o.status,o.lastContact,o.notes]));
   csvOut(rows,db.activeYear+'_outreach.csv'); closeSheets(); toast('Outreach CSV exported');
 };
+/* ============ budget review workbook (.xlsx) ============
+   Every raw input from the app, plus Excel formulas that recompute each total from those inputs,
+   next to the value the app itself shows. "Check" = formula minus app; anything non-zero is a mismatch. */
+function loadXLSX(){
+  if(window.XLSX) return Promise.resolve();
+  return new Promise((ok,bad)=>{ const t=document.createElement('script');
+    t.src='https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js'; t.onload=ok; t.onerror=bad; document.head.appendChild(t); });
+}
+async function exportReview(){
+  try{ await loadXLSX(); }catch(e){ toast('Couldn\u2019t load the Excel library — check your connection'); return; }
+  const y=yr(), n=y.inputs, c=calc(), wb=XLSX.utils.book_new();
+  const F=f=>({t:'n',f}), num=v=>+v||0;
+  const add=(name,rows,cols)=>{ const ws=XLSX.utils.aoa_to_sheet(rows); ws['!cols']=cols.map(w=>({wch:w})); XLSX.utils.book_append_sheet(wb,ws,name); };
+  const Q=nm=>"'"+nm+"'!";
+
+  /* Inputs */
+  const inp=[['Input','Value','Where it is set']], at={};
+  const I=(k,label,v,where)=>{ inp.push([label,num(v),where]); at[k]=Q('Inputs')+'$B$'+inp.length; };
+  I('golfers','Number of golfers',n.golfers,'Budget → Planning inputs');
+  I('entryFee','Entry fee per golfer',n.entryFee,'Budget → Planning inputs');
+  I('skins','Day/Skins money per golfer',n.skins,'Budget → Planning inputs');
+  I('proCredit','Pro shop credit per golfer',n.proCredit,'Budget → Planning inputs');
+  I('satHeadcount','Saturday dinner headcount',n.satHeadcount,'Budget → Planning inputs');
+  I('snackCount','Snack count',n.snackCount,'(used by linked F&B lines)');
+  I('carry','Carry forward',y.rev.carry,'Budget → Revenue');
+  I('mga','MGA donation',y.rev.mga,'Budget → Revenue');
+  I('raffles','50/50 raffles',y.rev.raffles,'Budget → Revenue');
+  I('flightPrize','Flight prize budget',y.flightPrizeBudget,'Budget → Expenses');
+  I('dinnerSvc','Dinner tax & service %',y.dinnerSvc,'Budget → Saturday dinner menu');
+  I('goal','Sponsorship goal',y.goal,'Menu → Edit sponsorship goal');
+  const fc=y.flightCalc;
+  I('fcFlights','Flight calc: flights',fc.flights,'Budget → Flight calculator');
+  ['p1','p2','p3','p4'].forEach((k,i)=>I('fc'+k,'Flight calc: place '+(i+1)+' $',fc[k],'Budget → Flight calculator'));
+  const a=y.actuals;
+  [['entryFees','Actual: entry fees'],['skins','Actual: day/skins collected'],['carry','Actual: carry forward'],['mga','Actual: MGA donation'],
+   ['raffles','Actual: 50/50 raffles'],['flight','Actual: flight prizes paid'],['proShop','Actual: pro shop spree'],['skinsPay','Actual: skins paid out']]
+   .forEach(([k,l])=>I('a_'+k,l,a[k],'Budget → Budget vs actual'));
+  add('Inputs',inp,[34,12,34]);
+
+  /* Sponsors + payments */
+  const sp=[['Key','Company','Tier','Pledged $','Deposited $ (sum of payments)','Deposited $ (app)','Check','Status (app)','Status (recomputed)','Status match','Committee']];
+  const pay=[['Sponsor key','Company','Amount $','Method','Date']];
+  y.sponsors.forEach((s,i)=>{ const k='S'+(i+1), r=sp.length+1;
+    (s.payments||[]).forEach(p=>pay.push([k,s.company,num(p.amount),p.method||'',p.date||'']));
+    sp.push([k,s.company,s.tier,num(s.pledged),F(`SUMIF(Payments!$A:$A,A${r},Payments!$C:$C)`),num(s.deposited),F(`E${r}-F${r}`),
+      s.status,F(`IF(E${r}<=0,"Pledged",IF(E${r}>=D${r},"Deposited","Partial"))`),F(`IF(H${r}=I${r},"OK","MISMATCH")`),s.committee||'']); });
+  const spEnd=sp.length;
+  sp.push(['','Total','',F(`SUM(D2:D${spEnd})`),F(`SUM(E2:E${spEnd})`),F(`SUM(F2:F${spEnd})`),F(`E${spEnd+1}-F${spEnd+1}`)]);
+  const spTot=spEnd+1;
+  add('Sponsors',sp,[6,30,14,11,14,12,8,11,11,10,14]);
+  add('Payments',pay,[10,30,11,10,10]);
+
+  /* Dinner menu */
+  const dn=[['Item','Qty','Unit $','Line total $','Notes']];
+  (y.dinner||[]).forEach(d=>{ const r=dn.length+1; dn.push([d.item,num(d.qty),num(d.unitCost),F(`B${r}*C${r}`),d.notes||'']); });
+  const dnEnd=dn.length; dn.push([]);
+  dn.push(['Menu subtotal','','',F(`SUM(D2:D${dnEnd})`)]); const dSub=dn.length;
+  dn.push(['Tax & service %','','',F(at.dinnerSvc)]); const dPct=dn.length;
+  dn.push(['Tax & service $','','',F(`D${dSub}*D${dPct}/100`)]);
+  dn.push(['Dinner total','','',F(`D${dSub}+D${dn.length}`)]); const dTot=dn.length;
+  dn.push(['Per person at headcount','','',F(`IF(${at.satHeadcount}>0,D${dTot}/${at.satHeadcount},0)`)]);
+  dn.push(['Dinner total (app)','','',dinnerTotal()]);
+  dn.push(['Check','','',F(`D${dTot}-D${dn.length}`)]);
+  add('Dinner menu',dn,[30,8,10,13,30]);
+
+  /* Food & Bev */
+  const FB='Food & Bev', fb=[['Day','Item','Qty entered','Qty linked to','Qty used','Unit $','Line total $','Line total (app)','Check','Actual $','Notes']];
+  ['Friday','Saturday','Sunday'].forEach(day=>(y.fb[day]||[]).forEach(it=>{ const r=fb.length+1;
+    const link=it.costLink==='dinner'?'':(it.qtyLink||'');
+    fb.push([day,it.item,num(it.qty),it.costLink==='dinner'?'(dinner menu)':link,
+      link?(at[link]?F(at[link]):num(n[link])):F(`C${r}`),it.costLink==='dinner'?'':num(it.unitCost),
+      F(it.costLink==='dinner'?`${Q('Dinner menu')}D${dTot}`:`E${r}*F${r}`),fbLineTotal(it),F(`G${r}-H${r}`),num(it.actual),it.notes||'']); }));
+  add(FB,fb,[9,34,10,14,9,9,12,12,8,10,30]);
+
+  /* Misc */
+  const mi=[['Expense','Budget $','Actual $','Notes']];
+  y.misc.forEach(m=>mi.push([m.desc,num(m.budget),num(m.actual),m.notes||'']));
+  const miEnd=mi.length; mi.push(['Total',F(`SUM(B2:B${miEnd})`),F(`SUM(C2:C${miEnd})`)]); const miTot=mi.length;
+  add('Misc',mi,[34,11,11,34]);
+
+  /* Summary: recomputed vs app */
+  const fbSum=(day,col)=>`SUMIF(${Q(FB)}$A:$A,"${day}",${Q(FB)}$${col}:$${col})`;
+  const sm=[['Line','Recomputed (formula)','App shows','Check','How it is calculated']];
+  const R=(label,f,app,how)=>{ const r=sm.length+1; sm.push([label,F(f),app,F(`B${r}-C${r}`),how]); return 'B'+r; };
+  const H=t=>sm.push([t]);
+  H('BUDGET — REVENUE');
+  const rE=R('Entry fees',`${at.golfers}*${at.entryFee}`,c.entryFees,'golfers × entry fee');
+  const rS=R('Day/Skins collected',`${at.golfers}*${at.skins}`,c.skinsC,'golfers × skins per golfer');
+  const rP=R('Sponsor revenue (pledged)',`Sponsors!D${spTot}`,c.pledged,'sum of sponsor pledges');
+  const rC=R('Carry forward',at.carry,+y.rev.carry||0,'input');
+  const rM=R('MGA donation',at.mga,+y.rev.mga||0,'input');
+  const rR=R('50/50 raffles',at.raffles,+y.rev.raffles||0,'input');
+  const rTR=R('Total revenue',[rE,rS,rP,rC,rM,rR].join('+'),c.totalRev,'sum of the above');
+  H('BUDGET — EXPENSES');
+  const eF=R('Food & Bev — Friday',fbSum('Friday','G'),c.fbF,'Food & Bev sheet, Friday lines');
+  const eS=R('Food & Bev — Saturday',fbSum('Saturday','G'),c.fbS,'Food & Bev sheet, Saturday lines (dinner = menu total)');
+  const eU=R('Food & Bev — Sunday',fbSum('Sunday','G'),c.fbU,'Food & Bev sheet, Sunday lines');
+  const eFl=R('Flight prize money',at.flightPrize,c.flight,'input (not the calculator)');
+  const ePr=R('Pro shop spree',`${at.golfers}*${at.proCredit}`,c.proShop,'golfers × pro shop credit');
+  const eSk=R('Day/Skins payout',rS,c.skinsC,'equals skins collected');
+  const eMi=R('Misc & event',`Misc!B${miTot}`,c.miscT,'Misc sheet budget total');
+  const eT=R('Total expenses',[eF,eS,eU,eFl,ePr,eSk,eMi].join('+'),c.totalExp,'sum of the above');
+  R('Net profit / (loss)',`${rTR}-${eT}`,c.net,'revenue − expenses');
+  H('ACTUALS');
+  const aR=R('Actual revenue',`${at.a_entryFees}+${at.a_skins}+Sponsors!E${spTot}+${at.a_carry}+${at.a_mga}+${at.a_raffles}`,c.totalRevA,'entered actuals + sponsor payments received');
+  const aE=R('Actual expenses',`${fbSum('Friday','J')}+${fbSum('Saturday','J')}+${fbSum('Sunday','J')}+${at.a_flight}+${at.a_proShop}+${at.a_skinsPay}+Misc!C${miTot}`,c.totalExpA,'F&B actuals + entered actuals + misc actuals');
+  R('Actual net so far',`${aR}-${aE}`,c.netA,'actual revenue − actual expenses');
+  H('OTHER');
+  R('Sponsor deposits received',`Sponsors!E${spTot}`,c.deposited,'sum of logged payments');
+  R('Flight prize calculator',`${at.fcFlights}*(${at.fcp1}+${at.fcp2}+${at.fcp3}+${at.fcp4})`,c.flightCalcT,'flights × sum of place prizes');
+  R('Saturday dinner total',`${Q('Dinner menu')}D${dTot}`,dinnerTotal(),'menu subtotal + tax & service');
+  sm.push([]); sm.push(['Exported',new Date().toLocaleString(),'','','Year '+db.activeYear+(CLOUD?' · cloud':' · this device only')]);
+  sm.push(['Any non-zero Check is a mismatch between the app and the spreadsheet (tiny decimals are rounding).']);
+  const ws=XLSX.utils.aoa_to_sheet(sm); ws['!cols']=[{wch:30},{wch:20},{wch:14},{wch:9},{wch:48}];
+  XLSX.utils.book_append_sheet(wb,ws,'Summary'); wb.SheetNames.unshift(wb.SheetNames.pop());
+  XLSX.writeFile(wb,'mm_budget_'+db.activeYear+'_'+new Date().toISOString().slice(0,10)+'.xlsx');
+  closeSheets(); toast('Budget workbook downloaded');
+}
+$('miReview').onclick=exportReview;
 $('miBackup').onclick=()=>{
   dl(JSON.stringify(db,null,2),'application/json','mm_backup_'+new Date().toISOString().slice(0,10)+'.json');
   closeSheets(); toast('Backup downloaded');
