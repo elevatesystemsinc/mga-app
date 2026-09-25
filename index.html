@@ -701,7 +701,7 @@ function defaultYear(){
     actuals:{entryFees:0,skins:0,carry:0,mga:0,raffles:0,flight:0,proShop:0,skinsPay:0},
     misc:[], fb:{'Friday':[],'Saturday':[],'Sunday':[]},
     flightCalc:{flights:5,p1:400,p2:300,p3:200,p4:100},
-    schedule:[], decisions:[], dinner:[], dinnerSvc:28
+    schedule:[], decisions:[], dinner:[], dinnerSvc:0
   };
 }
 function seeded2026(){
@@ -759,6 +759,7 @@ window.addEventListener('focus',()=>refetchCloud());
 function migrate(d){
   let changed=false;
   for(const [y,data] of Object.entries(d.years||{})){
+    if(+data.dinnerSvc){ data.dinnerSvc=0; changed=true; }   // all-in prices: no tax & service on top
     const wasV1 = data.outreach===undefined;
     // Saturday dinner menu (added 2026-09): pre-fill and link the existing headcount-based dinner line
     if(data.dinner===undefined && !wasV1){
@@ -803,9 +804,9 @@ const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&g
 
 /* ============ computed budget ============ */
 function dinnerSubtotal(){ return (yr().dinner||[]).reduce((a,i)=>a+(+i.qty||0)*(+i.unitCost||0),0); }
-function dinnerCharge(){ return dinnerSubtotal()*((+yr().dinnerSvc||0)/100); }
-/* what WCCC bills: menu subtotal + tax & service charge */
-function dinnerTotal(){ return dinnerSubtotal()+dinnerCharge(); }
+/* the club quotes all-in prices, so the dinner total is simply the menu items */
+function dinnerCharge(){ return 0; }
+function dinnerTotal(){ return dinnerSubtotal(); }
 function fbLineTotal(i){ return i.costLink==='dinner' ? dinnerTotal() : resQty(i)*(+i.unitCost||0); }
 function fbDayTotal(day){ return yr().fb[day].reduce((a,i)=>a+fbLineTotal(i),0); }
 function fbDayActual(day){ return yr().fb[day].reduce((a,i)=>a+(+i.actual||0),0); }
@@ -1102,8 +1103,6 @@ function renderBudget(w){
       <div class="it" data-dn="${d.id}">${esc(d.item)}${d.notes?`<small>${esc(d.notes)}</small>`:''}</div>
       ${numIn('dinner.'+i+'.qty',d.qty)}${numIn('dinner.'+i+'.unitCost',d.unitCost)}
       <span class="r">${fmt((+d.qty||0)*(+d.unitCost||0))}</span></div>`).join('')}
-    <div class="frow"><div class="l">Menu subtotal</div><div class="v">${fmt(dinnerSubtotal())}</div></div>
-    <div class="frow"><div class="l">Tax & service %<small>${fmt(dinnerCharge())} added on top of the menu</small></div>${numIn('dinnerSvc',y.dinnerSvc)}</div>
     <div class="frow total"><div class="l">Dinner total${hc?`<small style="text-transform:none;letter-spacing:0;font-weight:400">${'$'+(dT/hc).toFixed(2)} per person at ${hc} headcount</small>`:''}</div><div class="v">${fmt(dT)}</div></div>
     <button class="mini-add" id="dnAdd">+ Add menu item</button>
     ${linked?'':'<button class="mini-add" id="dnLink" style="margin-top:8px">Add dinner line to Saturday F&B</button>'}
@@ -1159,7 +1158,7 @@ function renderEvent(w){
           html+=`<div class="ev" data-fbday="${day}" data-id="${it.id}">
           <div class="time">Menu</div>
           <div class="body"><b>${esc(it.item)}</b>
-          <p>${fmt(dinnerTotal())} total from the Budget tab dinner menu (${(y.dinner||[]).length} items, incl. ${+y.dinnerSvc||0}% tax & service)${it.actual?` · <span style="color:var(--dep)">WCCC billed ${fmt(it.actual)}</span>`:''}</p></div></div>`;
+          <p>${fmt(dinnerTotal())} total from the Budget tab dinner menu (${(y.dinner||[]).length} items, all-in prices)${it.actual?` · <span style="color:var(--dep)">WCCC billed ${fmt(it.actual)}</span>`:''}</p></div></div>`;
           return;
         }
         const qty=resQty(it);
@@ -1622,7 +1621,6 @@ async function exportReview(){
   I('mga','MGA donation',y.rev.mga,'Budget → Revenue');
   I('raffles','50/50 raffles',y.rev.raffles,'Budget → Revenue');
   I('flightPrize','Flight prize budget',y.flightPrizeBudget,'Budget → Expenses');
-  I('dinnerSvc','Dinner tax & service %',y.dinnerSvc,'Budget → Saturday dinner menu');
   I('goal','Sponsorship goal',y.goal,'Menu → Edit sponsorship goal');
   const fc=y.flightCalc;
   I('fcFlights','Flight calc: flights',fc.flights,'Budget → Flight calculator');
@@ -1650,10 +1648,7 @@ async function exportReview(){
   const dn=[['Item','Qty','Unit $','Line total $','Notes']];
   (y.dinner||[]).forEach(d=>{ const r=dn.length+1; dn.push([d.item,num(d.qty),num(d.unitCost),F(`B${r}*C${r}`),d.notes||'']); });
   const dnEnd=dn.length; dn.push([]);
-  dn.push(['Menu subtotal','','',F(`SUM(D2:D${dnEnd})`)]); const dSub=dn.length;
-  dn.push(['Tax & service %','','',F(at.dinnerSvc)]); const dPct=dn.length;
-  dn.push(['Tax & service $','','',F(`D${dSub}*D${dPct}/100`)]);
-  dn.push(['Dinner total','','',F(`D${dSub}+D${dn.length}`)]); const dTot=dn.length;
+  dn.push(['Dinner total (all-in prices)','','',F(`SUM(D2:D${dnEnd})`)]); const dTot=dn.length;
   dn.push(['Per person at headcount','','',F(`IF(${at.satHeadcount}>0,D${dTot}/${at.satHeadcount},0)`)]);
   dn.push(['Dinner total (app)','','',dinnerTotal()]);
   dn.push(['Check','','',F(`D${dTot}-D${dn.length}`)]);
@@ -1704,7 +1699,7 @@ async function exportReview(){
   H('OTHER');
   R('Sponsor deposits received',`Sponsors!E${spTot}`,c.deposited,'sum of logged payments');
   R('Flight prize calculator',`${at.fcFlights}*(${at.fcp1}+${at.fcp2}+${at.fcp3}+${at.fcp4})`,c.flightCalcT,'flights × sum of place prizes');
-  R('Saturday dinner total',`${Q('Dinner menu')}D${dTot}`,dinnerTotal(),'menu subtotal + tax & service');
+  R('Saturday dinner total',`${Q('Dinner menu')}D${dTot}`,dinnerTotal(),'sum of menu items (all-in prices)');
   sm.push([]); sm.push(['Exported',new Date().toLocaleString(),'','','Year '+db.activeYear+(CLOUD?' · cloud':' · this device only')]);
   sm.push(['Any non-zero Check is a mismatch between the app and the spreadsheet (tiny decimals are rounding).']);
   const ws=XLSX.utils.aoa_to_sheet(sm); ws['!cols']=[{wch:30},{wch:20},{wch:14},{wch:9},{wch:48}];
