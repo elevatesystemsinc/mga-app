@@ -1,112 +1,162 @@
-# MM Tournament HQ
+# MGA Hub (side branch)
 
-Single-file app for running the MGA Member-Member tournament: sponsors, outreach,
-budget, financial summary, food & beverage, schedule, and open decisions. One shared
-board password, live sync across devices.
+The season-wide hub for the Walnut Creek CC MGA: members, board, every tournament
+(1–3 days, meals, events, field, sponsors, budget) and the season budget.
+Same stack as the Member-Member app: one static `index.html`, Supabase, Render.
 
-**Stack:** one static `index.html` (no build step) · Supabase (auth + one JSONB row + realtime) · Render static site.
+**It runs alongside the current Member-Member app and never changes it.**
+The hub keeps its own table (`mga_hub`). It only *reads* `mm_tournament`, to import
+Member-Member and to cross-check the numbers.
 
-## Setup (once)
+## Set up the branch (once)
 
-### 1. Supabase
-1. Create a project at supabase.com.
-2. SQL Editor → run `supabase-setup.sql` (creates the `mm_tournament` table, RLS, realtime).
-3. Authentication → Users → **Add user**
-   - Email: `board@mgamm.app` (doesn't need to be real — check **Auto Confirm**)
-   - Password: this becomes the board password.
-4. Authentication → Sign In / Providers → Email → turn **off** "Allow new users to sign up."
+1. In the repo: `git checkout -b hub`
+2. Replace `index.html` and `README.md` with the ones from this zip, add `crest.png`
+   and `hub-setup.sql`. Leave `config.js` handling exactly as it is on `main`.
+3. `git add -A && git commit -m "MGA Hub" && git push -u origin hub`
 
-### 2. Configure the app (Render environment variables)
-The app reads `window.MM_CONFIG` from a `config.js` file that **Render generates
-at build time from environment variables** — nothing credential-related lives in
-the repo (config.js is gitignored).
+## Supabase (same project)
 
-1. Render → your static site → **Environment** → add:
-   - `SUPABASE_URL` — e.g. `https://abcd1234.supabase.co`
-   - `SUPABASE_ANON_KEY` — Settings → API → anon public key
-   - `BOARD_EMAIL` — the shared Auth user's email (must match Supabase exactly)
-2. Render → **Settings → Build Command**, paste:
+SQL Editor → run `hub-setup.sql`. It creates `public.mga_hub` with RLS and realtime.
+It does not touch `mm_tournament`. The hub signs in with the same shared board login.
 
-   ```
-   printf "window.MM_CONFIG={url:'%s',anonKey:'%s',boardEmail:'%s'};" "$SUPABASE_URL" "$SUPABASE_ANON_KEY" "$BOARD_EMAIL" > config.js
-   ```
+## Render (a second static site)
 
-3. **Manual Deploy → Clear build cache & deploy.**
-4. Verify: `https://<your-site>/config.js` should show your real values, and the
-   site should now open with the board password screen.
+Render → **New → Static Site** → same repo, branch **`hub`**, publish directory `.`.
+Copy the current site's build command and environment variables
+(`SUPABASE_URL`, `SUPABASE_ANON_KEY`, `BOARD_EMAIL`) if it generates `config.js`.
+Optional: give it its own subdomain (e.g. `hub.wcccmga.org`). The current site on
+`main` keeps serving `app.wcccmga.org` untouched.
 
-Changing any value later = edit the env var in Render and redeploy. No commits.
+## Load and cross-verify Member-Member
 
-For **local testing** without Render: copy `config.example.js` to `config.js`
-in the folder and fill it in, or skip it entirely — no config.js means the app
-runs local-only per device (no password screen, no sync dot next to the year
-pill). If the deployed site ever shows that, the build command or env vars are
-missing.
+1. Sign in → Dashboard → **Import Member-Member** (or Tournaments → Import).
+2. Pick 2026 → Import. The hub reads the live Member-Member row and builds the
+   tournament: sponsors + payments, all three days of F&B with the Saturday dinner
+   menu, income, per-player pro shop credit, flight prizes, misc, actuals, schedule
+   and open decisions.
+3. The **Verify** tab lists every budget and actual total, recomputed exactly the
+   way the current app calculates it, next to the hub's number. All should say Match.
+4. **Compare with the live app now** re-checks against the current app at any time.
+   **Re-import** replaces the hub copy with a fresh one (use it while the board keeps
+   working in the current app this week).
 
-### 3. Render
-1. Push this repo to GitHub (private is fine).
-2. Render → **New → Static Site** → connect the repo.
-3. Branch `main`, build command *empty*, publish directory `.` → Create.
-4. Optional: Settings → Custom Domains to hang a subdomain on it (one CNAME).
+No Supabase access? Download a backup from the current app (⋯ → Backup all data)
+and choose it when the import asks.
 
-### 4. First sign-in
-The first device to sign in seeds the cloud from its local data. After that,
-cloud is the source of truth on every load.
+## Live scoring (Golf)
 
-## Operations
+One-time: Supabase → SQL Editor → run `golf-setup.sql`. Upload `score.html` alongside
+`index.html` on the `hub` branch.
 
-- **Board password change / turnover:** Supabase → Authentication → Users → reset
-  the shared user's password. Nothing to redeploy.
-- **Backups:** app menu (⋯) → *Backup all data* downloads a JSON of every year.
-  Creating a new year auto-downloads one first. *Restore backup* loads it back
-  (and syncs up to the cloud).
-- **Budget workbook:** app menu (⋯) → *Export budget workbook* downloads an .xlsx
-  of the active year: every input, sponsor, payment, F&B line, dinner menu item and
-  misc line, plus Excel formulas that recompute each budget total next to the value
-  the app shows. The **Check** column should be 0 everywhere; anything else is a
-  mismatch worth looking at. (Loads the SheetJS library from jsDelivr on first use.)
-- **Sync status:** dot in the header — green saved, gold saving, red offline
-  (offline changes are kept on-device and pushed on the next edit).
-- **Conflict model:** last-write-wins on the whole state, debounced 800ms.
-  Fine for a small board; if two people edit the same field in the same second,
-  one edit wins.
+- **Golf → Courses:** Oak and Pecan scorecards (par, men's/women's handicap, every tee).
+- **Golf → New scoring event:** name, date, default tee, a **custom link**, and optionally the
+  tournament it belongs to. Add groups by hand, or **Build groups from the field** (keeps
+  teams together; all Oak, all Pecan, or split; shotgun or off hole 1).
+- **Groups:** each has its own **Group ID** (random by default — change it to a cart number or
+  tee time), course, starting hole, and players (members, field players, or guests), each with
+  a tee and men's/women's par.
+- **Open scoring**, then share the link: `…/score.html?e=<your-link>`. Players enter their
+  Group ID and score hole by hole. Scores save as they tap, queue up in dead zones, and send
+  when signal returns. `…&view=board` is a big-screen leaderboard for the clubhouse TV.
+- **Leaderboard:** gross stroke play, to par for holes played, both courses combined. It's in the
+  event page, on the Dashboard, and a live link sits in the sidebar while scoring is open.
+  Click any player to correct a group's scores from the hub.
+- **Formats per nine:** Round type can be Stroke play, Best ball, Scramble, Shamble, or "Front & back
+  differ" (e.g. Member-Member Saturday: scramble front, shamble back). Scramble holes take one team
+  score (the phone shows one entry per team); best ball and shamble holes take every player's score
+  and the best net ball counts. Cards, leaderboards and the phone follow each hole's format.
+- **Handicap allowances** default to the USGA (WHS Appendix C) recommendations: individual stroke play
+  95%, four-ball 85%, 2-player scramble 35/15%, 4-player scramble 25/20/15/10%. Shamble isn't in the
+  USGA table — it defaults to 85% (it plays as four-ball after the drive). All editable per event,
+  with "Reset to USGA". Scramble team handicap = course handicaps low→high × those percentages.
+- **Course & start by flight** (Flights tab): each flight picks its course and Shotgun or Tee times —
+  first tee time, gap in minutes, and hole 1 or 10 — all editable. Tee-time groups go off in order of
+  combined handicap; a warning shows if one course has both a shotgun and tee times.
+- **Round type:** Stroke play or **Best ball**. Best ball: every player scores their own ball; the
+  team's score on each hole is its best score (gross, or net after each player's strokes — 90%
+  allowance is the usual four-ball setting). Teams come from the linked tournament (Member-Member
+  partners) or are set per group. Leaderboards switch between Teams and Players; the phone shows
+  each team's best on the current hole. Flights keep best-ball teams together.
+- **Handicaps:** each player's Handicap Index comes from their member profile (the Golf Genius
+  import); override it in the group for guests. Course handicap = Index × Slope ÷ 113 + (Course
+  Rating − Par), using the player's course, tee and men's/women's set, at the event's allowance %.
+  Ratings come from the club's printed rating card (all tees, men and women, incl. Blue/White and
+  White/Red) and can be edited on Golf → Courses.
+- **Flights:** event → Flights → enter how many. Filled evenly by course handicap (or Index),
+  lowest in A, sizes differ by at most one. For team events linked to a tournament, teams stay
+  together on combined handicap. Ties at a split are flagged; move anyone by hand afterward.
+- **Event workflow — 1 Field → 2 Flights → 3 Groups:**
+  1. *Field:* **Import field from <tournament>** pulls every player with their team and Handicap
+     Index (re-import adds newcomers, updates teams, optionally removes withdrawals). Add guests here.
+  2. *Flights:* set the number of flights; players and teams get a flight without being grouped.
+  3. *Groups:* **Build groups from flights** forms foursomes inside each flight on the flight's course.
+- **Groups by flight:** with "Build groups by flight" on, flights are sized in whole groups
+  (two 2-person teams per foursome, so every flight has an even number of teams) and groups are
+  formed inside each flight. Whole flights go to one course (split Oak/Pecan, or all on one).
+  Starting holes go 1, 2, 3… from the lowest combined handicap up; extra groups double on par 5s.
+  Players are re-rated on the course they'll actually play before holes are ordered.
+- **Net scoring:** strokes are given by hole handicap (plus handicaps give strokes back). The
+  leaderboard ranks gross or net, filters by flight, and the phone shows a dot on holes where a
+  player gets a stroke. `…&view=board&flight=A` puts one flight on the TV.
+- **Scorecards:** click any leaderboard row (hub or phone) for that group's card, styled after the
+  club's printed card — tee rows, handicap and par rows, gross in every cell with birdie circles
+  and bogey squares, the net score in the corner on holes where a stroke is given, and Hcp / Net
+  totals at the end. Best ball adds a team row per team (the counting score each hole, net or gross
+  per the event) and underlines the ball that counted. Final rounds are stamped FINAL; Print gives
+  a landscape copy. On phones the card stacks front and back nines.
+- **Printed scorecards:** event → Groups → **Print scorecards**. One tournament card per group:
+  event, date, course, format and flight; the group ID and starting hole in a box; yardage, par and
+  handicap rows; each player with their playing handicap and a dot on every hole they get a stroke
+  (+ where a plus handicap gives one back); a blank best-ball line per team; scorer/attest lines;
+  and a QR code that opens live scoring with that group already joined. Two cards per letter page
+  (cut in half for the cart) or one large card per page; all groups or one flight. Open scoring
+  before the round so the QR codes work.
+- **Close scoring** locks it: the public page can no longer change scores.
+- Security: the public page can only read an event's public info, look up a group by its ID, and
+  save scores for that group's players while the event is open. Group IDs are never exposed.
 
-## Saturday dinner menu
+## How it works
 
-Budget tab → **Saturday dinner menu** holds the WCCC dinner quote as line items
-(quantity × unit price, both editable in place; tap an item name to rename, add a
-note, or delete), plus an editable tax & service % (default 28%) applied to the
-menu subtotal. The dinner total (subtotal + tax & service) is the cost of the Saturday *Dinner (WCCC)* line
-in Event → Food & Bev, so it flows into the Saturday F&B total and the budget.
-That line shows "Menu" instead of a quantity; its WCCC actual bill is still
-entered on the Event line. If the linked line is ever deleted, the Budget card
-shows a button to add it back. The per-person figure uses the Saturday dinner
-headcount planning input for reference only — it doesn't drive the quantities.
+- **Editing:** screens are read-only; every change happens in one side panel.
+- **Tournaments:** 1, 2 or 3 days. Each day holds meals and events (fixed quantity,
+  or "every player"), plus catered menus (line items + tax & service %). Tournament-
+  wide expenses are fixed amounts (prizes, gifts, misc) or per-player (pro shop credit).
+  "Start from" copies another tournament's structure with actuals and payments cleared.
+- **Members:** Members → Import member list takes the Golf Genius contact list export
+  (.xlsx) or any spreadsheet/CSV with name columns. Preview first; re-uploading a newer
+  export updates people (matched by Golf Genius ID, GHIN, email, then name) and blank
+  cells never erase existing data. Optionally mark people missing from the file Inactive.
+- **Field:** Field tab → Import roster takes the Golf Genius registration export for the
+  event. Team Id sets the teams, RSVP questions (dinner, plus one, Par 3, anything else)
+  are kept per player, and the dinner headcount (players + plus-ones) can be applied to
+  a catered menu in one click. Re-uploading a newer export updates the field. Teams can
+  also be picked by hand from Members. Players who aren’t current members can still play:
+  they’re added to Members as Inactive and marked “Inactive Member” in the field. A later
+  member-list import that includes them switches them back to Active. The newest file
+  wins for handicap index (by the export’s “created on” time), entry paid and skins per player. The budget
+  uses the planned player count until you switch it to the field in Tournament details.
+- **Season budget:** all tournaments + annual dues (active members × dues, not
+  prorated, recorded per member) + any MGA-level lines. The 50/50 raffle is counted
+  inside the tournament it's assigned to, not added twice.
+- **Treasury** (sidebar): the treasurer's books for the season.
+  - *Ledger* — every dollar in and out: expenses and income recorded here, plus sponsor
+    payments and dues recorded elsewhere. Filter, search, export CSV.
+  - *Budget vs actual* — every line of every tournament plus MGA-level lines, with variance.
+    Use + on a line to record money against it. Once a line has ledger entries, its actual
+    comes from them (the typed "Actual $" field shows the ledger total instead).
+  - *Reconcile* — upload the bank's activity export (CSV, Excel, or OFX/QFX). Re-uploads and
+    overlapping statements are de-duplicated. Suggested matches: same check #, same amount and
+    name, nearest date, and one deposit made of several payments. Accept, Find (tick one or more
+    entries that add up), Add to books, or Set aside (transfers). Shows bank vs book balances,
+    deposits not yet made and checks not yet cleared, and checks the bank's own running balance.
+- **Season net (projected):** actual net for tournaments that are over (marked Complete, or past
+  their last day) plus budgeted net for upcoming ones, plus MGA-level budget lines.
+- **Sync:** last write wins, saved ~0.7s after an edit; open devices update live.
+  Own saves are recognized and not echoed back.
+- **Backups:** sidebar → Backup / Restore (JSON of everything).
 
-Existing data picks this up automatically on first load: the menu is pre-filled
-from the WCCC quote and the old headcount × per-plate dinner line is converted to
-the menu-linked line.
+## Later
 
-## New tournament year
-
-Year selector (top) → **New year**. Carries over sponsors and prospects with
-contact info (statuses reset, deposits cleared), budget structure, misc expense
-lines, F&B menu, Saturday dinner menu, tiers, and the schedule — with all actuals zeroed. Declined
-prospects stay declined.
-
-## Keeping free tiers awake
-
-- **Render static sites never sleep** — they're CDN-served. Nothing to do.
-- **Supabase free tier pauses after 7 days of no API activity** (off-season risk).
-  This repo includes `.github/workflows/supabase-keepalive.yml`, which pings the
-  `keepalive` table every 3 days. To activate it:
-  1. Repo → Settings → Secrets and variables → Actions → add two secrets:
-     `SUPABASE_URL` and `SUPABASE_ANON_KEY` (same values as in index.html).
-  2. Actions tab → enable workflows → run **Supabase keep-alive** once manually
-     to confirm it goes green.
-  The workflow also commits a timestamp to a `keepalive` side branch each run so
-  GitHub's 60-day inactive-schedule rule never disables it, without triggering
-  Render deploys (Render only watches `main`).
-- **If it ever pauses anyway:** Supabase dashboard → Restore. Data isn't lost on
-  pause, but don't leave it paused for months — and keep occasional JSON backups
-  from the app menu regardless.
+- Microsoft 365 sign-in per board member (Supabase Azure provider).
+- Golf Genius sync for members and signups (needs API access from Golf Genius).
