@@ -395,26 +395,26 @@ function convertMM(y,year){
   const t=newTournament({season:String(year),name:'Member-Member',startDate:start,days:3,venue:(y.info&&y.info.venue)||'Walnut Creek Country Club',
     entryFee:inp.entryFee,skinsFee:inp.skins,plannedPlayers:inp.golfers,teamSize:2});
   t.goal=n0(y.goal);
-  t.tiers=(y.tiers||[]).map(x=>({id:uid(),name:x.name,amt:n0(x.amt)}));
-  t.sponsors=(y.sponsors||[]).map(s=>({id:uid(),company:s.company||'',contact:s.contact||'',phone:s.phone||'',email:s.email||'',tier:s.tier||'',
-    pledged:n0(s.pledged),committee:s.committee||'',notes:s.notes||'',payments:(s.payments||[]).map(p=>({id:uid(),amount:n0(p.amount),method:p.method||'',date:p.date||''}))}));
-  const dinnerMenu={items:(y.dinner||[]).map(d=>({id:uid(),item:d.item||'',qty:n0(d.qty),unitCost:n0(d.unitCost),notes:d.notes||''})),svcPct:n0(y.dinnerSvc),guests:n0(inp.satHeadcount)};
+  t.tiers=(y.tiers||[]).map(x=>({id:x.id||uid(),name:x.name,amt:n0(x.amt)}));
+  t.sponsors=(y.sponsors||[]).map(s=>({id:s.id||uid(),company:s.company||'',contact:s.contact||'',phone:s.phone||'',email:s.email||'',tier:s.tier||'',
+    pledged:n0(s.pledged),committee:s.committee||'',notes:s.notes||'',payments:(s.payments||[]).map(p=>({id:p.id||uid(),amount:n0(p.amount),method:p.method||'',date:p.date||''}))}));
+  const dinnerMenu={items:(y.dinner||[]).map(d=>({id:d.id||uid(),item:d.item||'',qty:n0(d.qty),unitCost:n0(d.unitCost),notes:d.notes||''})),svcPct:n0(y.dinnerSvc),guests:n0(inp.satHeadcount)};
   ['Friday','Saturday','Sunday'].forEach((day,di)=>{
     t.dayItems[di]=((y.fb||{})[day]||[]).map(i=>{
-      const it={id:uid(),item:i.item||'',kind:guessKind(i.item||''),qty:oldResQty(y,i),unitCost:n0(i.unitCost),actual:n0(i.actual),notes:i.notes||'',qtyLink:''};
+      const it={id:i.id||uid(),item:i.item||'',kind:guessKind(i.item||''),qty:oldResQty(y,i),unitCost:n0(i.unitCost),actual:n0(i.actual),notes:i.notes||'',qtyLink:''};
       if(i.costLink==='dinner'){ it.menu=clone(dinnerMenu); it.kind='Meal'; it.qty=dinnerMenu.guests; it.unitCost=0; }
       else if(i.qtyLink){ it.notes=(it.notes?it.notes+' · ':'')+'Quantity was linked to '+i.qtyLink+' in the old app'; }
       return it; });
   });
-  t.income=[{id:uid(),desc:'Carry forward',budget:n0(rev.carry),actual:n0(act.carry),notes:''},
-            {id:uid(),desc:'MGA donation',budget:n0(rev.mga),actual:n0(act.mga),notes:''},
-            {id:uid(),desc:'50/50 raffle',budget:n0(rev.raffles),actual:n0(act.raffles),notes:'Season raffle proceeds assigned to Member-Member',source:'raffle'}];
-  t.perPlayer=[{id:uid(),desc:'Pro shop spree',perPlayer:n0(inp.proCredit),actual:n0(act.proShop),notes:''}];
-  t.lines=[{id:uid(),group:'Prizes',desc:'Flight prize money',budget:n0(y.flightPrizeBudget),actual:n0(act.flight),notes:''}]
-    .concat((y.misc||[]).map(x=>({id:uid(),group:'Misc',desc:x.desc||'',budget:n0(x.budget),actual:n0(x.actual),notes:x.notes||''})));
+  t.income=[{id:'mm-carry',desc:'Carry forward',budget:n0(rev.carry),actual:n0(act.carry),notes:''},
+            {id:'mm-mga',desc:'MGA donation',budget:n0(rev.mga),actual:n0(act.mga),notes:''},
+            {id:'mm-raffle',desc:'50/50 raffle',budget:n0(rev.raffles),actual:n0(act.raffles),notes:'Season raffle proceeds assigned to Member-Member',source:'raffle'}];
+  t.perPlayer=[{id:'mm-proshop',desc:'Pro shop spree',perPlayer:n0(inp.proCredit),actual:n0(act.proShop),notes:''}];
+  t.lines=[{id:'mm-flight',group:'Prizes',desc:'Flight prize money',budget:n0(y.flightPrizeBudget),actual:n0(act.flight),notes:''}]
+    .concat((y.misc||[]).map(x=>({id:x.id||uid(),group:'Misc',desc:x.desc||'',budget:n0(x.budget),actual:n0(x.actual),notes:x.notes||''})));
   t.actuals={entryFees:n0(act.entryFees),skins:n0(act.skins),skinsPaid:n0(act.skinsPay)};
-  t.schedule=(y.schedule||[]).map((d,di)=>({day:di,label:d.day||'',items:(d.items||[]).map(i=>({id:uid(),time:i.time||'',event:i.event||'',notes:i.notes||''}))}));
-  t.decisions=(y.decisions||[]).map(d=>({id:uid(),text:d.text||'',done:!!d.done}));
+  t.schedule=(y.schedule||[]).map((d,di)=>({day:di,label:d.day||'',items:(d.items||[]).map(i=>({id:i.id||uid(),time:i.time||'',event:i.event||'',notes:i.notes||''}))}));
+  t.decisions=(y.decisions||[]).map(d=>({id:d.id||uid(),text:d.text||'',done:!!d.done}));
   t.source={kind:'mm-app',year:String(year),importedAt:new Date().toISOString(),raw:clone(y)};
   return t;
 }
@@ -479,7 +479,7 @@ function setSync(s,err){
   else { lastSyncErr=''; $('syncErr').hidden=true; }
 }
 function persist(){
-  db._w=CLIENT; db._at=Date.now(); store.save(db);
+  db._w=CLIENT; db._at=Date.now(); store.save(db); if(typeof afterPersist==='function') afterPersist();
   if(!CLOUD||!sessionOK){ setSync('local'); return; }
   setSync('saving'); clearTimeout(saveT); saveT=setTimeout(pushCloud,700);
 }
@@ -503,7 +503,7 @@ async function startCloud(){
   cloudReady=true;
   if(row&&row.data){ db=normalize(row.data); store.save(db); setSync('synced'); }
   else await pushCloud();
-  render();
+  render(); if(typeof startSyncWatch==='function') startSyncWatch();
   sb.channel('mga-hub').on('postgres_changes',{event:'*',schema:'public',table:'mga_hub',filter:'id=eq.main'},p=>{
     const r=p.new&&p.new.data; if(!r||r._w===CLIENT) return; applyRemote(r);
   }).subscribe();
@@ -558,10 +558,10 @@ function toast(msg,undo){ const t=$('toast'); t.innerHTML=esc(msg); if(undo){ co
 /* ---------- drawer ---------- */
 const drawerOpen=()=>$('drawer').classList.contains('show');
 let drawerCtx=null;
-function openDrawer({kicker='',title,body,save,saveLabel='Save',del,delLabel='Delete',wire,wide}){
+function openDrawer({kicker='',title,body,save,saveLabel='Save',del,delLabel='Delete',wire,wide,delPlain}){
   drawerCtx={save,del}; $('drawer').classList.toggle('wide',wide===true); $('drawer').classList.toggle('xwide',wide==='x');
   $('dKicker').textContent=kicker; $('dTitle').textContent=title; $('dBody').innerHTML=body;
-  $('dFoot').innerHTML=`<div>${del?`<button class="btn danger" id="dDel">${I.trash}${esc(delLabel)}</button>`:''}</div><div class="actions"><button class="btn" id="dCancel">Cancel</button>${save?`<button class="btn pri" id="dSave">${esc(saveLabel)}</button>`:''}</div>`;
+  $('dFoot').innerHTML=`<div>${del?`<button class="btn${delPlain?'':' danger'}" id="dDel">${delPlain?'':I.trash}${esc(delLabel)}</button>`:''}</div><div class="actions"><button class="btn" id="dCancel">Cancel</button>${save?`<button class="btn pri" id="dSave">${esc(saveLabel)}</button>`:''}</div>`;
   $('drawer').classList.add('show'); $('scrim').classList.add('show');
   $('dCancel').onclick=closeDrawer;
   if(save) $('dSave').onclick=()=>{ if(save()!==false){ closeDrawer(); persist(); render(); } };
@@ -730,7 +730,7 @@ function vTournament(m){
   if(!tabs.some(x=>x[0]===view.ttab)) view.ttab='budget';
   m.innerHTML=`<div class="crumb"><button data-go="tournaments">Tournaments</button><span class="muted">/</span><span class="muted">${esc(t.name)}</span></div>
   <div class="phead"><div><h1 class="h1">${esc(t.name)}</h1>
-    <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap"><span class="chip navy">${t.days} day${t.days>1?'s':''}</span><span class="chip">${dateRange(t)}</span><span class="chip">${tcalc(t).players} players ${t.budgetBasis==='field'?'in field':'planned'}</span>${statusChip(t)}${t.source?'<span class="chip">Imported from current app</span>':''}</div></div>
+    <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap"><span class="chip navy">${t.days} day${t.days>1?'s':''}</span><span class="chip">${dateRange(t)}</span><span class="chip">${tcalc(t).players} players ${t.budgetBasis==='field'?'in field':'planned'}</span>${statusChip(t)}${typeof syncChip==='function'?syncChip(t):''}</div></div>
     <div class="actions">${t.source&&t.source.kind==='mm-app'?`<button class="btn" id="tPush" title="Send this tournament’s edits to the Member-Member app">${I.refresh}Push to current app</button>`:''}<button class="btn" id="tEdit">${I.edit}Tournament details</button></div></div>
   <div class="tabs">${tabs.map(([k,l])=>`<button class="tab${view.ttab===k?' on':''}" data-tab="${k}">${l}</button>`).join('')}</div>
   <div id="tbody" style="display:flex;flex-direction:column;gap:20px"></div>`;
@@ -2744,6 +2744,122 @@ async function pushToMM(t){
       })();
     }});
 }
+
+/* =====================================================================
+   Two-way sync with the current Member-Member app.
+   Each imported tournament remembers the current app's year as it was at the
+   last sync (t.source.raw). On every check:
+     hub changed, app didn't   → push the hub's version
+     app changed, hub didn't   → pull it into the hub (hub-only data kept)
+     both changed              → conflict: nothing is overwritten; you choose
+   Checks run a moment after hub edits, when the current app changes (live),
+   when the tab comes back into view, and every minute.
+   ===================================================================== */
+const SYNC_IDS={carry:'mm-carry',mga:'mm-mga',raffle:'mm-raffle',pp:'mm-proshop',flight:'mm-flight'};
+const isSynced=t=>t&&t.source&&t.source.kind==='mm-app'&&!(t.sync&&t.sync.off);
+/* bring the current app's year into a hub tournament, keeping what only the hub knows */
+function mergeFromMM(t,live){
+  const fresh=convertMM(live,t.source.year);
+  const hubInc={carry:t.income.find(i=>/carry/i.test(i.desc||'')),mga:t.income.find(i=>/mga|donation/i.test(i.desc||'')),raffle:t.income.find(i=>i.source==='raffle'||/50\/50|raffle/i.test(i.desc||''))};
+  const hubFlight=t.lines.find(l=>/flight prize/i.test(l.desc||''))||t.lines.find(l=>(l.group||'')==='Prizes');
+  // the hub's ids for the lines the current app keeps as plain fields (so ledger links survive)
+  fresh.income.forEach(i=>{ for(const k of ['carry','mga','raffle']) if(i.id===SYNC_IDS[k]&&hubInc[k]){ i.id=hubInc[k].id; i.desc=hubInc[k].desc; i.notes=hubInc[k].notes||i.notes; } });
+  if(fresh.perPlayer[0]&&t.perPlayer[0]){ fresh.perPlayer[0].id=t.perPlayer[0].id; fresh.perPlayer[0].desc=t.perPlayer[0].desc; }
+  const fl=fresh.lines.find(l=>l.id===SYNC_IDS.flight); if(fl&&hubFlight){ fl.id=hubFlight.id; fl.desc=hubFlight.desc; fl.group=hubFlight.group||'Prizes'; }
+  // hub-only lines the current app can't hold
+  t.income.filter(i=>![hubInc.carry,hubInc.mga,hubInc.raffle].includes(i)).forEach(i=>fresh.income.push(i));
+  const players=playersUsed(t), extraPP=t.perPlayer.slice(1);
+  extraPP.forEach(p=>{ const m=fresh.lines.find(l=>l.id===p.id); const q=clone(p);
+    if(m){ if(players&&Math.abs(n0(m.budget)-players*n0(p.perPlayer))>=0.01) q.perPlayer=Math.round(n0(m.budget)/players*100)/100; q.actual=n0(m.actual); fresh.lines=fresh.lines.filter(l=>l!==m); }
+    fresh.perPlayer.push(q); });
+  // lines in the hub keep their group; items keep their type, quantity links and extra catered menus
+  const hubLine=new Map(t.lines.map(l=>[l.id,l])); fresh.lines.forEach(l=>{ const h=hubLine.get(l.id); if(h&&h.group) l.group=h.group; });
+  [0,1,2].forEach(di=>{ const hubItems=new Map((t.dayItems[di]||[]).map(i=>[i.id,i]));
+    fresh.dayItems[di]=(fresh.dayItems[di]||[]).map(it=>{ const h=hubItems.get(it.id); if(!h) return it;
+      if(h.menu&&!it.menu&&n0(it.qty)===1&&Math.abs(n0(it.unitCost)-Math.round(menuTotal(h.menu)*100)/100)<0.01) return Object.assign(clone(h),{actual:it.actual,notes:it.notes,item:it.item});
+      if(h.kind) it.kind=h.kind;
+      if(h.qtyLink==='players'&&n0(it.qty)===players){ it.qtyLink='players'; }
+      if(it.menu&&h.menu) it.menu.guests=n0(it.menu.guests);
+      return it; }); });
+  // hub-only settings and the field stay as they are
+  const keep=['id','season','name','startDate','days','venue','status','budgetBasis','teamSize','ggEvent','notes','field','fieldQuestions','rosterFile','rosterImportedAt','sync'];
+  const saved={}; keep.forEach(k=>{ if(t[k]!==undefined) saved[k]=t[k]; });
+  if(t.budgetBasis==='field') saved.plannedPlayers=t.plannedPlayers;
+  const src=Object.assign({},fresh.source,{pushedAt:t.source.pushedAt||'',importedAt:t.source.importedAt});
+  Object.keys(fresh).forEach(k=>{ if(!keep.includes(k)) t[k]=fresh[k]; });
+  Object.assign(t,saved); t.source=src; t.source.raw=clone(live);
+}
+let syncBusy=false, syncTimer=null, syncSuppress=false, syncStarted=false;
+function syncState(t,state,extra){ t.sync=Object.assign(t.sync||{},{state,at:new Date().toISOString()},extra||{}); }
+async function syncTournament(t,depth){
+  if(!CLOUD||!sessionOK||!isSynced(t)) return;
+  const yr=t.source.year; let st;
+  try{ st=await fetchMMState(); }catch(e){ syncState(t,'error',{msg:'Couldn’t reach the current app'}); return; }
+  const live=st.years&&st.years[yr]; if(!live){ syncState(t,'error',{msg:`The current app has no ${yr} season`}); return; }
+  const raw=t.source.raw;
+  const local=stable(hubToMM(t,raw).year)!==stable(raw), remote=stable(live)!==stable(raw);
+  if(!local&&!remote){ syncState(t,'synced'); return; }
+  if(local&&remote){ syncState(t,'conflict',{appChanges:mmDrift(raw,live),hubChanges:mmDrift(raw,hubToMM(t,raw).year)}); return; }
+  if(remote){
+    if(drawerOpen()){ setTimeout(syncSoon,2500); return; }      // never swap records out from under an open editor
+    mergeFromMM(t,live); syncState(t,'synced',{last:'pulled'});
+    if(!depth) return syncTournament(t,1);                       // settle any tidy-up (e.g. numbers stored as text) once
+    return;
+  }
+  const next=hubToMM(t,live).year, data=clone(st); data.years[yr]=next;
+  const {error}=await sb.from('mm_tournament').update({data,updated_at:new Date().toISOString()}).eq('id','main');
+  if(error){ syncState(t,'error',{msg:'Push failed: '+error.message}); return; }
+  t.source.raw=clone(next); t.source.pushedAt=new Date().toISOString(); syncState(t,'synced',{last:'pushed'});
+}
+async function syncAll(){
+  if(syncBusy){ syncSoon(); return; } syncBusy=true;
+  const before=stable(db.tournaments.filter(isSynced).map(t=>[t.id,t.sync&&t.sync.state]));
+  try{ for(const t of db.tournaments.filter(isSynced)) await syncTournament(t); }
+  finally{ syncBusy=false; }
+  syncSuppress=true; persist(); syncSuppress=false;
+  const after=stable(db.tournaments.filter(isSynced).map(t=>[t.id,t.sync&&t.sync.state]));
+  if(!drawerOpen()&&(before!==after||view.page==='tournament'||view.page==='dash')) render();
+}
+function syncSoon(ms){ clearTimeout(syncTimer); syncTimer=setTimeout(syncAll,ms||2500); }
+function afterPersist(){ if(syncSuppress||!CLOUD||!sessionOK) return; if(db.tournaments.some(isSynced)) syncSoon(2500); startSyncWatch(); }
+function startSyncWatch(){
+  if(syncStarted||!CLOUD||!sessionOK) return; syncStarted=true;
+  sb.channel('mm-sync').on('postgres_changes',{event:'*',schema:'public',table:'mm_tournament',filter:'id=eq.main'},()=>{ if(db.tournaments.some(isSynced)) syncSoon(800); }).subscribe();
+  document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='visible'&&db.tournaments.some(isSynced)) syncSoon(500); });
+  setInterval(()=>{ if(document.visibilityState==='visible'&&db.tournaments.some(isSynced)) syncAll(); },60000);
+  if(db.tournaments.some(isSynced)) syncSoon(1000);
+}
+/* header chip + conflict resolver */
+function syncChip(t){
+  if(!t.source||t.source.kind!=='mm-app') return '';
+  if(t.sync&&t.sync.off) return '<button class="chip" data-sync="1" style="cursor:pointer">Sync off</button>';
+  if(!CLOUD||!sessionOK) return '<span class="chip">Sync needs the cloud sign-in</span>';
+  const s=t.sync||{}, when=s.at?new Date(s.at).toLocaleTimeString([], {hour:'numeric',minute:'2-digit'}):'';
+  if(s.state==='conflict') return '<button class="chip warn" data-sync="1" style="cursor:pointer">⇄ Conflict — choose a version</button>';
+  if(s.state==='error') return `<button class="chip warn" data-sync="1" style="cursor:pointer" title="${esc(s.msg||'')}">⇄ Sync problem — retry</button>`;
+  if(s.state==='synced') return `<button class="chip ok" data-sync="1" style="cursor:pointer" title="In sync with the current Member-Member app">⇄ In sync · ${when}</button>`;
+  return '<span class="chip">⇄ Checking…</span>';
+}
+function openSync(t){
+  const s=t.sync||{};
+  if(s.state==='conflict'){
+    openDrawer({kicker:t.name,title:'Both versions changed',saveLabel:'Keep the hub’s',delPlain:true,
+      body:`<p style="margin:0">Since the last sync, this tournament was edited in <b>both</b> the hub and the current Member-Member app. Nothing has been overwritten. Pick which version wins — the other side’s recent edits will be replaced.</p>
+        <div class="fld"><span class="lbl">Changed in the current app</span><div class="mini">${(s.appChanges||[]).map(x=>`<div class="mr"><span style="font-size:13px">${esc(x)}</span></div>`).join('')}</div></div>
+        <div class="fld"><span class="lbl">Changed in the hub</span><div class="mini">${(s.hubChanges||[]).map(x=>`<div class="mr"><span style="font-size:13px">${esc(x)}</span></div>`).join('')}</div></div>
+        <p class="hint"><b>Keep the hub’s</b> sends the hub’s version to the current app (a backup of the current app’s data downloads first). <b>Use the app’s</b> brings the current app’s version into the hub; the hub’s field, flights and ledger stay.</p>`,
+      del:()=>{ (async()=>{ const st=await fetchMMState(); mergeFromMM(t,st.years[t.source.year]); syncState(t,'synced',{last:'pulled'}); syncSuppress=true; persist(); syncSuppress=false; render(); toast('Took the current app’s version'); })(); return undefined; },delLabel:'Use the app’s',
+      save:()=>{ (async()=>{ const st=await fetchMMState(); dl(JSON.stringify(st,null,2),'application/json',`member-member_backup_before_sync_${new Date().toISOString().slice(0,16).replace(/[:T]/g,'-')}.json`);
+        t.source.raw=clone(st.years[t.source.year]); await syncTournament(t); syncSuppress=true; persist(); syncSuppress=false; render(); toast('Kept the hub’s version · backup saved'); })(); return undefined; }});
+    return;
+  }
+  openDrawer({kicker:t.name,title:'Sync with the current app',saveLabel:'Save',
+    body:`<label class="check" style="align-items:flex-start"><input type="checkbox" id="syOn"${t.sync&&t.sync.off?'':' checked'}><span>Keep this tournament in sync with the current Member-Member app <span class="muted">(${esc(t.source.year)})</span></span></label>
+      <p class="hint">Hub edits go to the current app a couple of seconds after you make them; edits made there show up here live. The field, flights and anything the current app can’t hold stay in the hub only. If both sides change at once, you’ll be asked which version to keep.</p>
+      <p class="hint">${s.state==='error'?esc(s.msg||''):s.at?'Last checked '+new Date(s.at).toLocaleString()+(s.last?` · last ${s.last==='pushed'?'sent to':'received from'} the current app`:''):''}</p>`,
+    save:()=>{ t.sync=Object.assign(t.sync||{},{off:!$('syOn').checked}); if(!t.sync.off) syncSoon(300); }});
+}
+document.addEventListener('click',e=>{ const b=e.target.closest('[data-sync]'); if(!b) return; const t=T(); if(t) openSync(t); });
 
 boot();
 </script>

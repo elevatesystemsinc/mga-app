@@ -41,6 +41,13 @@ Optional: give it its own subdomain (e.g. `hub.wcccmga.org`). The current site o
    **Re-import** replaces the hub copy with a fresh one (use it while the board keeps
    working in the current app this week).
 
+**Staying in sync:** imported tournaments sync both ways automatically. Hub edits reach the current
+app a couple of seconds later; edits made there appear in the hub live (or when the tab comes back into
+view, and every minute). Hub-only data — the field, flights, ledger links, extra lines — stays in the
+hub. If both sides change before a sync, the tournament shows **Conflict** and nothing is overwritten
+until you pick a version. The chip in the tournament header shows the state; click it to turn sync off
+for that tournament.
+
 **Push back to the current app:** on an imported tournament, **Push to current app** (header or
 Verify tab) sends the hub's edits to the Member-Member app so the board can keep using it. It shows
 every total before and after, checks the result matches the hub, downloads a backup of the current
