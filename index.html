@@ -83,6 +83,7 @@ a{color:var(--gold)}
 .chip.gold{background:#F6ECCF;border-color:#E5CF8E;color:#6B4F12}
 .chip.navy{background:var(--navy);border-color:var(--navy);color:#fff}
 .chip.ok{background:#E3F0E8;border-color:#BCD9C7;color:var(--pos)}
+.chip.inact{height:20px;font-size:11px;background:#EDEAE2;border-color:#CFC6AE;color:#5A4E36;margin-left:6px;vertical-align:1px}
 .chip.warn{background:#F8E6DF;border-color:#EBC2B3;color:var(--neg)}
 .tabs{display:flex;gap:4px;border-bottom:1px solid var(--line);overflow-x:auto}
 .tab{padding:12px 16px;font-weight:600;color:var(--muted);background:none;border:none;border-bottom:2px solid transparent;margin-bottom:-1px;white-space:nowrap}
@@ -787,6 +788,7 @@ function editMenu(t,di,it){
 }
 
 /* Field */
+const inactiveBadge=m=>m&&m.status==='Inactive'?' <span class="chip inact">Inactive Member</span>':'';
 function tField(el,t){
   const size=t.teamSize||2, teams={};
   t.field.forEach(p=>{ (teams[p.team||0]=teams[p.team||0]||[]).push(p); });
@@ -795,12 +797,13 @@ function tField(el,t){
   const cols=`grid-template-columns:80px repeat(${size},minmax(0,1fr)) 120px 40px`;
   const rs=fieldRSVP(t), qs=t.fieldQuestions||[];
   const ansLine=p=>qs.filter(q=>yes((p.answers||{})[q.key])).map(q=>q.short||qShort(q.label)).join(' · ');
-  el.innerHTML=`<div class="grid g4">${kpi('Players in field',String(t.field.length),size>1?`${nums.length} team${nums.length===1?'':'s'} of ${size}`:'individual')}${kpi('Entry fee',fmt(t.entryFee),'per player')}${kpi('Entry fees paid',String(paid),`of ${t.field.length} · ${fmt(paid*n0(t.entryFee))} collected`)}${rs.headcount!=null?kpi('Dinner headcount',String(rs.headcount),`${rs.dinner} players${rs.guests!=null?' + '+rs.guests+' plus-ones':''}`):kpi('Skins entered',String(skins),n0(t.skinsFee)?'× '+fmt(t.skinsFee):'no skins fee set')}</div>
+  const nInact=t.field.filter(p=>{const m=memberById(p.memberId);return m&&m.status==='Inactive';}).length;
+  el.innerHTML=`<div class="grid g4">${kpi('Players in field',String(t.field.length),(size>1?`${nums.length} team${nums.length===1?'':'s'} of ${size}`:'individual')+(nInact?` · ${nInact} inactive member${nInact>1?'s':''}`:''))}${kpi('Entry fee',fmt(t.entryFee),'per player')}${kpi('Entry fees paid',String(paid),`of ${t.field.length} · ${fmt(paid*n0(t.entryFee))} collected`)}${rs.headcount!=null?kpi('Dinner headcount',String(rs.headcount),`${rs.dinner} players${rs.guests!=null?' + '+rs.guests+' plus-ones':''}`):kpi('Skins entered',String(skins),n0(t.skinsFee)?'× '+fmt(t.skinsFee):'no skins fee set')}</div>
   ${qs.length?`<div class="card pad" style="display:flex;gap:10px 24px;flex-wrap:wrap;align-items:center;font-size:13.5px"><span class="lbl">RSVPs</span>${qs.map(q=>`<span><b class="num">${t.field.filter(p=>yes((p.answers||{})[q.key])).length}</b> <span class="muted">${esc(q.label)}</span></span>`).join('')}${t.rosterFile?`<span class="muted" style="margin-left:auto;font-size:12.5px">From ${esc(t.rosterFile)} · ${new Date(t.rosterImportedAt).toLocaleDateString()}</span>`:''}</div>`:''}
   ${t.budgetBasis!=='field'?`<div class="banner">The budget uses ${n0(t.plannedPlayers)} planned players. Switch it to the field in Tournament details once signups close.</div>`:''}
   <div class="toolbar"><div class="actions"><button class="btn pri" id="fImp">${I.down}Import roster</button><button class="btn" id="fAdd">${I.plus}Add ${size>1?'team':'player'}</button></div><span class="muted" style="margin-left:auto;font-size:13px">Players are picked from Members${db.members.length?'':' — add members first'}.</span></div>
   <div class="card" style="overflow:hidden">${t.field.length?`<div class="tw"><div class="t"><div class="tr th" style="${cols}"><span>${size>1?'Team':'#'}</span>${Array.from({length:size},(_,i)=>`<span>Player ${i+1}</span>`).join('')}<span>Entry</span><span></span></div>
-    ${nums.map(n=>`<div class="tr click" data-team="${n}" style="${cols}"><span class="muted">${size>1?'Team '+n:n}</span>${Array.from({length:size},(_,i)=>{const p=teams[n][i];const mm=p&&memberById(p.memberId);return p?`<div class="cell2"><b class="trunc">${esc(mm?memberName(mm):p.name||'Unknown')}${p.skins?' <span class="chip" style="height:20px;font-size:11px">Skins</span>':''}</b>${ansLine(p)?`<small class="trunc">${esc(ansLine(p))}</small>`:''}</div>`:'<span class="muted">—</span>';}).join('')}<span>${teams[n].every(p=>p.paid)?'<span class="chip ok">Paid</span>':`<span class="chip warn">${fmt(teams[n].filter(p=>!p.paid).length*n0(t.entryFee))} due</span>`}</span><span class="ib">${I.edit}</span></div>`).join('')}</div></div>`:`<div class="empty"><b>No field yet</b><span>Import the Golf Genius roster, or add ${size>1?'teams':'players'} from the member list as they sign up.</span></div>`}</div>`;
+    ${nums.map(n=>`<div class="tr click" data-team="${n}" style="${cols}"><span class="muted">${size>1?'Team '+n:n}</span>${Array.from({length:size},(_,i)=>{const p=teams[n][i];const mm=p&&memberById(p.memberId);return p?`<div class="cell2"><b class="trunc">${esc(mm?memberName(mm):p.name||'Unknown')}${inactiveBadge(mm)}${p.skins?' <span class="chip" style="height:20px;font-size:11px">Skins</span>':''}</b>${ansLine(p)?`<small class="trunc">${esc(ansLine(p))}</small>`:''}</div>`:'<span class="muted">—</span>';}).join('')}<span>${teams[n].every(p=>p.paid)?'<span class="chip ok">Paid</span>':`<span class="chip warn">${fmt(teams[n].filter(p=>!p.paid).length*n0(t.entryFee))} due</span>`}</span><span class="ib">${I.edit}</span></div>`).join('')}</div></div>`:`<div class="empty"><b>No field yet</b><span>Import the Golf Genius roster, or add ${size>1?'teams':'players'} from the member list as they sign up.</span></div>`}</div>`;
   $('fAdd').onclick=()=>editTeam(t,null); $('fImp').onclick=()=>importField(t);
   el.querySelectorAll('[data-team]').forEach(r=>r.onclick=()=>editTeam(t,+r.dataset.team));
 }
@@ -808,18 +811,26 @@ function editTeam(t,num){
   const size=t.teamSize||2, existing=num!=null?t.field.filter(p=>(p.team||0)===num):[];
   const next=num!=null?num:(Math.max(0,...t.field.map(p=>p.team||0))+1);
   const taken=new Set(t.field.filter(p=>(p.team||0)!==num).map(p=>p.memberId));
-  const opts=[['','— Choose member —']].concat(db.members.filter(m=>m.status!=='Inactive'||existing.some(p=>p.memberId===m.id)).sort((a,b)=>memberName(a).localeCompare(memberName(b))).map(m=>[m.id,memberName(m)+(taken.has(m.id)?' (already in field)':'')]));
+  const opts=[['','— Choose member —'],['__new','+ New player (adds an Inactive member)']].concat(db.members.slice().sort((a,b)=>memberName(a).localeCompare(memberName(b))).map(m=>[m.id,memberName(m)+(m.status==='Inactive'?' — Inactive Member':'')+(taken.has(m.id)?' (already in field)':'')]));
   openDrawer({kicker:t.name+' · Field',title:size>1?(num!=null?'Team '+num:'Add team'):(num!=null?'Edit player':'Add player'),
-    body:(size>1?field('Team number','tmNum',next,{type:'number'}):'')+Array.from({length:size},(_,i)=>{const p=existing[i]||{};return `<div class="card pad" style="display:flex;flex-direction:column;gap:10px">${field('Player '+(i+1),'tmM'+i,p.memberId||'',{type:'select',options:opts})}<div style="display:flex;gap:10px 18px;flex-wrap:wrap"><label class="check"><input type="checkbox" id="tmP${i}"${p.paid?' checked':''}>Entry paid</label><label class="check"><input type="checkbox" id="tmS${i}"${p.skins?' checked':''}>In skins</label>${(t.fieldQuestions||[]).map((q,qi)=>`<label class="check"><input type="checkbox" id="tmQ${i}_${qi}"${yes((p.answers||{})[q.key])?' checked':''}>${esc(q.short||qShort(q.label))}</label>`).join('')}</div></div>`;}).join('')+
-      (db.members.length?'':'<div class="banner">No members yet — add them on the Members page first.</div>'),
-    save:()=>{ const team=size>1?(+fv('tmNum')||next):next; const picks=[];
-      for(let i=0;i<size;i++){ const mid=fv('tmM'+i); if(!mid) continue; if(taken.has(mid)){ toast(memberName(memberById(mid))+' is already in the field'); return false; }
+    body:(size>1?field('Team number','tmNum',next,{type:'number'}):'')+Array.from({length:size},(_,i)=>{const p=existing[i]||{};return `<div class="card pad" style="display:flex;flex-direction:column;gap:10px">${field('Player '+(i+1),'tmM'+i,p.memberId||'',{type:'select',options:opts})}<div id="tmB${i}">${inactiveBadge(memberById(p.memberId))?`<span class="chip inact">Inactive Member</span>`:''}</div>
+      <div id="tmN${i}" hidden style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px"><input class="inp" id="tmNF${i}" placeholder="First name" aria-label="New player first name"><input class="inp" id="tmNL${i}" placeholder="Last name" aria-label="New player last name"><input class="inp" id="tmNE${i}" placeholder="Email (optional)" aria-label="New player email"></div><div style="display:flex;gap:10px 18px;flex-wrap:wrap"><label class="check"><input type="checkbox" id="tmP${i}"${p.paid?' checked':''}>Entry paid</label><label class="check"><input type="checkbox" id="tmS${i}"${p.skins?' checked':''}>In skins</label>${(t.fieldQuestions||[]).map((q,qi)=>`<label class="check"><input type="checkbox" id="tmQ${i}_${qi}"${yes((p.answers||{})[q.key])?' checked':''}>${esc(q.short||qShort(q.label))}</label>`).join('')}</div></div>`;}).join('')+
+      '<p class="hint">Players who aren’t current members can still play. Pick “New player” to add them to Members as Inactive; they’re marked Inactive Member in the field.</p>',
+    wire:r=>{ for(let i=0;i<size;i++){ const s=r.querySelector('#tmM'+i); const upd=()=>{ const n=r.querySelector('#tmN'+i); n.hidden=s.value!=='__new'; n.style.display=s.value==='__new'?'grid':'none';
+        r.querySelector('#tmB'+i).innerHTML=(s.value==='__new'||inactiveBadge(memberById(s.value)))?'<span class="chip inact">Inactive Member</span>':''; if(s.value==='__new') r.querySelector('#tmNF'+i).focus(); }; s.onchange=upd; upd(); } },
+    save:()=>{ const team=size>1?(+fv('tmNum')||next):next; const picks=[], created=[];
+      for(let i=0;i<size;i++){ let mid=fv('tmM'+i); if(!mid) continue;
+        if(mid==='__new'){ const f=fv('tmNF'+i), l=fv('tmNL'+i); if(!f&&!l){ toast('Enter the new player’s name'); return false; }
+          const dup=db.members.find(m=>(m.first||'').toLowerCase()===f.toLowerCase()&&(m.last||'').toLowerCase()===l.toLowerCase());
+          if(dup){ mid=dup.id; } else { const m={id:uid(),first:f,last:l,email:fv('tmNE'+i).toLowerCase(),status:'Inactive',joined:'',notes:'Added from the '+t.name+' field',source:'field'}; created.push(m); mid=m.id; } } if(taken.has(mid)){ toast(memberName(memberById(mid))+' is already in the field'); return false; }
         if(picks.some(p=>p.memberId===mid)){ toast('Same member picked twice'); return false; }
         const prev=existing.find(p=>p.memberId===mid)||existing[i]||{}; const answers=Object.assign({},prev.memberId===mid?prev.answers:{});
         (t.fieldQuestions||[]).forEach((q,qi)=>{ answers[q.key]=$(`tmQ${i}_${qi}`).checked?'Yes':'No'; });
         picks.push({...(prev.memberId===mid?prev:{}),id:(prev.memberId===mid&&prev.id)||uid(),memberId:mid,team,paid:$('tmP'+i).checked,skins:$('tmS'+i).checked,answers}); }
       if(!picks.length){ toast('Pick at least one player'); return false; }
-      t.field=t.field.filter(p=>(p.team||0)!==num).concat(picks); },
+      created.forEach(m=>db.members.push(m));
+      t.field=t.field.filter(p=>(p.team||0)!==num).concat(picks);
+      if(created.length) toast(created.map(memberName).join(' and ')+' added to Members as Inactive'); },
     del:num!=null?()=>{ t.field=t.field.filter(p=>(p.team||0)!==num); }:null,delLabel:size>1?'Remove team':'Remove player'});
 }
 
@@ -1048,20 +1059,21 @@ function previewField(t,res,fname){
   const removed=t.field.filter(x=>!matchedIds.has(x.memberId));
   const teamSizes={}; rows.forEach(r=>teamSizes[r.team]=(teamSizes[r.team]||0)+1);
   const odd=Object.entries(teamSizes).filter(([,n])=>n!==size);
-  const hcpChanges=rows.filter(r=>r.m&&r.p.hcp&&String(r.m.hcp??'')!==r.p.hcp).length;
+  const newerHcp=r=>r.m&&r.p.hcp&&String(r.m.hcp??'')!==r.p.hcp&&!(r.m.hcpAt&&res.fileDate<r.m.hcpAt);
+  const hcpChanges=rows.filter(newerHcp).length;
   const fills=rows.filter(r=>r.m&&['phone','email','ghin'].some(k=>r.p[k]&&!r.m[k])).length;
   const qs=res.questions;
   const tally=qs.map(q=>`${esc(qShort(q))}: ${rows.filter(r=>yes(r.p.answers[q])).length} yes`).join(' · ');
   const pn=r=>esc(r.m?memberName(r.m):r.p.first+' '+r.p.last);
   openDrawer({kicker:'Import · '+fname,title:'Review roster',saveLabel:`Import ${rows.length} players`,
     body:`<div class="grid g3" style="gap:10px">${[['Players',rows.length],['Teams',Object.keys(teamSizes).length],['New to field',added.length]].map(([l,v])=>`<div class="card pad kpi" style="padding:14px"><span class="lbl">${l}</span><span class="v num" style="font-size:30px">${v}</span></div>`).join('')}</div>
-      <p class="hint">${rows.length-newMembers.length} matched to existing members${newMembers.length?` · <b>${newMembers.length} not in Members yet</b>`:''}${moved.length?` · ${moved.length} changing teams`:''}${res.skippedGuests?` · ${res.skippedGuests} guests skipped`:''}.</p>
+      <p class="hint">${rows.length-newMembers.length} matched to existing members${rows.filter(r=>r.m&&r.m.status==='Inactive').length?` (${rows.filter(r=>r.m&&r.m.status==='Inactive').length} Inactive)`:''}${newMembers.length?` · <b>${newMembers.length} not in Members</b>`:''}${moved.length?` · ${moved.length} changing teams`:''}${res.skippedGuests?` · ${res.skippedGuests} guests skipped`:''}.</p>
       ${qs.length?`<div class="fld"><span class="lbl">RSVP questions found</span><span style="font-size:13.5px">${tally}</span></div>`:''}
       ${odd.length?`<div class="banner">${odd.length} team${odd.length>1?'s don’t':' doesn’t'} have ${size} players: ${odd.slice(0,6).map(([n,c])=>'Team '+n+' ('+c+')').join(', ')}${odd.length>6?'…':''}. They’ll import as-is so you can fix them on the Field tab.</div>`:''}
-      ${newMembers.length?`<div class="fld"><span class="lbl">Not in Members yet</span><div class="mini">${newMembers.slice(0,6).map(r=>`<div class="mr"><div class="cell2"><b>${pn(r)}</b><small>${esc([r.p.email,r.p.ghin&&'GHIN '+r.p.ghin].filter(Boolean).join(' · '))}</small></div></div>`).join('')}${newMembers.length>6?`<div class="mr"><span class="muted">+ ${newMembers.length-6} more</span></div>`:''}</div></div>`:''}
+      ${newMembers.length?`<div class="fld"><span class="lbl">Not in Members — will play as Inactive Members</span><div class="mini">${newMembers.slice(0,6).map(r=>`<div class="mr"><div class="cell2"><b>${pn(r)}</b><small>${esc([r.p.email,r.p.ghin&&'GHIN '+r.p.ghin].filter(Boolean).join(' · '))}</small></div></div>`).join('')}${newMembers.length>6?`<div class="mr"><span class="muted">+ ${newMembers.length-6} more</span></div>`:''}</div></div>`:''}
       ${removed.length?`<div class="fld"><span class="lbl">In the field now but not in this roster</span><div class="mini">${removed.slice(0,6).map(x=>`<div class="mr"><b>${esc(memberName(memberById(x.memberId))||'Unknown')}</b></div>`).join('')}${removed.length>6?`<div class="mr"><span class="muted">+ ${removed.length-6} more</span></div>`:''}</div></div>`:''}
       <div class="fld" style="gap:10px">
-        ${newMembers.length?`<label class="check"><input type="checkbox" id="fiAdd" checked>Add the ${newMembers.length} new player${newMembers.length>1?'s':''} to Members</label>`:''}
+        ${newMembers.length?`<label class="check"><input type="checkbox" id="fiAdd" checked>Add the ${newMembers.length} player${newMembers.length>1?'s':''} who aren’t members to Members as <b>Inactive</b></label>`:''}
         ${hcpChanges||fills?`<label class="check" style="align-items:flex-start"><input type="checkbox" id="fiUpd" checked><span>Update members from this roster <span class="muted">(${hcpChanges} handicap index${hcpChanges===1?'':'es'}${fills?`, fill in ${fills} missing phone/email/GHIN`:''})</span></span></label>`:''}
         ${removed.length?`<label class="check"><input type="checkbox" id="fiRem" checked>Remove the ${removed.length} player${removed.length>1?'s':''} not in this roster from the field</label>`:''}
         <label class="check"><input type="checkbox" id="fiPaid">Mark every imported player’s entry fee as paid</label>
@@ -1069,7 +1081,7 @@ function previewField(t,res,fname){
       </div>`,
     save:()=>{
       const chk=id=>$(id)&&$(id).checked, before={field:clone(t.field),members:clone(db.members),q:clone(t.fieldQuestions||[]),basis:t.budgetBasis};
-      if(newMembers.length&&!chk('fiAdd')&&!confirm(`${newMembers.length} player(s) aren’t in Members and will be skipped. Continue?`)) return false;
+      if(newMembers.length&&!chk('fiAdd')&&!confirm(`${newMembers.length} player(s) aren’t in Members and will be left out of the field. Continue?`)) return false;
       // questions
       const qmap=new Map((t.fieldQuestions||[]).map(q=>[q.label,q]));
       qs.forEach(l=>{ if(!qmap.has(l)) qmap.set(l,{key:uid(),label:l,short:qShort(l),kind:qKind(l)}); });
@@ -1079,8 +1091,8 @@ function previewField(t,res,fname){
       const next=[];
       for(const r of rows){
         let m=r.m;
-        if(!m){ if(!chk('fiAdd')) continue; m={id:uid(),status:'Active',joined:'',notes:'',source:'field-roster'}; ROSTER_FIELDS.forEach(([k])=>{ if(k!=='ggId') m[k]=r.p[k]||''; }); db.members.push(m); }
-        else if(upd){ if(r.p.hcp) m.hcp=r.p.hcp; ['phone','email','ghin','address1','city','state','zip'].forEach(k=>{ if(r.p[k]&&!m[k]) m[k]=r.p[k]; }); if(m.status==='Inactive') m.status='Active'; }
+        if(!m){ if(!chk('fiAdd')) continue; m={id:uid(),status:'Inactive',joined:'',notes:'Added from the '+t.name+' roster',source:'field-roster'}; ROSTER_FIELDS.forEach(([k])=>{ if(k!=='ggId') m[k]=r.p[k]||''; }); if(r.p.hcp) m.hcpAt=res.fileDate; db.members.push(m); }
+        else if(upd){ if(newerHcp(r)){ m.hcp=r.p.hcp; m.hcpAt=res.fileDate; } ['phone','email','ghin','address1','city','state','zip'].forEach(k=>{ if(r.p[k]&&!m[k]) m[k]=r.p[k]; }); }
         const prev=inField.get(m.id)||{};
         const answers=Object.assign({},prev.answers||{}); qs.forEach(l=>{ answers[keyOf(l)]=r.p.answers[l]||''; });
         next.push({id:prev.id||uid(),memberId:m.id,team:r.team,paid:paid||!!prev.paid,skins:!!prev.skins,entryNo:r.p.entryNo||prev.entryNo||'',regId:r.p.ggId||prev.regId||'',answers});
@@ -1118,6 +1130,8 @@ function mapRoster(rows){
     const m={}; rows[i].forEach((h,ci)=>{ const k=h.toLowerCase().replace(/\s+/g,' ').trim(); for(const [key,re] of Object.entries(ROSTER_COLS)) if(m[key]===undefined&&re.test(k)){ m[key]=ci; break; } });
     if((m.first!==undefined&&m.last!==undefined)||m.full!==undefined||m.handle!==undefined){ hi=i; map=m; }
   }
+  let fileDate=Date.now();
+  for(const r of rows.slice(0,Math.max(hi,0))){ const mt=/created on\s+(\d{1,2})\/(\d{1,2})\/(\d{4})\s+(\d{1,2}):(\d{2})\s*([AP]M)?/i.exec(r.join(' ')); if(mt){ let hh=+mt[4]%12; if(/pm/i.test(mt[6]||'')) hh+=12; fileDate=new Date(+mt[3],+mt[1]-1,+mt[2],hh,+mt[5]).getTime(); break; } }
   const questions=[];
   if(hi>=0) rows[hi].forEach((h,ci)=>{ if(/\?\s*$|^(are|will|do|did|would) you\b/i.test(h.trim())&&!Object.values(map).includes(ci)) questions.push({ci,label:h.trim()}); });
   if(hi<0) throw new Error('Couldn’t find a header row with First Name and Last Name (or Name)');
@@ -1132,7 +1146,7 @@ function mapRoster(rows){
       address1:g('addr1'),address2:g('addr2'),city:g('city'),state:g('state'),zip:g('zip'),dob:g('dob'),memberType:g('memberType'),
       team:g('team'),entryNo:g('entryNo'),answers:Object.fromEntries(questions.map(q=>[q.label,(r[q.ci]||'').trim()]))});
   }
-  return {people,skippedGuests,skippedBlank,columns:Object.keys(map),questions:questions.map(q=>q.label)};
+  return {people,skippedGuests,skippedBlank,columns:Object.keys(map),questions:questions.map(q=>q.label),fileDate};
 }
 const ROSTER_FIELDS=[['first','First name'],['last','Last name'],['email','Email'],['phone','Phone'],['hcp','Handicap'],['ghin','GHIN'],['memberNo','Member #'],['ggId','Golf Genius ID'],
   ['address1','Address'],['address2','Address 2'],['city','City'],['state','State'],['zip','Zip'],['dob','Date of birth'],['memberType','Member type']];
@@ -1142,13 +1156,14 @@ function matchMember(p,used,noGG){
   for(const t of tries){ const m=db.members.find(x=>!used.has(x.id)&&t(x)); if(m) return m; }
   return null;
 }
-function planRoster(people){
+function planRoster(people,fileDate){
   const used=new Set(), plan={add:[],update:[],same:[]};
   for(const p of people){
     const m=matchMember(p,used);
     if(!m){ plan.add.push(p); continue; }
     used.add(m.id);
-    const changes=ROSTER_FIELDS.filter(([k])=>p[k]&&String(m[k]??'')!==p[k]).map(([k,l])=>({k,l,from:m[k]??'',to:p[k]}));
+    const changes=ROSTER_FIELDS.filter(([k])=>p[k]&&String(m[k]??'')!==p[k]&&!(k==='hcp'&&m.hcpAt&&fileDate<m.hcpAt)).map(([k,l])=>({k,l,from:m[k]??'',to:p[k]}));
+    if(m.status==='Inactive') changes.push({k:'status',l:'Status',from:'Inactive',to:'Active'});
     (changes.length?plan.update:plan.same).push({m,p,changes});
   }
   plan.missing=db.members.filter(x=>!used.has(x.id)&&x.status!=='Inactive');
@@ -1164,7 +1179,7 @@ function importRoster(){
       catch(err){ msg.style.color='var(--neg)'; msg.textContent=err.message||'Couldn’t read that file'; } }; }});
 }
 function previewRoster(res,fname){
-  const plan=planRoster(res.people);
+  const plan=planRoster(res.people,res.fileDate);
   const li=(t,sub)=>`<div class="mr" style="grid-template-columns:minmax(0,1fr)"><div class="cell2"><b>${t}</b>${sub?`<small>${sub}</small>`:''}</div></div>`;
   const more=(n,shown)=>n>shown?`<div class="mr"><span class="muted">+ ${n-shown} more</span></div>`:'';
   const SHOW=8;
@@ -1178,8 +1193,8 @@ function previewRoster(res,fname){
       const inact=$('rosterInact')&&$('rosterInact').checked;
       if(!plan.add.length&&!plan.update.length&&!inact){ toast('Nothing to change — the hub already matches this file'); return; }
       const before=clone(db.members);
-      for(const p of plan.add){ const m={id:uid(),status:'Active',joined:'',notes:''}; ROSTER_FIELDS.forEach(([k])=>{ m[k]=p[k]||''; }); m.source='roster'; db.members.push(m); }
-      for(const u of plan.update){ u.changes.forEach(c=>{ u.m[c.k]=c.to; }); if(u.m.status==='Inactive') u.m.status='Active'; }
+      for(const p of plan.add){ const m={id:uid(),status:'Active',joined:'',notes:''}; ROSTER_FIELDS.forEach(([k])=>{ m[k]=p[k]||''; }); m.source='roster'; if(p.hcp) m.hcpAt=res.fileDate; db.members.push(m); }
+      for(const u of plan.update){ u.changes.forEach(c=>{ u.m[c.k]=c.to; if(c.k==='hcp') u.m.hcpAt=res.fileDate; }); if(u.m.status==='Inactive') u.m.status='Active'; }
       if(inact) plan.missing.forEach(m=>m.status='Inactive');
       db.rosterImportedAt=new Date().toISOString(); db.rosterFile=fname;
       toast(`${plan.add.length} added · ${plan.update.length} updated${inact?` · ${plan.missing.length} marked inactive`:''}`,()=>{ db.members=before; persist(); render(); });

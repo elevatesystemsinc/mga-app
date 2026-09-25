@@ -59,7 +59,10 @@ and choose it when the import asks.
   event. Team Id sets the teams, RSVP questions (dinner, plus one, Par 3, anything else)
   are kept per player, and the dinner headcount (players + plus-ones) can be applied to
   a catered menu in one click. Re-uploading a newer export updates the field. Teams can
-  also be picked by hand from Members, entry paid and skins per player. The budget
+  also be picked by hand from Members. Players who aren’t current members can still play:
+  they’re added to Members as Inactive and marked “Inactive Member” in the field. A later
+  member-list import that includes them switches them back to Active. The newest file
+  wins for handicap index (by the export’s “created on” time), entry paid and skins per player. The budget
   uses the planned player count until you switch it to the field in Tournament details.
 - **Season budget:** all tournaments + annual dues (active members × dues, not
   prorated, recorded per member) + any MGA-level lines. The 50/50 raffle is counted
