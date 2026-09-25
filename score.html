@@ -7,7 +7,7 @@
 <title>Live Scoring · Walnut Creek MGA</title>
 <link rel="icon" href="crest.png?v=2">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@600;700&family=Public+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,600;0,700;1,700&family=Public+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <script src="config.js"></script>
 <style>
@@ -169,6 +169,111 @@ function bestBallBoard(pub,scores,opt){
 function eventBoard(pub,scores,opt){ opt=opt||{}; return pub.format==='bestball'&&opt.view!=='players'?bestBallBoard(pub,scores,opt):leaderboard(pub,scores,opt); }
 const FORMAT_LABEL={stroke:'Stroke play',bestball:'Best ball'};
 
+/* ---------- WCCC-style scorecard ----------
+   Styled after the club's printed card: course header, tee rows in their colors, par and
+   handicap rows, then players. Gross in every cell; where a player gets a stroke the net
+   score sits small in the corner. Totals end with HCP and NET like the printed card.
+   Best ball adds a team row per team (the counting score each hole, on the event's basis),
+   and the ball that counted is underlined in gold. */
+const WC_CSS=`
+.wc{--wc-navy:#1F3552;--wc-red:#A2343A;--wc-gold:#C7B350;--wc-teeRed:#B9434A;--wc-green:#444C48;--wc-line:#C9C2B2;
+  background:#fff;border:1px solid var(--wc-line);border-radius:12px;overflow:hidden;font-family:'Public Sans',system-ui,sans-serif;color:#14222B}
+.wc-top{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;padding:14px 18px 10px;border-bottom:2px solid var(--wc-accent,var(--wc-navy))}
+.wc-top .nm{font-family:'Cormorant Garamond',Georgia,serif;font-style:italic;font-weight:700;font-size:30px;line-height:1;color:var(--wc-accent,var(--wc-navy))}
+.wc-top small{display:block;font-size:11.5px;color:#56626A;margin-top:4px}
+.wc-top .ev{text-align:right;font-size:12.5px;color:#56626A} .wc-top .ev b{display:block;color:#14222B;font-size:14px}
+.wc-final{display:inline-block;margin-top:4px;padding:2px 8px;border:1.5px solid #1F6B4A;color:#1F6B4A;border-radius:4px;font-weight:800;font-size:11px;letter-spacing:.08em;transform:rotate(-3deg)}
+.wc-wrap{overflow-x:auto}
+.wc table{border-collapse:collapse;width:100%;font-variant-numeric:tabular-nums;font-size:13px}
+.wc th,.wc td{border:1px solid var(--wc-line);text-align:center;padding:0;height:34px;min-width:30px}
+.wc th:first-child,.wc td:first-child{text-align:left;padding:0 10px;min-width:128px;white-space:nowrap;position:sticky;left:0;background:inherit;z-index:1}
+.wc .wc-h th,.wc .wc-h td{background:var(--wc-accent,var(--wc-navy));color:#fff;font-weight:700}
+.wc .wc-tot{font-weight:700;background:#F4F0E6}
+.wc .wc-h .wc-tot{background:rgba(0,0,0,.25)}
+.wc tr.t-gold td,.wc tr.t-gold th{background:var(--wc-gold);color:#2B2410}
+.wc tr.t-blue td,.wc tr.t-blue th,.wc tr.t-blue-white td,.wc tr.t-blue-white th{background:var(--wc-navy);color:#fff}
+.wc tr.t-white td,.wc tr.t-white th,.wc tr.t-white-red td,.wc tr.t-white-red th{background:#fff}
+.wc tr.t-red td,.wc tr.t-red th{background:var(--wc-teeRed);color:#fff}
+.wc tr.t-green td,.wc tr.t-green th{background:var(--wc-green);color:#fff}
+.wc tr.t-blue-white th::after{content:'';} 
+.wc tr.wc-par td,.wc tr.wc-par th{background:var(--wc-navy);color:#fff;font-weight:700}
+.wc tr.wc-hc td,.wc tr.wc-hc th{font-size:11.5px;color:#56626A;background:#FBFAF5}
+.wc tr.wc-p th{font-weight:700;background:#fff}
+.wc tr.wc-p th small{display:block;font-weight:500;font-size:11px;color:#56626A;margin-top:1px}
+.wc tr.wc-p td{background:#fff;position:relative;font-size:15px;font-weight:600}
+.wc tr.wc-me th,.wc tr.wc-me td{background:#FBF4E0}
+.wc .wc-s{display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;line-height:1}
+.wc .wc-s.b{border:1.5px solid #14222B;border-radius:50%}
+.wc .wc-s.e{border:1.5px solid #14222B;border-radius:50%;box-shadow:0 0 0 2px #fff,0 0 0 3.5px #14222B}
+.wc .wc-s.o{border:1.5px solid #14222B}
+.wc .wc-s.d{border:1.5px solid #14222B;box-shadow:0 0 0 2px #fff,0 0 0 3.5px #14222B}
+.wc .wc-n{position:absolute;right:2px;bottom:1px;font-size:10px;font-weight:800;color:#8C6A1F}
+.wc .wc-dot{position:absolute;left:3px;top:3px;width:5px;height:5px;border-radius:50%;background:#8C6A1F}
+.wc .wc-dot+.wc-dot{left:10px}
+.wc td.wc-c::after{content:'';position:absolute;left:5px;right:5px;bottom:2px;height:3px;border-radius:2px;background:#C7A13A}
+.wc tr.wc-t th,.wc tr.wc-t td{background:#EEF1F2;font-weight:800;position:relative}
+.wc tr.wc-t th small{display:block;font-weight:600;font-size:11px;color:#56626A}
+.wc .wc-net{color:#1F6B4A}
+.wc-key{display:flex;gap:14px;flex-wrap:wrap;padding:10px 18px 14px;font-size:11.5px;color:#56626A;align-items:center;border-top:1px solid var(--wc-line)}
+.wc-key .wc-s{width:18px;height:18px;font-size:11px;margin-right:4px;vertical-align:middle}
+.wc-key i{display:inline-block;width:16px;height:3px;background:#C7A13A;border-radius:2px;margin-right:4px;vertical-align:middle}
+.wc-key em{font-style:normal;font-weight:800;color:#8C6A1F;margin-right:3px}
+.wc .wc-n{right:1px;bottom:0}
+@media (max-width:560px){ .wc th,.wc td{min-width:24px;height:32px;font-size:12px} .wc th:first-child,.wc td:first-child{min-width:0;max-width:92px;padding:0 5px;overflow:hidden;text-overflow:ellipsis} .wc th:first-child small{font-size:10px}
+  .wc tr.wc-p td{font-size:13.5px} .wc .wc-s{width:21px;height:21px} .wc-top .nm{font-size:24px} .wc-top{flex-wrap:wrap} .wc-top .ev{text-align:left} }
+.wc-sign{display:flex;justify-content:space-between;padding:8px 18px 12px;font-size:12px;color:#56626A;border-top:1px solid var(--wc-line)}
+`;
+function ensureCardCSS(){ if(typeof document==='undefined'||document.getElementById('wc-css')) return; const s=document.createElement('style'); s.id='wc-css'; s.textContent=WC_CSS; document.head.appendChild(s); }
+function scorecardHTML(pub,g,scores,opt){
+  opt=opt||{}; ensureCardCSS();
+  const c=pub.courses[g.course]; if(!c) return '';
+  const E=s=>String(s??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+  const accent=g.course==='pecan'?'#A2343A':'#1F3552';
+  const halves=opt.split?[[1,9],[10,18]]:[[1,18]];
+  const ps=g.players, BB=pub.format==='bestball', basisNet=(pub.scoring==='net');
+  const par=p=>c.par[p.set||'M']||c.par.M, hc=p=>c.hcp[p.set||'M']||c.hcp.M;
+  const sc=p=>scores[p.id]||{}, k=(p,h)=>typeof p.ph==='number'?strokesOn(p.ph,hc(p)[h-1]):0;
+  const teesUsed=[...new Set(ps.map(p=>p.tee))].filter(t=>c.tees&&t in c.tees);
+  const anyW=ps.some(p=>p.set==='W');
+  // best ball: the counting ball on each hole for each team
+  const teams=BB?[...new Set(ps.map(p=>p.team||p.id))].map(tk=>({tk,ms:ps.filter(p=>(p.team||p.id)===tk)})):[];
+  const counted=new Set(), teamCell={};
+  teams.forEach(t=>{ teamCell[t.tk]={}; for(let h=1;h<=18;h++){ let best=null;
+      for(const p of t.ms){ const s=+sc(p)[h]; if(!s) continue; const v=basisNet?s-k(p,h):s, rel=v-par(p)[h-1];
+        if(!best||rel<best.rel) best={p,rel,gross:s,net:s-k(p,h)}; }
+      if(best){ teamCell[t.tk][h]=best; counted.add(best.p.id+'|'+h); } } });
+  const short=n=>{ const w=String(n).trim().split(/\s+/); return opt.split&&w.length>1?w[0][0]+'. '+w.slice(1).join(' '):n; };
+  const shape=(s,pr)=>{ const d=s-pr; return d<=-2?'e':d===-1?'b':d===1?'o':d>=2?'d':''; };
+  const range=(a,b)=>Array.from({length:b-a+1},(_,i)=>a+i);
+  const sumH=(fn,a,b)=>{ let t=0,n=0; for(let h=a;h<=b;h++){ const v=fn(h); if(v!=null){ t+=v; n++; } } return n?t:''; };
+  const tables=halves.map(([a,b])=>{
+    const nines=a===1&&b===18?[[1,9,'Out'],[10,18,'In']]:[[a,b,a===1?'Out':'In']];
+    const endCols=(a===1&&b===18)||b===18;
+    const head=`<tr class="wc-h"><th>Hole</th>${nines.map(([x,y,l])=>range(x,y).map(h=>`<th>${h}</th>`).join('')+`<th class="wc-tot">${l}</th>`).join('')}${endCols?'<th class="wc-tot">Tot</th><th class="wc-tot">Hcp</th><th class="wc-tot">Net</th>':''}</tr>`;
+    const lineRow=(cls,label,valFn,totFn)=>`<tr class="${cls}"><th>${label}</th>${nines.map(([x,y])=>range(x,y).map(h=>`<td>${valFn(h)??''}</td>`).join('')+`<td class="wc-tot">${totFn?totFn(x,y):''}</td>`).join('')}${endCols?`<td class="wc-tot">${totFn?totFn(1,18):''}</td><td class="wc-tot"></td><td class="wc-tot"></td>`:''}</tr>`;
+    const tees=teesUsed.map(t=>{ const y=c.tees[t]; return lineRow('t-'+t.toLowerCase().replace('/','-'),E(t),h=>y?y[h-1]:'·',(x,z)=>y?sumH(h=>y[h-1],x,z):''); }).join('');
+    const hcpM=lineRow('wc-hc','Men’s Handicap',h=>c.hcp.M[h-1]);
+    const parRow=lineRow('wc-par','Par',h=>(anyW&&c.par.W[h-1]!==c.par.M[h-1])?c.par.M[h-1]+'/'+c.par.W[h-1]:c.par.M[h-1],(x,z)=>sumH(h=>c.par.M[h-1],x,z));
+    const hcpW=anyW?lineRow('wc-hc','Women’s Handicap',h=>c.hcp.W[h-1]):'';
+    const pRows=ps.map(p=>{ const S=sc(p), gT=(x,z)=>sumH(h=>+S[h]||null,x,z), nT=(x,z)=>sumH(h=>S[h]?(+S[h])-k(p,h):null,x,z);
+      const cells=nines.map(([x,y])=>range(x,y).map(h=>{ const s=+S[h], kk=k(p,h);
+        if(!s) return `<td>${kk>0?'<span class="wc-dot"></span>'.repeat(Math.min(kk,2)):''}</td>`;
+        return `<td class="${BB&&counted.has(p.id+'|'+h)?'wc-c':''}">${kk>0&&!s?'':''}<span class="wc-s ${shape(s,par(p)[h-1])}">${s}</span>${kk?`<span class="wc-n" title="Net ${s-kk}">${s-kk}</span>`:''}</td>`; }).join('')+`<td class="wc-tot">${gT(x,y)}</td>`).join('');
+      const full=Object.keys(S).length;
+      return `<tr class="wc-p${opt.highlight&&(opt.highlight===p.id||opt.highlight===p.team)?' wc-me':''}"><th title="${E(p.name)}">${E(short(p.name))}<small>${E(p.tee)}${p.flight?' · Flight '+E(p.flight):''}${typeof p.ph==='number'?' · plays '+(p.ph<0?'+'+(-p.ph):p.ph):''}</small></th>${cells}${endCols?`<td class="wc-tot">${gT(1,18)}</td><td class="wc-tot">${typeof p.ph==='number'?(p.ph<0?'+'+(-p.ph):p.ph):''}</td><td class="wc-tot wc-net">${full&&typeof p.ph==='number'?nT(1,18):''}</td>`:''}</tr>`; }).join('');
+    const tRows=teams.map(t=>{ const T=teamCell[t.tk];
+      const main=h=>T[h]?(basisNet?T[h].net:T[h].gross):null, other=h=>T[h]?(basisNet?T[h].gross:T[h].net):null;
+      const cells=nines.map(([x,y])=>range(x,y).map(h=>{ const v=main(h); if(v==null) return '<td></td>'; const o=other(h);
+        return `<td><span class="wc-s ${shape(v,par(T[h].p)[h-1])}">${v}</span>${o!==v?`<span class="wc-n" title="${basisNet?'Gross':'Net'} ${o}">${o}</span>`:''}</td>`; }).join('')+`<td class="wc-tot">${sumH(main,x,y)}</td>`).join('');
+      const gross=sumH(h=>T[h]?T[h].gross:null,1,18), net=sumH(h=>T[h]?T[h].net:null,1,18);
+      return `<tr class="wc-t"><th>${opt.split?'Team':'Best ball'}${basisNet?' net':''}<small>${E(t.ms.map(p=>p.name.split(' ').slice(-1)[0]).join(' & '))}</small></th>${cells}${endCols?`<td class="wc-tot">${basisNet?net:gross}</td><td class="wc-tot"></td><td class="wc-tot wc-net">${net}</td>`:''}</tr>`; }).join('');
+    return `<div class="wc-wrap"><table>${head}${tees}${hcpM}${parRow}${pRows}${tRows}${hcpW}</table></div>`;
+  }).join(opt.split?'<div style="height:8px"></div>':'');
+  const status=pub.status==='final'?'<span class="wc-final">FINAL</span>':'';
+  const key=`<div class="wc-key"><span><span class="wc-s b">3</span>Birdie</span><span><span class="wc-s e">2</span>Eagle</span><span><span class="wc-s o">5</span>Bogey</span><span><span class="wc-s d">6</span>Double+</span><span><em>3</em>Net where a stroke is given</span>${BB?`<span><i></i>Ball that counted${basisNet?' (net)':''}</span>`:''}</div>`;
+  return `<div class="wc" style="--wc-accent:${accent}"><div class="wc-top"><div><div class="nm">${E(c.name)}</div><small>Walnut Creek Country Club · Mansfield, Texas</small></div><div class="ev"><b>${E(pub.name)}</b>${E([pub.date?new Date(pub.date+'T12:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}):'',g.label].filter(Boolean).join(' · '))}<br>${status}</div></div>${tables}${key}<div class="wc-sign"><span>Scorer ________________</span><span>Attest ________________</span></div></div>`;
+}
+
 const $=id=>document.getElementById(id);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const CFG=window.MM_CONFIG||{}; const sb=(CFG.url&&CFG.anonKey&&window.supabase)?window.supabase.createClient(CFG.url,CFG.anonKey,{auth:{persistSession:false}}):null;
@@ -292,17 +397,16 @@ function renderHole(){
   $('leave').onclick=()=>{ if(queue.length&&!confirm('Some scores haven’t reached the server yet. Switch anyway? They’ll keep trying in the background.')) return; groupId=null; code=''; localStorage.removeItem(KEY); render(); };
 }
 function renderCard(){
-  const g=group(), c=pub.courses[g.course];
-  const nine=(p,a,b)=>{ let s=0,n=0; for(let h=a;h<=b;h++){ const v=(scores[p.id]||{})[h]; if(v){ s+=v; n++; } } return n?s:''; };
-  const rows=h=>`<tr><td>${h}</td><td class="muted">${c.par.M[h-1]}</td>${g.players.map(p=>{ const v=(scores[p.id]||{})[h], pr=(c.par[p.set||'M']||c.par.M)[h-1]; return `<td class="num ${v?(v<pr?'pos':v>pr?'neg':''):''}" style="font-weight:700">${v||'·'}</td>`; }).join('')}</tr>`;
-  $('main').innerHTML=`<div class="card" style="overflow:hidden"><div class="pad" style="padding-bottom:10px"><h1 style="font-size:26px">Scorecard</h1><p class="muted" style="margin:4px 0 0">${esc(c.name)} · Group ${esc(code)} · tap a hole to change it</p></div>
-   <table class="sc"><thead><tr><th>Hole</th><th>Par</th>${g.players.map(p=>`<th>${esc(p.name.split(' ')[0])}</th>`).join('')}</tr></thead><tbody>
-   ${[1,2,3,4,5,6,7,8,9].map(rows).join('')}<tr class="tot"><td>Out</td><td>${G_SUM(c.par.M.slice(0,9))}</td>${g.players.map(p=>`<td>${nine(p,1,9)}</td>`).join('')}</tr>
-   ${[10,11,12,13,14,15,16,17,18].map(rows).join('')}<tr class="tot"><td>In</td><td>${G_SUM(c.par.M.slice(9))}</td>${g.players.map(p=>`<td>${nine(p,10,18)}</td>`).join('')}</tr>
-   <tr class="tot"><td>Total</td><td>${G_SUM(c.par.M)}</td>${g.players.map(p=>`<td>${nine(p,1,18)}</td>`).join('')}</tr></tbody></table></div>
-   <p class="muted" style="text-align:center;font-size:13px;margin-top:14px">${queue.length?queue.length+' score'+(queue.length===1?'':'s')+' still saving…':'All scores saved.'}</p>`;
-  const order=playOrder(g.startHole);
-  document.querySelectorAll('.sc tbody tr').forEach(tr=>{ const h=+tr.firstElementChild.textContent; if(h>=1&&h<=18){ tr.style.cursor='pointer'; tr.onclick=()=>{ holeIdx=order.indexOf(h); tab='score'; render(); }; } });
+  const g=group(), order=playOrder(g.startHole);
+  $('main').innerHTML=scorecardHTML(pub,g,scores,{split:true})+
+   `<p class="muted" style="text-align:center;font-size:13px;margin:14px 0 6px">${queue.length?queue.length+' score'+(queue.length===1?'':'s')+' still saving…':'All scores saved.'}</p>
+   ${pub.status==='live'?`<p style="text-align:center;font-size:13px;margin:0 0 6px" class="muted">Change a hole:</p><div class="strip">${order.map((h,i)=>`<button data-go="${i}">${h}</button>`).join('')}</div>`:''}`;
+  document.querySelectorAll('.strip [data-go]').forEach(b=>b.onclick=()=>{ holeIdx=+b.dataset.go; tab='score'; render(); window.scrollTo(0,0); });
+}
+function showCardFor(gid,pid){
+  const g=pub.groups.find(x=>x.id===gid); if(!g) return;
+  $('main').innerHTML=`<p style="margin:0 0 12px"><button class="btn" id="cardBack" style="height:40px">‹ Leaderboard</button></p>`+scorecardHTML(pub,g,scores,{split:true,highlight:pid});
+  $('cardBack').onclick=()=>renderBoard(); window.scrollTo(0,0);
 }
 function renderBoard(fromJoin){
   if(lbSort==null) lbSort=pub.scoring||'gross';
@@ -315,12 +419,13 @@ function renderBoard(fromJoin){
    ${!BIG&&(flights.length||hasNet||BB)?`<div class="chips">${BB?[['teams','Teams'],['players','Players']].map(([k,l])=>`<button data-vw="${k}" class="${lbView===k?'on':''}">${l}</button>`).join(''):''}${hasNet?['gross','net'].map(x=>`<button data-sort="${x}" class="${(net?'net':'gross')===x?'on':''}">${x==='net'?'Net':'Gross'}</button>`).join(''):''}${flights.length?['',...flights].map(f=>`<button data-fl="${f}" class="${lbFlight===f?'on':''}">${f?'Flight '+f:'All'}</button>`).join(''):''}</div>`:''}
    <div class="card" style="overflow:hidden">
    <div class="lb h"><span>Pos</span><span>${BB&&lbView==='teams'?'Team':'Player'}</span><span class="r">Thru</span><span class="r">${net?'Net':'To par'}</span></div>
-   ${lb.map(r=>`<div class="lb num${mine.has(r.id)||(r.members||[]).some(id=>mine.has(id))?' me':''}"><b>${r.posTxt}</b><div style="min-width:0"><div style="font-weight:700;${r.team?'line-height:1.25':'overflow:hidden;text-overflow:ellipsis;white-space:nowrap'}" title="${esc(r.name)}">${r.team?r.name.split(' / ').map(esc).join('<br>'):esc(r.name)}</div>${BIG?'':`<div class="muted" style="font-size:12px">${esc(r.courseName.replace(' Course',''))}${r.flight&&!lbFlight?' · Flt '+esc(r.flight):''}${r.n?' · '+r.gross+(net&&r.net!=null?' / net '+r.net:''):''}</div>`}</div><span class="r muted">${r.n?r.thru:'—'}</span>${(()=>{ const v=net?r.netToPar:r.toPar; return `<span class="tp ${r.n&&v<0?'pos':r.n?'':'muted'}">${r.n&&v!=null?toParTxt(v):'—'}</span>`; })()}</div>`).join('')||'<div class="lb"><span></span><span class="muted">No players yet.</span></div>'}
-  </div><p class="muted" style="text-align:center;font-size:12.5px">${net?'Net':'Gross'} ${BB&&lbView==='teams'?'best ball':'stroke play'}${lbFlight?' · Flight '+esc(lbFlight):''} · updates live</p>${fromJoin?'<p style="text-align:center"><button class="btn" id="backJoin">Back</button></p>':''}`;
+   ${lb.map(r=>`<div class="lb num${mine.has(r.id)||(r.members||[]).some(id=>mine.has(id))?' me':''}" data-card="${esc(r.groupId)}|${esc(r.team?(r.members||[])[0]:r.id)}" style="cursor:pointer"><b>${r.posTxt}</b><div style="min-width:0"><div style="font-weight:700;${r.team?'line-height:1.25':'overflow:hidden;text-overflow:ellipsis;white-space:nowrap'}" title="${esc(r.name)}">${r.team?r.name.split(' / ').map(esc).join('<br>'):esc(r.name)}</div>${BIG?'':`<div class="muted" style="font-size:12px">${esc(r.courseName.replace(' Course',''))}${r.flight&&!lbFlight?' · Flt '+esc(r.flight):''}${r.n?' · '+r.gross+(net&&r.net!=null?' / net '+r.net:''):''}</div>`}</div><span class="r muted">${r.n?r.thru:'—'}</span>${(()=>{ const v=net?r.netToPar:r.toPar; return `<span class="tp ${r.n&&v<0?'pos':r.n?'':'muted'}">${r.n&&v!=null?toParTxt(v):'—'}</span>`; })()}</div>`).join('')||'<div class="lb"><span></span><span class="muted">No players yet.</span></div>'}
+  </div><p class="muted" style="text-align:center;font-size:12.5px">${pub.status==='final'?'Final · ':''}${net?'Net':'Gross'} ${BB&&lbView==='teams'?'best ball':'stroke play'}${BIG?'':' · tap a row for the scorecard'}${lbFlight?' · Flight '+esc(lbFlight):''} · updates live</p>${fromJoin?'<p style="text-align:center"><button class="btn" id="backJoin">Back</button></p>':''}`;
   const bj=$('backJoin'); if(bj) bj.onclick=()=>renderJoin();
   document.querySelectorAll('[data-fl]').forEach(b=>b.onclick=()=>{ lbFlight=b.dataset.fl; renderBoard.first=false; renderBoard(fromJoin); });
   document.querySelectorAll('[data-sort]').forEach(b=>b.onclick=()=>{ lbSort=b.dataset.sort; renderBoard(fromJoin); });
   document.querySelectorAll('[data-vw]').forEach(b=>b.onclick=()=>{ lbView=b.dataset.vw; renderBoard(fromJoin); });
+  if(!BIG) document.querySelectorAll('[data-card]').forEach(r=>r.onclick=()=>{ const [gid,pid]=r.dataset.card.split('|'); showCardFor(gid,pid); });
 }
 boot();
 </script>

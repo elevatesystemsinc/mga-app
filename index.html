@@ -6,7 +6,7 @@
 <title>MGA Hub · Walnut Creek Country Club</title>
 <link rel="icon" href="crest.png?v=2">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=Public+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;0,700;1,700&family=Public+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <script src="config.js"></script><!-- window.MM_CONFIG = {url, anonKey, boardEmail}. Missing file = local-only mode. -->
 <style>
@@ -161,6 +161,7 @@ textarea.inp{height:auto;min-height:84px;padding:10px 12px;resize:vertical}
 .scrim.show{opacity:1;pointer-events:auto}
 .drawer{position:fixed;top:0;right:0;bottom:0;width:520px;max-width:100%;background:#fff;border-left:1px solid var(--line);display:flex;flex-direction:column;transform:translateX(100%);visibility:hidden;transition:transform .2s ease,visibility 0s .2s;z-index:50}
 .drawer.wide{width:780px}
+.drawer.xwide{width:min(1180px,100%)}
 .drawer.show{transform:none;visibility:visible;box-shadow:-18px 0 50px rgba(10,28,39,.16);transition:transform .2s ease}
 .dhead{padding:24px 28px 16px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:flex-start;gap:12px}
 .dhead .h2{font-size:30px;margin-top:2px}
@@ -558,7 +559,7 @@ function toast(msg,undo){ const t=$('toast'); t.innerHTML=esc(msg); if(undo){ co
 const drawerOpen=()=>$('drawer').classList.contains('show');
 let drawerCtx=null;
 function openDrawer({kicker='',title,body,save,saveLabel='Save',del,delLabel='Delete',wire,wide}){
-  drawerCtx={save,del}; $('drawer').classList.toggle('wide',!!wide);
+  drawerCtx={save,del}; $('drawer').classList.toggle('wide',wide===true); $('drawer').classList.toggle('xwide',wide==='x');
   $('dKicker').textContent=kicker; $('dTitle').textContent=title; $('dBody').innerHTML=body;
   $('dFoot').innerHTML=`<div>${del?`<button class="btn danger" id="dDel">${I.trash}${esc(delLabel)}</button>`:''}</div><div class="actions"><button class="btn" id="dCancel">Cancel</button>${save?`<button class="btn pri" id="dSave">${esc(saveLabel)}</button>`:''}</div>`;
   $('drawer').classList.add('show'); $('scrim').classList.add('show');
@@ -1822,6 +1823,111 @@ function bestBallBoard(pub,scores,opt){
 function eventBoard(pub,scores,opt){ opt=opt||{}; return pub.format==='bestball'&&opt.view!=='players'?bestBallBoard(pub,scores,opt):leaderboard(pub,scores,opt); }
 const FORMAT_LABEL={stroke:'Stroke play',bestball:'Best ball'};
 
+/* ---------- WCCC-style scorecard ----------
+   Styled after the club's printed card: course header, tee rows in their colors, par and
+   handicap rows, then players. Gross in every cell; where a player gets a stroke the net
+   score sits small in the corner. Totals end with HCP and NET like the printed card.
+   Best ball adds a team row per team (the counting score each hole, on the event's basis),
+   and the ball that counted is underlined in gold. */
+const WC_CSS=`
+.wc{--wc-navy:#1F3552;--wc-red:#A2343A;--wc-gold:#C7B350;--wc-teeRed:#B9434A;--wc-green:#444C48;--wc-line:#C9C2B2;
+  background:#fff;border:1px solid var(--wc-line);border-radius:12px;overflow:hidden;font-family:'Public Sans',system-ui,sans-serif;color:#14222B}
+.wc-top{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;padding:14px 18px 10px;border-bottom:2px solid var(--wc-accent,var(--wc-navy))}
+.wc-top .nm{font-family:'Cormorant Garamond',Georgia,serif;font-style:italic;font-weight:700;font-size:30px;line-height:1;color:var(--wc-accent,var(--wc-navy))}
+.wc-top small{display:block;font-size:11.5px;color:#56626A;margin-top:4px}
+.wc-top .ev{text-align:right;font-size:12.5px;color:#56626A} .wc-top .ev b{display:block;color:#14222B;font-size:14px}
+.wc-final{display:inline-block;margin-top:4px;padding:2px 8px;border:1.5px solid #1F6B4A;color:#1F6B4A;border-radius:4px;font-weight:800;font-size:11px;letter-spacing:.08em;transform:rotate(-3deg)}
+.wc-wrap{overflow-x:auto}
+.wc table{border-collapse:collapse;width:100%;font-variant-numeric:tabular-nums;font-size:13px}
+.wc th,.wc td{border:1px solid var(--wc-line);text-align:center;padding:0;height:34px;min-width:30px}
+.wc th:first-child,.wc td:first-child{text-align:left;padding:0 10px;min-width:128px;white-space:nowrap;position:sticky;left:0;background:inherit;z-index:1}
+.wc .wc-h th,.wc .wc-h td{background:var(--wc-accent,var(--wc-navy));color:#fff;font-weight:700}
+.wc .wc-tot{font-weight:700;background:#F4F0E6}
+.wc .wc-h .wc-tot{background:rgba(0,0,0,.25)}
+.wc tr.t-gold td,.wc tr.t-gold th{background:var(--wc-gold);color:#2B2410}
+.wc tr.t-blue td,.wc tr.t-blue th,.wc tr.t-blue-white td,.wc tr.t-blue-white th{background:var(--wc-navy);color:#fff}
+.wc tr.t-white td,.wc tr.t-white th,.wc tr.t-white-red td,.wc tr.t-white-red th{background:#fff}
+.wc tr.t-red td,.wc tr.t-red th{background:var(--wc-teeRed);color:#fff}
+.wc tr.t-green td,.wc tr.t-green th{background:var(--wc-green);color:#fff}
+.wc tr.t-blue-white th::after{content:'';} 
+.wc tr.wc-par td,.wc tr.wc-par th{background:var(--wc-navy);color:#fff;font-weight:700}
+.wc tr.wc-hc td,.wc tr.wc-hc th{font-size:11.5px;color:#56626A;background:#FBFAF5}
+.wc tr.wc-p th{font-weight:700;background:#fff}
+.wc tr.wc-p th small{display:block;font-weight:500;font-size:11px;color:#56626A;margin-top:1px}
+.wc tr.wc-p td{background:#fff;position:relative;font-size:15px;font-weight:600}
+.wc tr.wc-me th,.wc tr.wc-me td{background:#FBF4E0}
+.wc .wc-s{display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;line-height:1}
+.wc .wc-s.b{border:1.5px solid #14222B;border-radius:50%}
+.wc .wc-s.e{border:1.5px solid #14222B;border-radius:50%;box-shadow:0 0 0 2px #fff,0 0 0 3.5px #14222B}
+.wc .wc-s.o{border:1.5px solid #14222B}
+.wc .wc-s.d{border:1.5px solid #14222B;box-shadow:0 0 0 2px #fff,0 0 0 3.5px #14222B}
+.wc .wc-n{position:absolute;right:2px;bottom:1px;font-size:10px;font-weight:800;color:#8C6A1F}
+.wc .wc-dot{position:absolute;left:3px;top:3px;width:5px;height:5px;border-radius:50%;background:#8C6A1F}
+.wc .wc-dot+.wc-dot{left:10px}
+.wc td.wc-c::after{content:'';position:absolute;left:5px;right:5px;bottom:2px;height:3px;border-radius:2px;background:#C7A13A}
+.wc tr.wc-t th,.wc tr.wc-t td{background:#EEF1F2;font-weight:800;position:relative}
+.wc tr.wc-t th small{display:block;font-weight:600;font-size:11px;color:#56626A}
+.wc .wc-net{color:#1F6B4A}
+.wc-key{display:flex;gap:14px;flex-wrap:wrap;padding:10px 18px 14px;font-size:11.5px;color:#56626A;align-items:center;border-top:1px solid var(--wc-line)}
+.wc-key .wc-s{width:18px;height:18px;font-size:11px;margin-right:4px;vertical-align:middle}
+.wc-key i{display:inline-block;width:16px;height:3px;background:#C7A13A;border-radius:2px;margin-right:4px;vertical-align:middle}
+.wc-key em{font-style:normal;font-weight:800;color:#8C6A1F;margin-right:3px}
+.wc .wc-n{right:1px;bottom:0}
+@media (max-width:560px){ .wc th,.wc td{min-width:24px;height:32px;font-size:12px} .wc th:first-child,.wc td:first-child{min-width:0;max-width:92px;padding:0 5px;overflow:hidden;text-overflow:ellipsis} .wc th:first-child small{font-size:10px}
+  .wc tr.wc-p td{font-size:13.5px} .wc .wc-s{width:21px;height:21px} .wc-top .nm{font-size:24px} .wc-top{flex-wrap:wrap} .wc-top .ev{text-align:left} }
+.wc-sign{display:flex;justify-content:space-between;padding:8px 18px 12px;font-size:12px;color:#56626A;border-top:1px solid var(--wc-line)}
+`;
+function ensureCardCSS(){ if(typeof document==='undefined'||document.getElementById('wc-css')) return; const s=document.createElement('style'); s.id='wc-css'; s.textContent=WC_CSS; document.head.appendChild(s); }
+function scorecardHTML(pub,g,scores,opt){
+  opt=opt||{}; ensureCardCSS();
+  const c=pub.courses[g.course]; if(!c) return '';
+  const E=s=>String(s??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+  const accent=g.course==='pecan'?'#A2343A':'#1F3552';
+  const halves=opt.split?[[1,9],[10,18]]:[[1,18]];
+  const ps=g.players, BB=pub.format==='bestball', basisNet=(pub.scoring==='net');
+  const par=p=>c.par[p.set||'M']||c.par.M, hc=p=>c.hcp[p.set||'M']||c.hcp.M;
+  const sc=p=>scores[p.id]||{}, k=(p,h)=>typeof p.ph==='number'?strokesOn(p.ph,hc(p)[h-1]):0;
+  const teesUsed=[...new Set(ps.map(p=>p.tee))].filter(t=>c.tees&&t in c.tees);
+  const anyW=ps.some(p=>p.set==='W');
+  // best ball: the counting ball on each hole for each team
+  const teams=BB?[...new Set(ps.map(p=>p.team||p.id))].map(tk=>({tk,ms:ps.filter(p=>(p.team||p.id)===tk)})):[];
+  const counted=new Set(), teamCell={};
+  teams.forEach(t=>{ teamCell[t.tk]={}; for(let h=1;h<=18;h++){ let best=null;
+      for(const p of t.ms){ const s=+sc(p)[h]; if(!s) continue; const v=basisNet?s-k(p,h):s, rel=v-par(p)[h-1];
+        if(!best||rel<best.rel) best={p,rel,gross:s,net:s-k(p,h)}; }
+      if(best){ teamCell[t.tk][h]=best; counted.add(best.p.id+'|'+h); } } });
+  const short=n=>{ const w=String(n).trim().split(/\s+/); return opt.split&&w.length>1?w[0][0]+'. '+w.slice(1).join(' '):n; };
+  const shape=(s,pr)=>{ const d=s-pr; return d<=-2?'e':d===-1?'b':d===1?'o':d>=2?'d':''; };
+  const range=(a,b)=>Array.from({length:b-a+1},(_,i)=>a+i);
+  const sumH=(fn,a,b)=>{ let t=0,n=0; for(let h=a;h<=b;h++){ const v=fn(h); if(v!=null){ t+=v; n++; } } return n?t:''; };
+  const tables=halves.map(([a,b])=>{
+    const nines=a===1&&b===18?[[1,9,'Out'],[10,18,'In']]:[[a,b,a===1?'Out':'In']];
+    const endCols=(a===1&&b===18)||b===18;
+    const head=`<tr class="wc-h"><th>Hole</th>${nines.map(([x,y,l])=>range(x,y).map(h=>`<th>${h}</th>`).join('')+`<th class="wc-tot">${l}</th>`).join('')}${endCols?'<th class="wc-tot">Tot</th><th class="wc-tot">Hcp</th><th class="wc-tot">Net</th>':''}</tr>`;
+    const lineRow=(cls,label,valFn,totFn)=>`<tr class="${cls}"><th>${label}</th>${nines.map(([x,y])=>range(x,y).map(h=>`<td>${valFn(h)??''}</td>`).join('')+`<td class="wc-tot">${totFn?totFn(x,y):''}</td>`).join('')}${endCols?`<td class="wc-tot">${totFn?totFn(1,18):''}</td><td class="wc-tot"></td><td class="wc-tot"></td>`:''}</tr>`;
+    const tees=teesUsed.map(t=>{ const y=c.tees[t]; return lineRow('t-'+t.toLowerCase().replace('/','-'),E(t),h=>y?y[h-1]:'·',(x,z)=>y?sumH(h=>y[h-1],x,z):''); }).join('');
+    const hcpM=lineRow('wc-hc','Men’s Handicap',h=>c.hcp.M[h-1]);
+    const parRow=lineRow('wc-par','Par',h=>(anyW&&c.par.W[h-1]!==c.par.M[h-1])?c.par.M[h-1]+'/'+c.par.W[h-1]:c.par.M[h-1],(x,z)=>sumH(h=>c.par.M[h-1],x,z));
+    const hcpW=anyW?lineRow('wc-hc','Women’s Handicap',h=>c.hcp.W[h-1]):'';
+    const pRows=ps.map(p=>{ const S=sc(p), gT=(x,z)=>sumH(h=>+S[h]||null,x,z), nT=(x,z)=>sumH(h=>S[h]?(+S[h])-k(p,h):null,x,z);
+      const cells=nines.map(([x,y])=>range(x,y).map(h=>{ const s=+S[h], kk=k(p,h);
+        if(!s) return `<td>${kk>0?'<span class="wc-dot"></span>'.repeat(Math.min(kk,2)):''}</td>`;
+        return `<td class="${BB&&counted.has(p.id+'|'+h)?'wc-c':''}">${kk>0&&!s?'':''}<span class="wc-s ${shape(s,par(p)[h-1])}">${s}</span>${kk?`<span class="wc-n" title="Net ${s-kk}">${s-kk}</span>`:''}</td>`; }).join('')+`<td class="wc-tot">${gT(x,y)}</td>`).join('');
+      const full=Object.keys(S).length;
+      return `<tr class="wc-p${opt.highlight&&(opt.highlight===p.id||opt.highlight===p.team)?' wc-me':''}"><th title="${E(p.name)}">${E(short(p.name))}<small>${E(p.tee)}${p.flight?' · Flight '+E(p.flight):''}${typeof p.ph==='number'?' · plays '+(p.ph<0?'+'+(-p.ph):p.ph):''}</small></th>${cells}${endCols?`<td class="wc-tot">${gT(1,18)}</td><td class="wc-tot">${typeof p.ph==='number'?(p.ph<0?'+'+(-p.ph):p.ph):''}</td><td class="wc-tot wc-net">${full&&typeof p.ph==='number'?nT(1,18):''}</td>`:''}</tr>`; }).join('');
+    const tRows=teams.map(t=>{ const T=teamCell[t.tk];
+      const main=h=>T[h]?(basisNet?T[h].net:T[h].gross):null, other=h=>T[h]?(basisNet?T[h].gross:T[h].net):null;
+      const cells=nines.map(([x,y])=>range(x,y).map(h=>{ const v=main(h); if(v==null) return '<td></td>'; const o=other(h);
+        return `<td><span class="wc-s ${shape(v,par(T[h].p)[h-1])}">${v}</span>${o!==v?`<span class="wc-n" title="${basisNet?'Gross':'Net'} ${o}">${o}</span>`:''}</td>`; }).join('')+`<td class="wc-tot">${sumH(main,x,y)}</td>`).join('');
+      const gross=sumH(h=>T[h]?T[h].gross:null,1,18), net=sumH(h=>T[h]?T[h].net:null,1,18);
+      return `<tr class="wc-t"><th>${opt.split?'Team':'Best ball'}${basisNet?' net':''}<small>${E(t.ms.map(p=>p.name.split(' ').slice(-1)[0]).join(' & '))}</small></th>${cells}${endCols?`<td class="wc-tot">${basisNet?net:gross}</td><td class="wc-tot"></td><td class="wc-tot wc-net">${net}</td>`:''}</tr>`; }).join('');
+    return `<div class="wc-wrap"><table>${head}${tees}${hcpM}${parRow}${pRows}${tRows}${hcpW}</table></div>`;
+  }).join(opt.split?'<div style="height:8px"></div>':'');
+  const status=pub.status==='final'?'<span class="wc-final">FINAL</span>':'';
+  const key=`<div class="wc-key"><span><span class="wc-s b">3</span>Birdie</span><span><span class="wc-s e">2</span>Eagle</span><span><span class="wc-s o">5</span>Bogey</span><span><span class="wc-s d">6</span>Double+</span><span><em>3</em>Net where a stroke is given</span>${BB?`<span><i></i>Ball that counted${basisNet?' (net)':''}</span>`:''}</div>`;
+  return `<div class="wc" style="--wc-accent:${accent}"><div class="wc-top"><div><div class="nm">${E(c.name)}</div><small>Walnut Creek Country Club · Mansfield, Texas</small></div><div class="ev"><b>${E(pub.name)}</b>${E([pub.date?new Date(pub.date+'T12:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}):'',g.label].filter(Boolean).join(' · '))}<br>${status}</div></div>${tables}${key}<div class="wc-sign"><span>Scorer ________________</span><span>Attest ________________</span></div></div>`;
+}
+
 /* =====================================================================
    MGA Hub — Golf: courses, live-scoring events, groups with custom IDs,
    share link for the public scoring page, and live leaderboards.
@@ -2002,7 +2108,7 @@ function editGroup(ev,grp){
       pair(field('Course','ggC',grp?.course||'oak',{type:'select',options:g.courses.map(c=>[c.id,c.name])}),field('Starting hole','ggS',grp?.startHole||1,{type:'select',options:Array.from({length:18},(_,i)=>[i+1,'Hole '+(i+1)])}))+
       `<div class="fld"><span class="lbl">Players</span><div class="mini">${rowsHead}<div id="ggRows">${rows()}</div></div><p class="hint">Index comes from the member’s profile (Golf Genius import). Type over it for a guest or a one-off change.</p></div><div id="ggTeams">${teamsHTML()}
        <div style="display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px"><select class="inp" id="ggPick" aria-label="Add a member">${opts}</select><button class="btn" type="button" id="ggGuest">+ Guest</button></div></div>
-      ${grp?`<button class="btn" type="button" id="ggScores">Enter or correct scores</button>`:''}`,
+      ${grp?`<div class="actions"><button class="btn" type="button" id="ggCard">View scorecard</button><button class="btn" type="button" id="ggScores">Enter or correct scores</button></div>`:''}`,
     wire:r=>{ const bind=()=>{ r.querySelectorAll('[data-pi]').forEach(e=>e.oninput=e.onchange=()=>{ const i=+e.dataset.pi; players[i][e.dataset.k]=e.value; const s=r.querySelector(`[data-ch="${i}"]`); if(s) s.textContent=chTxt(players[i]); }); r.querySelectorAll('[data-pdel]').forEach(b=>b.onclick=()=>{ players.splice(+b.dataset.pdel,1); redraw(); });
         r.querySelectorAll('[data-team]').forEach(s=>s.onchange=()=>{ players[+s.dataset.team].team=s.value; }); };
       const redraw=()=>{ r.querySelector('#ggRows').innerHTML=rows(); r.querySelector('#ggTeams').innerHTML=teamsHTML(); bind(); }; bind();
@@ -2010,7 +2116,8 @@ function editGroup(ev,grp){
         players.push({id:uid(),memberId:m.id,name:memberName(m),tee:ev.defaultTee||'White',set:'M',team:fieldTeam.get(m.id)||''}); redraw(); };
       r.querySelector('#ggGuest').onclick=()=>{ players.push({id:uid(),memberId:'',name:'',tee:ev.defaultTee||'White',set:'M'}); redraw(); const ins=r.querySelectorAll('[data-k=name]'); ins[ins.length-1].focus(); };
       r.querySelector('#ggC').onchange=redraw;
-      const sc=r.querySelector('#ggScores'); if(sc) sc.onclick=()=>{ closeDrawer(); scoreSheet(ev,grp); }; },
+      const sc=r.querySelector('#ggScores'); if(sc) sc.onclick=()=>{ closeDrawer(); scoreSheet(ev,grp); };
+      const vc=r.querySelector('#ggCard'); if(vc) vc.onclick=()=>{ closeDrawer(); setTimeout(()=>viewCard(ev,grp),0); }; },
     save:()=>{ const code=fv('ggCode').toUpperCase().replace(/\s+/g,''); if(!code){ toast('Give the group an ID'); return false; }
       if(!/^[A-Z0-9-]{2,20}$/.test(code)){ toast('Group ID: 2–20 letters, numbers or dashes'); return false; }
       if(ev.groups.some(x=>x!==grp&&x.code===code)){ toast('Another group already uses '+code); return false; }
@@ -2044,15 +2151,15 @@ function gBoard(el,ev){
   const courses=[...new Set(ev.groups.map(g=>g.course))];
   el.innerHTML=`<div class="toolbar">${BB?`<div class="seg">${[['teams','Teams (best ball)'],['players','Players']].map(([k,l])=>`<button class="${view.gview===k?'on':''}" data-gvw="${k}">${l}</button>`).join('')}</div>`:''}<div class="seg">${['gross','net'].map(s=>`<button class="${view.gsort===s?'on':''}" data-gs="${s}">${s==='net'?'Net':'Gross'}</button>`).join('')}</div>
     ${names.length?`<div class="seg">${['',...names].map(n=>`<button class="${view.gflight===n?'on':''}" data-gf="${n}">${n?'Flight '+n:'All flights'}</button>`).join('')}</div>`:''}
-    <span class="muted" style="font-size:13px">To par for holes played${courses.length>1?' · both courses':''} · live</span><button class="btn sm" id="gbRef" style="margin-left:auto">${I.refresh}Refresh</button></div>
+    <span class="muted" style="font-size:13px">${ev.status==='final'?'Final · click any row for the scorecard':'To par for holes played'+(courses.length>1?' · both courses':'')+' · live · click a row for the scorecard'}</span><button class="btn sm" id="gbRef" style="margin-left:auto">${I.refresh}Refresh</button></div>
   <div class="card" style="overflow:hidden">${lb.length?`<div class="tw"><div class="t" style="min-width:860px"><div class="tr th" style="${cols}"><span>Pos</span><span>${BB&&view.gview==='teams'?'Team':'Player'}</span><span>Group</span><span class="r">Flt</span><span class="r">Thru</span><span class="r">Gross</span><span class="r">${net?'Net':'To par'}</span><span class="r">${net?'Net to par':'Net'}</span><span></span></div>
-    ${lb.map(r=>`<div class="tr num click" data-lbg="${r.groupId}" style="${cols}"><b>${r.posTxt}</b><b class="trunc">${esc(r.name)}</b><span class="trunc muted">${esc(r.group||'')} · ${esc(r.courseName.replace(' Course',''))}</span><span class="r muted">${esc(r.flight||'')}</span><span class="r">${r.n?r.thru:'—'}</span><span class="r">${r.n?r.gross+' <small class="muted">('+toParTxt(r.toPar)+')</small>':'—'}</span>${net?`<span class="r">${r.n&&r.net!=null?r.net:'—'}</span><b class="r ${r.n&&r.netToPar<0?'pos':''}" style="font-size:15px">${r.n&&r.netToPar!=null?toParTxt(r.netToPar):'—'}</b>`:`<b class="r ${r.n&&r.toPar<0?'pos':''}" style="font-size:15px">${r.n?toParTxt(r.toPar):'—'}</b><span class="r muted">${r.n&&r.netToPar!=null?toParTxt(r.netToPar):'—'}</span>`}<span class="ib">${I.edit}</span></div>`).join('')}</div></div>`
+    ${lb.map(r=>`<div class="tr num click" data-lbg="${r.groupId}" data-lbp="${esc(r.team?(r.members||[])[0]:r.id)}" style="${cols}"><b>${r.posTxt}</b><b class="trunc">${esc(r.name)}</b><span class="trunc muted">${esc(r.group||'')} · ${esc(r.courseName.replace(' Course',''))}</span><span class="r muted">${esc(r.flight||'')}</span><span class="r">${r.n?r.thru:'—'}</span><span class="r">${r.n?r.gross+' <small class="muted">('+toParTxt(r.toPar)+')</small>':'—'}</span>${net?`<span class="r">${r.n&&r.net!=null?r.net:'—'}</span><b class="r ${r.n&&r.netToPar<0?'pos':''}" style="font-size:15px">${r.n&&r.netToPar!=null?toParTxt(r.netToPar):'—'}</b>`:`<b class="r ${r.n&&r.toPar<0?'pos':''}" style="font-size:15px">${r.n?toParTxt(r.toPar):'—'}</b><span class="r muted">${r.n&&r.netToPar!=null?toParTxt(r.netToPar):'—'}</span>`}<span class="ib">${I.edit}</span></div>`).join('')}</div></div>`
     :'<div class="empty"><b>No players yet</b><span>Add groups to see the leaderboard.</span></div>'}</div>`;
   $('gbRef').onclick=()=>loadScores(ev);
   el.querySelectorAll('[data-gs]').forEach(b=>b.onclick=()=>{ view.gsort=b.dataset.gs; render(); });
   el.querySelectorAll('[data-gvw]').forEach(b=>b.onclick=()=>{ view.gview=b.dataset.gvw; render(); });
   el.querySelectorAll('[data-gf]').forEach(b=>b.onclick=()=>{ view.gflight=b.dataset.gf; render(); });
-  el.querySelectorAll('[data-lbg]').forEach(r=>r.onclick=()=>scoreSheet(ev,ev.groups.find(g=>g.id===r.dataset.lbg)));
+  el.querySelectorAll('[data-lbg]').forEach(r=>r.onclick=()=>viewCard(ev,ev.groups.find(g=>g.id===r.dataset.lbg),r.dataset.lbp));
 }
 /* Leaderboard card for the dashboard + sidebar live link */
 function liveBoardCard(){
@@ -2270,6 +2377,16 @@ function buildGroupsFromField(ev){
         const startHole=start==='shotgun'?(idx%18)+1:1; const dbl=start==='shotgun'&&idx>=18?' B':'';
         out.push({id:uid(),code:newCode({groups:out}),label:`${course==='oak'?'Oak':'Pecan'} ${start==='shotgun'?startHole+dbl:'#'+(i+1)}`,course,startHole,players:ps.map(p=>({...p}))}); });
       ev.groups=out; ev.pool=[]; golfSave(ev); toast(`${ev.groups.length} groups built`); }});
+}
+
+/* ---------- scorecard viewer ---------- */
+function viewCard(ev,grp,highlight){
+  const pub=publicEvent(ev), pg=pub.groups.find(x=>x.id===grp.id);
+  openDrawer({kicker:ev.name+' · Group '+grp.code,title:'Scorecard',wide:'x',saveLabel:'Correct scores',
+    body:scorecardHTML(pub,pg,scoresFor(ev),{highlight})+`<div class="actions" style="justify-content:flex-end"><button class="btn sm" type="button" id="vcPrint">Print</button></div>`,
+    wire:r=>{ r.querySelector('#vcPrint').onclick=()=>{ const w=window.open('','_blank'); if(!w){ toast('Allow pop-ups to print'); return; }
+      w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>${esc(ev.name)} · ${esc(grp.code)}</title><link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@1,700&family=Public+Sans:wght@400;600;700;800&display=swap" rel="stylesheet"><style>${WC_CSS} body{margin:24px} .wc th:first-child,.wc td:first-child{position:static} @page{size:landscape;margin:12mm}</style></head><body>${scorecardHTML(pub,pg,scoresFor(ev),{})}<script>setTimeout(()=>print(),400)<\/script></body></html>`); w.document.close(); }; },
+    save:()=>{ setTimeout(()=>scoreSheet(ev,grp),0); }});
 }
 
 boot();

@@ -88,6 +88,12 @@ One-time: Supabase → SQL Editor → run `golf-setup.sql`. Upload `score.html` 
 - **Net scoring:** strokes are given by hole handicap (plus handicaps give strokes back). The
   leaderboard ranks gross or net, filters by flight, and the phone shows a dot on holes where a
   player gets a stroke. `…&view=board&flight=A` puts one flight on the TV.
+- **Scorecards:** click any leaderboard row (hub or phone) for that group's card, styled after the
+  club's printed card — tee rows, handicap and par rows, gross in every cell with birdie circles
+  and bogey squares, the net score in the corner on holes where a stroke is given, and Hcp / Net
+  totals at the end. Best ball adds a team row per team (the counting score each hole, net or gross
+  per the event) and underlines the ball that counted. Final rounds are stamped FINAL; Print gives
+  a landscape copy. On phones the card stacks front and back nines.
 - **Close scoring** locks it: the public page can no longer change scores.
 - Security: the public page can only read an event's public info, look up a group by its ID, and
   save scores for that group's players while the event is open. Group IDs are never exposed.
