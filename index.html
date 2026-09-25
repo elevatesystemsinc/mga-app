@@ -1840,7 +1840,7 @@ function golfData(){
       c.tees=seed.tees.map(st=>{ const old=c.tees.find(t=>t.name===st.name); return Object.assign({},clone(st),old&&old.yards&&!st.yards?{yards:old.yards}:{}); }); }
     g.ratingsVersion=RATINGS_VERSION; }
   for(const c of g.courses) for(const t of c.tees) if(!t.rating) t.rating={};
-  for(const e of g.events){ if(e.allowance==null) e.allowance=100; if(!e.scoring) e.scoring='gross'; if(!e.format) e.format='stroke'; e.flights=e.flights||{count:0,names:[]}; }
+  for(const e of g.events){ if(e.allowance==null) e.allowance=100; if(!e.scoring) e.scoring='gross'; if(!e.format) e.format='stroke'; e.flights=e.flights||{count:0,names:[]}; e.pool=e.pool||[]; }
   return g;
 }
 const courseById=id=>golfData().courses.find(c=>c.id===id);
@@ -1852,6 +1852,10 @@ function scoringLink(ev){ const base=location.href.split('#')[0].split('?')[0].r
 function playerIndex(p){ const own=p.index!=null&&String(p.index).trim()!==''?p.index:null; const m=p.memberId?memberById(p.memberId):null; return parseIndex(own!=null?own:(m?m.hcp:null)); }
 function playerHcp(ev,grp,p){ const c=courseById(grp.course); const idx=playerIndex(p); const ch=c?courseHcp(idx,c,p.tee||ev.defaultTee||'White',p.set||'M'):null;
   return {idx,ch,ph:ch==null?null:whsRound(ch*(+ev.allowance||100)/100),missing:idx==null?'index':ch==null?'rating':''}; }
+/* every player in the event: in a group, or on the roster waiting for one */
+function evPlayers(ev){ return ev.groups.flatMap(grp=>grp.players.map(p=>({p,grp}))).concat((ev.pool||[]).map(p=>({p,grp:null}))); }
+function courseFor(ev,p,grp){ if(grp) return grp.course; const F=ev.flights||{}; return (F.courseOf&&F.courseOf[p.flight])||(F.courses&&F.courses!=='split'?F.courses:'')||ev.defaultCourse||'oak'; }
+const hcpOf=(ev,p,grp)=>playerHcp(ev,{course:courseFor(ev,p,grp)},p);
 function publicEvent(ev){
   const courses={}; const tt=db.tournaments.find(x=>x.id===ev.tournamentId); const ftm=new Map(tt?tt.field.map(p=>[p.memberId,'T'+(p.team||0)]):[]);
   for(const g of ev.groups){ if(!courses[g.course]){ const c=courseById(g.course); if(c) courses[g.course]={name:c.name,par:c.par,hcp:c.hcp,tees:Object.fromEntries(c.tees.map(t=>[t.name,t.yards||null]))}; } }
@@ -1909,7 +1913,7 @@ function gEvents(el){
   el.innerHTML=`<div class="card" style="overflow:hidden">${evs.length?`<div class="tw"><div class="t" style="min-width:720px"><div class="tr th" style="${cols}"><span>Event</span><span>Date</span><span>Courses</span><span>Field</span><span>Status</span></div>
     ${evs.map(e=>`<div class="tr click" data-ge="${e.id}" style="${cols}"><div class="cell2"><b class="trunc" style="color:var(--navy)">${esc(e.name)}</b><small class="trunc">${esc(scoringLink(e).replace(/^https?:\/\//,''))}</small></div><span class="num">${e.date?shortDate(e.date):'—'}</span><span class="muted trunc">${[...new Set(e.groups.map(g=>courseById(g.course)?.name.replace(' Course','')))].join(' + ')||'—'}</span><span class="num">${e.groups.length} group${e.groups.length===1?'':'s'} · ${sum(e.groups,g=>g.players.length)}</span><span>${evStatusChip(e)}</span></div>`).join('')}</div></div>`
     :`<div class="empty"><b>No scoring events yet</b><span>Create one, add groups with their own group IDs, then share the link. Players open it on their phones and enter their group ID to keep score.</span><button class="btn pri" id="gNew2">${I.plus}New scoring event</button></div>`}</div>`;
-  el.querySelectorAll('[data-ge]').forEach(r=>r.onclick=()=>{ view.geid=r.dataset.ge; view.getab='groups'; render(); loadScores(GEV()); });
+  el.querySelectorAll('[data-ge]').forEach(r=>r.onclick=()=>{ view.geid=r.dataset.ge; view.getab='field'; render(); loadScores(GEV()); });
   const n2=$('gNew2'); if(n2) n2.onclick=()=>editEvent(null);
 }
 const shortDate=s=>{ const d=parseD(s); return d?MONTHS[d.getMonth()]+' '+d.getDate()+', '+d.getFullYear():s; };
@@ -1952,7 +1956,7 @@ function editEvent(ev){
       const slug=slugify(fv('geS')||name);
       if(g.events.some(e=>e!==ev&&e.slug===slug)){ toast('Another event already uses that link'); return false; }
       const data={name,date:fv('geD'),defaultTee:fv('geT'),slug,tournamentId:fv('geTour'),format:fv('geF'),scoring:fv('geSc'),allowance:Math.max(0,Math.min(100,fnum('geA')||100))};
-      if(ev) Object.assign(ev,data); else { const e=Object.assign({id:uid(),status:'draft',groups:[],createdAt:new Date().toISOString()},data); g.events.push(e); view.geid=e.id; view.getab='groups'; ev=e; }
+      if(ev) Object.assign(ev,data); else { const e=Object.assign({id:uid(),status:'draft',groups:[],pool:[],flights:{count:0,names:[]},createdAt:new Date().toISOString()},data); g.events.push(e); view.geid=e.id; view.getab='field'; ev=e; }
       golfSave(ev); toast('Saved'); return undefined; },
     del:ev?()=>{ if(!confirm(`Delete ${ev.name}? Its groups and scores are removed.`)) return false; g.events=g.events.filter(x=>x!==ev); view.geid=null;
       if(CLOUD&&sessionOK) sb.from('golf_events').delete().eq('id',ev.id); }:null,delLabel:'Delete event'});
@@ -1963,30 +1967,19 @@ function vGolfEvent(m,ev){
   const pub=publicEvent(ev), lb=leaderboard(pub,scoresFor(ev)), link=scoringLink(ev);
   const t=db.tournaments.find(x=>x.id===ev.tournamentId);
   m.innerHTML=`<div class="crumb"><button id="gBack">Golf</button><span class="muted">/</span><span class="muted">${esc(ev.name)}</span></div>
-  <div class="phead"><div><h1 class="h1">${esc(ev.name)}</h1><div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">${evStatusChip(ev)}<span class="chip">${ev.date?shortDate(ev.date):'Date TBD'}</span><span class="chip">${FORMAT_LABEL[ev.format]||'Stroke play'} · ${ev.scoring==='net'?'net':'gross'}</span>${ev.flights.count?`<span class="chip gold">${ev.flights.count} flights</span>`:''}<span class="chip">${ev.groups.length} groups · ${sum(ev.groups,g=>g.players.length)} players</span>${t?`<span class="chip">${esc(t.name)}</span>`:''}</div></div>
+  <div class="phead"><div><h1 class="h1">${esc(ev.name)}</h1><div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">${evStatusChip(ev)}<span class="chip">${ev.date?shortDate(ev.date):'Date TBD'}</span><span class="chip">${FORMAT_LABEL[ev.format]||'Stroke play'} · ${ev.scoring==='net'?'net':'gross'}</span>${ev.flights.count?`<span class="chip gold">${ev.flights.count} flights</span>`:''}<span class="chip">${evPlayers(ev).length} players · ${ev.groups.length} groups</span>${t?`<span class="chip">${esc(t.name)}</span>`:''}</div></div>
     <div class="actions">${ev.status==='live'?`<button class="btn" id="gClose">Close scoring</button>`:`<button class="btn pri" id="gOpen">${ev.status==='final'?'Reopen scoring':'Open scoring'}</button>`}<button class="btn" id="gEdit">${I.edit}Details</button></div></div>
   <div class="card pad" style="display:flex;gap:12px 20px;align-items:center;flex-wrap:wrap"><div class="cell2" style="flex:1 1 320px;min-width:0"><span class="lbl">Scoring link</span><a href="${esc(link)}" target="_blank" rel="noopener" class="trunc" style="font-weight:600;font-size:15px">${esc(link)}</a><small class="muted">${ev.status==='live'?'Open — groups can enter scores now.':ev.status==='final'?'Closed — the leaderboard is final. Scorers can still view it.':'Draft — the link shows the event but scoring is off until you open it.'}</small></div>
     <div class="actions"><button class="btn sm" id="gCopy">Copy link</button><a class="btn sm" href="${esc(link)}" target="_blank" rel="noopener">Open scoring page</a><a class="btn sm" href="${esc(link)}&view=board" target="_blank" rel="noopener">Leaderboard screen</a></div></div>
   ${!CLOUD||!sessionOK?`<div class="banner">This device isn’t signed in to the cloud, so the public scoring page can’t see this event. Scores you enter here stay on this device.</div>`:''}
-  <div class="tabs">${[['groups','Groups'],['flights','Flights'],['board','Leaderboard']].map(([k,l])=>`<button class="tab${view.getab===k?' on':''}" data-get="${k}">${l}</button>`).join('')}</div><div id="gebody" style="display:flex;flex-direction:column;gap:16px"></div>`;
+  <div class="tabs">${[['field','1 · Field'],['flights','2 · Flights'],['groups','3 · Groups'],['board','Leaderboard']].map(([k,l])=>`<button class="tab${view.getab===k?' on':''}" data-get="${k}">${l}</button>`).join('')}</div><div id="gebody" style="display:flex;flex-direction:column;gap:16px"></div>`;
   $('gBack').onclick=()=>{ view.geid=null; render(); };
   $('gEdit').onclick=()=>editEvent(ev);
   const op=$('gOpen'); if(op) op.onclick=()=>{ if(!ev.groups.length){ toast('Add at least one group first'); return; } ev.status='live'; golfSave(ev); render(); toast('Scoring is open'); };
   const cl=$('gClose'); if(cl) cl.onclick=()=>{ ev.status='final'; golfSave(ev); render(); toast('Scoring closed — leaderboard is final'); };
   $('gCopy').onclick=async()=>{ try{ await navigator.clipboard.writeText(link); toast('Link copied'); }catch(_){ prompt('Copy this link:',link); } };
   m.querySelectorAll('[data-get]').forEach(b=>b.onclick=()=>{ view.getab=b.dataset.get; render(); });
-  ({board:gBoard,flights:gFlights,groups:gGroups}[view.getab]||gGroups)($('gebody'),ev,lb);
-}
-function gGroups(el,ev){
-  const cols='grid-template-columns:100px minmax(0,1.1fr) 110px 70px minmax(0,2fr) 40px';
-  const t=db.tournaments.find(x=>x.id===ev.tournamentId);
-  el.innerHTML=`<div class="toolbar"><div class="actions"><button class="btn pri" id="ggAdd">${I.plus}Add group</button>${t?`<button class="btn" id="ggBuild">Build groups from ${esc(t.name)} field</button>`:''}</div><span class="muted" style="margin-left:auto;font-size:13px">Each group gets its own group ID. Players enter it on the scoring page.</span></div>
-  <div class="card" style="overflow:hidden">${ev.groups.length?`<div class="tw"><div class="t" style="min-width:820px"><div class="tr th" style="${cols}"><span>Group ID</span><span>Group</span><span>Course</span><span>Starts</span><span>Players</span><span></span></div>
-   ${ev.groups.map(g=>`<div class="tr click" data-gg="${g.id}" style="${cols}"><b style="letter-spacing:.06em;color:var(--navy)">${esc(g.code)}</b>${(()=>{ const hs=g.players.map(p=>playerHcp(ev,g,p).ch); const tot=hs.every(v=>v!=null)&&hs.length?hs.reduce((a,v)=>a+v,0):null; return `<div class="cell2"><span class="trunc">${esc(g.label||'—')}</span>${tot!=null?`<small>Combined ${fmtH(tot,'course')}</small>`:''}</div>`; })()}<span class="muted">${esc(courseById(g.course)?.name||'')}</span><span class="num">Hole ${+g.startHole||1}</span><span class="trunc">${g.players.map(p=>{ const h=playerHcp(ev,g,p); return esc(p.name)+(h.ch!=null?` <span class="muted">(${fmtH(h.ch,'course')})</span>`:''); }).join(', ')||'<span class="muted">No players</span>'}</span><span class="ib">${I.edit}</span></div>`).join('')}</div></div>`
-   :`<div class="empty"><b>No groups yet</b><span>Add groups by hand${t?', or build them from the tournament field':''}.</span></div>`}</div>`;
-  $('ggAdd').onclick=()=>editGroup(ev,null);
-  const bb=$('ggBuild'); if(bb) bb.onclick=()=>buildGroups(ev,t);
-  el.querySelectorAll('[data-gg]').forEach(r=>r.onclick=()=>editGroup(ev,ev.groups.find(g=>g.id===r.dataset.gg)));
+  ({field:gField,board:gBoard,flights:gFlights,groups:gGroups}[view.getab]||gField)($('gebody'),ev,lb);
 }
 function editGroup(ev,grp){
   const g=golfData(), t=db.tournaments.find(x=>x.id===ev.tournamentId);
@@ -2025,29 +2018,9 @@ function editGroup(ev,grp){
       if(!ps.length){ toast('Add at least one player'); return false; }
       const data={code,label:fv('ggL'),course:fv('ggC'),startHole:+fv('ggS')||1,players:ps};
       if(grp) Object.assign(grp,data); else ev.groups.push(Object.assign({id:uid()},data));
+      const inG=new Set(ps.map(p=>p.id)), inM=new Set(ps.map(p=>p.memberId).filter(Boolean)); ev.pool=(ev.pool||[]).filter(p=>!inG.has(p.id)&&!(p.memberId&&inM.has(p.memberId)));
       golfSave(ev); toast(grp?'Group saved':'Group '+code+' added'); return undefined; },
-    del:grp?()=>{ ev.groups=ev.groups.filter(x=>x!==grp); golfSave(ev); }:null,delLabel:'Remove group'});
-}
-function buildGroups(ev,t){
-  const teams={}; t.field.forEach(p=>{ (teams[p.team||0]=teams[p.team||0]||[]).push(p); });
-  const units=Object.keys(teams).map(Number).sort((a,b)=>a-b).map(n=>teams[n]);
-  openDrawer({kicker:ev.name,title:'Build groups from the field',saveLabel:'Build groups',
-    body:`<p style="margin:0">${t.field.length} players in ${units.length} teams. Teams stay together.</p>`+
-      pair(field('Players per group','bgN',4,{type:'select',options:[[2,'2'],[3,'3'],[4,'4'],[5,'5']]}),field('Courses','bgC','split',{type:'select',options:[['oak','All on Oak'],['pecan','All on Pecan'],['split','Split between Oak and Pecan']]}))+
-      field('Start','bgS','shotgun',{type:'select',options:[['shotgun','Shotgun — groups spread across holes 1–18'],['one','Everyone off hole 1']]})+
-      (ev.groups.length?`<div class="banner">This replaces the ${ev.groups.length} groups already set up. Scores already entered for removed players are no longer shown.</div>`:'')+
-      '<p class="hint">Each group gets a random group ID — edit any of them afterward.</p>',
-    save:()=>{ const size=+fv('bgN'), mode=fv('bgC'), start=fv('bgS');
-      const groups=[]; let cur=[];
-      for(const u of units){ if(cur.length&&cur.length+u.length>size){ groups.push(cur); cur=[]; } cur=cur.concat(u); }
-      if(cur.length) groups.push(cur);
-      ev.groups=[];
-      const half=Math.ceil(groups.length/2);
-      groups.forEach((ps,i)=>{ const course=mode==='split'?(i<half?'oak':'pecan'):mode; const idx=mode==='split'?(i<half?i:i-half):i;
-        const startHole=start==='shotgun'?(idx%18)+1:1; const dbl=start==='shotgun'&&idx>=18?' B':'';
-        ev.groups.push({id:uid(),code:newCode(ev),label:`${course==='oak'?'Oak':'Pecan'} ${startHole}${dbl}`,course,startHole,
-          players:ps.map(p=>{ const m=memberById(p.memberId); return {id:uid(),memberId:p.memberId,name:m?memberName(m):'Player',tee:ev.defaultTee||'White',set:'M',team:'T'+(p.team||0)}; })}); });
-      golfSave(ev); toast(`${ev.groups.length} groups built`); }});
+    del:grp?()=>{ ev.pool=(ev.pool||[]).concat(grp.players); ev.groups=ev.groups.filter(x=>x!==grp); golfSave(ev); toast('Group removed — its players are back on the Field'); }:null,delLabel:'Remove group'});
 }
 /* Board scorecard editor (corrections, or scoring from the hub) */
 function scoreSheet(ev,grp){
@@ -2097,7 +2070,7 @@ const FLIGHT_NAMES='ABCDEFGHIJ'.split('');
 function flightUnits(ev,basis,unit,courseOf){
   const t=db.tournaments.find(x=>x.id===ev.tournamentId);
   const teamOf=new Map(t?t.field.map(p=>[p.memberId,p.team||0]):[]);
-  const all=[]; for(const grp of ev.groups) for(const p of grp.players){ const cg=courseOf&&courseOf(p)?{...grp,course:courseOf(p)}:grp; const h=playerHcp(ev,cg,p); all.push({p,grp,h,val:basis==='index'?h.idx:h.ch}); }
+  const all=[]; for(const {p,grp} of evPlayers(ev)){ const h=playerHcp(ev,{course:(courseOf&&courseOf(p))||courseFor(ev,p,grp)},p); all.push({p,grp,h,val:basis==='index'?h.idx:h.ch}); }
   if(unit==='team'&&(t||ev.format==='bestball')){ const m=new Map();
     for(const x of all){ const k=x.p.team?'e'+x.p.team:teamOf.has(x.p.memberId)?'t'+teamOf.get(x.p.memberId):'p'+x.p.id; (m.get(k)||m.set(k,[]).get(k)).push(x); }
     return [...m.values()].map(ms=>({members:ms,val:ms.some(x=>x.val==null)?null:ms.reduce((a,x)=>a+x.val,0),label:ms.map(x=>x.p.name).join(' / ')})); }
@@ -2116,13 +2089,12 @@ function planFlights(ev,count,basis,unit,per,courseOf){
   return {flights,missing,ties};
 }
 function buildFlightGroups(ev,plan,per,mode,start){
-  const oldBy=new Map(ev.groups.flatMap(g=>g.players).filter(p=>p.memberId).map(p=>[p.memberId,p]));
   const groups=[];
   plan.flights.forEach(f=>{ for(let i=0;i<f.units.length;i+=per){ const us=f.units.slice(i,i+per);
     groups.push({flight:f.name,units:us,sum:us.reduce((a,u)=>a+u.val,0)}); } });
   // courses: whole flights go to one course, filling Oak first up to half the groups
   const byFlight=plan.flights.map(f=>({name:f.name,n:groups.filter(x=>x.flight===f.name).length}));
-  const courseOf={}; if(mode==='split'){ const half=groups.length/2; let acc=0; byFlight.forEach(f=>{ courseOf[f.name]=acc<half&&(acc+f.n<=half+f.n/2)?'oak':'pecan'; if(courseOf[f.name]==='oak') acc+=f.n; }); }
+  const courseOf={}; if(mode&&typeof mode==='object'){ byFlight.forEach(f=>{ courseOf[f.name]=mode[f.name]||'oak'; }); } else if(mode==='split'){ const half=groups.length/2; let acc=0; byFlight.forEach(f=>{ courseOf[f.name]=acc<half&&(acc+f.n<=half+f.n/2)?'oak':'pecan'; if(courseOf[f.name]==='oak') acc+=f.n; }); }
   else byFlight.forEach(f=>{ courseOf[f.name]=mode; });
   const out=[];
   for(const cid of ['oak','pecan']){
@@ -2132,68 +2104,172 @@ function buildFlightGroups(ev,plan,per,mode,start){
       if(start==='shotgun'){ if(i<18) hole=i+1; else { const j=i-18; hole=par5.length?par5[j%par5.length]:(j%18)+1; tag=' B'; } }
       out.push({id:uid(),code:newCode({groups:out}),course:cid,startHole:hole,flight:x.flight,
         label:`${cid==='oak'?'Oak':'Pecan'} ${start==='shotgun'?hole+tag:'#'+(i+1)} · Flight ${x.flight}`,
-        players:x.units.flatMap(u=>u.members.map(m=>{ const o=oldBy.get(m.p.memberId)||m.p; return {...o,id:o.id||uid(),flight:x.flight}; }))}); });
+        players:x.units.flatMap(u=>u.members.map(m=>({...m.p,flight:x.flight})))}); });
   }
-  return out;
+  out.courseOf=courseOf; return out;
 }
 const fmtH=(v,basis)=>v==null?'—':basis==='index'?idxTxt(Math.round(v*10)/10):(v<0?'+'+Math.abs(v):String(v));
+
+/* ============ Step 1 · Field ============ */
+function gField(el,ev){
+  const t=db.tournaments.find(x=>x.id===ev.tournamentId), all=evPlayers(ev), BB=ev.format==='bestball';
+  const teamN=new Map(); all.forEach(({p})=>{ if(p.team&&!teamN.has(p.team)) teamN.set(p.team,teamN.size+1); });
+  const rows=all.slice().sort((a,b)=>(a.p.flight||'~').localeCompare(b.p.flight||'~')||((a.p.team&&teamN.get(a.p.team))||999)-((b.p.team&&teamN.get(b.p.team))||999)||a.p.name.localeCompare(b.p.name));
+  const noIdx=all.filter(x=>hcpOf(ev,x.p,x.grp).idx==null).length;
+  const cols='grid-template-columns:minmax(0,1.5fr) 90px 64px 56px 70px 60px 90px 40px';
+  el.innerHTML=`<div class="toolbar"><div class="actions">${t?`<button class="btn pri" id="gfImp">${I.down}Import field from ${esc(t.name)}</button>`:''}<button class="btn" id="gfAdd">${I.plus}Add player</button></div>
+    <span class="muted" style="margin-left:auto;font-size:13px">${all.length} players${BB||t?` · ${new Set(all.map(x=>x.p.team).filter(Boolean)).size} teams`:''}${noIdx?` · <span class="neg">${noIdx} without an index</span>`:''}</span></div>
+  ${!t&&!all.length?'<div class="banner">Link this event to a tournament in Details to import its field, or add players one at a time.</div>':''}
+  <div class="card" style="overflow:hidden">${all.length?`<div class="tw"><div class="t" style="min-width:860px"><div class="tr th" style="${cols}"><span>Player</span><span>Team</span><span class="r">Index</span><span class="r">CH</span><span>Tee</span><span>Flight</span><span>Group</span><span></span></div>
+    ${rows.map(({p,grp})=>{ const h=hcpOf(ev,p,grp); return `<div class="tr num click" data-fp="${p.id}" style="${cols}"><div class="cell2"><b class="trunc">${esc(p.name)}</b>${p.memberId?'':'<small>Guest</small>'}</div><span class="muted">${p.team?'Team '+(/^T\d+$/.test(p.team)?p.team.slice(1):teamN.get(p.team)):'—'}</span><span class="r">${h.idx==null?'<span class="neg">—</span>':idxTxt(h.idx)}</span><span class="r">${fmtH(h.ch,'course')}</span><span class="muted">${esc(p.tee||ev.defaultTee)}</span><span>${p.flight?`<span class="chip gold">${esc(p.flight)}</span>`:'<span class="muted">—</span>'}</span><span class="muted">${grp?esc(grp.code):'—'}</span><span class="ib">${I.edit}</span></div>`; }).join('')}</div></div>`
+    :`<div class="empty"><b>No players yet</b><span>${t?`Import the ${esc(t.name)} field — teams and handicaps come with it.`:'Add players, or link a tournament to import its field.'}</span></div>`}</div>
+  ${all.length?`<div style="display:flex;justify-content:flex-end"><button class="btn" id="gfNext">Next: set flights ${I.chev}</button></div>`:''}`;
+  const imp=$('gfImp'); if(imp) imp.onclick=()=>importFieldToEvent(ev,t);
+  $('gfAdd').onclick=()=>editFieldPlayer(ev,null);
+  const nx=$('gfNext'); if(nx) nx.onclick=()=>{ view.getab='flights'; render(); };
+  el.querySelectorAll('[data-fp]').forEach(r=>r.onclick=()=>editFieldPlayer(ev,all.find(x=>x.p.id===r.dataset.fp)));
+}
+function importFieldToEvent(ev,t){
+  const inEv=new Map(evPlayers(ev).filter(x=>x.p.memberId).map(x=>[x.p.memberId,x]));
+  const fieldIds=new Set(t.field.map(p=>p.memberId));
+  const add=t.field.filter(p=>!inEv.has(p.memberId));
+  const gone=evPlayers(ev).filter(x=>x.p.memberId&&!fieldIds.has(x.p.memberId));
+  const teamChange=t.field.filter(p=>inEv.has(p.memberId)&&inEv.get(p.memberId).p.team!=='T'+(p.team||0)).length;
+  openDrawer({kicker:ev.name+' · Field',title:'Import field',saveLabel:add.length||gone.length||teamChange?'Import':'Close',
+    body:`<div class="grid g3" style="gap:10px">${[['In '+t.name,t.field.length],['New to this event',add.length],['Already here',t.field.length-add.length]].map(([l,v])=>`<div class="card pad kpi" style="padding:14px"><span class="lbl">${esc(l)}</span><span class="v num" style="font-size:30px">${v}</span></div>`).join('')}</div>
+      <p class="hint">Players come in with their ${esc(t.name)} team and the Handicap Index on their member profile, on the ${esc(ev.defaultTee||'White')} tees (change any player afterward).${teamChange?` ${teamChange} player${teamChange===1?'’s':'s’'} team changed and will be updated.`:''}</p>
+      ${gone.length?`<label class="check" style="align-items:flex-start"><input type="checkbox" id="ifRm" checked><span>Remove the ${gone.length} player${gone.length===1?'':'s'} no longer in the ${esc(t.name)} field <span class="muted">(${esc(gone.slice(0,5).map(x=>x.p.name).join(', '))}${gone.length>5?'…':''})</span></span></label>`:''}
+      ${ev.flights.count&&add.length?'<div class="banner">Flights are already set. New players come in without a flight — re-run flights afterward.</div>':''}`,
+    save:()=>{ if(!add.length&&!gone.length&&!teamChange) return;
+      add.forEach(fp=>{ const m=memberById(fp.memberId); ev.pool.push({id:uid(),memberId:fp.memberId,name:m?memberName(m):'Player',tee:ev.defaultTee||'White',set:'M',team:'T'+(fp.team||0),index:'',flight:''}); });
+      t.field.forEach(fp=>{ const x=inEv.get(fp.memberId); if(x) x.p.team='T'+(fp.team||0); });
+      if(gone.length&&$('ifRm').checked){ const rm=new Set(gone.map(x=>x.p.id)); ev.pool=ev.pool.filter(p=>!rm.has(p.id)); ev.groups.forEach(grp=>{ grp.players=grp.players.filter(p=>!rm.has(p.id)); }); }
+      golfSave(ev); toast(`${add.length} player${add.length===1?'':'s'} imported`); }});
+}
+function editFieldPlayer(ev,x){
+  const p=x?x.p:{id:uid(),memberId:'',name:'',tee:ev.defaultTee||'White',set:'M',team:'',index:'',flight:''};
+  const teams=[...new Set(evPlayers(ev).map(y=>y.p.team).filter(Boolean))];
+  const m=p.memberId?memberById(p.memberId):null, c=courseById(courseFor(ev,p,x&&x.grp))||golfData().courses[0];
+  const memOpts=[['','— Guest (not a member) —']].concat(db.members.slice().sort((a,b)=>memberName(a).localeCompare(memberName(b))).map(mm=>[mm.id,memberName(mm)]));
+  openDrawer({kicker:ev.name+' · Field',title:x?p.name:'Add player',
+    body:(x?'':field('Member','fpM','',{type:'select',options:memOpts}))+field('Name','fpN',p.name,{ph:'Guest name'})+
+      pair(field('Handicap Index','fpI',p.index||(m?m.hcp:'')||'',{hint:m?'From the member profile'+(m.hcp?' ('+esc(m.hcp)+')':'')+'. Type over it for this event only.':'Use + for plus handicaps, e.g. +1.2'}),field('Tee','fpT',p.tee||ev.defaultTee,{type:'select',options:c.tees.map(tt=>tt.name)}))+
+      pair(field('Par & handicap set','fpS',p.set||'M',{type:'select',options:[['M','Men'],['W','Women']]}),field('Team','fpTm',p.team||'',{type:'select',options:[['','— No team —']].concat(teams.map((k,i)=>[k,'Team '+(i+1)+(k.startsWith('T')?' (field team '+k.slice(1)+')':'')])).concat([['__new','+ New team']])}))+
+      (ev.flights.count?field('Flight','fpF',p.flight||'',{type:'select',options:[['','— None —']].concat(ev.flights.names.map(n=>[n,'Flight '+n]))}):'')+
+      (x&&x.grp?`<p class="hint">In group ${esc(x.grp.code)} (${esc(x.grp.label||'')}).</p>`:''),
+    wire:r=>{ const mm=r.querySelector('#fpM'); if(mm) mm.onchange=()=>{ const a=memberById(mm.value); if(a){ r.querySelector('#fpN').value=memberName(a); r.querySelector('#fpI').value=a.hcp||''; } }; },
+    save:()=>{ const name=fv('fpN'); if(!name){ toast('Enter a name'); return false; }
+      const mid=x?p.memberId:fv('fpM'); const prof=mid?(memberById(mid)||{}).hcp:''; const idx=fv('fpI');
+      if(!x&&mid&&evPlayers(ev).some(y=>y.p.memberId===mid)){ toast('That member is already in this event'); return false; }
+      let team=fv('fpTm'); if(team==='__new') team='G'+uid().slice(0,6);
+      Object.assign(p,{memberId:mid,name,index:idx&&idx!==String(prof??'')?idx:'',tee:fv('fpT'),set:fv('fpS'),team});
+      if(ev.flights.count) p.flight=fv('fpF');
+      if(!x) ev.pool.push(p); golfSave(ev); },
+    del:x?()=>{ if(x.grp) x.grp.players=x.grp.players.filter(y=>y!==p); else ev.pool=ev.pool.filter(y=>y!==p); golfSave(ev); toast(p.name+' removed from the event'); }:null,delLabel:'Remove from event'});
+}
+
+/* ============ Step 2 · Flights ============ */
 function gFlights(el,ev){
-  const t=db.tournaments.find(x=>x.id===ev.tournamentId), teams=(t&&(t.teamSize||2)>1&&t.field.length)||ev.format==='bestball';
+  const t=db.tournaments.find(x=>x.id===ev.tournamentId), all=evPlayers(ev);
+  const teams=all.some(x=>x.p.team)||ev.format==='bestball';
   const F=ev.flights||{count:0,names:[]};
-  const players=ev.groups.flatMap(grp=>grp.players.map(p=>({p,grp,h:playerHcp(ev,grp,p)})));
-  const noIdx=players.filter(x=>x.h.idx==null), noRate=players.filter(x=>x.h.idx!=null&&x.h.ch==null);
-  const missingTees=[...new Set(noRate.map(x=>`${courseById(x.grp.course)?.name.replace(' Course','')} ${x.p.tee||ev.defaultTee} (${(x.p.set||'M')==='W'?'women':'men'})`))];
-  const cur=F.count?FLIGHT_NAMES.slice(0,F.count).map(n=>({n,ps:players.filter(x=>x.p.flight===n)})):[];
+  if(!all.length){ el.innerHTML=`<div class="card"><div class="empty"><b>No players yet</b><span>Import or add the field first.</span><button class="btn pri" id="flToField">Go to Field</button></div></div>`; $('flToField').onclick=()=>{ view.getab='field'; render(); }; return; }
+  const withH=all.map(x=>({...x,h:hcpOf(ev,x.p,x.grp)}));
+  const noIdx=withH.filter(x=>x.h.idx==null), noRate=withH.filter(x=>x.h.idx!=null&&x.h.ch==null);
+  const missingTees=[...new Set(noRate.map(x=>`${courseById(courseFor(ev,x.p,x.grp))?.name.replace(' Course','')} ${x.p.tee||ev.defaultTee} (${(x.p.set||'M')==='W'?'women':'men'})`))];
+  const cur=F.count?F.names.map(n=>({n,ps:withH.filter(x=>x.p.flight===n)})):[];
+  const val=x=>F.basis==='index'?x.h.idx:x.h.ch;
   el.innerHTML=`<div class="card pad" style="display:flex;flex-direction:column;gap:14px">
     <div style="display:flex;gap:16px;flex-wrap:wrap;align-items:flex-end">
-      <div class="fld" style="width:140px"><label class="lbl" for="flN">Number of flights</label><input class="inp num" id="flN" inputmode="numeric" value="${F.count||''}" placeholder="e.g. 4"></div>
+      <div class="fld" style="width:130px"><label class="lbl" for="flN">Number of flights</label><input class="inp num" id="flN" inputmode="numeric" value="${F.count||''}" placeholder="e.g. 4"></div>
       <div class="fld" style="width:230px"><label class="lbl" for="flB">Fill by</label><select class="inp" id="flB"><option value="course"${F.basis!=='index'?' selected':''}>Course handicap (rating & slope)</option><option value="index"${F.basis==='index'?' selected':''}>Handicap Index</option></select></div>
-      ${teams?`<div class="fld" style="width:230px"><label class="lbl" for="flU">Flight</label><select class="inp" id="flU"><option value="team"${F.unit!=='player'?' selected':''}>Teams (combined handicap)</option><option value="player"${F.unit==='player'?' selected':''}>Individual players</option></select></div>`:''}
-      <div class="fld" style="width:130px"><label class="lbl" for="flG">Players per group</label><select class="inp" id="flG">${[4,3,2,5].map(n=>`<option value="${n}"${(F.groupSize||4)===n?' selected':''}>${n}</option>`).join('')}</select></div>
-      <button class="btn pri" id="flGo">${F.count?'Re-flight':'Create flights'}</button>${F.count?`<button class="btn" id="flClear">Remove flights</button>`:''}
-    </div>
-    <div style="display:flex;gap:16px;flex-wrap:wrap;align-items:center">
-      <label class="check"><input type="checkbox" id="flBuild"${F.grouped!==false?' checked':''}>Build groups by flight</label>
+      ${teams?`<div class="fld" style="width:220px"><label class="lbl" for="flU">Flight</label><select class="inp" id="flU"><option value="team"${F.unit!=='player'?' selected':''}>Teams (combined handicap)</option><option value="player"${F.unit==='player'?' selected':''}>Individual players</option></select></div>`:''}
+      <div class="fld" style="width:120px"><label class="lbl" for="flG">Players per group</label><select class="inp" id="flG">${[4,3,2,5].map(n=>`<option value="${n}"${(F.groupSize||4)===n?' selected':''}>${n}</option>`).join('')}</select></div>
       <div class="fld" style="width:230px"><label class="lbl" for="flC">Courses</label><select class="inp" id="flC">${[['split','Split flights between Oak and Pecan'],['oak','All on Oak'],['pecan','All on Pecan']].map(([v,l])=>`<option value="${v}"${(F.courses||'split')===v?' selected':''}>${l}</option>`).join('')}</select></div>
-      <div class="fld" style="width:260px"><label class="lbl" for="flS">Start</label><select class="inp" id="flS">${[['shotgun','Shotgun — holes by combined handicap'],['one','Off hole 1 — order by combined handicap']].map(([v,l])=>`<option value="${v}"${(F.start||'shotgun')===v?' selected':''}>${l}</option>`).join('')}</select></div>
+      <button class="btn pri" id="flGo">${F.count?'Re-flight':'Set flights'}</button>${F.count?`<button class="btn" id="flClear">Remove flights</button>`:''}
     </div>
-    <p class="hint" style="margin:0">Lowest handicaps go to Flight A. Flights are sized in whole groups${teams?' — an even number of teams, two per foursome —':''} so nobody plays with another flight; group counts differ by at most one. Within each course, groups start on holes 1, 2, 3… from lowest combined handicap up; extra groups double up on the par 5s. Course handicap = Index × Slope ÷ 113 + (Course Rating − Par), at ${ev.allowance||100}% allowance for net scores.</p>
-    ${noIdx.length?`<div class="banner">${noIdx.length} player${noIdx.length===1?' has':'s have'} no Handicap Index: ${esc(noIdx.slice(0,8).map(x=>x.p.name).join(', '))}${noIdx.length>8?'…':''}. Add it on the member or in the group, or they’ll be left out of flights.</div>`:''}
-    ${noRate.length&&F.basis!=='index'?`<div class="banner">No course rating/slope for ${esc(missingTees.join(', '))} — ${noRate.length} player${noRate.length===1?'':'s'} can’t get a course handicap. Enter it on Golf → Courses, or fill by Handicap Index.</div>`:''}
+    <p class="hint" style="margin:0">Lowest handicaps go to Flight A. Flights are sized in whole groups${teams?' — an even number of teams, two per foursome':''} — so groups never mix flights; group counts differ by at most one. Each flight is placed on one course, and everyone is rated on the course they’ll play. Course handicap = Index × Slope ÷ 113 + (Course Rating − Par), at ${ev.allowance||100}% for net.</p>
+    ${noIdx.length?`<div class="banner">${noIdx.length} player${noIdx.length===1?' has':'s have'} no Handicap Index: ${esc(noIdx.slice(0,8).map(x=>x.p.name).join(', '))}${noIdx.length>8?'…':''}. Add it on the Field tab, or they won’t be flighted.</div>`:''}
+    ${noRate.length&&F.basis!=='index'?`<div class="banner">No course rating/slope for ${esc(missingTees.join(', '))}. Enter it on Golf → Courses, or fill by Handicap Index.</div>`:''}
   </div>
-  ${cur.length?`<div class="grid ${cur.length>=4?'g4':cur.length===3?'g3':'g2'}">${cur.map(f=>{ const vals=f.ps.map(x=>F.basis==='index'?x.h.idx:x.h.ch).filter(v=>v!=null).sort((a,b)=>a-b);
-    return `<div class="card" style="overflow:hidden"><div class="cardhead" style="padding-bottom:10px"><div><h2 class="h2">Flight ${f.n}</h2><span class="muted">${f.ps.length} players${teams?' · '+new Set(f.ps.map(x=>x.p.team||x.p.id)).size+' teams':''}${vals.length?` · ${F.basis==='index'?'Index':'CH'} ${fmtH(vals[0],F.basis)}–${fmtH(vals[vals.length-1],F.basis)}`:''}${F.grouped?` · ${new Set(f.ps.map(x=>x.grp.id)).size} groups on ${[...new Set(f.ps.map(x=>courseById(x.grp.course)?.name.replace(' Course','')))].join(' + ')}`:''}</span></div></div>
-      ${f.ps.sort((a,b)=>((F.basis==='index'?a.h.idx:a.h.ch)??99)-((F.basis==='index'?b.h.idx:b.h.ch)??99)).map(x=>`<div class="tr num" style="grid-template-columns:minmax(0,1fr) 44px 58px;min-height:40px;font-size:13px"><span class="trunc">${esc(x.p.name)}</span><span class="r muted">${fmtH(F.basis==='index'?x.h.idx:x.h.ch,F.basis)}</span><select class="inp" data-mv="${x.p.id}" aria-label="Move ${esc(x.p.name)}" style="height:30px;padding:0 4px;font-size:12px">${FLIGHT_NAMES.slice(0,F.count).map(n=>`<option${n===f.n?' selected':''}>${n}</option>`).join('')}</select></div>`).join('')}</div>`; }).join('')}</div>
-   ${players.some(x=>!x.p.flight)?`<p class="hint">${players.filter(x=>!x.p.flight).length} players aren’t in a flight (no handicap). Re-flight after adding their index.</p>`:''}`:''}`;
+  ${cur.length?`<div class="grid ${cur.length>=4?'g4':cur.length===3?'g3':'g2'}">${cur.map(f=>{ const vs=f.ps.map(val).filter(v=>v!=null).sort((a,b)=>a-b); const cs=[...new Set(f.ps.map(x=>courseFor(ev,x.p,x.grp)))];
+    return `<div class="card" style="overflow:hidden"><div class="cardhead" style="padding-bottom:10px"><div><h2 class="h2">Flight ${f.n}</h2><span class="muted">${f.ps.length} players${teams?' · '+new Set(f.ps.map(x=>x.p.team||x.p.id)).size+' teams':''}${vs.length?` · ${F.basis==='index'?'Index':'CH'} ${fmtH(vs[0],F.basis)}–${fmtH(vs[vs.length-1],F.basis)}`:''} · ${cs.map(c=>courseById(c)?.name.replace(' Course','')).join(' + ')}</span></div></div>
+      ${f.ps.sort((a,b)=>(val(a)??99)-(val(b)??99)).map(x=>`<div class="tr num" style="grid-template-columns:minmax(0,1fr) 44px 58px;min-height:40px;font-size:13px"><span class="trunc">${esc(x.p.name)}</span><span class="r muted">${fmtH(val(x),F.basis)}</span><select class="inp" data-mv="${x.p.id}" aria-label="Move ${esc(x.p.name)}" style="height:30px;padding:0 4px;font-size:12px">${F.names.map(n=>`<option${n===f.n?' selected':''}>${n}</option>`).join('')}</select></div>`).join('')}</div>`; }).join('')}</div>
+   ${withH.some(x=>!x.p.flight)?`<p class="hint">${withH.filter(x=>!x.p.flight).length} players aren’t in a flight (no handicap). Add their index and re-flight.</p>`:''}
+   <div style="display:flex;justify-content:flex-end"><button class="btn pri" id="flNext">Next: build groups from flights ${I.chev}</button></div>`:''}`;
   $('flGo').onclick=()=>{ const n=parseInt(fv('flN'),10); if(!(n>=1&&n<=10)){ toast('Enter 1–10 flights'); return; }
-    const basis=fv('flB'), unit=teams?fv('flU'):'player', gsize=+fv('flG')||4, build=$('flBuild').checked, cmode=fv('flC'), start=fv('flS');
+    const basis=fv('flB'), unit=teams?fv('flU'):'player', gsize=+fv('flG')||4, cmode=fv('flC');
     const us0=flightUnits(ev,basis,unit), sz={}; us0.forEach(u=>sz[u.members.length]=(sz[u.members.length]||0)+1); const tsz=+Object.entries(sz).sort((a,b)=>b[1]-a[1])[0]?.[0]||1;
     const per=Math.max(1,Math.round(gsize/tsz));
-    let plan=planFlights(ev,n,basis,unit,build?per:1), preview=build?buildFlightGroups(ev,plan,per,cmode,start):null;
-    if(build&&basis==='course'){ for(let pass=0;pass<3;pass++){ const cmap=new Map(preview.flatMap(x=>x.players.map(p=>[p.id,x.course])));
-        const next=planFlights(ev,n,basis,unit,per,p=>cmap.get(p.id)); const nprev=buildFlightGroups(ev,next,per,cmode,start);
-        const same=nprev.every(x=>x.players.every(p=>cmap.get(p.id)===x.course)); plan=next; preview=nprev; if(same) break; } }
-    const hasScores=Object.keys(scoresFor(ev)||{}).length>0;
-    const flat=plan.flights.map(f=>{ const gs=preview?preview.filter(x=>x.flight===f.name):[]; const cs=[...new Set(gs.map(x=>x.course))];
-      return `<div class="mr num" style="grid-template-columns:70px minmax(0,1fr) 110px"><b>Flight ${f.name}</b><div class="cell2"><span>${f.units.length} ${unit==='team'?'teams':'players'} (${f.units.reduce((a,u)=>a+u.members.length,0)} players)</span>${preview?`<small>${gs.length} groups on ${cs.map(x=>courseById(x).name.replace(' Course','')).join(' + ')} · holes ${gs.map(x=>x.startHole+(x.label.includes(' B ')||/ B ·/.test(x.label)?'B':'')).join(', ')}</small>`:''}</div><span class="r muted">${fmtH(f.units[0]?.val,basis)} – ${fmtH(f.units[f.units.length-1]?.val,basis)}</span></div>`; }).join('');
-    const odd=preview?preview.filter(x=>x.players.length!==gsize):[];
-    openDrawer({kicker:ev.name,title:`${plan.flights.length} flights`,saveLabel:'Assign flights',
+    let plan=planFlights(ev,n,basis,unit,per,p=>cmode==='split'?'':cmode), groups=buildFlightGroups(ev,plan,per,cmode,'shotgun');
+    if(basis==='course'){ for(let pass=0;pass<3;pass++){ const cmap=new Map(groups.flatMap(x=>x.players.map(p=>[p.id,x.course])));
+      const next=planFlights(ev,n,basis,unit,per,p=>cmap.get(p.id)); const ng=buildFlightGroups(ev,next,per,cmode,'shotgun');
+      const same=ng.every(x=>x.players.every(p=>cmap.get(p.id)===x.course)); plan=next; groups=ng; if(same) break; } }
+    const courseOf=groups.courseOf;
+    const flat=plan.flights.map(f=>`<div class="mr num" style="grid-template-columns:70px minmax(0,1fr) 110px"><b>Flight ${f.name}</b><div class="cell2"><span>${f.units.length} ${unit==='team'?'teams':'players'} · ${f.units.reduce((a,u)=>a+u.members.length,0)} players</span><small>${Math.ceil(f.units.length/per)} group${Math.ceil(f.units.length/per)===1?'':'s'} · ${courseById(courseOf[f.name])?.name||''}</small></div><span class="r muted">${fmtH(f.units[0]?.val,basis)} – ${fmtH(f.units[f.units.length-1]?.val,basis)}</span></div>`).join('');
+    openDrawer({kicker:ev.name+' · Flights',title:`${plan.flights.length} flights`,saveLabel:'Set flights',
       body:`<p style="margin:0">Filled by ${basis==='index'?'Handicap Index':'course handicap'}${unit==='team'?', teams kept together (combined handicap)':''}, lowest in Flight A.</p><div class="mini">${flat}</div>
-        ${plan.ties.length?`<div class="banner">Tied handicaps sit on both sides of a split: ${esc(plan.ties.join('; '))}. The tie is broken alphabetically — move anyone by hand after.</div>`:''}
+        ${plan.ties.length?`<div class="banner">Tied handicaps sit on both sides of a split: ${esc(plan.ties.join('; '))}. Broken alphabetically — move anyone by hand after.</div>`:''}
         ${plan.missing.length?`<div class="banner">${plan.missing.length} ${unit==='team'?'team':'player'}${plan.missing.length===1?'':'s'} without a handicap won’t be flighted: ${esc(plan.missing.slice(0,6).map(u=>u.label).join(', '))}${plan.missing.length>6?'…':''}.</div>`:''}
-        ${odd.length?`<div class="banner">${odd.length} group${odd.length>1?'s':''} won’t be full (${odd.map(x=>x.players.length+' players, Flight '+x.flight).join('; ')}) — the field doesn’t divide evenly.</div>`:''}
-        ${preview?`<div class="banner">This replaces all ${ev.groups.length} current groups with ${preview.length} new ones and new group IDs.${hasScores?' Scores already entered stay with each player.':''}${ev.status==='live'?' Scoring is open — re-share group IDs with players.':''}</div>`:''}
-        ${ev.flights.count&&!preview?'<p class="hint">This replaces the current flights, including any players you moved by hand.</p>':''}`,
-      save:()=>{ ev.groups.forEach(grp=>grp.players.forEach(p=>{ p.flight=''; }));
-        plan.flights.forEach(f=>f.units.forEach(u=>u.members.forEach(x=>{ x.p.flight=f.name; })));
-        if(preview){ const keep=new Set(preview.flatMap(x=>x.players.map(p=>p.id))); const loose=ev.groups.flatMap(x=>x.players).filter(p=>!keep.has(p.id));
-          ev.groups=preview.map(({flight,...grp})=>grp);
-          if(loose.length) ev.groups.push({id:uid(),code:newCode(ev),course:cmode==='pecan'?'pecan':'oak',startHole:1,label:'No handicap — not flighted',players:loose}); }
-        ev.flights={count:plan.flights.length,names:plan.flights.map(f=>f.name),basis,unit,groupSize:gsize,grouped:build,courses:cmode,start,at:new Date().toISOString()};
+        ${ev.groups.length?'<p class="hint">Flights don’t move anyone between groups — build groups from flights on the next step.</p>':''}`,
+      save:()=>{ evPlayers(ev).forEach(({p})=>{ p.flight=''; }); plan.flights.forEach(f=>f.units.forEach(u=>u.members.forEach(x=>{ x.p.flight=f.name; })));
+        ev.flights={count:plan.flights.length,names:plan.flights.map(f=>f.name),basis,unit,groupSize:gsize,perGroup:per,courses:cmode,courseOf,at:new Date().toISOString()};
         if(ev.scoring!=='net'&&confirm('Rank the leaderboard by net score? (Flighted events usually do.)')) ev.scoring='net';
-        golfSave(ev); toast(`${plan.flights.length} flights assigned${preview?` · ${ev.groups.length} groups built`:''}`); }}); };
-  const clr=$('flClear'); if(clr) clr.onclick=()=>{ if(!confirm('Remove all flights?')) return; ev.groups.forEach(grp=>grp.players.forEach(p=>{ p.flight=''; })); ev.flights={count:0,names:[]}; golfSave(ev); render(); };
-  el.querySelectorAll('[data-mv]').forEach(s=>s.onchange=()=>{ if(F.grouped&&!confirm('Groups were built by flight. Moving one player leaves them in a group with another flight — move their whole group from the Groups tab instead? Press OK to move just this player.')){ render(); return; } for(const grp of ev.groups) for(const p of grp.players) if(p.id===s.dataset.mv) p.flight=s.value; golfSave(ev); render(); });
+        golfSave(ev); toast(`${plan.flights.length} flights set`); }}); };
+  const clr=$('flClear'); if(clr) clr.onclick=()=>{ if(!confirm('Remove all flights?')) return; evPlayers(ev).forEach(({p})=>{ p.flight=''; }); ev.flights={count:0,names:[]}; golfSave(ev); render(); };
+  const nx=$('flNext'); if(nx) nx.onclick=()=>{ view.getab='groups'; render(); buildGroupsFromFlights(ev); };
+  el.querySelectorAll('[data-mv]').forEach(s=>s.onchange=()=>{ const x=all.find(y=>y.p.id===s.dataset.mv); const mates=F.unit==='team'&&x.p.team?all.filter(y=>y.p.team===x.p.team):[x];
+    mates.forEach(y=>{ y.p.flight=s.value; }); golfSave(ev); render(); if(mates.length>1) toast(mates.map(y=>y.p.name).join(' & ')+' moved to Flight '+s.value); });
+}
+
+/* ============ Step 3 · Groups ============ */
+function gGroups(el,ev){
+  const cols='grid-template-columns:100px minmax(0,1.1fr) 110px 70px minmax(0,2fr) 40px';
+  const F=ev.flights||{}, pool=ev.pool||[];
+  el.innerHTML=`<div class="toolbar"><div class="actions">${F.count?`<button class="btn pri" id="ggFl">Build groups from flights</button>`:`<button class="btn pri" id="ggFld"${evPlayers(ev).length?'':' disabled'}>Build groups from field</button>`}<button class="btn" id="ggAdd">${I.plus}Add group</button></div><span class="muted" style="margin-left:auto;font-size:13px">Each group gets its own group ID. Players enter it on the scoring page.</span></div>
+  ${pool.length?`<div class="banner">${pool.length} player${pool.length===1?' isn’t':'s aren’t'} in a group yet. ${F.count?'Build groups from flights':'Build groups from the field'} to place them.</div>`:''}
+  <div class="card" style="overflow:hidden">${ev.groups.length?`<div class="tw"><div class="t" style="min-width:820px"><div class="tr th" style="${cols}"><span>Group ID</span><span>Group</span><span>Course</span><span>Starts</span><span>Players</span><span></span></div>
+   ${ev.groups.map(g=>`<div class="tr click" data-gg="${g.id}" style="${cols}"><b style="letter-spacing:.06em;color:var(--navy)">${esc(g.code)}</b>${(()=>{ const hs=g.players.map(p=>playerHcp(ev,g,p).ch); const tot=hs.every(v=>v!=null)&&hs.length?hs.reduce((a,v)=>a+v,0):null; return `<div class="cell2"><span class="trunc">${esc(g.label||'—')}</span>${tot!=null?`<small>Combined ${fmtH(tot,'course')}</small>`:''}</div>`; })()}<span class="muted">${esc(courseById(g.course)?.name||'')}</span><span class="num">Hole ${+g.startHole||1}</span><span class="trunc">${g.players.map(p=>{ const h=playerHcp(ev,g,p); return esc(p.name)+(h.ch!=null?` <span class="muted">(${fmtH(h.ch,'course')})</span>`:''); }).join(', ')||'<span class="muted">No players</span>'}</span><span class="ib">${I.edit}</span></div>`).join('')}</div></div>`
+   :`<div class="empty"><b>No groups yet</b><span>${F.count?'Build groups from the flights — groups stay inside each flight, and starting holes follow combined handicap.':'Build groups from the field, or add them by hand.'}</span></div>`}</div>`;
+  $('ggAdd').onclick=()=>editGroup(ev,null);
+  const a=$('ggFl'); if(a) a.onclick=()=>buildGroupsFromFlights(ev);
+  const b=$('ggFld'); if(b) b.onclick=()=>buildGroupsFromField(ev);
+  el.querySelectorAll('[data-gg]').forEach(r=>r.onclick=()=>editGroup(ev,ev.groups.find(g=>g.id===r.dataset.gg)));
+}
+function groupsConfirmNote(ev){ const hasScores=Object.keys(scoresFor(ev)||{}).length>0;
+  return ev.groups.length?`<div class="banner">This replaces the ${ev.groups.length} current groups and their group IDs.${hasScores?' Scores already entered stay with each player.':''}${ev.status==='live'?' Scoring is open — re-share group IDs with players.':''}</div>`:''; }
+function buildGroupsFromFlights(ev){
+  const F=ev.flights; if(!F||!F.count){ toast('Set flights first'); return; }
+  const basis=F.basis||'course', unit=F.unit||'player', per=F.perGroup||Math.max(1,Math.round((F.groupSize||4)/(unit==='team'?2:1)));
+  const units=flightUnits(ev,basis,unit);
+  const plan={flights:F.names.map(n=>({name:n,units:units.filter(u=>u.members.every(m=>m.p.flight===n)&&u.val!=null).sort((a,b)=>a.val-b.val||a.label.localeCompare(b.label))}))};
+  const loose=units.filter(u=>!plan.flights.some(f=>f.units.includes(u)));
+  const preview=start=>{ const gs=buildFlightGroups(ev,plan,per,F.courseOf||F.courses||'split',start);
+    for(let i=0;i<loose.length;i+=per){ const us=loose.slice(i,i+per); gs.push({id:uid(),code:newCode({groups:gs}),course:ev.defaultCourse||'oak',startHole:1,label:'Not flighted',players:us.flatMap(u=>u.members.map(m=>({...m.p})))}); }
+    return gs; };
+  const summary=gs=>F.names.map(n=>{ const fg=gs.filter(x=>x.flight===n); return `<div class="mr num" style="grid-template-columns:70px minmax(0,1fr)"><b>Flight ${n}</b><div class="cell2"><span>${fg.length} groups · ${courseById(fg[0]?.course)?.name||''}</span><small>Holes ${fg.map(x=>x.startHole+(/ B /.test(x.label)?'B':'')).join(', ')}</small></div></div>`; }).join('');
+  const odd=gs=>gs.filter(x=>x.players.length!==(F.groupSize||4));
+  openDrawer({kicker:ev.name+' · Groups',title:'Build groups from flights',saveLabel:'Build groups',
+    body:`<p style="margin:0">Groups of ${F.groupSize||4}${unit==='team'?`, ${per} teams each`:''}, formed inside each flight from lowest handicap up. Each flight stays on its course.</p>`+
+      field('Start','bgS','shotgun',{type:'select',options:[['shotgun','Shotgun — holes 1, 2, 3… by combined handicap'],['one','Off hole 1 — tee order by combined handicap']]})+
+      `<div class="mini" id="bgSum">${summary(preview('shotgun'))}</div><div id="bgOdd"></div>${groupsConfirmNote(ev)}`,
+    wire:r=>{ const upd=()=>{ const gs=preview(r.querySelector('#bgS').value); r.querySelector('#bgSum').innerHTML=summary(gs); const o=odd(gs); r.querySelector('#bgOdd').innerHTML=o.length?`<div class="banner">${o.length} group${o.length>1?'s':''} won’t be full: ${esc(o.map(x=>x.players.length+' players · '+(x.flight?'Flight '+x.flight:x.label)).join('; '))}.</div>`:''; }; r.querySelector('#bgS').onchange=upd; upd(); },
+    save:()=>{ const gs=preview(fv('bgS')); ev.groups=gs.map(({flight,...grp})=>grp); ev.pool=[]; golfSave(ev); toast(`${ev.groups.length} groups built`); }});
+}
+function buildGroupsFromField(ev){
+  const all=evPlayers(ev); if(!all.length){ toast('Import or add the field first'); return; }
+  const units=[], seen=new Map(); all.forEach(({p})=>{ const k=p.team||('p'+p.id); if(!seen.has(k)){ seen.set(k,[]); units.push(seen.get(k)); } seen.get(k).push(p); });
+  openDrawer({kicker:ev.name+' · Groups',title:'Build groups from the field',saveLabel:'Build groups',
+    body:`<p style="margin:0">${all.length} players${units.some(u=>u.length>1)?` in ${units.length} teams — teams stay together`:''}. No flights are set, so groups follow field order.</p>`+
+      pair(field('Players per group','bgN',4,{type:'select',options:[[2,'2'],[3,'3'],[4,'4'],[5,'5']]}),field('Courses','bgC','split',{type:'select',options:[['oak','All on Oak'],['pecan','All on Pecan'],['split','Split between Oak and Pecan']]}))+
+      field('Start','bgS','shotgun',{type:'select',options:[['shotgun','Shotgun — groups spread across holes 1–18'],['one','Everyone off hole 1']]})+groupsConfirmNote(ev),
+    save:()=>{ const size=+fv('bgN'), mode=fv('bgC'), start=fv('bgS'); const groups=[]; let cur=[];
+      for(const u of units){ if(cur.length&&cur.length+u.length>size){ groups.push(cur); cur=[]; } cur=cur.concat(u); } if(cur.length) groups.push(cur);
+      const half=Math.ceil(groups.length/2); const out=[];
+      groups.forEach((ps,i)=>{ const course=mode==='split'?(i<half?'oak':'pecan'):mode; const idx=mode==='split'?(i<half?i:i-half):i;
+        const startHole=start==='shotgun'?(idx%18)+1:1; const dbl=start==='shotgun'&&idx>=18?' B':'';
+        out.push({id:uid(),code:newCode({groups:out}),label:`${course==='oak'?'Oak':'Pecan'} ${start==='shotgun'?startHole+dbl:'#'+(i+1)}`,course,startHole,players:ps.map(p=>({...p}))}); });
+      ev.groups=out; ev.pool=[]; golfSave(ev); toast(`${ev.groups.length} groups built`); }});
 }
 
 boot();

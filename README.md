@@ -75,6 +75,11 @@ One-time: Supabase → SQL Editor → run `golf-setup.sql`. Upload `score.html` 
 - **Flights:** event → Flights → enter how many. Filled evenly by course handicap (or Index),
   lowest in A, sizes differ by at most one. For team events linked to a tournament, teams stay
   together on combined handicap. Ties at a split are flagged; move anyone by hand afterward.
+- **Event workflow — 1 Field → 2 Flights → 3 Groups:**
+  1. *Field:* **Import field from <tournament>** pulls every player with their team and Handicap
+     Index (re-import adds newcomers, updates teams, optionally removes withdrawals). Add guests here.
+  2. *Flights:* set the number of flights; players and teams get a flight without being grouped.
+  3. *Groups:* **Build groups from flights** forms foursomes inside each flight on the flight's course.
 - **Groups by flight:** with "Build groups by flight" on, flights are sized in whole groups
   (two 2-person teams per foursome, so every flight has an even number of teams) and groups are
   formed inside each flight. Whole flights go to one course (split Oak/Pecan, or all on one).
