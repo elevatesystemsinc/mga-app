@@ -68,7 +68,7 @@ a{color:var(--gold)}
 .kpi .v{font-family:var(--serif);font-size:38px;font-weight:600;line-height:1.05;color:var(--navy)}
 .kpi .v.pos{color:var(--pos)} .kpi .v.neg{color:var(--neg)}
 .lbl{font-size:12px;font-weight:600;color:var(--muted)}
-.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;height:40px;padding:0 16px;border-radius:8px;border:1px solid var(--line);background:#fff;color:var(--navy);font-weight:600;font-size:13.5px;white-space:nowrap}
+.btn{text-decoration:none;display:inline-flex;align-items:center;justify-content:center;gap:8px;height:40px;padding:0 16px;border-radius:8px;border:1px solid var(--line);background:#fff;color:var(--navy);font-weight:600;font-size:13.5px;white-space:nowrap}
 .btn:hover{border-color:#CBBF9F}
 .btn.pri{background:var(--navy);border-color:var(--navy);color:#fff}
 .btn.pri:hover{background:var(--deep)}
@@ -102,6 +102,27 @@ a{color:var(--gold)}
 .seat-act{display:flex;gap:8px;margin-top:auto}
 .seat-empty{margin-top:auto;height:76px;border-style:dashed;color:var(--gold);width:100%}
 .trunc{display:block}
+details>summary::-webkit-details-marker{display:none}
+details[open]>summary .ib svg{transform:rotate(90deg)}
+.rrow{border-top:1px solid var(--line);padding:12px 22px;display:flex;flex-direction:column;gap:8px}
+.rtop{display:grid;grid-template-columns:72px minmax(0,1fr) auto;gap:12px;align-items:center}
+.rbot{display:flex;gap:10px 16px;align-items:center;flex-wrap:wrap;padding-left:84px}
+@media (max-width:900px){ .rbot{padding-left:0} }
+/* golf */
+.livedot{width:8px;height:8px;border-radius:50%;background:#6FBF8E;box-shadow:0 0 0 3px rgba(111,191,142,.25);margin-left:auto;flex-shrink:0}
+.nav.livelink{font-size:13px;color:#E9E4D6;margin-top:6px;border:1px dashed rgba(111,191,142,.45)}
+.nav.livelink .livedot{margin-left:0}
+table.scard{border-collapse:collapse;width:100%;min-width:900px;font-size:13px}
+table.scard th,table.scard td{border-top:1px solid var(--line);padding:9px 6px;text-align:center}
+table.scard thead th{background:var(--navy);color:#fff;font-weight:600;border-top:none}
+table.scard tbody th{text-align:left;padding-left:16px;font-weight:600;white-space:nowrap;min-width:110px}
+table.scard .st{background:var(--ivory);font-weight:700}
+table.scard thead .st{background:var(--deep)}
+table.scard tr.par td,table.scard tr.par th{background:#EEF1F2;font-weight:700}
+table.scard tr.hcp td{color:var(--muted);font-size:12px}
+table.scard tr.tee-gold th{box-shadow:inset 4px 0 0 #C9A227} table.scard tr.tee-blue th{box-shadow:inset 4px 0 0 #1F3F66}
+table.scard tr.tee-white th{box-shadow:inset 4px 0 0 #CFC6AE} table.scard tr.tee-red th{box-shadow:inset 4px 0 0 #A1402B} table.scard tr.tee-green th{box-shadow:inset 4px 0 0 #3E6B4A}
+table.scard.sheet{min-width:0} table.scard.sheet .inp{height:34px;padding:0 6px;width:56px}
 .empty{padding:36px 22px;text-align:center;color:var(--muted);display:flex;flex-direction:column;gap:12px;align-items:center}
 .empty b{font-family:var(--serif);font-size:22px;color:var(--navy)}
 
@@ -263,7 +284,7 @@ function daysOut(t){ const d=parseD(t.startDate); if(!d) return null; const now=
 const HUB_VERSION=1;
 const DEFAULT_ROLES=['President','Vice President','Treasurer','Secretary','Tournament Chair','Member at Large','Member at Large'];
 const ITEM_KINDS=['Meal','Drinks','Event','Other'];
-function newSeason(){ return {dues:{amount:90,installments:2},duesPayments:[],lines:[]}; }
+function newSeason(){ return {dues:{amount:90,installments:2},duesPayments:[],lines:[],txns:[],bank:[],bankBatches:[],bankOpening:{amount:0,date:''}}; }
 function emptyHub(){
   const y=String(new Date().getFullYear());
   return {v:HUB_VERSION,activeSeason:y,members:[],board:DEFAULT_ROLES.map(r=>({id:uid(),role:r,memberId:'',term:''})),
@@ -282,7 +303,7 @@ function normalize(d){
   d.v=d.v||HUB_VERSION; d.members=d.members||[]; d.board=d.board||[]; d.seasons=d.seasons||{}; d.tournaments=d.tournaments||[];
   if(!d.activeSeason) d.activeSeason=String(new Date().getFullYear());
   if(!d.seasons[d.activeSeason]) d.seasons[d.activeSeason]=newSeason();
-  for(const s of Object.values(d.seasons)){ s.dues=s.dues||{amount:90,installments:2}; s.duesPayments=s.duesPayments||[]; s.lines=s.lines||[]; }
+  for(const s of Object.values(d.seasons)){ s.dues=s.dues||{amount:90,installments:2}; s.duesPayments=s.duesPayments||[]; s.lines=s.lines||[]; s.txns=s.txns||[]; s.bank=s.bank||[]; s.bankBatches=s.bankBatches||[]; s.bankOpening=s.bankOpening||{amount:0,date:''}; }
   for(const t of d.tournaments){
     t.dayItems=t.dayItems||[[],[],[]]; while(t.dayItems.length<3) t.dayItems.push([]);
     for(const k of ['field','sponsors','tiers','income','perPlayer','lines','schedule','decisions','fieldQuestions']) t[k]=t[k]||[];
@@ -301,6 +322,17 @@ function playersUsed(t){ return t.budgetBasis==='field'?t.field.length:n0(t.plan
 function itemQty(t,it){ return it.qtyLink==='players'?playersUsed(t):n0(it.qty); }
 function itemTotal(t,it){ return it.menu?menuTotal(it.menu):itemQty(t,it)*n0(it.unitCost); }
 function spPaid(s){ return sum(s.payments,p=>p.amount); }
+/* ---------- ledger-driven actuals ----------
+   A budget line's actual comes from the Treasury ledger once any entry is linked to it;
+   until then it uses the number typed on the line. Link = {t: tournament id ('' = MGA), k: kind, id}. */
+const INCOME_KINDS=new Set(['inc','entry','skins','mgaInc']);
+function ledgerIndex(season){ const s=db.seasons[season], idx={}; if(!s) return idx;
+  for(const x of s.txns||[]){ const L=x.link; if(!L||!L.k) continue; const key=(L.t||'')+'|'+L.k+'|'+(L.id||'');
+    const signed=n0(x.amount)*((x.dir==='in')===INCOME_KINDS.has(L.k)?1:-1);
+    const r=idx[key]||(idx[key]={sum:0,n:0}); r.sum+=signed; r.n++; }
+  return idx; }
+function linkInfo(season,tid,k,id){ return ledgerIndex(season)[(tid||'')+'|'+k+'|'+(id||'')]||null; }
+function actualOf(IX,tid,k,id,manual){ const r=IX[(tid||'')+'|'+k+'|'+(id||'')]; return r?r.sum:n0(manual); }
 function tcalc(t){
   const players=playersUsed(t), days=t.days||1;
   const entryFees=players*n0(t.entryFee), skins=players*n0(t.skinsFee);
@@ -308,17 +340,21 @@ function tcalc(t){
   const otherInc=sum(t.income,i=>i.budget);
   const revenue=entryFees+skins+pledged+otherInc;
   const dayTot=[0,1,2].map(i=>i<days?sum(t.dayItems[i],it=>itemTotal(t,it)):0);
-  const dayAct=[0,1,2].map(i=>i<days?sum(t.dayItems[i],it=>it.actual):0);
+  const IX=ledgerIndex(t.season), A=(k,id,m)=>actualOf(IX,t.id,k,id,m);
+  const dayAct=[0,1,2].map(i=>i<days?sum(t.dayItems[i],it=>A('item',it.id,it.actual)):0);
   const perPlayer=sum(t.perPlayer,p=>players*n0(p.perPlayer));
   const lineTot=sum(t.lines,l=>l.budget);
   const skinsPayout=skins;
   const expenses=dayTot[0]+dayTot[1]+dayTot[2]+perPlayer+skinsPayout+lineTot;
   const a=t.actuals;
-  const revenueA=n0(a.entryFees)+n0(a.skins)+received+sum(t.income,i=>i.actual);
-  const expensesA=dayAct[0]+dayAct[1]+dayAct[2]+sum(t.perPlayer,p=>p.actual)+n0(a.skinsPaid)+sum(t.lines,l=>l.actual);
+  const revenueA=A('entry','',a.entryFees)+A('skins','',a.skins)+received+sum(t.income,i=>A('inc',i.id,i.actual));
+  const expensesA=dayAct[0]+dayAct[1]+dayAct[2]+sum(t.perPlayer,p=>A('pp',p.id,p.actual))+A('skinsPaid','',a.skinsPaid)+sum(t.lines,l=>A('line',l.id,l.actual));
   return {players,entryFees,skins,pledged,received,otherInc,revenue,dayTot,dayAct,perPlayer,lineTot,skinsPayout,expenses,
           net:revenue-expenses,revenueA,expensesA,netA:revenueA-expensesA};
 }
+/* A tournament counts as past once it's marked Complete or its last day is behind us. */
+function tEnd(t){ const d=parseD(t.startDate); return d?addDays(d,(t.days||1)-1):null; }
+function isPast(t){ if(t.status==='Complete') return true; const e=tEnd(t); if(!e) return false; const now=new Date(); now.setHours(0,0,0,0); return e<now; }
 function seasonTournaments(y){ return db.tournaments.filter(t=>t.season===y).sort((a,b)=>(a.startDate||'9').localeCompare(b.startDate||'9')); }
 function scalc(y){
   const s=db.seasons[y]||newSeason(), ts=seasonTournaments(y).map(t=>({t,c:tcalc(t)}));
@@ -327,10 +363,17 @@ function scalc(y){
   const incLines=s.lines.filter(l=>l.type==='Income'), expLines=s.lines.filter(l=>l.type!=='Income');
   const tRev=sum(ts,x=>x.c.revenue), tExp=sum(ts,x=>x.c.expenses), tRevA=sum(ts,x=>x.c.revenueA), tExpA=sum(ts,x=>x.c.expensesA);
   const revenue=tRev+duesBudget+sum(incLines,l=>l.budget), expenses=tExp+sum(expLines,l=>l.budget);
-  const revenueA=tRevA+duesActual+sum(incLines,l=>l.actual), expensesA=tExpA+sum(expLines,l=>l.actual);
+  const IX=ledgerIndex(y), mA=l=>actualOf(IX,'',l.type==='Income'?'mgaInc':'mgaExp',l.id,l.actual);
+  const revenueA=tRevA+duesActual+sum(incLines,mA), expensesA=tExpA+sum(expLines,mA);
   const raffle=sum(ts,x=>sum(x.t.income.filter(i=>i.source==='raffle'),i=>i.budget));
-  const raffleA=sum(ts,x=>sum(x.t.income.filter(i=>i.source==='raffle'),i=>i.actual));
-  return {s,ts,active,duesBudget,duesActual,tRev,tExp,revenue,expenses,net:revenue-expenses,revenueA,expensesA,netA:revenueA-expensesA,raffle,raffleA,
+  const raffleA=sum(ts,x=>sum(x.t.income.filter(i=>i.source==='raffle'),i=>actualOf(IX,x.t.id,'inc',i.id,i.actual)));
+  /* Projected season net: actuals for tournaments that are over, budget for the rest, plus MGA-level money
+     (dues and MGA lines use actuals once the season's tournaments are all past, budget otherwise). */
+  const past=ts.filter(x=>isPast(x.t)), upcoming=ts.filter(x=>!isPast(x.t));
+  const tProj=sum(past,x=>x.c.netA)+sum(upcoming,x=>x.c.net);
+  const mgaBud=duesBudget+sum(incLines,l=>l.budget)-sum(expLines,l=>l.budget);
+  const projected=tProj+mgaBud;
+  return {s,ts,active,duesBudget,duesActual,tRev,tExp,revenue,expenses,net:revenue-expenses,past,upcoming,tProj,projected,revenueA,expensesA,netA:revenueA-expensesA,raffle,raffleA,
           pledged:sum(ts,x=>x.c.pledged),received:sum(ts,x=>x.c.received)};
 }
 function memberDues(y,mid){ const s=db.seasons[y]; return s?sum(s.duesPayments.filter(p=>p.memberId===mid),p=>p.amount):0; }
@@ -479,6 +522,14 @@ async function fetchMMState(){
 /* =====================================================================
    MGA Hub — UI. Screens are read-only; every edit happens in ONE drawer.
    ===================================================================== */
+const tA=(t,k,id,m)=>actualOf(ledgerIndex(t.season),t.id,k,id,m);
+/* Actual $ input, or — when Treasury entries are linked — a read-only total that points to the ledger. */
+function actField(label,id,season,tid,k,lid,manual,ph){
+  const L=linkInfo(season,tid,k,lid);
+  if(L) return `<div class="fld"><span class="lbl">${label}</span><div class="banner" style="justify-content:space-between"><span><b class="num">${fmt(L.sum)}</b> from ${L.n} Treasury entr${L.n===1?'y':'ies'}</span><button class="btn sm" type="button" data-goledger="1">Open ledger</button></div><input type="hidden" id="${id}" value="${esc(manual||'')}"></div>`;
+  return field(label,id,manual||'',{type:'number',ph:ph||'Enter when invoiced, or record it in Treasury'});
+}
+document.addEventListener('click',e=>{ const b=e.target.closest('[data-goledger]'); if(b){ closeDrawer(); go('treasury',{xtab:'ledger'}); } });
 const svg=d=>`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${d}</svg>`;
 const I={
   home:svg('<path d="M3 11l9-7 9 7"/><path d="M5 10v10h14V10"/>'),
@@ -542,10 +593,12 @@ function statusChip(t){ const d=daysOut(t); const st=t.status||'Planning';
 function render(){
   const ys=Object.keys(db.seasons).sort((a,b)=>b-a);
   $('seasonSel').innerHTML=ys.map(y=>`<option value="${y}"${y===Y()?' selected':''}>${y} season</option>`).join('')+'<option value="__new">+ New season…</option>';
-  $('nav').innerHTML=NAV.map(([k,l,ic])=>`<button class="nav${(view.page===k||(k==='tournaments'&&view.page==='tournament'))?' on':''}" data-go="${k}">${ic}<span>${l}</span></button>`).join('');
-  $('nav').querySelectorAll('[data-go]').forEach(b=>b.onclick=()=>go(b.dataset.go));
+  const live=typeof liveEvents==='function'?liveEvents():[];
+  $('nav').innerHTML=NAV.map(([k,l,ic])=>`<button class="nav${(view.page===k||(k==='tournaments'&&view.page==='tournament'))?' on':''}" data-go="${k}">${ic}<span>${l}</span>${k==='golf'&&live.length?'<span class="livedot" aria-label="Live scoring"></span>':''}</button>`).join('')+
+    live.map(e=>`<button class="nav livelink" data-golfev="${e.id}"><span class="livedot"></span><span class="trunc">Leaderboard · ${esc(e.name)}</span></button>`).join('');
+  $('nav').querySelectorAll('[data-go]').forEach(b=>b.onclick=()=>{ if(b.dataset.go==='golf') view.geid=null; go(b.dataset.go); });
   const m=$('main');
-  ({dash:vDash,tournaments:vTournaments,tournament:vTournament,members:vMembers,board:vBoard,budget:vBudget}[view.page]||vDash)(m);
+  ({dash:vDash,tournaments:vTournaments,tournament:vTournament,members:vMembers,board:vBoard,budget:vBudget,treasury:vTreasury,golf:vGolf}[view.page]||vDash)(m);
 }
 
 /* ---------- Dashboard ---------- */
@@ -563,7 +616,7 @@ function vDash(m){
   if(db.members.length&&unpaid&&sc.s.duesPayments.length) attention.push([String(unpaid),`member${unpaid>1?'s have':' has'} not paid full ${Y()} dues`,'warn',null]);
   m.innerHTML=head(`${Y()} Season`,'Walnut Creek Country Club Men’s Golf Association',btn('New tournament','dNew','pri',I.plus))+`
   <div class="grid g4">
-    ${kpi('Season net (budgeted)',fmtS(sc.net),`${withBudget} of ${sc.ts.length} tournament budgets started`,netCls(sc.net))}
+    ${kpi('Season net (projected)',fmtS(sc.projected),`Actuals for ${sc.past.length} completed · budget for ${sc.upcoming.length} upcoming`,netCls(sc.projected))}
     ${kpi('Next up',next?dayShort(next,0)||'TBD':'—',next?`${esc(next.name)} · ${daysOut(next)===0?'today':daysOut(next)+' days out'}`:'No upcoming tournaments')}
     ${kpi('Sponsor money received',fmt(sc.received),`of ${fmt(sc.pledged)} pledged this season`)}
     ${kpi('Members',String(sc.active),`active · ${db.board.filter(b=>b.memberId).length} on the board`)}
@@ -578,6 +631,7 @@ function vDash(m){
       </div></div>`:`<div class="empty"><b>No tournaments yet</b><span>Add the season’s first event, or import Member-Member from the current app.</span><div class="actions"><button class="btn pri" id="dNew2">${I.plus}New tournament</button><button class="btn" id="dImp">${I.down}Import Member-Member</button></div></div>`}
     </div>
     <div style="display:flex;flex-direction:column;gap:20px">
+      ${typeof liveBoardCard==='function'?liveBoardCard():''}
       <div class="card pad" style="display:flex;flex-direction:column;gap:12px"><h2 class="h2">Needs attention</h2>
         ${attention.length?attention.map(([c,txt,k,id])=>`<div style="display:flex;gap:10px;align-items:flex-start;font-size:13.5px"><span class="chip ${k}">${c}</span><span>${id?`<a href="#" data-open="${id}">${txt}</a>`:txt}</span></div>`).join(''):'<span class="muted">Nothing outstanding.</span>'}
       </div>
@@ -728,7 +782,7 @@ function editSched(t,di,id){
 /* Meals & events (per day) */
 function itemRow(t,it,di){
   const q=it.menu?`Menu ${fmt(menuSubtotal(it.menu))} + ${n0(it.menu.svcPct)}%`:`${itemQty(t,it)}${it.qtyLink==='players'?' (players)':''} × ${fmt2(it.unitCost).replace('.00','')}`;
-  return `<div class="tr num click bl" data-item="${di}|${it.id}"><div class="cell2"><span style="font-weight:500">${esc(it.item)} <span class="chip" style="height:20px;font-size:11px;margin-left:4px">${esc(it.kind||'Other')}</span></span>${it.menu?`<small>${it.menu.items.length} menu items · ${n0(it.menu.guests)} guests</small>`:it.notes?`<small class="trunc">${esc(it.notes)}</small>`:''}</div><span class="muted" style="font-size:13px">${q}</span><b class="r">${fmt(itemTotal(t,it))}</b><span class="r muted" style="font-size:12.5px">${n0(it.actual)?fmt(it.actual)+' act.':''}</span><span class="ib" aria-hidden="true">${I.edit}</span></div>`;
+  return `<div class="tr num click bl" data-item="${di}|${it.id}"><div class="cell2"><span style="font-weight:500">${esc(it.item)} <span class="chip" style="height:20px;font-size:11px;margin-left:4px">${esc(it.kind||'Other')}</span></span>${it.menu?`<small>${it.menu.items.length} menu items · ${n0(it.menu.guests)} guests</small>`:it.notes?`<small class="trunc">${esc(it.notes)}</small>`:''}</div><span class="muted" style="font-size:13px">${q}</span><b class="r">${fmt(itemTotal(t,it))}</b><span class="r muted" style="font-size:12.5px">${tA(t,'item',it.id,it.actual)?fmt(tA(t,'item',it.id,it.actual))+' act.':''}</span><span class="ib" aria-hidden="true">${I.edit}</span></div>`;
 }
 function tMeals(el,t){
   const c=tcalc(t);
@@ -749,7 +803,7 @@ function editItem(t,di,it){
       `<div class="fld"><span class="lbl">Quantity</span>${seg('iLink',[['','Fixed number'],['players','Every player']],it?.qtyLink||'')}</div>`+
       pair(field('Quantity','iQty',it?(it.qtyLink?playersUsed(t):it.qty):'',{type:'number'}),field('Unit cost $','iCost',it?.unitCost??'',{type:'number'}))+
       `<div class="sumrows num"><div class="big"><span>Budget</span><span id="iTot">${fmt(it?itemTotal(t,it):0)}</span></div></div>`+
-      field('Actual $ (after the bill)','iAct',it?.actual||'',{type:'number',ph:'Enter when invoiced'})+field('Notes','iNotes',it?.notes||'',{type:'textarea'}),
+      actField('Actual $ (after the bill)','iAct',t.season,t.id,'item',it?.id,it?.actual)+field('Notes','iNotes',it?.notes||'',{type:'textarea'}),
     wire:r=>{ const upd=()=>{ const link=$('iLink').dataset.val; const q=link?playersUsed(t):fnum('iQty'); $('iQty').disabled=!!link; if(link) $('iQty').value=q; $('iTot').textContent=fmt(q*fnum('iCost')); };
       wireSeg(r,'iLink',upd); r.querySelector('#iQty').oninput=upd; r.querySelector('#iCost').oninput=upd; upd(); },
     save:()=>{ const name=fv('iName'); if(!name){toast('Name the item');return false;}
@@ -768,7 +822,7 @@ function editMenu(t,di,it){
       (fieldRSVP(t).headcount!=null&&fieldRSVP(t).headcount!==n0(menu.guests)?`<div class="banner" style="justify-content:space-between"><span>Field RSVPs: <b>${fieldRSVP(t).headcount}</b> (${fieldRSVP(t).dinner} players + ${fieldRSVP(t).guests||0} plus-ones)</span><button class="btn sm" type="button" id="mUseRsvp">Use ${fieldRSVP(t).headcount}</button></div>`:'')+
       `<div class="fld"><div style="display:flex;justify-content:space-between;align-items:center"><span class="lbl">Menu</span><button class="btn sm" id="mAdd" type="button">${I.plus}Add item</button></div>
        <div class="mini"><div class="mr h" style="grid-template-columns:minmax(0,1fr) 64px 84px 76px 28px"><span>Item</span><span class="r">Qty</span><span class="r">Unit $</span><span class="r">Total</span><span></span></div><div id="mRows">${rowsHTML()}</div></div></div>
-       <div class="sumrows num" id="mTot">${totals()}</div>`+field('Actual $ (final bill)','mAct',it?.actual||'',{type:'number',ph:'Enter after the event'})+field('Notes','mNotes',it?.notes||'',{type:'textarea'}),
+       <div class="sumrows num" id="mTot">${totals()}</div>`+actField('Actual $ (final bill)','mAct',t.season,t.id,'item',it?.id,it?.actual)+field('Notes','mNotes',it?.notes||'',{type:'textarea'}),
     wire:r=>{
       const rewire=()=>{ r.querySelector('#mRows').innerHTML=rowsHTML(); bind(); r.querySelector('#mTot').innerHTML=totals(); };
       const bind=()=>{ r.querySelectorAll('[data-mi]').forEach(inp=>inp.oninput=()=>{ const x=menu.items[+inp.dataset.mi]; x[inp.dataset.k]=inp.dataset.k==='item'?inp.value:inp.value; const i=+inp.dataset.mi;
@@ -849,7 +903,7 @@ function tSponsors(el,t){
 }
 function editSponsor(t,s){
   const pays=s?clone(s.payments||[]):[];
-  const payHTML=()=>pays.map((p,i)=>`<div class="mr num" style="grid-template-columns:90px minmax(0,1fr) 90px 28px"><input class="inp r" data-pi="${i}" data-k="amount" inputmode="decimal" value="${esc(p.amount)}" aria-label="Payment amount"><select class="inp" data-pi="${i}" data-k="method" aria-label="Payment method">${['Check','Zelle','CC','Cash','Other'].map(o=>`<option${o===p.method?' selected':''}>${o}</option>`).join('')}</select><input class="inp" data-pi="${i}" data-k="date" value="${esc(p.date)}" placeholder="Date" aria-label="Payment date"><button class="ib" data-pdel="${i}" aria-label="Remove payment">${I.x}</button></div>`).join('')||'<div class="mr"><span class="muted">No payments logged.</span></div>';
+  const payHTML=()=>pays.map((p,i)=>`<div class="mr num" style="grid-template-columns:86px minmax(0,1fr) 72px 76px 28px"><input class="inp r" data-pi="${i}" data-k="amount" inputmode="decimal" value="${esc(p.amount)}" aria-label="Payment amount"><select class="inp" data-pi="${i}" data-k="method" aria-label="Payment method">${['Check','Zelle','CC','Cash','Other'].map(o=>`<option${o===p.method?' selected':''}>${o}</option>`).join('')}</select><input class="inp" data-pi="${i}" data-k="checkNo" value="${esc(p.checkNo||'')}" placeholder="Chk #" aria-label="Check number"><input class="inp" data-pi="${i}" data-k="date" value="${esc(p.date)}" placeholder="Date" aria-label="Payment date"><button class="ib" data-pdel="${i}" aria-label="Remove payment">${I.x}</button></div>`).join('')||'<div class="mr"><span class="muted">No payments logged.</span></div>';
   const tierOpts=[['','— None —']].concat(t.tiers.map(x=>[x.name,x.name]));
   openDrawer({kicker:t.name+' · Sponsor',title:s?s.company:'Add sponsor',
     body:field('Company','sCo',s?.company||'')+pair(field('Tier','sTier',s?.tier||'',{type:'select',options:tierOpts}),field('Pledged $','sPl',s?.pledged??'',{type:'number'}))+
@@ -864,7 +918,7 @@ function editSponsor(t,s){
       r.querySelector('#pAdd').onclick=()=>{ const left=Math.max(0,fnum('sPl')-sum(pays,p=>p.amount)); const d=new Date(); pays.push({id:uid(),amount:left||'',method:'Check',date:(d.getMonth()+1)+'/'+d.getDate()}); r.querySelector('#pRows').innerHTML=payHTML(); bind(); sumTxt(); }; },
     save:()=>{ const co=fv('sCo'); if(!co){ toast('Company name is required'); return false; }
       const data={company:co,tier:fv('sTier'),pledged:fnum('sPl'),contact:fv('sCt'),committee:fv('sCm'),phone:fv('sPh'),email:fv('sEm'),notes:fv('sNt'),
-        payments:pays.filter(p=>n0(p.amount)).map(p=>({id:p.id||uid(),amount:n0(p.amount),method:p.method||'Check',date:p.date||''}))};
+        payments:pays.filter(p=>n0(p.amount)).map(p=>({id:p.id||uid(),amount:n0(p.amount),method:p.method||'Check',date:p.date||'',checkNo:p.checkNo||''}))};
       if(s) Object.assign(s,data); else t.sponsors.push(Object.assign({id:uid()},data)); },
     del:s?()=>{ const i=t.sponsors.indexOf(s); t.sponsors.splice(i,1); toast('Sponsor removed',()=>{t.sponsors.splice(i,0,s);persist();render();}); }:null});
 }
@@ -887,16 +941,16 @@ function tBudget(el,t){
   const grp=(title,total,chip,body,addKey)=>`<div class="gh"><div style="display:flex;align-items:center;gap:10px"><b>${title}</b>${chip?`<span class="chip">${chip}</span>`:''}${addKey?`<button class="btn sm" data-badd="${addKey}">${I.plus}Add</button>`:''}</div><b class="num">${fmt(total)}</b></div>${body}`;
   const pl=`${c.players} ${t.budgetBasis==='field'?'in the field':'planned'}`;
   const rev=grp('Revenue',c.revenue,'',
-    row('Entry fees',`${pl} × ${fmt(t.entryFee)}`,c.entryFees,t.actuals.entryFees,'a:entryFees',t.budgetBasis==='field'?'Players from the Field tab':'')+
-    (n0(t.skinsFee)||c.skins?row('Skins / day money',`${c.players} × ${fmt(t.skinsFee)} · paid back out`,c.skins,t.actuals.skins,'a:skins'):'')+
+    row('Entry fees',`${pl} × ${fmt(t.entryFee)}`,c.entryFees,tA(t,'entry','',t.actuals.entryFees),'a:entryFees',t.budgetBasis==='field'?'Players from the Field tab':'')+
+    (n0(t.skinsFee)||c.skins?row('Skins / day money',`${c.players} × ${fmt(t.skinsFee)} · paid back out`,c.skins,tA(t,'skins','',t.actuals.skins),'a:skins'):'')+
     row('Sponsors',`${t.sponsors.length} sponsors · Sponsors tab`,c.pledged,c.received,'go:sponsors')+
-    t.income.map(i=>row(esc(i.desc),i.source==='raffle'?'Season raffle':'',i.budget,i.actual,'inc:'+i.id,i.notes?esc(i.notes):'')).join(''),'inc');
-  const days=[0,1,2].slice(0,t.days).map(di=>grp(dayLabel(t,di),c.dayTot[di],dayShort(t,di),t.dayItems[di].map(it=>row(esc(it.item),it.menu?`Menu ${fmt(menuSubtotal(it.menu))} + ${n0(it.menu.svcPct)}% service`:`${itemQty(t,it)} × ${fmt2(it.unitCost).replace('.00','')}`,itemTotal(t,it),it.actual,`it:${di}:${it.id}`,it.menu?`${it.menu.items.length} menu items · ${n0(it.menu.guests)} guests`:'')).join('')||'<div class="tr"><span class="muted">No meals or events.</span></div>','day'+di)).join('');
+    t.income.map(i=>row(esc(i.desc),i.source==='raffle'?'Season raffle':'',i.budget,tA(t,'inc',i.id,i.actual),'inc:'+i.id,i.notes?esc(i.notes):'')).join(''),'inc');
+  const days=[0,1,2].slice(0,t.days).map(di=>grp(dayLabel(t,di),c.dayTot[di],dayShort(t,di),t.dayItems[di].map(it=>row(esc(it.item),it.menu?`Menu ${fmt(menuSubtotal(it.menu))} + ${n0(it.menu.svcPct)}% service`:`${itemQty(t,it)} × ${fmt2(it.unitCost).replace('.00','')}`,itemTotal(t,it),tA(t,'item',it.id,it.actual),`it:${di}:${it.id}`,it.menu?`${it.menu.items.length} menu items · ${n0(it.menu.guests)} guests`:'')).join('')||'<div class="tr"><span class="muted">No meals or events.</span></div>','day'+di)).join('');
   const groups=[...new Set(t.lines.map(l=>l.group||'Other'))];
   const wide=grp('Tournament-wide',c.perPlayer+c.skinsPayout+c.lineTot,'',
-    t.perPlayer.map(p=>row(esc(p.desc),`${c.players} × ${fmt(p.perPlayer)} per player`,c.players*n0(p.perPlayer),p.actual,'pp:'+p.id)).join('')+
-    (c.skinsPayout?row('Skins / day money payout','Matches what’s collected',c.skinsPayout,t.actuals.skinsPaid,'a:skinsPaid'):'')+
-    groups.map(g=>t.lines.filter(l=>(l.group||'Other')===g).map(l=>row(esc(l.desc),esc(g),l.budget,l.actual,'ln:'+l.id,l.notes?esc(l.notes):'')).join('')).join(''),'wide');
+    t.perPlayer.map(p=>row(esc(p.desc),`${c.players} × ${fmt(p.perPlayer)} per player`,c.players*n0(p.perPlayer),tA(t,'pp',p.id,p.actual),'pp:'+p.id)).join('')+
+    (c.skinsPayout?row('Skins / day money payout','Matches what’s collected',c.skinsPayout,tA(t,'skinsPaid','',t.actuals.skinsPaid),'a:skinsPaid'):'')+
+    groups.map(g=>t.lines.filter(l=>(l.group||'Other')===g).map(l=>row(esc(l.desc),esc(g),l.budget,tA(t,'line',l.id,l.actual),'ln:'+l.id,l.notes?esc(l.notes):'')).join('')).join(''),'wide');
   el.innerHTML=`<div style="display:flex;gap:20px;align-items:flex-start;flex-wrap:wrap">
     <div class="card" style="flex:1 1 640px;overflow:hidden;min-width:0"><div class="tw"><div class="t bt">
       <div class="tr th bl"><span>Line</span><span>How it’s calculated</span><span class="r">Budget</span><span class="r">Actual</span><span></span></div>
@@ -931,7 +985,7 @@ function budgetEdit(t,key){
   if(k==='pp') return editPerPlayer(t,t.perPlayer.find(x=>x.id===a));
   if(k==='a'){
     const lab={entryFees:'Entry fees collected',skins:'Skins / day money collected',skinsPaid:'Skins / day money paid out'}[a];
-    openDrawer({kicker:t.name+' · Actual',title:lab,body:field('Actual $','aVal',t.actuals[a]||'',{type:'number'})+(a==='entryFees'&&t.field.length?`<p class="hint">The field shows ${t.field.filter(p=>p.paid).length} paid × ${fmt(t.entryFee)} = ${fmt(t.field.filter(p=>p.paid).length*n0(t.entryFee))}.</p>`:'')+`<p class="hint">Change the per-player amount in Tournament details.</p>`,
+    openDrawer({kicker:t.name+' · Actual',title:lab,body:actField('Actual $','aVal',t.season,t.id,{entryFees:'entry',skins:'skins',skinsPaid:'skinsPaid'}[a],'',t.actuals[a])+(a==='entryFees'&&t.field.length?`<p class="hint">The field shows ${t.field.filter(p=>p.paid).length} paid × ${fmt(t.entryFee)} = ${fmt(t.field.filter(p=>p.paid).length*n0(t.entryFee))}.</p>`:'')+`<p class="hint">Change the per-player amount in Tournament details.</p>`,
       save:()=>{ t.actuals[a]=fnum('aVal'); }});
   }
 }
@@ -942,7 +996,7 @@ function chooseWide(t){
 function editLine(t,kind,l){
   const inc=kind==='income', groups=[...new Set(['Prizes','Gifts','Entertainment','Misc'].concat(t.lines.map(x=>x.group).filter(Boolean)))];
   openDrawer({kicker:t.name+(inc?' · Income':' · Expense'),title:l?l.desc:(inc?'Add income':'Add expense'),
-    body:field('Description','lDesc',l?.desc||'')+(inc?'':field('Group','lGrp',l?.group||'Misc',{type:'select',options:groups}))+pair(field('Budget $','lBud',l?.budget??'',{type:'number'}),field('Actual $','lAct',l?.actual||'',{type:'number'}))+
+    body:field('Description','lDesc',l?.desc||'')+(inc?'':field('Group','lGrp',l?.group||'Misc',{type:'select',options:groups}))+pair(field('Budget $','lBud',l?.budget??'',{type:'number'}),actField('Actual $','lAct',t.season,t.id,inc?'inc':'line',l?.id,l?.actual))+
       (inc?`<label class="check"><input type="checkbox" id="lRaf"${l?.source==='raffle'?' checked':''}>This is season 50/50 raffle money</label>`:'')+field('Notes','lNt',l?.notes||'',{type:'textarea'}),
     save:()=>{ const d=fv('lDesc'); if(!d){ toast('Add a description'); return false; }
       const data={desc:d,budget:fnum('lBud'),actual:fnum('lAct'),notes:fv('lNt')}; if(!inc) data.group=fv('lGrp'); else data.source=$('lRaf').checked?'raffle':'';
@@ -951,7 +1005,7 @@ function editLine(t,kind,l){
 }
 function editPerPlayer(t,p){
   openDrawer({kicker:t.name+' · Per-player expense',title:p?p.desc:'Add per-player expense',
-    body:field('Description','ppD',p?.desc||'',{ph:'e.g. Pro shop spree'})+pair(field('Amount per player $','ppA',p?.perPlayer??'',{type:'number'}),field('Actual $','ppAct',p?.actual||'',{type:'number'}))+`<p class="hint">Budget = ${playersUsed(t)} players × amount.</p>`,
+    body:field('Description','ppD',p?.desc||'',{ph:'e.g. Pro shop spree'})+pair(field('Amount per player $','ppA',p?.perPlayer??'',{type:'number'}),actField('Actual $','ppAct',t.season,t.id,'pp',p?.id,p?.actual))+`<p class="hint">Budget = ${playersUsed(t)} players × amount.</p>`,
     save:()=>{ const d=fv('ppD'); if(!d){ toast('Add a description'); return false; } const data={desc:d,perPlayer:fnum('ppA'),actual:fnum('ppAct')};
       if(p) Object.assign(p,data); else t.perPlayer.push(Object.assign({id:uid(),notes:''},data)); },
     del:p?()=>{ t.perPlayer=t.perPlayer.filter(x=>x!==p); }:null});
@@ -1243,10 +1297,10 @@ function vBudget(m){
   const cols='grid-template-columns:minmax(160px,2fr) 140px 130px 130px 120px 120px';
   const r=(n,d,rv,ex,nt,act,cls='',attr='')=>`<div class="tr num ${cls}" ${attr} style="${cols}"><span style="font-weight:600;color:var(--navy)">${n}</span><span class="muted">${d}</span><span class="r">${rv}</span><span class="r">${ex}</span><b class="r ${typeof nt==='number'?netCls(nt):''}">${typeof nt==='number'?fmtS(nt):nt}</b><span class="r muted">${act}</span></div>`;
   m.innerHTML=head('Season budget','Tournaments are self-sustaining; dues are the MGA’s own income. Everything rolls up here.',btn('Add MGA line','sbAdd','',I.plus))+`
-  <div class="grid g3">${kpi('Budgeted revenue',fmt(sc.revenue),'tournaments + dues + MGA lines')}${kpi('Budgeted expenses',fmt(sc.expenses),'tournaments + MGA lines')}${kpi('Season net',fmtS(sc.net),'Actual so far: '+fmtS(sc.netA),netCls(sc.net))}</div>
+  <div class="grid g3">${kpi('Budgeted revenue',fmt(sc.revenue),'tournaments + dues + MGA lines')}${kpi('Budgeted expenses',fmt(sc.expenses),'tournaments + MGA lines')}${kpi('Season net (projected)',fmtS(sc.projected),`Actuals for ${sc.past.length} completed, budget for ${sc.upcoming.length} upcoming · all-budget net ${fmtS(sc.net)}`,netCls(sc.projected))}</div>
   <div class="card" style="overflow:hidden"><div class="cardhead"><h2 class="h2">Tournaments</h2></div><div class="tw"><div class="t" style="min-width:820px">
     <div class="tr th" style="${cols}"><span>Tournament</span><span>Dates</span><span class="r">Revenue</span><span class="r">Expenses</span><span class="r">Net</span><span class="r">Actual net</span></div>
-    ${sc.ts.map(({t,c})=>r(esc(t.name),dateRange(t).replace(/, \d{4}$/,''),fmt(c.revenue),fmt(c.expenses),c.net,fmtS(c.netA),'click',`data-open="${t.id}"`)).join('')||'<div class="tr"><span class="muted">No tournaments this season.</span></div>'}
+    ${sc.ts.map(({t,c})=>r(esc(t.name)+(isPast(t)?' <span class="chip ok" style="height:20px;font-size:11px;margin-left:6px">Actual counts</span>':''),dateRange(t).replace(/, \d{4}$/,''),fmt(c.revenue),fmt(c.expenses),c.net,fmtS(c.netA),'click',`data-open="${t.id}"`)).join('')||'<div class="tr"><span class="muted">No tournaments this season.</span></div>'}
     ${r('Tournaments subtotal','',fmt(sc.tRev),fmt(sc.tExp),sc.tRev-sc.tExp,'','tot')}
   </div></div></div>
   <div class="card" style="overflow:hidden"><div class="cardhead"><h2 class="h2">MGA-level money</h2></div><div class="tw"><div class="t" style="min-width:820px">
@@ -1255,7 +1309,7 @@ function vBudget(m){
     <div class="tr" style="${cols};border-top:none;min-height:0;padding-bottom:12px"><span class="muted" style="font-size:12.5px;grid-column:1/-1">${n0(s.dues.installments)>1?`Charged as ${s.dues.installments} × ${fmt(n0(s.dues.amount)/s.dues.installments)}, `:''}not prorated. Actual comes from dues recorded on each member.</span></div>
     ${r('50/50 raffle (all season)','Assigned to tournaments',fmt(sc.raffle)+' → tournaments','','',fmt(sc.raffleA))}
     <div class="tr" style="${cols};border-top:none;min-height:0;padding-bottom:12px"><span class="muted" style="font-size:12.5px;grid-column:1/-1">Collected at every event and counted in the tournament it’s assigned to (Member-Member), so it isn’t added again here.</span></div>
-    ${s.lines.map(l=>r(esc(l.desc),esc(l.type),l.type==='Income'?fmt(l.budget):'',l.type==='Income'?'':fmt(l.budget),'',fmt(l.actual),'click',`data-sl="${l.id}"`)).join('')}
+    ${s.lines.map(l=>r(esc(l.desc),esc(l.type),l.type==='Income'?fmt(l.budget):'',l.type==='Income'?'':fmt(l.budget),'',fmt(actualOf(ledgerIndex(y),'',l.type==='Income'?'mgaInc':'mgaExp',l.id,l.actual)),'click',`data-sl="${l.id}"`)).join('')}
   </div></div></div>`;
   wireCommon(m);
   $('sbDues').onclick=editDues; $('sbAdd').onclick=()=>editSeasonLine(null);
@@ -1263,7 +1317,7 @@ function vBudget(m){
 }
 function editSeasonLine(l){
   const s=db.seasons[Y()];
-  openDrawer({kicker:Y()+' season · MGA-level',title:l?l.desc:'Add MGA line',body:field('Description','slD',l?.desc||'',{ph:'e.g. Year-end banquet'})+field('Type','slT',l?.type||'Expense',{type:'select',options:['Income','Expense']})+pair(field('Budget $','slB',l?.budget??'',{type:'number'}),field('Actual $','slA',l?.actual||'',{type:'number'})),
+  openDrawer({kicker:Y()+' season · MGA-level',title:l?l.desc:'Add MGA line',body:field('Description','slD',l?.desc||'',{ph:'e.g. Year-end banquet'})+field('Type','slT',l?.type||'Expense',{type:'select',options:['Income','Expense']})+pair(field('Budget $','slB',l?.budget??'',{type:'number'}),actField('Actual $','slA',Y(),'',(l?.type||'Expense')==='Income'?'mgaInc':'mgaExp',l?.id,l?.actual)),
     save:()=>{ const d=fv('slD'); if(!d){ toast('Add a description'); return false; } const data={desc:d,type:fv('slT'),budget:fnum('slB'),actual:fnum('slA')};
       if(l) Object.assign(l,data); else s.lines.push(Object.assign({id:uid()},data)); },
     del:l?()=>{ s.lines=s.lines.filter(x=>x!==l); }:null});
@@ -1306,6 +1360,647 @@ async function boot(){
   if(data&&data.session){ sessionOK=true; $('btnSignOut').hidden=false; startCloud(); }
   else { $('login').classList.add('show'); setTimeout(()=>$('loginPw').focus(),100); }
 }
+
+/* =====================================================================
+   MGA Hub — Treasury: one ledger for the season, budget vs actual across
+   every tournament, and bank reconciliation against uploaded statements.
+   Book entries = ledger transactions + sponsor payments + dues payments.
+   Bank lines are matched to book entries (one-to-one, or several checks
+   to one deposit). Nothing is ever matched without the treasurer's OK.
+   ===================================================================== */
+I.bank=svg('<path d="M3 10l9-6 9 6"/><path d="M5 10v8M9.5 10v8M14.5 10v8M19 10v8"/><path d="M3 20h18"/>');
+NAV.splice(4,0,['treasury','Treasury',I.bank]);
+view.xtab=view.xtab||'ledger'; view.lfilter='All'; view.lq=''; view.showMatched=false;
+
+/* ---------- dates + money ---------- */
+function isoDate(s,year){
+  s=String(s??'').trim(); if(!s) return '';
+  let m;
+  if((m=/^(\d{4})-(\d{1,2})-(\d{1,2})/.exec(s))) return `${m[1]}-${m[2].padStart(2,'0')}-${m[3].padStart(2,'0')}`;
+  if((m=/^(\d{4})(\d{2})(\d{2})/.exec(s))) return `${m[1]}-${m[2]}-${m[3]}`;
+  if((m=/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2,4})/.exec(s))){ let y=+m[3]; if(y<100) y+=2000; return `${y}-${m[1].padStart(2,'0')}-${m[2].padStart(2,'0')}`; }
+  if((m=/^(\d{1,2})\/(\d{1,2})$/.exec(s))&&year) return `${year}-${m[1].padStart(2,'0')}-${m[2].padStart(2,'0')}`;
+  const d=new Date(s); if(!isNaN(d)) return d.toISOString().slice(0,10);
+  return '';
+}
+const dayDiff=(a,b)=>(a&&b)?Math.round((new Date(a)-new Date(b))/864e5):null;
+const shortD=s=>{ if(!s) return '—'; const [y,mo,d]=s.split('-'); return `${+mo}/${+d}/${y.slice(2)}`; };
+function money(s){ s=String(s??'').trim(); if(!s) return null; let neg=/^\(.*\)$/.test(s)||/-\s*$/.test(s)||/^-/.test(s.replace(/[$\s]/g,''))||/\bDR\b/i.test(s);
+  const v=parseFloat(s.replace(/[^0-9.]/g,'')); if(!isFinite(v)) return null; return neg?-v:v; }
+const todayISO=()=>{ const d=new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; };
+
+/* ---------- budget lines a ledger entry can be linked to ---------- */
+function budgetLines(y){
+  const out=[];
+  for(const t of seasonTournaments(y)){
+    const g=t.name+(t.startDate?' ('+dayShort(t,0)+')':'');
+    out.push({g,v:`${t.id}|entry|`,l:'Entry fees',dir:'in'});
+    if(n0(t.skinsFee)) out.push({g,v:`${t.id}|skins|`,l:'Skins / day money collected',dir:'in'});
+    t.income.forEach(i=>out.push({g,v:`${t.id}|inc|${i.id}`,l:i.desc,dir:'in'}));
+    [0,1,2].slice(0,t.days).forEach(di=>t.dayItems[di].forEach(it=>out.push({g,v:`${t.id}|item|${it.id}`,l:`${dayLabel(t,di).split(' · ')[0]}: ${it.item}`,dir:'out'})));
+    t.perPlayer.forEach(p=>out.push({g,v:`${t.id}|pp|${p.id}`,l:p.desc,dir:'out'}));
+    if(n0(t.skinsFee)) out.push({g,v:`${t.id}|skinsPaid|`,l:'Skins / day money paid out',dir:'out'});
+    t.lines.forEach(l=>out.push({g,v:`${t.id}|line|${l.id}`,l:(l.group?l.group+': ':'')+l.desc,dir:'out'}));
+  }
+  (db.seasons[y].lines||[]).forEach(l=>out.push({g:'MGA-level',v:`|${l.type==='Income'?'mgaInc':'mgaExp'}|${l.id}`,l:l.desc,dir:l.type==='Income'?'in':'out'}));
+  return out;
+}
+function linkLabel(y,L){
+  if(!L||!L.k) return 'Uncategorized';
+  const hit=budgetLines(y).find(o=>o.v===`${L.t||''}|${L.k}|${L.id||''}`);
+  return hit?`${hit.g.replace(/ \(.*\)$/,'')} · ${hit.l}`:'Line no longer exists';
+}
+
+/* ---------- book entries (everything the MGA's books say happened) ---------- */
+function bookEntries(y){
+  const s=db.seasons[y], out=[];
+  for(const x of s.txns) out.push({key:'tx:'+x.id,src:'ledger',ref:x,date:x.date,amount:n0(x.amount),dir:x.dir,desc:x.desc||'(no description)',payee:x.payee||'',method:x.method||'',checkNo:x.checkNo||'',line:linkLabel(y,x.link)});
+  for(const t of seasonTournaments(y)) for(const sp of t.sponsors) for(const p of sp.payments||[])
+    out.push({key:'sp:'+p.id,src:'sponsor',ref:{t,sp,p},date:isoDate(p.date,y),amount:n0(p.amount),dir:'in',desc:sp.company,payee:'',method:p.method||'',checkNo:p.checkNo||'',line:`${t.name} · Sponsors`});
+  for(const p of s.duesPayments){ const m=memberById(p.memberId);
+    out.push({key:'du:'+p.id,src:'dues',ref:{p,m},date:isoDate(p.date,y),amount:n0(p.amount),dir:'in',desc:(m?memberName(m):'Member')+' — dues',payee:'',method:p.method||'',checkNo:'',line:'MGA · Dues'}); }
+  return out;
+}
+function matchedKeys(y){ const set=new Map(); for(const b of db.seasons[y].bank) if(b.status==='matched') for(const k of b.matched||[]) set.set(k,b); return set; }
+
+/* ---------- ledger entry editor ---------- */
+function editTxn(x,prefill,onSaved){
+  const y=Y(), s=db.seasons[y], p=Object.assign({},prefill||{}), cur=x||p;
+  const dir=cur.dir||'out', lines=budgetLines(y);
+  const curLink=cur.link?`${cur.link.t||''}|${cur.link.k}|${cur.link.id||''}`:'';
+  const optHTML=d=>{ const groups=[...new Set(lines.map(o=>o.g))];
+    return `<option value="">Uncategorized</option>`+groups.map(g=>`<optgroup label="${esc(g)}">${lines.filter(o=>o.g===g&&(o.dir===d||o.v===curLink)).map(o=>`<option value="${esc(o.v)}"${o.v===curLink?' selected':''}>${esc(o.l)}</option>`).join('')}</optgroup>`).join(''); };
+  const bankMatch=x&&matchedKeys(y).get('tx:'+x.id);
+  openDrawer({kicker:y+' season · Treasury',title:x?(x.dir==='in'?'Edit income':'Edit expense'):(dir==='in'?'Record income':'Record expense'),
+    body:`<div class="fld"><span class="lbl">Type</span>${seg('xDir',[['out','Money out'],['in','Money in']],dir)}</div>`+
+      pair(field('Date','xDate',cur.date||todayISO(),{type:'date'}),field('Amount $','xAmt',cur.amount??'',{type:'number'}))+
+      field(dir==='in'?'Received from':'Paid to','xPayee',cur.payee||'',{ph:dir==='in'?'e.g. WCCC, Calcutta':'e.g. WCCC, Backroads band'})+
+      field('Description','xDesc',cur.desc||'',{ph:'What it was for'})+
+      `<div class="fld"><label class="lbl" for="xLink">Budget line</label><select class="inp" id="xLink">${optHTML(dir)}</select><p class="hint">Linking it here makes it that line’s actual.</p></div>`+
+      pair(field('Method','xMeth',cur.method||'Check',{type:'select',options:['Check','Debit card','Credit card','ACH / transfer','Zelle','Cash','Other']}),field('Check #','xChk',cur.checkNo||''))+
+      field('Notes','xMemo',cur.memo||'',{type:'textarea'})+
+      (bankMatch?`<div class="banner" style="background:#E3F0E8;border-color:#BCD9C7;color:#174F37">Cleared the bank ${shortD(bankMatch.date)} · ${esc(bankMatch.desc)}</div>`:''),
+    wire:r=>wireSeg(r,'xDir',d=>{ r.querySelector('#xLink').innerHTML=optHTML(d); r.querySelector('label[for=xPayee]').textContent=d==='in'?'Received from':'Paid to'; }),
+    save:()=>{ const amt=Math.abs(fnum('xAmt')); if(!amt){ toast('Enter an amount'); return false; }
+      const lv=fv('xLink').split('|'); const link=fv('xLink')?{t:lv[0],k:lv[1],id:lv[2]}:null;
+      const data={dir:$('xDir').dataset.val,date:fv('xDate'),amount:amt,payee:fv('xPayee'),desc:fv('xDesc')||fv('xPayee'),link,method:fv('xMeth'),checkNo:fv('xChk'),memo:fv('xMemo')};
+      let rec=x; if(x) Object.assign(x,data); else { rec=Object.assign({id:uid()},data); s.txns.push(rec); }
+      if(onSaved) onSaved(rec); toast(x?'Saved':'Recorded'); },
+    del:x?()=>{ const i=s.txns.indexOf(x); s.txns.splice(i,1); s.bank.forEach(b=>{ if((b.matched||[]).includes('tx:'+x.id)){ b.matched=[]; b.status='open'; } });
+      toast('Entry deleted',()=>{ s.txns.splice(i,0,x); persist(); render(); }); }:null});
+}
+
+/* ---------- Treasury page ---------- */
+function vTreasury(m){
+  const tabs=[['ledger','Ledger'],['bva','Budget vs actual'],['rec','Reconcile']];
+  m.innerHTML=head('Treasury',`Every dollar in and out for the ${Y()} season, checked against the bank.`,btn('Record income','xIn','',I.plus)+btn('Record expense','xOut','pri',I.plus))+
+    `<div class="tabs">${tabs.map(([k,l])=>`<button class="tab${view.xtab===k?' on':''}" data-x="${k}">${l}</button>`).join('')}</div><div id="xbody" style="display:flex;flex-direction:column;gap:20px"></div>`;
+  m.querySelectorAll('[data-x]').forEach(b=>b.onclick=()=>{ view.xtab=b.dataset.x; render(); });
+  $('xIn').onclick=()=>editTxn(null,{dir:'in'}); $('xOut').onclick=()=>editTxn(null,{dir:'out'});
+  ({ledger:xLedger,bva:xBva,rec:xRec}[view.xtab]||xLedger)($('xbody'));
+}
+
+/* Ledger */
+function xLedger(el){
+  const y=Y(), all=bookEntries(y), mk=matchedKeys(y);
+  const inT=sum(all.filter(e=>e.dir==='in'),e=>e.amount), outT=sum(all.filter(e=>e.dir==='out'),e=>e.amount);
+  let list=all;
+  const f=view.lfilter, q=view.lq.toLowerCase();
+  if(f==='Money in') list=list.filter(e=>e.dir==='in'); if(f==='Money out') list=list.filter(e=>e.dir==='out');
+  if(f==='Not cleared') list=list.filter(e=>!mk.has(e.key)); if(f==='Uncategorized') list=list.filter(e=>e.src==='ledger'&&!e.ref.link);
+  if(q) list=list.filter(e=>[e.desc,e.payee,e.line,e.checkNo,e.method,String(e.amount)].join(' ').toLowerCase().includes(q));
+  list.sort((a,b)=>(b.date||'').localeCompare(a.date||''));
+  const cols='grid-template-columns:88px minmax(0,1.4fr) minmax(0,1.4fr) 110px 110px 96px';
+  el.innerHTML=`<div class="grid g4">${kpi('Money in',fmt(inT),`${all.filter(e=>e.dir==='in').length} entries incl. sponsor payments and dues`,'pos')}${kpi('Money out',fmt(outT),`${all.filter(e=>e.dir==='out').length} entries`)}${kpi('Net',fmtS(inT-outT),'in − out, all recorded',netCls(inT-outT))}${kpi('Not yet cleared',String(all.filter(e=>!mk.has(e.key)).length),'not matched to a bank line')}</div>
+  <div class="toolbar"><div class="search">${I.search}<input class="inp" id="lq" placeholder="Search payee, description, line, check #" value="${esc(view.lq)}" aria-label="Search ledger"></div>
+    <div class="seg">${['All','Money in','Money out','Not cleared','Uncategorized'].map(x=>`<button class="${f===x?'on':''}" data-lf="${x}">${x}</button>`).join('')}</div>
+    <button class="btn sm" id="lCsv" style="margin-left:auto">${I.down}Export CSV</button></div>
+  <div class="card" style="overflow:hidden">${list.length?`<div class="tw"><div class="t" style="min-width:860px"><div class="tr th" style="${cols}"><span>Date</span><span>Description</span><span>Budget line</span><span>Method</span><span class="r">Amount</span><span>Bank</span></div>
+    ${list.map(e=>`<div class="tr num click" data-le="${e.key}" style="${cols}"><span class="muted">${shortD(e.date)}</span><div class="cell2"><b class="trunc">${esc(e.payee||e.desc)}</b><small class="trunc">${esc(e.payee&&e.desc!==e.payee?e.desc:'')}${e.src!=='ledger'?(e.payee?' · ':'')+(e.src==='sponsor'?'Sponsor payment':'Dues payment'):''}</small></div><span class="trunc ${e.line==='Uncategorized'?'neg':'muted'}">${esc(e.line)}</span><span class="muted trunc">${esc(e.method)}${e.checkNo?' #'+esc(e.checkNo):''}</span><b class="r ${e.dir==='in'?'pos':''}">${e.dir==='in'?'+':'−'}${fmt2(e.amount).replace('$','$')}</b><span>${mk.has(e.key)?'<span class="chip ok">Cleared</span>':'<span class="chip">Open</span>'}</span></div>`).join('')}</div></div>`
+    :`<div class="empty"><b>${all.length?'Nothing matches':'No money recorded yet'}</b><span>${all.length?'Try another filter.':'Record expenses and income here, or from any line on Budget vs actual. Sponsor payments and dues show up automatically.'}</span></div>`}</div>`;
+  const qi=$('lq'); qi.oninput=()=>{ view.lq=qi.value; const p=qi.selectionStart; render(); const n=$('lq'); n.focus(); n.setSelectionRange(p,p); };
+  el.querySelectorAll('[data-lf]').forEach(b=>b.onclick=()=>{ view.lfilter=b.dataset.lf; render(); });
+  el.querySelectorAll('[data-le]').forEach(r=>r.onclick=()=>{ const e=all.find(x=>x.key===r.dataset.le); openBook(e); });
+  $('lCsv').onclick=()=>{ const rows=[['Date','Direction','Amount','Payee','Description','Budget line','Method','Check #','Source','Cleared bank','Bank date','Bank description']];
+    all.sort((a,b)=>(a.date||'').localeCompare(b.date||'')).forEach(e=>{ const b=mk.get(e.key); rows.push([e.date,e.dir==='in'?'In':'Out',(e.dir==='in'?1:-1)*e.amount,e.payee,e.desc,e.line,e.method,e.checkNo,e.src,b?'Yes':'No',b?b.date:'',b?b.desc:'']); });
+    const csv=rows.map(r=>r.map(v=>{v=String(v??'');return /[",\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v;}).join(',')).join('\r\n');
+    dl(csv,'text/csv',`mga_ledger_${y}.csv`); toast('Ledger exported'); };
+}
+function openBook(e){
+  if(e.src==='ledger') return editTxn(e.ref);
+  if(e.src==='sponsor') return editSponsor(e.ref.t,e.ref.sp);
+  if(e.src==='dues'&&e.ref.m) return editMember(e.ref.m);
+}
+
+/* Budget vs actual — every line, every tournament; add money straight from a line */
+function xBva(el){
+  const y=Y(), sc=scalc(y), IX=ledgerIndex(y);
+  const cols='grid-template-columns:minmax(0,1.6fr) 110px 110px 110px 70px 40px';
+  const row=(name,sub,bud,act,isInc,v,count)=>{ const variance=isInc?act-bud:bud-act;
+    return `<div class="tr num" style="${cols}"><div class="cell2"><span class="trunc" style="font-weight:500">${esc(name)}</span>${sub?`<small class="trunc">${esc(sub)}</small>`:''}</div><span class="r">${fmt(bud)}</span><span class="r">${act?fmt(act):'—'}</span><b class="r ${act?(variance>=0?'pos':'neg'):'muted'}">${act?fmtS(variance):''}</b><span class="r muted" style="font-size:12px">${count?count+' entr'+(count===1?'y':'ies'):''}</span>${v?`<button class="ib" data-bx="${esc(v)}" data-bd="${isInc?'in':'out'}" aria-label="Record money for ${esc(name)}">${I.plus}</button>`:'<span></span>'}</div>`; };
+  const cnt=(tid,k,id)=>(IX[(tid||'')+'|'+k+'|'+(id||'')]||{}).n||0;
+  const card=(title,sub,net,netA,body)=>`<div class="card" style="overflow:hidden"><div class="cardhead"><div><h2 class="h2">${title}</h2><span class="muted">${sub}</span></div><div class="num" style="text-align:right"><div class="lbl">Budget net / actual net</div><b>${fmtS(net)}</b> <span class="muted">/</span> <b class="${netCls(netA)}">${fmtS(netA)}</b></div></div><div class="tw"><div class="t" style="min-width:720px"><div class="tr th" style="${cols}"><span>Line</span><span class="r">Budget</span><span class="r">Actual</span><span class="r">Variance</span><span></span><span></span></div>${body}</div></div></div>`;
+  const gh=t=>`<div class="gh"><b>${t}</b><span></span></div>`;
+  el.innerHTML=`<p class="hint" style="margin:0">Green variance is good (under budget on spending, over budget on income). Use <b>+</b> on any line to record money against it — the entry becomes that line’s actual.</p>`+
+  sc.ts.map(({t,c})=>{ const A=(k,id,m)=>actualOf(IX,t.id,k,id,m);
+    const inc=[row('Entry fees',`${c.players} × ${fmt(t.entryFee)}`,c.entryFees,A('entry','',t.actuals.entryFees),true,`${t.id}|entry|`,cnt(t.id,'entry'))]
+      .concat(c.skins?[row('Skins / day money collected','',c.skins,A('skins','',t.actuals.skins),true,`${t.id}|skins|`,cnt(t.id,'skins'))]:[])
+      .concat([row('Sponsors',`${t.sponsors.length} sponsors · payments logged on the Sponsors tab`,c.pledged,c.received,true,'',0)])
+      .concat(t.income.map(i=>row(i.desc,i.source==='raffle'?'Season 50/50 raffle':'',i.budget,A('inc',i.id,i.actual),true,`${t.id}|inc|${i.id}`,cnt(t.id,'inc',i.id))));
+    const exp=[0,1,2].slice(0,t.days).flatMap(di=>t.dayItems[di].map(it=>row(it.item,dayLabel(t,di).split(' · ')[0],itemTotal(t,it),A('item',it.id,it.actual),false,`${t.id}|item|${it.id}`,cnt(t.id,'item',it.id))))
+      .concat(t.perPlayer.map(p=>row(p.desc,`${c.players} × ${fmt(p.perPlayer)}`,c.players*n0(p.perPlayer),A('pp',p.id,p.actual),false,`${t.id}|pp|${p.id}`,cnt(t.id,'pp',p.id))))
+      .concat(c.skinsPayout?[row('Skins / day money paid out','',c.skinsPayout,A('skinsPaid','',t.actuals.skinsPaid),false,`${t.id}|skinsPaid|`,cnt(t.id,'skinsPaid'))]:[])
+      .concat(t.lines.map(l=>row(l.desc,l.group||'',l.budget,A('line',l.id,l.actual),false,`${t.id}|line|${l.id}`,cnt(t.id,'line',l.id))));
+    return card(esc(t.name),`${dateRange(t)}${isPast(t)?' · complete — actuals count in the season projection':''}`,c.net,c.netA,gh('Income')+inc.join('')+gh('Expenses')+exp.join(''));
+  }).join('')+
+  card('MGA-level',`Dues and anything not tied to a tournament`,sc.duesBudget+sum(sc.s.lines,l=>(l.type==='Income'?1:-1)*n0(l.budget)),sc.duesActual+sum(sc.s.lines,l=>(l.type==='Income'?1:-1)*actualOf(IX,'',l.type==='Income'?'mgaInc':'mgaExp',l.id,l.actual)),
+    row('Annual dues',`${sc.active} active × ${fmt(sc.s.dues.amount)} · recorded on each member`,sc.duesBudget,sc.duesActual,true,'',0)+
+    sc.s.lines.map(l=>{ const k=l.type==='Income'?'mgaInc':'mgaExp'; return row(l.desc,l.type,l.budget,actualOf(IX,'',k,l.id,l.actual),l.type==='Income',`|${k}|${l.id}`,cnt('',k,l.id)); }).join('')+
+    `<div class="tr"><button class="btn sm" id="bvaMga">${I.plus}Add MGA-level line</button></div>`);
+  el.querySelectorAll('[data-bx]').forEach(b=>b.onclick=()=>{ const [t,k,id]=b.dataset.bx.split('|'); editTxn(null,{dir:b.dataset.bd,link:{t,k,id}}); });
+  $('bvaMga').onclick=()=>editSeasonLine(null);
+}
+
+/* ---------- bank statement import ---------- */
+const BANK_COLS={date:/^(post(ing|ed)? ?date|trans(action)?\.? ?date|date( posted)?|effective date)$/, desc:/^(description|payee|name|transaction|merchant|narrative)( description)?$/, memo:/^(memo|notes?|extended description|additional info)$/,
+  amount:/^(amount|transaction amount|amt|net amount)$/, debit:/^(debit|debits|withdrawal|withdrawals|money out|payments?|charge|debit amount)$/, credit:/^(credit|credits|deposit|deposits|money in|credit amount)$/,
+  check:/^(check|chk|cheque|check ?(no|number|#)|ref(erence)?( no)?)$/, balance:/^(running )?balance$/, type:/^(type|transaction type|details|dr\/cr|debit\/credit)$/};
+function parseBankTable(rows,year){
+  let hi=-1,map={};
+  for(let i=0;i<Math.min(rows.length,40)&&hi<0;i++){ const m={}; rows[i].forEach((h,ci)=>{ const k=String(h).toLowerCase().replace(/\s+/g,' ').trim(); for(const [key,re] of Object.entries(BANK_COLS)) if(m[key]===undefined&&re.test(k)){ m[key]=ci; break; } });
+    if(m.date!==undefined&&(m.amount!==undefined||m.debit!==undefined||m.credit!==undefined)){ hi=i; map=m; } }
+  if(hi<0) throw new Error('Couldn’t find the statement columns — it needs a Date column and either Amount or Debit/Credit columns');
+  const out=[];
+  for(const r of rows.slice(hi+1)){ const g=k=>map[k]!==undefined?String(r[map[k]]??'').trim():'';
+    const date=isoDate(g('date'),year); if(!date) continue;
+    let amt=null;
+    if(map.amount!==undefined){ amt=money(g('amount')); const ty=g('type').toLowerCase(); if(amt!=null&&amt>0&&/^debit|withdraw|\bdr\b|payment|check_paid|^check/.test(ty)) amt=-amt; }
+    if(amt==null){ const d=money(g('debit')), c=money(g('credit')); if(d==null&&c==null) continue; amt=(c?Math.abs(c):0)-(d?Math.abs(d):0); }
+    if(!amt) continue;
+    const desc=[g('desc'),g('memo')].filter(Boolean).join(' — ');
+    let chk=g('check'); if(!chk){ const mm=/\bche?c?k\s*#?\s*(\d{3,})/i.exec(desc); if(mm) chk=mm[1]; }
+    out.push({date,amount:Math.round(amt*100)/100,desc:desc||'(no description)',checkNo:chk.replace(/^0+/,''),balance:money(g('balance'))});
+  }
+  return out;
+}
+function parseOFX(txt){
+  const out=[]; const blocks=txt.split(/<STMTTRN>/i).slice(1);
+  const tag=(b,t)=>{ const m=new RegExp('<'+t+'>([^<\\r\\n]*)','i').exec(b); return m?m[1].trim():''; };
+  for(const b of blocks){ const amt=money(tag(b,'TRNAMT')); if(!amt) continue;
+    out.push({date:isoDate(tag(b,'DTPOSTED').slice(0,8)),amount:Math.round(amt*100)/100,desc:[tag(b,'NAME'),tag(b,'MEMO')].filter(Boolean).join(' — ')||'(no description)',checkNo:tag(b,'CHECKNUM').replace(/^0+/,''),fitid:tag(b,'FITID'),balance:null}); }
+  const bal=/<LEDGERBAL>[\s\S]*?<BALAMT>([^<\r\n]+)/i.exec(txt); if(bal&&out.length){ const last=out.reduce((a,b)=>a.date>=b.date?a:b); last.balance=money(bal[1]); }
+  return out;
+}
+async function readBankFile(f,year){
+  const ext=(f.name.split('.').pop()||'').toLowerCase();
+  if(ext==='ofx'||ext==='qfx'){ const txt=await f.text(); const r=parseOFX(txt); if(!r.length) throw new Error('No transactions found in that OFX/QFX file'); return r; }
+  return parseBankTable(await readRosterFile(f),year);
+}
+const bankKey=b=>b.fitid?'fit:'+b.fitid:`${b.date}|${b.amount.toFixed(2)}|${b.desc.toLowerCase().replace(/\s+/g,' ').slice(0,60)}`;
+function importBank(){
+  const y=Y(), s=db.seasons[y];
+  openDrawer({kicker:y+' season · Reconcile',title:'Upload bank statement',
+    body:`<p style="margin:0">Download the account activity from the bank’s website as <b>CSV</b>, <b>Excel</b>, or <b>OFX/QFX</b> (Quicken) and choose it here.</p>
+      <p class="hint">Needs a date and either an amount column or separate debit/credit columns — the usual bank export. Lines already uploaded are skipped, so overlapping statements are fine. You’ll see a summary before anything is saved.</p>
+      <input type="file" id="bankF" accept=".csv,.xlsx,.xls,.ofx,.qfx,text/csv" class="inp" style="padding-top:8px"><p class="hint" id="bankMsg" aria-live="polite"></p>`,
+    wire:r=>{ r.querySelector('#bankF').onchange=async e=>{ const f=e.target.files[0]; if(!f) return; const msg=r.querySelector('#bankMsg'); msg.style.color=''; msg.textContent='Reading '+f.name+'…';
+      try{ const lines=await readBankFile(f,y); if(!lines.length) throw new Error('No transactions found');
+        // de-duplicate against earlier uploads (same date, amount, description — counting repeats)
+        const have={}; s.bank.forEach(b=>{ have[b.key]=(have[b.key]||0)+1; }); const seen={}; const fresh=[];
+        for(const l of lines){ const k=bankKey(l); seen[k]=(seen[k]||0)+1; if(seen[k]>(have[k]||0)) fresh.push(Object.assign(l,{key:k})); }
+        closeDrawer(); previewBank(f.name,lines,fresh); }
+      catch(err){ msg.style.color='var(--neg)'; msg.textContent=err.message||'Couldn’t read that file'; } }; }});
+}
+function previewBank(fname,lines,fresh){
+  const y=Y(), s=db.seasons[y];
+  const dates=lines.map(l=>l.date).sort(), inn=sum(fresh.filter(l=>l.amount>0),l=>l.amount), out=sum(fresh.filter(l=>l.amount<0),l=>-l.amount);
+  openDrawer({kicker:'Statement · '+fname,title:'Review statement',saveLabel:fresh.length?`Add ${fresh.length} bank line${fresh.length===1?'':'s'}`:'Close',
+    body:`<div class="grid g3" style="gap:10px">${[['Lines',lines.length],['New',fresh.length],['Already uploaded',lines.length-fresh.length]].map(([l,v])=>`<div class="card pad kpi" style="padding:14px"><span class="lbl">${l}</span><span class="v num" style="font-size:30px">${v}</span></div>`).join('')}</div>
+      <div class="sumrows num"><div><span class="muted">Dates</span><span>${shortD(dates[0])} – ${shortD(dates[dates.length-1])}</span></div><div><span class="muted">Deposits (new)</span><span class="pos">+${fmt2(inn)}</span></div><div><span class="muted">Withdrawals (new)</span><span>−${fmt2(out)}</span></div></div>
+      ${fresh.length?`<div class="mini">${fresh.slice(0,8).map(l=>`<div class="mr num" style="grid-template-columns:70px minmax(0,1fr) 100px"><span class="muted">${shortD(l.date)}</span><span class="trunc">${esc(l.desc)}</span><b class="r ${l.amount>0?'pos':''}">${l.amount>0?'+':'−'}${fmt2(Math.abs(l.amount))}</b></div>`).join('')}${fresh.length>8?`<div class="mr"><span class="muted">+ ${fresh.length-8} more</span></div>`:''}</div>`:'<p class="hint">Every line in this file was already uploaded.</p>'}
+      ${!s.bank.length&&!n0(s.bankOpening.amount)?`<div class="banner">Set the account’s opening balance on the Reconcile tab so the running balance matches the bank.</div>`:''}`,
+    save:()=>{ if(!fresh.length) return;
+      const batch={id:uid(),file:fname,importedAt:new Date().toISOString(),from:dates[0],to:dates[dates.length-1],count:fresh.length};
+      s.bankBatches.push(batch);
+      fresh.forEach(l=>s.bank.push({id:uid(),batch:batch.id,date:l.date,amount:l.amount,desc:l.desc,checkNo:l.checkNo||'',balance:l.balance,fitid:l.fitid||'',key:l.key,matched:[],status:'open',note:''}));
+      view.xtab='rec'; toast(`${fresh.length} bank line${fresh.length===1?'':'s'} added — review the suggested matches`); }});
+}
+
+/* ---------- matching ---------- */
+function subsetSum(cands,target,maxN){
+  cands=cands.slice().sort((a,b)=>b.amount-a.amount); const T=Math.round(target*100), vals=cands.map(c=>Math.round(c.amount*100));
+  let best=null, steps=0;
+  (function dfs(i,sumC,pick){ if(best||steps++>20000) return; if(sumC===T&&pick.length>1){ best=pick.slice(); return; }
+    if(pick.length>=maxN) return;
+    for(let j=i;j<cands.length;j++){ if(sumC+vals[j]>T) continue; pick.push(j); dfs(j+1,sumC+vals[j],pick); pick.pop(); if(best) return; } })(0,0,[]);
+  return best?best.map(j=>cands[j]):null;
+}
+function suggestMatches(y){
+  const s=db.seasons[y], mk=matchedKeys(y), used=new Set(mk.keys());
+  const book=bookEntries(y).filter(e=>!used.has(e.key));
+  const sugg=new Map();
+  const open=s.bank.filter(b=>b.status==='open').sort((a,b)=>a.date.localeCompare(b.date));
+  const words=s2=>new Set(String(s2||'').toLowerCase().replace(/[^a-z0-9 ]/g,' ').split(/\s+/).filter(w=>w.length>2&&!/^(the|and|llc|inc|from|for|payment|deposit|check|zelle|online|services?|group|company|co)$/.test(w)));
+  const nameHit=(b,e)=>{ const bw=words(b.desc); for(const w of words((e.payee||'')+' '+e.desc)) if(bw.has(w)) return 1; return 0; };
+  const isTransfer=b=>/\b(transfer|xfer|trnsfr)\b/i.test(b.desc);
+  const single=(b,dated)=>{ if(isTransfer(b)) return null; const dir=b.amount>0?'in':'out', amt=Math.abs(b.amount), win=dir==='out'?60:30;
+    const c=book.filter(e=>!used.has(e.key)&&e.dir===dir&&Math.abs(e.amount-amt)<0.005&&(dated?(e.date&&Math.abs(dayDiff(b.date,e.date))<=win):!e.date));
+    if(!c.length) return null;
+    c.sort((p,q)=>((q.checkNo&&q.checkNo===b.checkNo)-(p.checkNo&&p.checkNo===b.checkNo))||(nameHit(b,q)-nameHit(b,p))||(Math.abs(dayDiff(b.date,p.date)??99)-Math.abs(dayDiff(b.date,q.date)??99)));
+    return c[0]; };
+  // 1) same amount, dated within the window (same check # wins)
+  for(const b of open){ const e=single(b,true); if(!e) continue; used.add(e.key); const d=Math.abs(dayDiff(b.date,e.date));
+    sugg.set(b.id,{keys:[e.key],entries:[e],why:e.checkNo&&e.checkNo===b.checkNo?'Same check # and amount':(nameHit(b,e)?'Same amount and name, ':'Same amount, ')+`${d} day${d===1?'':'s'} apart`}); }
+  // 2) one deposit made up of several payments received in the weeks before it
+  for(const b of open){ if(sugg.has(b.id)||b.amount<=0||isTransfer(b)) continue;
+    const c=book.filter(e=>!used.has(e.key)&&e.dir==='in'&&e.date&&e.amount<b.amount&&dayDiff(b.date,e.date)>=-3&&dayDiff(b.date,e.date)<=30).slice(0,30);
+    const combo=subsetSum(c,b.amount,8);
+    if(combo){ combo.forEach(e=>used.add(e.key)); sugg.set(b.id,{keys:combo.map(e=>e.key),entries:combo,why:`${combo.length} payments add up to this deposit`}); } }
+  // 3) same amount but the entry has no date — shown as a possibility, never auto-accepted
+  for(const b of open){ if(sugg.has(b.id)) continue; const e=single(b,false); if(!e) continue; used.add(e.key);
+    sugg.set(b.id,{keys:[e.key],entries:[e],why:'Same amount — the entry has no date, so check it',weak:true}); }
+  return sugg;
+}
+function recTotals(y){
+  const s=db.seasons[y], mk=matchedKeys(y), book=bookEntries(y);
+  const open=n0(s.bankOpening.amount);
+  const bankNet=sum(s.bank,b=>b.amount), bankBal=open+bankNet;
+  const outstanding=book.filter(e=>!mk.has(e.key));
+  const dit=sum(outstanding.filter(e=>e.dir==='in'),e=>e.amount), oc=sum(outstanding.filter(e=>e.dir==='out'),e=>e.amount);
+  const bookBal=open+sum(book,e=>(e.dir==='in'?1:-1)*e.amount);
+  const bankOnly=sum(s.bank.filter(b=>b.status!=='matched'),b=>b.amount);
+  const last=[...s.bank].filter(b=>b.balance!=null).sort((a,b)=>a.date.localeCompare(b.date)).pop();
+  return {open,bankBal,dit,oc,adjBank:bankBal+dit-oc,bookBal,bankOnly,adjBook:bookBal+bankOnly,outstanding,
+    needs:s.bank.filter(b=>b.status==='open').length, matched:s.bank.filter(b=>b.status==='matched').length, ignored:s.bank.filter(b=>b.status==='ignored').length,
+    stmtBal:last?last.balance:null, stmtDate:last?last.date:null, lastDate:[...s.bank].map(b=>b.date).sort().pop()||''};
+}
+function xRec(el){
+  const y=Y(), s=db.seasons[y], R=recTotals(y), sugg=suggestMatches(y), book=bookEntries(y), byKey=new Map(book.map(e=>[e.key,e]));
+  const open=s.bank.filter(b=>b.status==='open').sort((a,b)=>a.date.localeCompare(b.date));
+  const done=s.bank.filter(b=>b.status!=='open').sort((a,b)=>b.date.localeCompare(a.date));
+  const cols='grid-template-columns:76px minmax(0,1.3fr) 110px minmax(0,1.5fr) auto';
+  const amt=v=>`<b class="r num ${v>0?'pos':''}">${v>0?'+':'−'}${fmt2(Math.abs(v))}</b>`;
+  const reconciled=s.bank.length&&R.needs===0&&Math.abs(R.adjBank-R.adjBook)<0.005;
+  const stmtCheck=R.stmtBal!=null?Math.abs((n0(s.bankOpening.amount)+sum(s.bank.filter(b=>b.date<=R.stmtDate),b=>b.amount))-R.stmtBal)<0.005:null;
+  el.innerHTML=`${!s.bank.length?`<div class="card"><div class="empty"><b>Upload a bank statement to start</b><span>Each bank line gets matched to what’s recorded in the hub — ledger entries, sponsor payments and dues. Anything left over is either missing from the books or hasn’t cleared the bank yet.</span><div class="actions"><button class="btn pri" id="rUp">${I.down}Upload bank statement</button><button class="btn" id="rOpen">Set opening balance</button></div></div></div>`:''}
+  ${s.bank.length?`<div class="grid g4">${kpi('Bank lines',String(s.bank.length),`${shortD(s.bank.map(b=>b.date).sort()[0])} – ${shortD(R.lastDate)}`)}${kpi('Matched',String(R.matched),R.ignored?`${R.ignored} set aside`:'to entries in the hub','pos')}${kpi('Need attention',String(R.needs),R.needs?'bank lines not in the books yet':'every bank line accounted for',R.needs?'neg':'pos')}${kpi('Not yet cleared',String(R.outstanding.length),'in the books, not on a statement yet')}</div>
+  <div class="split">
+   <div style="display:flex;flex-direction:column;gap:20px;min-width:0">
+    <div class="card" style="overflow:hidden"><div class="cardhead"><div><h2 class="h2">Needs a match</h2><span class="muted">${open.length?'Accept a suggestion, pick the matching entries, or add what’s missing to the books.':'Nothing waiting.'}</span></div>
+      <div class="actions">${[...sugg.values()].filter(x=>!x.weak).length?`<button class="btn pri sm" id="rAll">${I.check}Accept ${[...sugg.values()].filter(x=>!x.weak).length} confident match${[...sugg.values()].filter(x=>!x.weak).length===1?'':'es'}</button>`:''}<button class="btn sm" id="rUp">${I.down}Upload statement</button></div></div>
+      ${open.length?open.map(b=>{ const sg=sugg.get(b.id);
+        return `<div class="rrow"><div class="rtop"><span class="muted num">${shortD(b.date)}</span><div class="cell2"><b class="trunc" title="${esc(b.desc)}">${esc(b.desc)}</b>${b.checkNo?`<small>Check #${esc(b.checkNo)}</small>`:''}</div>${amt(b.amount)}</div>
+          <div class="rbot"><div class="cell2" style="font-size:13px;flex:1 1 260px;min-width:0">${sg?`<span class="trunc"><span class="chip ${sg.weak?'':'gold'}" style="height:20px;font-size:11px;margin-right:6px">${sg.weak?'Possible':'Suggested'}</span>${esc(sg.entries.map(e=>e.payee||e.desc).join(' + '))}</span><small class="trunc">${esc(sg.why)}${sg.entries.length===1?' · '+esc(sg.entries[0].line):''}</small>`:(/\b(transfer|xfer|trnsfr)\b/i.test(b.desc)?'<span class="muted">Looks like a transfer — set it aside if it’s between MGA accounts</span>':'<span class="muted">Nothing in the books matches — add it, or find it</span>')}</div>
+          <div class="actions" style="gap:6px">${sg?`<button class="btn sm pri" data-acc="${b.id}">Accept</button>`:''}<button class="btn sm" data-find="${b.id}">Find</button><button class="btn sm" data-add="${b.id}">Add to books</button><button class="btn sm" data-ign="${b.id}" title="Transfers and other money that isn’t MGA income or spending">Set aside</button></div></div></div>`; }).join(''):''}
+    </div>
+    <div class="card" style="overflow:hidden"><div class="cardhead"><div><h2 class="h2">In the books, not on a statement</h2><span class="muted">Checks not cashed yet, deposits not made yet — or entries recorded twice.</span></div></div>
+      ${R.outstanding.length?`<div class="tw"><div class="t" style="min-width:640px">${R.outstanding.sort((a,b)=>(a.date||'').localeCompare(b.date||'')).map(e=>`<div class="tr num click" data-ob="${e.key}" style="grid-template-columns:76px minmax(0,1.3fr) minmax(0,1.2fr) 110px"><span class="muted">${shortD(e.date)}</span><div class="cell2"><b class="trunc">${esc(e.payee||e.desc)}</b><small class="trunc">${esc(e.method)}${e.checkNo?' #'+esc(e.checkNo):''}</small></div><span class="trunc muted">${esc(e.line)}</span>${amt(e.dir==='in'?e.amount:-e.amount)}</div>`).join('')}</div></div>`:'<div class="tr"><span class="muted">Everything in the books has cleared.</span></div>'}
+    </div>
+    <details class="card" ${view.showMatched?'open':''} id="rDone" style="overflow:hidden"><summary class="cardhead" style="cursor:pointer;list-style:none"><div><h2 class="h2">Matched &amp; set aside</h2><span class="muted">${done.length} bank line${done.length===1?'':'s'} — open to review or undo</span></div><span class="ib" aria-hidden="true">${I.chev}</span></summary>
+      ${done.length?`<div class="tw"><div class="t" style="min-width:760px">${done.map(b=>`<div class="tr" style="${cols};padding-top:8px;padding-bottom:8px"><span class="muted num">${shortD(b.date)}</span><span class="trunc">${esc(b.desc)}</span>${amt(b.amount)}<span class="trunc muted" style="font-size:13px">${b.status==='ignored'?'Set aside'+(b.note?' — '+esc(b.note):''):(b.matched||[]).map(k=>{const e=byKey.get(k);return e?esc((e.payee||e.desc)+' · '+e.line):'(entry deleted)';}).join(' + ')}</span><div class="actions" style="justify-content:flex-end"><button class="btn sm" data-un="${b.id}">Undo</button></div></div>`).join('')}</div></div>`:''}
+    </details>
+   </div>
+   <div style="display:flex;flex-direction:column;gap:16px">
+    <div class="card pad" style="display:flex;flex-direction:column;gap:12px">
+      <div style="display:flex;justify-content:space-between;align-items:center"><span class="lbl">Reconciliation</span>${reconciled?'<span class="chip ok">Reconciled</span>':`<span class="chip ${R.needs?'warn':'gold'}">${R.needs?R.needs+' to resolve':'Check balances'}</span>`}</div>
+      <div class="sumrows num" style="border-top:none;padding-top:0">
+        <div><span class="muted">Opening balance</span><button class="linkbtn" id="rOpen" style="color:var(--gold);text-decoration:none;font-weight:600">${fmt2(R.open)}</button></div>
+        <div><span>Bank balance${R.lastDate?' '+shortD(R.lastDate):''}</span><b>${fmt2(R.bankBal)}</b></div>
+        <div><span class="muted">+ Deposits not yet made</span><span>${fmt2(R.dit)}</span></div>
+        <div><span class="muted">− Checks not yet cleared</span><span>${fmt2(R.oc)}</span></div>
+        <div class="big"><span>Adjusted bank</span><span>${fmt2(R.adjBank)}</span></div>
+      </div>
+      <div class="sumrows num">
+        <div><span>Book balance</span><b>${fmt2(R.bookBal)}</b></div>
+        <div><span class="muted">± Bank lines not in the books</span><span>${fmt2(R.bankOnly)}</span></div>
+        <div class="big"><span>Adjusted books</span><span>${fmt2(R.adjBook)}</span></div>
+      </div>
+      <p class="hint">${reconciled?'Every bank line is accounted for and both sides agree.':R.needs?'Resolve the bank lines under “Needs a match” — each one is either a missing entry, a match to pick, or something to set aside.':'Balances should agree once every line is matched.'}</p>
+      ${stmtCheck!=null?`<div class="banner" style="${stmtCheck?'background:#E3F0E8;border-color:#BCD9C7;color:#174F37':'background:#F8E6DF;border-color:#EBC2B3;color:#6E2A1B'}">${stmtCheck?`Opening balance + uploaded lines = the bank’s own balance of ${fmt2(R.stmtBal)} on ${shortD(R.stmtDate)}.`:`The bank shows ${fmt2(R.stmtBal)} on ${shortD(R.stmtDate)}, but opening balance + uploaded lines gives ${fmt2(n0(s.bankOpening.amount)+sum(s.bank.filter(b=>b.date<=R.stmtDate),b=>b.amount))}. Check the opening balance, or upload the missing dates.`}</div>`:''}
+    </div>
+    <div class="card pad" style="display:flex;flex-direction:column;gap:10px"><span class="lbl">Uploaded statements</span>
+      ${s.bankBatches.map(bt=>`<div style="display:flex;justify-content:space-between;gap:10px;font-size:13px"><div class="cell2"><span class="trunc">${esc(bt.file)}</span><small>${shortD(bt.from)} – ${shortD(bt.to)} · ${bt.count} lines</small></div><button class="ib" data-rmb="${bt.id}" aria-label="Remove ${esc(bt.file)}">${I.trash}</button></div>`).join('')}
+    </div>
+   </div>
+  </div>`:''}`;
+  const on=(sel,fn)=>el.querySelectorAll(sel).forEach(b=>b.onclick=()=>fn(b));
+  el.querySelectorAll('#rUp').forEach(b=>b.onclick=importBank);
+  el.querySelectorAll('#rOpen').forEach(b=>b.onclick=editOpening);
+  const all=$('rAll'); if(all) all.onclick=()=>{ const before=clone(s.bank); let n=0; for(const [id,sg] of sugg){ if(sg.weak) continue; const b=s.bank.find(x=>x.id===id); b.matched=sg.keys; b.status='matched'; n++; } persist(); render(); toast(n+' matches accepted',()=>{ s.bank=before; persist(); render(); }); };
+  on('[data-acc]',b=>{ const bl=s.bank.find(x=>x.id===b.dataset.acc), sg=sugg.get(bl.id); bl.matched=sg.keys; bl.status='matched'; persist(); render(); });
+  on('[data-find]',b=>findMatch(s.bank.find(x=>x.id===b.dataset.find)));
+  on('[data-add]',b=>{ const bl=s.bank.find(x=>x.id===b.dataset.add);
+    editTxn(null,{dir:bl.amount>0?'in':'out',date:bl.date,amount:Math.abs(bl.amount),desc:bl.desc,payee:bl.desc.split(' — ')[0].slice(0,60),checkNo:bl.checkNo,method:bl.checkNo?'Check':/zelle/i.test(bl.desc)?'Zelle':/card|pos|purchase/i.test(bl.desc)?'Debit card':'ACH / transfer'},rec=>{ bl.matched=['tx:'+rec.id]; bl.status='matched'; }); });
+  on('[data-ign]',b=>{ const bl=s.bank.find(x=>x.id===b.dataset.ign);
+    openDrawer({kicker:'Reconcile',title:'Set aside bank line',body:`<p style="margin:0">${shortD(bl.date)} · ${esc(bl.desc)} · <b>${fmt2(bl.amount)}</b></p><p class="hint">For money that isn’t MGA income or spending — a transfer between accounts, a returned deposit, an opening deposit. If it’s a real expense (a bank fee, say), use “Add to books” instead so it lands in the budget.</p>`+field('Reason','ignNote','',{ph:'e.g. Transfer from savings'}),
+      save:()=>{ bl.status='ignored'; bl.note=fv('ignNote'); }}); });
+  on('[data-un]',b=>{ const bl=s.bank.find(x=>x.id===b.dataset.un); bl.status='open'; bl.matched=[]; bl.note=''; view.showMatched=true; persist(); render(); });
+  on('[data-ob]',b=>{ const e=book.find(x=>x.key===b.dataset.ob); openBook(e); });
+  on('[data-rmb]',b=>{ const bt=s.bankBatches.find(x=>x.id===b.dataset.rmb); const n=s.bank.filter(x=>x.batch===bt.id).length;
+    if(!confirm(`Remove ${bt.file} and its ${n} bank lines? Any matches on those lines are undone; entries in the books stay.`)) return;
+    s.bank=s.bank.filter(x=>x.batch!==bt.id); s.bankBatches=s.bankBatches.filter(x=>x!==bt); persist(); render(); toast('Statement removed'); });
+  const det=$('rDone'); if(det) det.ontoggle=()=>{ view.showMatched=det.open; };
+}
+function editOpening(){
+  const s=db.seasons[Y()];
+  openDrawer({kicker:Y()+' season · Reconcile',title:'Opening balance',body:pair(field('Balance $','obA',s.bankOpening.amount||'',{type:'number'}),field('As of','obD',s.bankOpening.date||'',{type:'date'}))+'<p class="hint">The account balance right before the first uploaded statement line — the “beginning balance” on that statement.</p>',
+    save:()=>{ s.bankOpening={amount:fnum('obA'),date:fv('obD')}; }});
+}
+function findMatch(bl){
+  const y=Y(), s=db.seasons[y], mk=matchedKeys(y), dir=bl.amount>0?'in':'out', target=Math.abs(bl.amount);
+  const cands=bookEntries(y).filter(e=>e.dir===dir&&!mk.has(e.key))
+    .sort((a,b)=>Math.abs(a.amount-target)-Math.abs(b.amount-target)||Math.abs(dayDiff(bl.date,a.date)??999)-Math.abs(dayDiff(bl.date,b.date)??999));
+  const picked=new Set();
+  const rowsHTML=q=>cands.filter(e=>!q||[e.payee,e.desc,e.line,String(e.amount)].join(' ').toLowerCase().includes(q.toLowerCase())).slice(0,60).map(e=>`<label class="mr num" style="grid-template-columns:22px 70px minmax(0,1fr) 90px;cursor:pointer"><input type="checkbox" data-pk="${e.key}"${picked.has(e.key)?' checked':''} style="width:18px;height:18px;accent-color:var(--navy)"><span class="muted">${shortD(e.date)}</span><div class="cell2"><b class="trunc">${esc(e.payee||e.desc)}</b><small class="trunc">${esc(e.line)}</small></div><b class="r">${fmt2(e.amount)}</b></label>`).join('')||'<div class="mr"><span class="muted">No open entries in that direction.</span></div>';
+  const total=()=>sum(cands.filter(e=>picked.has(e.key)),e=>e.amount);
+  openDrawer({kicker:'Reconcile · '+shortD(bl.date),title:'Find the match',saveLabel:'Match',
+    body:`<div class="banner" style="justify-content:space-between"><span class="trunc">${esc(bl.desc)}</span><b class="num">${fmt2(bl.amount)}</b></div>
+      <p class="hint">Tick the entry — or several, when one deposit covers multiple checks. The picked total has to equal the bank amount.</p>
+      <input class="inp" id="fmQ" placeholder="Search entries" aria-label="Search entries"><div class="mini" id="fmL" style="max-height:48vh;overflow-y:auto">${rowsHTML('')}</div>
+      <div class="sumrows num"><div><span class="muted">Picked</span><span id="fmT">$0.00</span></div><div><span class="muted">Bank line</span><span>${fmt2(target)}</span></div><div class="big"><span>Difference</span><span id="fmD">${fmt2(target)}</span></div></div>`,
+    wire:r=>{ const bind=()=>r.querySelectorAll('[data-pk]').forEach(cb=>cb.onchange=()=>{ cb.checked?picked.add(cb.dataset.pk):picked.delete(cb.dataset.pk); const t=total(); r.querySelector('#fmT').textContent=fmt2(t); const d=target-t; const el2=r.querySelector('#fmD'); el2.textContent=fmt2(d); el2.style.color=Math.abs(d)<0.005?'var(--pos)':''; });
+      bind(); r.querySelector('#fmQ').oninput=e=>{ r.querySelector('#fmL').innerHTML=rowsHTML(e.target.value); bind(); }; },
+    save:()=>{ if(!picked.size){ toast('Tick at least one entry'); return false; }
+      if(Math.abs(total()-target)>=0.005){ toast(`Picked ${fmt2(total())} — needs to equal ${fmt2(target)}. For a difference like a fee, add it to the books.`); return false; }
+      bl.matched=[...picked]; bl.status='matched'; toast('Matched'); }});
+}
+
+/* =====================================================================
+   Golf core — shared by the hub and the public scoring page.
+   Walnut Creek CC course data transcribed from the Oak and Pecan scorecards
+   (every nine and total checked against the printed card).
+   ===================================================================== */
+const WCCC_COURSES=[
+  {id:'oak',name:'Oak Course',
+   par:{M:[5,4,5,3,4,3,4,4,4, 4,3,5,4,3,4,4,4,4], W:[5,4,5,3,4,3,4,4,5, 4,3,5,4,3,4,4,4,4]},
+   hcp:{M:[17,1,9,13,11,15,5,7,3, 6,18,16,12,14,8,2,10,4], W:[17,3,9,15,1,11,7,5,13, 6,14,16,4,18,12,2,8,10]},
+   tees:[{name:'Gold',yards:[525,379,523,174,462,142,398,428,439, 375,138,546,339,180,411,433,408,453]},
+         {name:'Blue',yards:[468,369,506,155,431,133,373,369,406, 363,138,464,327,168,391,394,374,444]},
+         {name:'White',yards:[402,339,482,140,402,121,321,330,371, 328,124,440,315,153,332,356,347,385]},
+         {name:'Red',yards:[347,297,381,109,327,104,267,294,371, 251,122,386,245,98,285,336,320,325]}]},
+  {id:'pecan',name:'Pecan Course',
+   par:{M:[5,4,4,3,4,4,4,3,4, 4,4,4,3,4,4,3,4,5], W:[5,4,4,3,4,4,4,3,4, 4,5,4,3,4,4,3,4,5]},
+   hcp:{M:[17,15,1,9,5,13,7,11,3, 12,2,14,10,4,8,16,6,18], W:[9,7,1,17,5,13,11,15,3, 6,14,10,16,2,8,12,4,18]},
+   tees:[{name:'Gold',yards:[457,391,434,153,373,339,381,200,404, 432,446,366,213,445,450,191,412,531]},
+         {name:'Blue',yards:[448,367,415,141,352,318,375,169,388, 414,437,346,197,418,402,186,398,496]},
+         {name:'White',yards:[433,344,380,122,310,292,356,146,355, 394,428,330,182,365,391,176,374,478]},
+         {name:'Red',yards:[410,324,353,107,288,259,304,124,328, 343,407,319,152,301,305,159,324,392]},
+         {name:'Green',yards:[316,220,219,80,208,176,184,85,221, 260,243,200,96,226,222,98,229,336]}]}
+];
+const G_SUM=a=>a.reduce((x,y)=>x+(+y||0),0);
+/* holes in playing order for a group (shotgun starts wrap around) */
+function playOrder(start){ const s=Math.min(18,Math.max(1,+start||1)); return Array.from({length:18},(_,i)=>((s-1+i)%18)+1); }
+function toParTxt(v){ return v===0?'E':(v>0?'+'+v:'−'+Math.abs(v)); }
+/* stroke-play leaderboard. pub = public event, scores = {playerId:{hole:strokes}} */
+function leaderboard(pub,scores){
+  const rows=[];
+  for(const g of pub.groups||[]){ const c=pub.courses[g.course]; if(!c) continue;
+    for(const p of g.players||[]){ const par=c.par[p.set||'M']||c.par.M, sc=scores[p.id]||{};
+      let n=0,gross=0,parPlayed=0,out=0,inn=0;
+      for(let h=1;h<=18;h++){ const s=+sc[h]; if(!s) continue; n++; gross+=s; parPlayed+=par[h-1]; if(h<=9) out+=s; else inn+=s; }
+      rows.push({id:p.id,name:p.name,group:g.label||'',groupId:g.id,course:g.course,courseName:c.name,tee:p.tee,n,gross,toPar:gross-parPlayed,out,inn,thru:n===18?'F':String(n),par});
+    } }
+  const played=rows.filter(r=>r.n>0).sort((a,b)=>a.toPar-b.toPar||b.n-a.n||a.gross-b.gross||a.name.localeCompare(b.name));
+  const idle=rows.filter(r=>!r.n).sort((a,b)=>a.name.localeCompare(b.name));
+  let pos=0,prev=null; played.forEach((r,i)=>{ if(prev===null||r.toPar!==prev){ pos=i+1; prev=r.toPar; } r.pos=pos; });
+  played.forEach(r=>{ r.posTxt=(played.filter(x=>x.pos===r.pos).length>1?'T':'')+r.pos; });
+  idle.forEach(r=>{ r.posTxt='—'; });
+  return played.concat(idle);
+}
+
+/* =====================================================================
+   MGA Hub — Golf: courses, live-scoring events, groups with custom IDs,
+   share link for the public scoring page, and live leaderboards.
+   Event setup lives in the hub's data; when an event is saved it's published
+   to golf_events (public info + group IDs). Scores live in golf_scores.
+   ===================================================================== */
+I.golf=svg('<path d="M12 21V3l7 3.5-7 3.5"/><ellipse cx="12" cy="21" rx="6" ry="1.5"/>');
+NAV.splice(2,0,['golf','Golf',I.golf]);
+view.gtab='events'; view.geid=null; view.getab='groups'; view.gcourse='oak';
+
+/* ---------- data ---------- */
+function golfData(){
+  if(!db.golf) db.golf={courses:clone(WCCC_COURSES),events:[],localScores:{}};
+  const g=db.golf; g.courses=g.courses&&g.courses.length?g.courses:clone(WCCC_COURSES); g.events=g.events||[]; g.localScores=g.localScores||{};
+  return g;
+}
+const courseById=id=>golfData().courses.find(c=>c.id===id);
+const GEV=()=>golfData().events.find(e=>e.id===view.geid);
+const CODE_CHARS='ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+function newCode(ev){ let c; do{ c=Array.from({length:5},()=>CODE_CHARS[Math.floor(Math.random()*CODE_CHARS.length)]).join(''); }while(ev.groups.some(g=>g.code===c)); return c; }
+const slugify=s=>String(s||'').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'').slice(0,40)||'event';
+function scoringLink(ev){ const base=location.href.split('#')[0].split('?')[0].replace(/[^/]*$/,''); return base+'score.html?e='+encodeURIComponent(ev.slug); }
+function publicEvent(ev){
+  const courses={};
+  for(const g of ev.groups){ if(!courses[g.course]){ const c=courseById(g.course); if(c) courses[g.course]={name:c.name,par:c.par,hcp:c.hcp,tees:Object.fromEntries(c.tees.map(t=>[t.name,t.yards]))}; } }
+  return {slug:ev.slug,name:ev.name,date:ev.date,status:ev.status,club:'Walnut Creek Country Club',courses,
+    groups:ev.groups.map(g=>({id:g.id,label:g.label||'',course:g.course,startHole:+g.startHole||1,players:g.players.map(p=>({id:p.id,name:p.name,tee:p.tee||ev.defaultTee||'White',set:p.set||'M'}))}))};
+}
+
+/* ---------- publishing + scores ---------- */
+const golfScores={}; let golfSub=null;
+async function publishEvent(ev){
+  if(!CLOUD||!sessionOK) return;
+  const codes=Object.fromEntries(ev.groups.map(g=>[String(g.code).toUpperCase(),g.id]));
+  const {error}=await sb.from('golf_events').upsert({id:ev.id,slug:ev.slug.toLowerCase(),public:publicEvent(ev),codes,updated_at:new Date().toISOString()});
+  if(error) toast(/duplicate|unique/i.test(error.message)?'That link is already used by another event — pick a different one':/relation|does not exist/i.test(error.message)?'Run golf-setup.sql in Supabase to turn on live scoring':'Couldn’t publish the event: '+error.message);
+}
+function golfSave(ev){ persist(); publishEvent(ev); }
+function scoresFor(ev){ return CLOUD&&sessionOK?(golfScores[ev.id]||{}):(golfData().localScores[ev.id]||{}); }
+async function loadScores(ev){
+  if(!CLOUD||!sessionOK) return;
+  const {data,error}=await sb.from('golf_scores').select('player_id,hole,strokes').eq('event_id',ev.id);
+  if(error) return;
+  const m={}; for(const r of data||[]) (m[r.player_id]=m[r.player_id]||{})[r.hole]=r.strokes; golfScores[ev.id]=m;
+  if(!golfSub){ golfSub=sb.channel('golf-scores').on('postgres_changes',{event:'*',schema:'public',table:'golf_scores'},p=>{
+      const r=p.new&&p.new.event_id?p.new:p.old; if(!r||!golfScores[r.event_id]) return;
+      const m2=golfScores[r.event_id]; if(p.eventType==='DELETE'){ if(m2[r.player_id]) delete m2[r.player_id][r.hole]; } else (m2[r.player_id]=m2[r.player_id]||{})[r.hole]=r.strokes;
+      if(!drawerOpen()&&['golf','dash'].includes(view.page)) render(); }).subscribe(); }
+  if(!drawerOpen()) render();
+}
+async function setScore(ev,pid,hole,strokes){
+  if(CLOUD&&sessionOK){
+    const q=strokes?sb.from('golf_scores').upsert({event_id:ev.id,player_id:pid,hole,strokes,updated_at:new Date().toISOString()}):sb.from('golf_scores').delete().eq('event_id',ev.id).eq('player_id',pid).eq('hole',hole);
+    const {error}=await q; if(error){ toast('Couldn’t save score: '+error.message); return false; }
+    const m=(golfScores[ev.id]=golfScores[ev.id]||{}); m[pid]=m[pid]||{}; if(strokes) m[pid][hole]=strokes; else delete m[pid][hole]; return true;
+  }
+  const L=golfData().localScores, m=(L[ev.id]=L[ev.id]||{}); m[pid]=m[pid]||{}; if(strokes) m[pid][hole]=strokes; else delete m[pid][hole]; persist(); return true;
+}
+const liveEvents=()=>golfData().events.filter(e=>e.status==='live');
+
+/* ---------- page ---------- */
+function vGolf(m){
+  golfData();
+  if(view.geid&&GEV()) return vGolfEvent(m,GEV());
+  view.geid=null;
+  m.innerHTML=head('Golf','Live scoring and leaderboards for Walnut Creek’s Oak and Pecan courses.',btn('New scoring event','gNew','pri',I.plus))+
+    `<div class="tabs">${[['events','Scoring events'],['courses','Courses']].map(([k,l])=>`<button class="tab${view.gtab===k?' on':''}" data-gt="${k}">${l}</button>`).join('')}</div><div id="gbody" style="display:flex;flex-direction:column;gap:20px"></div>`;
+  m.querySelectorAll('[data-gt]').forEach(b=>b.onclick=()=>{ view.gtab=b.dataset.gt; render(); });
+  $('gNew').onclick=()=>editEvent(null);
+  (view.gtab==='courses'?gCourses:gEvents)($('gbody'));
+}
+function evStatusChip(e){ return e.status==='live'?'<span class="chip ok">● Live</span>':e.status==='final'?'<span class="chip navy">Final</span>':'<span class="chip">Draft</span>'; }
+function gEvents(el){
+  const evs=golfData().events.slice().sort((a,b)=>(b.date||'').localeCompare(a.date||''));
+  const cols='grid-template-columns:minmax(0,1.6fr) 110px minmax(0,1fr) 110px 100px';
+  el.innerHTML=`<div class="card" style="overflow:hidden">${evs.length?`<div class="tw"><div class="t" style="min-width:720px"><div class="tr th" style="${cols}"><span>Event</span><span>Date</span><span>Courses</span><span>Field</span><span>Status</span></div>
+    ${evs.map(e=>`<div class="tr click" data-ge="${e.id}" style="${cols}"><div class="cell2"><b class="trunc" style="color:var(--navy)">${esc(e.name)}</b><small class="trunc">${esc(scoringLink(e).replace(/^https?:\/\//,''))}</small></div><span class="num">${e.date?shortDate(e.date):'—'}</span><span class="muted trunc">${[...new Set(e.groups.map(g=>courseById(g.course)?.name.replace(' Course','')))].join(' + ')||'—'}</span><span class="num">${e.groups.length} group${e.groups.length===1?'':'s'} · ${sum(e.groups,g=>g.players.length)}</span><span>${evStatusChip(e)}</span></div>`).join('')}</div></div>`
+    :`<div class="empty"><b>No scoring events yet</b><span>Create one, add groups with their own group IDs, then share the link. Players open it on their phones and enter their group ID to keep score.</span><button class="btn pri" id="gNew2">${I.plus}New scoring event</button></div>`}</div>`;
+  el.querySelectorAll('[data-ge]').forEach(r=>r.onclick=()=>{ view.geid=r.dataset.ge; view.getab='groups'; render(); loadScores(GEV()); });
+  const n2=$('gNew2'); if(n2) n2.onclick=()=>editEvent(null);
+}
+const shortDate=s=>{ const d=parseD(s); return d?MONTHS[d.getMonth()]+' '+d.getDate()+', '+d.getFullYear():s; };
+
+/* Courses: scorecards */
+function gCourses(el){
+  const g=golfData(), c=courseById(view.gcourse)||g.courses[0];
+  const nine=(arr,a,b)=>arr.slice(a,b);
+  const rowH=(label,vals,cls='',tot=true)=>`<tr class="${cls}"><th scope="row">${label}</th>${nine(vals,0,9).map(v=>`<td>${v}</td>`).join('')}<td class="st">${tot?G_SUM(nine(vals,0,9)):''}</td>${nine(vals,9,18).map(v=>`<td>${v}</td>`).join('')}<td class="st">${tot?G_SUM(nine(vals,9,18)):''}</td><td class="st">${tot?G_SUM(vals):''}</td></tr>`;
+  el.innerHTML=`<div class="seg">${g.courses.map(x=>`<button class="${x.id===c.id?'on':''}" data-gc="${x.id}">${esc(x.name)}</button>`).join('')}</div>
+  <div class="card" style="overflow:hidden"><div class="cardhead"><div><h2 class="h2">${esc(c.name)}</h2><span class="muted">Men’s par ${G_SUM(c.par.M)} · women’s par ${G_SUM(c.par.W)} · ${c.tees.map(t=>t.name+' '+G_SUM(t.yards).toLocaleString()).join(' · ')}</span></div></div>
+   <div class="tw"><table class="scard num"><thead><tr><th scope="col">Hole</th>${[1,2,3,4,5,6,7,8,9].map(h=>`<th scope="col">${h}</th>`).join('')}<th scope="col" class="st">Out</th>${[10,11,12,13,14,15,16,17,18].map(h=>`<th scope="col">${h}</th>`).join('')}<th scope="col" class="st">In</th><th scope="col" class="st">Tot</th></tr></thead><tbody>
+   ${c.tees.map(t=>rowH(t.name,t.yards,'tee tee-'+t.name.toLowerCase())).join('')}
+   ${rowH('Par',c.par.M,'par')}${rowH('Men’s hcp',c.hcp.M,'hcp',false)}${rowH('Women’s par',c.par.W,'par2')}${rowH('Women’s hcp',c.hcp.W,'hcp',false)}
+   </tbody></table></div></div>
+   <p class="hint">Transcribed from the club’s printed scorecards. Combination tees (Blue/White, White/Red) aren’t included.</p>`;
+  el.querySelectorAll('[data-gc]').forEach(b=>b.onclick=()=>{ view.gcourse=b.dataset.gc; render(); });
+}
+
+/* Event editor */
+function editEvent(ev){
+  const g=golfData(), ts=seasonTournaments(Y());
+  openDrawer({kicker:'Golf · Scoring event',title:ev?'Event details':'New scoring event',saveLabel:ev?'Save':'Create event',
+    body:field('Name','geN',ev?.name||'',{ph:'e.g. Member-Member · Saturday'})+pair(field('Date','geD',ev?.date||'',{type:'date'}),field('Default tee','geT',ev?.defaultTee||'White',{type:'select',options:['Gold','Blue','White','Red','Green']}))+
+      field('Custom link','geS',ev?.slug||'',{ph:'e.g. mm2026-sat',hint:'Players open <b>…/score.html?e=</b><i>this</i>. Letters, numbers and dashes.'})+
+      field('Tournament (optional)','geTour',ev?.tournamentId||'',{type:'select',options:[['','— Not linked —']].concat(ts.map(t=>[t.id,t.name+' · '+dateRange(t)])),hint:'Linking lets you build groups straight from that tournament’s field.'}),
+    wire:r=>{ const n=r.querySelector('#geN'), s=r.querySelector('#geS'); let touched=!!ev; s.oninput=()=>touched=true; n.oninput=()=>{ if(!touched) s.value=slugify(n.value); }; },
+    save:()=>{ const name=fv('geN'); if(!name){ toast('Name the event'); return false; }
+      const slug=slugify(fv('geS')||name);
+      if(g.events.some(e=>e!==ev&&e.slug===slug)){ toast('Another event already uses that link'); return false; }
+      const data={name,date:fv('geD'),defaultTee:fv('geT'),slug,tournamentId:fv('geTour')};
+      if(ev) Object.assign(ev,data); else { const e=Object.assign({id:uid(),status:'draft',groups:[],createdAt:new Date().toISOString()},data); g.events.push(e); view.geid=e.id; view.getab='groups'; ev=e; }
+      golfSave(ev); toast('Saved'); return undefined; },
+    del:ev?()=>{ if(!confirm(`Delete ${ev.name}? Its groups and scores are removed.`)) return false; g.events=g.events.filter(x=>x!==ev); view.geid=null;
+      if(CLOUD&&sessionOK) sb.from('golf_events').delete().eq('id',ev.id); }:null,delLabel:'Delete event'});
+}
+
+/* Event detail */
+function vGolfEvent(m,ev){
+  const pub=publicEvent(ev), lb=leaderboard(pub,scoresFor(ev)), link=scoringLink(ev);
+  const t=db.tournaments.find(x=>x.id===ev.tournamentId);
+  m.innerHTML=`<div class="crumb"><button id="gBack">Golf</button><span class="muted">/</span><span class="muted">${esc(ev.name)}</span></div>
+  <div class="phead"><div><h1 class="h1">${esc(ev.name)}</h1><div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">${evStatusChip(ev)}<span class="chip">${ev.date?shortDate(ev.date):'Date TBD'}</span><span class="chip">Stroke play</span><span class="chip">${ev.groups.length} groups · ${sum(ev.groups,g=>g.players.length)} players</span>${t?`<span class="chip">${esc(t.name)}</span>`:''}</div></div>
+    <div class="actions">${ev.status==='live'?`<button class="btn" id="gClose">Close scoring</button>`:`<button class="btn pri" id="gOpen">${ev.status==='final'?'Reopen scoring':'Open scoring'}</button>`}<button class="btn" id="gEdit">${I.edit}Details</button></div></div>
+  <div class="card pad" style="display:flex;gap:12px 20px;align-items:center;flex-wrap:wrap"><div class="cell2" style="flex:1 1 320px;min-width:0"><span class="lbl">Scoring link</span><a href="${esc(link)}" target="_blank" rel="noopener" class="trunc" style="font-weight:600;font-size:15px">${esc(link)}</a><small class="muted">${ev.status==='live'?'Open — groups can enter scores now.':ev.status==='final'?'Closed — the leaderboard is final. Scorers can still view it.':'Draft — the link shows the event but scoring is off until you open it.'}</small></div>
+    <div class="actions"><button class="btn sm" id="gCopy">Copy link</button><a class="btn sm" href="${esc(link)}" target="_blank" rel="noopener">Open scoring page</a><a class="btn sm" href="${esc(link)}&view=board" target="_blank" rel="noopener">Leaderboard screen</a></div></div>
+  ${!CLOUD||!sessionOK?`<div class="banner">This device isn’t signed in to the cloud, so the public scoring page can’t see this event. Scores you enter here stay on this device.</div>`:''}
+  <div class="tabs">${[['groups','Groups'],['board','Leaderboard']].map(([k,l])=>`<button class="tab${view.getab===k?' on':''}" data-get="${k}">${l}</button>`).join('')}</div><div id="gebody" style="display:flex;flex-direction:column;gap:16px"></div>`;
+  $('gBack').onclick=()=>{ view.geid=null; render(); };
+  $('gEdit').onclick=()=>editEvent(ev);
+  const op=$('gOpen'); if(op) op.onclick=()=>{ if(!ev.groups.length){ toast('Add at least one group first'); return; } ev.status='live'; golfSave(ev); render(); toast('Scoring is open'); };
+  const cl=$('gClose'); if(cl) cl.onclick=()=>{ ev.status='final'; golfSave(ev); render(); toast('Scoring closed — leaderboard is final'); };
+  $('gCopy').onclick=async()=>{ try{ await navigator.clipboard.writeText(link); toast('Link copied'); }catch(_){ prompt('Copy this link:',link); } };
+  m.querySelectorAll('[data-get]').forEach(b=>b.onclick=()=>{ view.getab=b.dataset.get; render(); });
+  (view.getab==='board'?gBoard:gGroups)($('gebody'),ev,lb);
+}
+function gGroups(el,ev){
+  const cols='grid-template-columns:110px minmax(0,.9fr) 130px 80px minmax(0,2fr) 40px';
+  const t=db.tournaments.find(x=>x.id===ev.tournamentId);
+  el.innerHTML=`<div class="toolbar"><div class="actions"><button class="btn pri" id="ggAdd">${I.plus}Add group</button>${t?`<button class="btn" id="ggBuild">Build groups from ${esc(t.name)} field</button>`:''}</div><span class="muted" style="margin-left:auto;font-size:13px">Each group gets its own group ID. Players enter it on the scoring page.</span></div>
+  <div class="card" style="overflow:hidden">${ev.groups.length?`<div class="tw"><div class="t" style="min-width:820px"><div class="tr th" style="${cols}"><span>Group ID</span><span>Group</span><span>Course</span><span>Starts</span><span>Players</span><span></span></div>
+   ${ev.groups.map(g=>`<div class="tr click" data-gg="${g.id}" style="${cols}"><b style="letter-spacing:.06em;color:var(--navy)">${esc(g.code)}</b><span class="trunc">${esc(g.label||'—')}</span><span class="muted">${esc(courseById(g.course)?.name||'')}</span><span class="num">Hole ${+g.startHole||1}</span><span class="trunc">${g.players.map(p=>esc(p.name)).join(', ')||'<span class="muted">No players</span>'}</span><span class="ib">${I.edit}</span></div>`).join('')}</div></div>`
+   :`<div class="empty"><b>No groups yet</b><span>Add groups by hand${t?', or build them from the tournament field':''}.</span></div>`}</div>`;
+  $('ggAdd').onclick=()=>editGroup(ev,null);
+  const bb=$('ggBuild'); if(bb) bb.onclick=()=>buildGroups(ev,t);
+  el.querySelectorAll('[data-gg]').forEach(r=>r.onclick=()=>editGroup(ev,ev.groups.find(g=>g.id===r.dataset.gg)));
+}
+function editGroup(ev,grp){
+  const g=golfData(), t=db.tournaments.find(x=>x.id===ev.tournamentId);
+  const players=grp?clone(grp.players):[];
+  const inOther=new Set(ev.groups.filter(x=>x!==grp).flatMap(x=>x.players.map(p=>p.memberId).filter(Boolean)));
+  const fieldIds=new Set(t?t.field.map(p=>p.memberId):[]);
+  const pool=db.members.slice().sort((a,b)=>(fieldIds.has(b.id)-fieldIds.has(a.id))||memberName(a).localeCompare(memberName(b)));
+  const opts=`<option value="">— Add a member —</option>`+(t?`<optgroup label="${esc(t.name)} field">${pool.filter(m=>fieldIds.has(m.id)).map(m=>`<option value="${m.id}">${esc(memberName(m))}${inOther.has(m.id)?' (in another group)':''}</option>`).join('')}</optgroup><optgroup label="All members">`:'')+pool.filter(m=>!t||!fieldIds.has(m.id)).map(m=>`<option value="${m.id}">${esc(memberName(m))}${inOther.has(m.id)?' (in another group)':''}</option>`).join('')+(t?'</optgroup>':'');
+  const tees=c=>(courseById(c)||g.courses[0]).tees.map(x=>x.name);
+  const rows=()=>players.map((p,i)=>`<div class="mr" style="grid-template-columns:minmax(0,1fr) 92px 70px 28px"><input class="inp" data-pi="${i}" data-k="name" value="${esc(p.name)}" aria-label="Player name"><select class="inp" data-pi="${i}" data-k="tee" aria-label="Tee">${tees(fv('ggC')||grp?.course||'oak').map(x=>`<option${x===(p.tee||ev.defaultTee)?' selected':''}>${x}</option>`).join('')}</select><select class="inp" data-pi="${i}" data-k="set" aria-label="Par set"><option value="M"${p.set!=='W'?' selected':''}>Men</option><option value="W"${p.set==='W'?' selected':''}>Women</option></select><button class="ib" type="button" data-pdel="${i}" aria-label="Remove ${esc(p.name)}">${I.x}</button></div>`).join('')||'<div class="mr"><span class="muted">No players yet.</span></div>';
+  openDrawer({kicker:ev.name+' · Group',title:grp?'Group '+grp.code:'Add group',
+    body:pair(field('Group ID','ggCode',grp?.code||newCode(ev),{hint:'What players type on the scoring page. Make it anything unique — a tee time, a cart number, or leave the random one.'}),field('Label (optional)','ggL',grp?.label||'',{ph:'e.g. 8:10 · Oak 1'}))+
+      pair(field('Course','ggC',grp?.course||'oak',{type:'select',options:g.courses.map(c=>[c.id,c.name])}),field('Starting hole','ggS',grp?.startHole||1,{type:'select',options:Array.from({length:18},(_,i)=>[i+1,'Hole '+(i+1)])}))+
+      `<div class="fld"><span class="lbl">Players</span><div class="mini" id="ggRows">${rows()}</div>
+       <div style="display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px"><select class="inp" id="ggPick" aria-label="Add a member">${opts}</select><button class="btn" type="button" id="ggGuest">+ Guest</button></div></div>
+      ${grp?`<button class="btn" type="button" id="ggScores">Enter or correct scores</button>`:''}`,
+    wire:r=>{ const bind=()=>{ r.querySelectorAll('[data-pi]').forEach(e=>e.oninput=e.onchange=()=>{ players[+e.dataset.pi][e.dataset.k]=e.value; }); r.querySelectorAll('[data-pdel]').forEach(b=>b.onclick=()=>{ players.splice(+b.dataset.pdel,1); redraw(); }); };
+      const redraw=()=>{ r.querySelector('#ggRows').innerHTML=rows(); bind(); }; bind();
+      r.querySelector('#ggPick').onchange=e=>{ const m=memberById(e.target.value); e.target.value=''; if(!m) return; if(players.some(p=>p.memberId===m.id)) return;
+        players.push({id:uid(),memberId:m.id,name:memberName(m),tee:ev.defaultTee||'White',set:'M'}); redraw(); };
+      r.querySelector('#ggGuest').onclick=()=>{ players.push({id:uid(),memberId:'',name:'',tee:ev.defaultTee||'White',set:'M'}); redraw(); const ins=r.querySelectorAll('[data-k=name]'); ins[ins.length-1].focus(); };
+      r.querySelector('#ggC').onchange=redraw;
+      const sc=r.querySelector('#ggScores'); if(sc) sc.onclick=()=>{ closeDrawer(); scoreSheet(ev,grp); }; },
+    save:()=>{ const code=fv('ggCode').toUpperCase().replace(/\s+/g,''); if(!code){ toast('Give the group an ID'); return false; }
+      if(!/^[A-Z0-9-]{2,20}$/.test(code)){ toast('Group ID: 2–20 letters, numbers or dashes'); return false; }
+      if(ev.groups.some(x=>x!==grp&&x.code===code)){ toast('Another group already uses '+code); return false; }
+      const ps=players.filter(p=>p.name.trim()).map(p=>({...p,name:p.name.trim()}));
+      if(!ps.length){ toast('Add at least one player'); return false; }
+      const data={code,label:fv('ggL'),course:fv('ggC'),startHole:+fv('ggS')||1,players:ps};
+      if(grp) Object.assign(grp,data); else ev.groups.push(Object.assign({id:uid()},data));
+      golfSave(ev); toast(grp?'Group saved':'Group '+code+' added'); return undefined; },
+    del:grp?()=>{ ev.groups=ev.groups.filter(x=>x!==grp); golfSave(ev); }:null,delLabel:'Remove group'});
+}
+function buildGroups(ev,t){
+  const teams={}; t.field.forEach(p=>{ (teams[p.team||0]=teams[p.team||0]||[]).push(p); });
+  const units=Object.keys(teams).map(Number).sort((a,b)=>a-b).map(n=>teams[n]);
+  openDrawer({kicker:ev.name,title:'Build groups from the field',saveLabel:'Build groups',
+    body:`<p style="margin:0">${t.field.length} players in ${units.length} teams. Teams stay together.</p>`+
+      pair(field('Players per group','bgN',4,{type:'select',options:[[2,'2'],[3,'3'],[4,'4'],[5,'5']]}),field('Courses','bgC','split',{type:'select',options:[['oak','All on Oak'],['pecan','All on Pecan'],['split','Split between Oak and Pecan']]}))+
+      field('Start','bgS','shotgun',{type:'select',options:[['shotgun','Shotgun — groups spread across holes 1–18'],['one','Everyone off hole 1']]})+
+      (ev.groups.length?`<div class="banner">This replaces the ${ev.groups.length} groups already set up. Scores already entered for removed players are no longer shown.</div>`:'')+
+      '<p class="hint">Each group gets a random group ID — edit any of them afterward.</p>',
+    save:()=>{ const size=+fv('bgN'), mode=fv('bgC'), start=fv('bgS');
+      const groups=[]; let cur=[];
+      for(const u of units){ if(cur.length&&cur.length+u.length>size){ groups.push(cur); cur=[]; } cur=cur.concat(u); }
+      if(cur.length) groups.push(cur);
+      ev.groups=[];
+      const half=Math.ceil(groups.length/2);
+      groups.forEach((ps,i)=>{ const course=mode==='split'?(i<half?'oak':'pecan'):mode; const idx=mode==='split'?(i<half?i:i-half):i;
+        const startHole=start==='shotgun'?(idx%18)+1:1; const dbl=start==='shotgun'&&idx>=18?' B':'';
+        ev.groups.push({id:uid(),code:newCode(ev),label:`${course==='oak'?'Oak':'Pecan'} ${startHole}${dbl}`,course,startHole,
+          players:ps.map(p=>{ const m=memberById(p.memberId); return {id:uid(),memberId:p.memberId,name:m?memberName(m):'Player',tee:ev.defaultTee||'White',set:'M'}; })}); });
+      golfSave(ev); toast(`${ev.groups.length} groups built`); }});
+}
+/* Board scorecard editor (corrections, or scoring from the hub) */
+function scoreSheet(ev,grp){
+  const pub=publicEvent(ev), c=pub.courses[grp.course], sc=scoresFor(ev), order=playOrder(grp.startHole);
+  const par=p=>c.par[p.set||'M']||c.par.M;
+  openDrawer({kicker:ev.name+' · Group '+grp.code,title:'Scores',saveLabel:'Save scores',
+    body:`<p class="hint">${esc(c.name)} · starts on hole ${grp.startHole}. Leave a hole blank if it hasn’t been played.</p><div class="tw"><table class="scard sheet num"><thead><tr><th>Hole</th>${grp.players.map(p=>`<th>${esc(p.name.split(' ')[0])}</th>`).join('')}<th>Par</th></tr></thead><tbody>
+      ${order.map(h=>`<tr><th scope="row">${h}</th>${grp.players.map(p=>`<td><input class="inp r" inputmode="numeric" data-sp="${p.id}" data-h="${h}" value="${(sc[p.id]||{})[h]||''}" aria-label="${esc(p.name)} hole ${h}"></td>`).join('')}<td class="muted">${par(grp.players[0]||{})[h-1]}</td></tr>`).join('')}
+      </tbody></table></div>`,
+    save:()=>{ const jobs=[];
+      document.querySelectorAll('[data-sp]').forEach(i=>{ const v=parseInt(i.value,10)||0, pid=i.dataset.sp, h=+i.dataset.h, was=+((sc[pid]||{})[h]||0);
+        if(v!==was&&(v===0||(v>=1&&v<=20))) jobs.push(setScore(ev,pid,h,v||null)); });
+      Promise.all(jobs).then(()=>{ render(); if(jobs.length) toast(jobs.length+' score'+(jobs.length===1?'':'s')+' saved'); }); }});
+}
+function gBoard(el,ev,lb){
+  const cols='grid-template-columns:52px minmax(0,1.5fr) minmax(0,1fr) 64px 64px 70px 40px';
+  const courses=[...new Set(ev.groups.map(g=>g.course))];
+  el.innerHTML=`<div class="toolbar"><span class="muted" style="font-size:13px">Gross stroke play · to par for holes played${courses.length>1?' · both courses combined':''}. Updates live as groups score.</span><button class="btn sm" id="gbRef" style="margin-left:auto">${I.refresh}Refresh</button></div>
+  <div class="card" style="overflow:hidden">${lb.length?`<div class="tw"><div class="t" style="min-width:700px"><div class="tr th" style="${cols}"><span>Pos</span><span>Player</span><span>Group</span><span class="r">Thru</span><span class="r">Gross</span><span class="r">To par</span><span></span></div>
+    ${lb.map(r=>`<div class="tr num click" data-lbg="${r.groupId}" style="${cols}"><b>${r.posTxt}</b><b class="trunc">${esc(r.name)}</b><span class="trunc muted">${esc(r.group||'')} · ${esc(r.courseName.replace(' Course',''))}</span><span class="r">${r.n?r.thru:'—'}</span><span class="r">${r.n?r.gross:'—'}</span><b class="r ${r.n?(r.toPar<0?'pos':r.toPar>0?'':''):'muted'}" style="font-size:15px">${r.n?toParTxt(r.toPar):'—'}</b><span class="ib">${I.edit}</span></div>`).join('')}</div></div>`
+    :'<div class="empty"><b>No players yet</b><span>Add groups to see the leaderboard.</span></div>'}</div>`;
+  $('gbRef').onclick=()=>loadScores(ev);
+  el.querySelectorAll('[data-lbg]').forEach(r=>r.onclick=()=>scoreSheet(ev,ev.groups.find(g=>g.id===r.dataset.lbg)));
+}
+/* Leaderboard card for the dashboard + sidebar live link */
+function liveBoardCard(){
+  const evs=liveEvents(); if(!evs.length) return '';
+  const ev=evs[0], lb=leaderboard(publicEvent(ev),scoresFor(ev)).filter(r=>r.n).slice(0,8);
+  if(!golfScores[ev.id]&&CLOUD&&sessionOK) setTimeout(()=>loadScores(ev),0);
+  return `<div class="card pad" style="display:flex;flex-direction:column;gap:10px"><div style="display:flex;justify-content:space-between;align-items:center"><h2 class="h2">Leaderboard</h2><span class="chip ok">● Live</span></div><span class="muted" style="font-size:13px">${esc(ev.name)}</span>
+    ${lb.length?lb.map(r=>`<div class="num" style="display:grid;grid-template-columns:34px minmax(0,1fr) 36px 42px;gap:8px;font-size:13.5px;align-items:center"><b>${r.posTxt}</b><span class="trunc">${esc(r.name)}</span><span class="muted r">${r.thru}</span><b class="r">${toParTxt(r.toPar)}</b></div>`).join(''):'<span class="muted">No scores yet.</span>'}
+    <button class="btn sm" data-golfev="${ev.id}">Full leaderboard</button></div>`;
+}
+document.addEventListener('click',e=>{ const b=e.target.closest('[data-golfev]'); if(b){ view.geid=b.dataset.golfev; view.getab='board'; go('golf'); loadScores(GEV()); } });
+
 boot();
 </script>
 </body>

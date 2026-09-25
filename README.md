@@ -44,6 +44,28 @@ Optional: give it its own subdomain (e.g. `hub.wcccmga.org`). The current site o
 No Supabase access? Download a backup from the current app (⋯ → Backup all data)
 and choose it when the import asks.
 
+## Live scoring (Golf)
+
+One-time: Supabase → SQL Editor → run `golf-setup.sql`. Upload `score.html` alongside
+`index.html` on the `hub` branch.
+
+- **Golf → Courses:** Oak and Pecan scorecards (par, men's/women's handicap, every tee).
+- **Golf → New scoring event:** name, date, default tee, a **custom link**, and optionally the
+  tournament it belongs to. Add groups by hand, or **Build groups from the field** (keeps
+  teams together; all Oak, all Pecan, or split; shotgun or off hole 1).
+- **Groups:** each has its own **Group ID** (random by default — change it to a cart number or
+  tee time), course, starting hole, and players (members, field players, or guests), each with
+  a tee and men's/women's par.
+- **Open scoring**, then share the link: `…/score.html?e=<your-link>`. Players enter their
+  Group ID and score hole by hole. Scores save as they tap, queue up in dead zones, and send
+  when signal returns. `…&view=board` is a big-screen leaderboard for the clubhouse TV.
+- **Leaderboard:** gross stroke play, to par for holes played, both courses combined. It's in the
+  event page, on the Dashboard, and a live link sits in the sidebar while scoring is open.
+  Click any player to correct a group's scores from the hub.
+- **Close scoring** locks it: the public page can no longer change scores.
+- Security: the public page can only read an event's public info, look up a group by its ID, and
+  save scores for that group's players while the event is open. Group IDs are never exposed.
+
 ## How it works
 
 - **Editing:** screens are read-only; every change happens in one side panel.
@@ -67,6 +89,19 @@ and choose it when the import asks.
 - **Season budget:** all tournaments + annual dues (active members × dues, not
   prorated, recorded per member) + any MGA-level lines. The 50/50 raffle is counted
   inside the tournament it's assigned to, not added twice.
+- **Treasury** (sidebar): the treasurer's books for the season.
+  - *Ledger* — every dollar in and out: expenses and income recorded here, plus sponsor
+    payments and dues recorded elsewhere. Filter, search, export CSV.
+  - *Budget vs actual* — every line of every tournament plus MGA-level lines, with variance.
+    Use + on a line to record money against it. Once a line has ledger entries, its actual
+    comes from them (the typed "Actual $" field shows the ledger total instead).
+  - *Reconcile* — upload the bank's activity export (CSV, Excel, or OFX/QFX). Re-uploads and
+    overlapping statements are de-duplicated. Suggested matches: same check #, same amount and
+    name, nearest date, and one deposit made of several payments. Accept, Find (tick one or more
+    entries that add up), Add to books, or Set aside (transfers). Shows bank vs book balances,
+    deposits not yet made and checks not yet cleared, and checks the bank's own running balance.
+- **Season net (projected):** actual net for tournaments that are over (marked Complete, or past
+  their last day) plus budgeted net for upcoming ones, plus MGA-level budget lines.
 - **Sync:** last write wins, saved ~0.7s after an edit; open devices update live.
   Own saves are recognized and not echoed back.
 - **Backups:** sidebar → Backup / Restore (JSON of everything).
