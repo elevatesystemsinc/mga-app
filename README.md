@@ -62,6 +62,17 @@ One-time: Supabase → SQL Editor → run `golf-setup.sql`. Upload `score.html` 
 - **Leaderboard:** gross stroke play, to par for holes played, both courses combined. It's in the
   event page, on the Dashboard, and a live link sits in the sidebar while scoring is open.
   Click any player to correct a group's scores from the hub.
+- **Formats per nine:** Round type can be Stroke play, Best ball, Scramble, Shamble, or "Front & back
+  differ" (e.g. Member-Member Saturday: scramble front, shamble back). Scramble holes take one team
+  score (the phone shows one entry per team); best ball and shamble holes take every player's score
+  and the best net ball counts. Cards, leaderboards and the phone follow each hole's format.
+- **Handicap allowances** default to the USGA (WHS Appendix C) recommendations: individual stroke play
+  95%, four-ball 85%, 2-player scramble 35/15%, 4-player scramble 25/20/15/10%. Shamble isn't in the
+  USGA table — it defaults to 85% (it plays as four-ball after the drive). All editable per event,
+  with "Reset to USGA". Scramble team handicap = course handicaps low→high × those percentages.
+- **Course & start by flight** (Flights tab): each flight picks its course and Shotgun or Tee times —
+  first tee time, gap in minutes, and hole 1 or 10 — all editable. Tee-time groups go off in order of
+  combined handicap; a warning shows if one course has both a shotgun and tee times.
 - **Round type:** Stroke play or **Best ball**. Best ball: every player scores their own ball; the
   team's score on each hole is its best score (gross, or net after each player's strokes — 90%
   allowance is the usual four-ball setting). Teams come from the linked tournament (Member-Member

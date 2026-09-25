@@ -63,6 +63,7 @@ h1{font-family:var(--serif);font-weight:700;color:var(--navy);font-size:32px;mar
 .banner{background:#F6ECCF;border:1px solid #E5CF8E;color:#5C4410;border-radius:10px;padding:12px 14px;font-size:14px;margin-bottom:14px}
 .big .lb{grid-template-columns:70px minmax(0,1fr) 90px 110px;font-size:26px;padding:16px 24px}
 .chips{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px}.chips button{height:36px;padding:0 14px;border-radius:999px;border:1px solid var(--line);background:#fff;font-weight:700;font-size:13px;color:var(--muted)}.chips button.on{background:var(--navy);border-color:var(--navy);color:#fff}
+.fmtpill{display:inline-block;padding:4px 12px;border-radius:999px;background:#F6ECCF;border:1px solid #E5CF8E;color:#6B4F12;font-weight:800;font-size:12.5px}
 .pop{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--gold);margin-left:6px;vertical-align:2px}
 .big .lb .tp{font-size:30px} .big main{max-width:1100px}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
@@ -221,6 +222,9 @@ const WC_CSS=`
 .wc .wc-n{right:1px;bottom:0}
 @media (max-width:560px){ .wc th,.wc td{min-width:24px;height:32px;font-size:12px} .wc th:first-child,.wc td:first-child{min-width:0;max-width:92px;padding:0 5px;overflow:hidden;text-overflow:ellipsis} .wc th:first-child small{font-size:10px}
   .wc tr.wc-p td{font-size:13.5px} .wc .wc-s{width:21px;height:21px} .wc-top .nm{font-size:24px} .wc-top{flex-wrap:wrap} .wc-top .ev{text-align:left} }
+.wc tr.wc-fmt td,.wc tr.wc-fmt th{background:#F6ECCF;color:#6B4F12;font-weight:800;font-size:11.5px;height:24px;letter-spacing:.02em}
+.wc tr.wc-p td.wc-x,.wc td.wc-x{background:repeating-linear-gradient(135deg,#F1EEE6 0 6px,#E7E2D6 6px 7px)}
+.wc-key .wc-xk{display:inline-block;width:16px;height:12px;margin-right:4px;vertical-align:middle;background:repeating-linear-gradient(135deg,#F1EEE6 0 4px,#E7E2D6 4px 5px);border:1px solid #C9C2B2}
 .wc-sign{display:flex;justify-content:space-between;padding:8px 18px 12px;font-size:12px;color:#56626A;border-top:1px solid var(--wc-line)}
 `;
 function ensureCardCSS(){ if(typeof document==='undefined'||document.getElementById('wc-css')) return; const s=document.createElement('style'); s.id='wc-css'; s.textContent=WC_CSS; document.head.appendChild(s); }
@@ -230,49 +234,104 @@ function scorecardHTML(pub,g,scores,opt){
   const E=s=>String(s??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
   const accent=g.course==='pecan'?'#A2343A':'#1F3552';
   const halves=opt.split?[[1,9],[10,18]]:[[1,18]];
-  const ps=g.players, BB=pub.format==='bestball', basisNet=(pub.scoring==='net');
+  const ps=g.players, TEAM=isTeamEvent(pub), basisNet=(pub.scoring==='net'), split=pub.format==='split';
   const par=p=>c.par[p.set||'M']||c.par.M, hc=p=>c.hcp[p.set||'M']||c.hcp.M;
-  const sc=p=>scores[p.id]||{}, k=(p,h)=>typeof p.ph==='number'?strokesOn(p.ph,hc(p)[h-1]):0;
+  const sc=p=>scores[p.id]||{};
+  const phFor=(p,h)=>{ const f=holeFormat(pub,h); if(f==='scramble') return null; return f==='stroke'?p.ph:segPH(pub,p,f); };
+  const k=(p,h)=>{ const ph=phFor(p,h); return typeof ph==='number'?strokesOn(ph,hc(p)[h-1]):0; };
   const teesUsed=[...new Set(ps.map(p=>p.tee))].filter(t=>c.tees&&t in c.tees);
   const anyW=ps.some(p=>p.set==='W');
-  // best ball: the counting ball on each hole for each team
-  const teams=BB?[...new Set(ps.map(p=>p.team||p.id))].map(tk=>({tk,ms:ps.filter(p=>(p.team||p.id)===tk)})):[];
-  const counted=new Set(), teamCell={};
-  teams.forEach(t=>{ teamCell[t.tk]={}; for(let h=1;h<=18;h++){ let best=null;
-      for(const p of t.ms){ const s=+sc(p)[h]; if(!s) continue; const v=basisNet?s-k(p,h):s, rel=v-par(p)[h-1];
-        if(!best||rel<best.rel) best={p,rel,gross:s,net:s-k(p,h)}; }
-      if(best){ teamCell[t.tk][h]=best; counted.add(best.p.id+'|'+h); } } });
+  const teams=TEAM?groupTeams(g):[];
+  const TH={}, counted=new Set();
+  teams.forEach(t=>{ TH[t.key]={}; for(let h=1;h<=18;h++){ const r=teamHole(pub,c,t,h,scores); if(r){ TH[t.key][h]=r; if(r.by) counted.add(r.by+'|'+h); } } });
   const short=n=>{ const w=String(n).trim().split(/\s+/); return opt.split&&w.length>1?w[0][0]+'. '+w.slice(1).join(' '):n; };
   const shape=(s,pr)=>{ const d=s-pr; return d<=-2?'e':d===-1?'b':d===1?'o':d>=2?'d':''; };
   const range=(a,b)=>Array.from({length:b-a+1},(_,i)=>a+i);
   const sumH=(fn,a,b)=>{ let t=0,n=0; for(let h=a;h<=b;h++){ const v=fn(h); if(v!=null){ t+=v; n++; } } return n?t:''; };
+  const phTxt=v=>typeof v==='number'?(v<0?'+'+(-v):v):'';
+  const plFmt=eventFormats(pub).find(f=>f!=='scramble');
   const tables=halves.map(([a,b])=>{
     const nines=a===1&&b===18?[[1,9,'Out'],[10,18,'In']]:[[a,b,a===1?'Out':'In']];
     const endCols=(a===1&&b===18)||b===18;
+    const fmtRow=split?`<tr class="wc-fmt"><th>Format</th>${nines.map(([x,y])=>`<td colspan="${y-x+2}">${E(FORMAT_LABEL[holeFormat(pub,x)])}${holeFormat(pub,x)==='scramble'?' · team score':''}</td>`).join('')}${endCols?'<td colspan="3"></td>':''}</tr>`:'';
     const head=`<tr class="wc-h"><th>Hole</th>${nines.map(([x,y,l])=>range(x,y).map(h=>`<th>${h}</th>`).join('')+`<th class="wc-tot">${l}</th>`).join('')}${endCols?'<th class="wc-tot">Tot</th><th class="wc-tot">Hcp</th><th class="wc-tot">Net</th>':''}</tr>`;
     const lineRow=(cls,label,valFn,totFn)=>`<tr class="${cls}"><th>${label}</th>${nines.map(([x,y])=>range(x,y).map(h=>`<td>${valFn(h)??''}</td>`).join('')+`<td class="wc-tot">${totFn?totFn(x,y):''}</td>`).join('')}${endCols?`<td class="wc-tot">${totFn?totFn(1,18):''}</td><td class="wc-tot"></td><td class="wc-tot"></td>`:''}</tr>`;
     const tees=teesUsed.map(t=>{ const y=c.tees[t]; return lineRow('t-'+t.toLowerCase().replace('/','-'),E(t),h=>y?y[h-1]:'·',(x,z)=>y?sumH(h=>y[h-1],x,z):''); }).join('');
     const hcpM=lineRow('wc-hc','Men’s Handicap',h=>c.hcp.M[h-1]);
     const parRow=lineRow('wc-par','Par',h=>(anyW&&c.par.W[h-1]!==c.par.M[h-1])?c.par.M[h-1]+'/'+c.par.W[h-1]:c.par.M[h-1],(x,z)=>sumH(h=>c.par.M[h-1],x,z));
     const hcpW=anyW?lineRow('wc-hc','Women’s Handicap',h=>c.hcp.W[h-1]):'';
-    const pRows=ps.map(p=>{ const S=sc(p), gT=(x,z)=>sumH(h=>+S[h]||null,x,z), nT=(x,z)=>sumH(h=>S[h]?(+S[h])-k(p,h):null,x,z);
-      const cells=nines.map(([x,y])=>range(x,y).map(h=>{ const s=+S[h], kk=k(p,h);
+    const pRow=p=>{ const S=sc(p), own=h=>holeFormat(pub,h)!=='scramble'&&S[h]?+S[h]:null;
+      const gT=(x,z)=>sumH(own,x,z), nT=(x,z)=>sumH(h=>own(h)!=null?own(h)-k(p,h):null,x,z);
+      const cells=nines.map(([x,y])=>range(x,y).map(h=>{ if(holeFormat(pub,h)==='scramble') return '<td class="wc-x"></td>';
+        const s=+S[h], kk=k(p,h);
         if(!s) return `<td>${kk>0?'<span class="wc-dot"></span>'.repeat(Math.min(kk,2)):''}</td>`;
-        return `<td class="${BB&&counted.has(p.id+'|'+h)?'wc-c':''}">${kk>0&&!s?'':''}<span class="wc-s ${shape(s,par(p)[h-1])}">${s}</span>${kk?`<span class="wc-n" title="Net ${s-kk}">${s-kk}</span>`:''}</td>`; }).join('')+`<td class="wc-tot">${gT(x,y)}</td>`).join('');
-      const full=Object.keys(S).length;
-      return `<tr class="wc-p${opt.highlight&&(opt.highlight===p.id||opt.highlight===p.team)?' wc-me':''}"><th title="${E(p.name)}">${E(short(p.name))}<small>${E(p.tee)}${p.flight?' · Flight '+E(p.flight):''}${typeof p.ph==='number'?' · plays '+(p.ph<0?'+'+(-p.ph):p.ph):''}</small></th>${cells}${endCols?`<td class="wc-tot">${gT(1,18)}</td><td class="wc-tot">${typeof p.ph==='number'?(p.ph<0?'+'+(-p.ph):p.ph):''}</td><td class="wc-tot wc-net">${full&&typeof p.ph==='number'?nT(1,18):''}</td>`:''}</tr>`; }).join('');
-    const tRows=teams.map(t=>{ const T=teamCell[t.tk];
-      const main=h=>T[h]?(basisNet?T[h].net:T[h].gross):null, other=h=>T[h]?(basisNet?T[h].gross:T[h].net):null;
-      const cells=nines.map(([x,y])=>range(x,y).map(h=>{ const v=main(h); if(v==null) return '<td></td>'; const o=other(h);
-        return `<td><span class="wc-s ${shape(v,par(T[h].p)[h-1])}">${v}</span>${o!==v?`<span class="wc-n" title="${basisNet?'Gross':'Net'} ${o}">${o}</span>`:''}</td>`; }).join('')+`<td class="wc-tot">${sumH(main,x,y)}</td>`).join('');
-      const gross=sumH(h=>T[h]?T[h].gross:null,1,18), net=sumH(h=>T[h]?T[h].net:null,1,18);
-      return `<tr class="wc-t"><th>${opt.split?'Team':'Best ball'}${basisNet?' net':''}<small>${E(t.ms.map(p=>p.name.split(' ').slice(-1)[0]).join(' & '))}</small></th>${cells}${endCols?`<td class="wc-tot">${basisNet?net:gross}</td><td class="wc-tot"></td><td class="wc-tot wc-net">${net}</td>`:''}</tr>`; }).join('');
-    return `<div class="wc-wrap"><table>${head}${tees}${hcpM}${parRow}${pRows}${tRows}${hcpW}</table></div>`;
+        return `<td class="${TEAM&&counted.has(p.id+'|'+h)?'wc-c':''}"><span class="wc-s ${shape(s,par(p)[h-1])}">${s}</span>${kk?`<span class="wc-n" title="Net ${s-kk}">${s-kk}</span>`:''}</td>`; }).join('')+`<td class="wc-tot">${gT(x,y)}</td>`).join('');
+      const ph=plFmt?(plFmt==='stroke'?p.ph:segPH(pub,p,plFmt)):null; const allOwn=range(1,18).every(h=>holeFormat(pub,h)==='scramble'||S[h]);
+      return `<tr class="wc-p${opt.highlight&&(opt.highlight===p.id||opt.highlight===p.team)?' wc-me':''}"><th title="${E(p.name)}">${E(short(p.name))}<small>${E(p.tee)}${p.flight?' · Flight '+E(p.flight):''}${typeof ph==='number'?' · plays '+phTxt(ph):''}</small></th>${cells}${endCols?`<td class="wc-tot">${gT(1,18)}</td><td class="wc-tot">${phTxt(ph)}</td><td class="wc-tot wc-net">${allOwn&&typeof ph==='number'?nT(1,18):''}</td>`:''}</tr>`; };
+    const tRow=t=>{ const T=TH[t.key]; const main=h=>T[h]?(basisNet&&T[h].net!=null?T[h].net:T[h].gross):null, other=h=>T[h]?(basisNet?T[h].gross:T[h].net):null;
+      const cells=nines.map(([x,y])=>range(x,y).map(h=>{ const v=main(h); const scr=holeFormat(pub,h)==='scramble';
+        if(v==null){ const tph=scr?scrambleTeamPH(pub,t.members):null, kk=tph==null?0:strokesOn(tph,hc(t.captain)[h-1]); return `<td>${kk>0?'<span class="wc-dot"></span>'.repeat(Math.min(kk,2)):''}</td>`; }
+        const o=other(h); return `<td><span class="wc-s ${shape(v,T[h].par)}">${v}</span>${o!=null&&o!==v?`<span class="wc-n" title="${basisNet?'Gross':'Net'} ${o}">${o}</span>`:''}</td>`; }).join('')+`<td class="wc-tot">${sumH(main,x,y)}</td>`).join('');
+      const gross=sumH(h=>T[h]?T[h].gross:null,1,18), net=sumH(h=>T[h]&&T[h].net!=null?T[h].net:null,1,18);
+      const tph=eventFormats(pub).includes('scramble')?scrambleTeamPH(pub,t.members):null;
+      const lab=split?'Team':FORMAT_LABEL[holeFormat(pub,1)]==='Scramble'?'Team score':'Best ball';
+      return `<tr class="wc-t"><th>${opt.split?'Team':lab}${basisNet?' net':''}<small>${E(t.members.map(p=>p.name.split(' ').slice(-1)[0]).join(' & '))}</small></th>${cells}${endCols?`<td class="wc-tot">${basisNet?net:gross}</td><td class="wc-tot">${tph!=null?phTxt(tph):''}</td><td class="wc-tot wc-net">${net}</td>`:''}</tr>`; };
+    const body=TEAM?teams.map(t=>t.members.map(pRow).join('')+tRow(t)).join(''):ps.map(pRow).join('');
+    return `<div class="wc-wrap"><table>${fmtRow}${head}${tees}${hcpM}${parRow}${body}${hcpW}</table></div>`;
   }).join(opt.split?'<div style="height:8px"></div>':'');
   const status=pub.status==='final'?'<span class="wc-final">FINAL</span>':'';
-  const key=`<div class="wc-key"><span><span class="wc-s b">3</span>Birdie</span><span><span class="wc-s e">2</span>Eagle</span><span><span class="wc-s o">5</span>Bogey</span><span><span class="wc-s d">6</span>Double+</span><span><em>3</em>Net where a stroke is given</span>${BB?`<span><i></i>Ball that counted${basisNet?' (net)':''}</span>`:''}</div>`;
-  return `<div class="wc" style="--wc-accent:${accent}"><div class="wc-top"><div><div class="nm">${E(c.name)}</div><small>Walnut Creek Country Club · Mansfield, Texas</small></div><div class="ev"><b>${E(pub.name)}</b>${E([pub.date?new Date(pub.date+'T12:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}):'',g.label].filter(Boolean).join(' · '))}<br>${status}</div></div>${tables}${key}<div class="wc-sign"><span>Scorer ________________</span><span>Attest ________________</span></div></div>`;
+  const key=`<div class="wc-key"><span><span class="wc-s b">3</span>Birdie</span><span><span class="wc-s e">2</span>Eagle</span><span><span class="wc-s o">5</span>Bogey</span><span><span class="wc-s d">6</span>Double+</span><span><em>3</em>Net where a stroke is given</span>${TEAM&&eventFormats(pub).some(f=>f!=='scramble')?`<span><i></i>Ball that counted</span>`:''}${eventFormats(pub).includes('scramble')?'<span><b class="wc-xk"></b>Team plays one ball (scramble)</span>':''}</div>`;
+  return `<div class="wc" style="--wc-accent:${accent}"><div class="wc-top"><div><div class="nm">${E(c.name)}</div><small>Walnut Creek Country Club · Mansfield, Texas</small></div><div class="ev"><b>${E(pub.name)}</b>${E([pub.date?new Date(pub.date+'T12:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}):'',g.label,formatSummary(pub)].filter(Boolean).join(' · '))}<br>${status}</div></div>${tables}${key}<div class="wc-sign"><span>Scorer ________________</span><span>Attest ________________</span></div></div>`;
 }
+
+/* ---------- formats per nine + USGA handicap allowances ----------
+   WHS Appendix C recommendations: individual stroke play 95%; four-ball stroke play 85%;
+   2-player scramble 35% low / 15% high; 4-player scramble 25/20/15/10%. Shamble isn't in
+   Appendix C — defaulted to 85% (it plays as four-ball after the drive); set it per event. */
+const TEAM_FORMATS=['bestball','scramble','shamble'];
+const USGA_ALLOW={stroke:95,bestball:85,shamble:85,scramble2:[35,15],scramble3:[30,20,10],scramble4:[25,20,15,10]};
+FORMAT_LABEL.scramble='Scramble'; FORMAT_LABEL.shamble='Shamble'; FORMAT_LABEL.split='Split format';
+function holeFormat(pub,h){ return pub.format==='split'?(h<=9?pub.front:pub.back):(pub.format||'stroke'); }
+function eventFormats(pub){ return pub.format==='split'?[pub.front,pub.back]:[pub.format||'stroke']; }
+function isTeamEvent(pub){ return eventFormats(pub).some(f=>TEAM_FORMATS.includes(f)); }
+function formatSummary(pub){ return pub.format==='split'?`Front: ${FORMAT_LABEL[pub.front]} · Back: ${FORMAT_LABEL[pub.back]}`:(FORMAT_LABEL[pub.format]||'Stroke play'); }
+function allowOf(pub){ return Object.assign({},USGA_ALLOW,pub.allow||{}); }
+/* a player's playing handicap for a per-player format (stroke / best ball / shamble) */
+function segPH(pub,p,fmt){ if(typeof p.ch!=='number') return typeof p.ph==='number'?p.ph:null; const a=allowOf(pub)[fmt==='stroke'?'stroke':fmt]; return whsRound(p.ch*(+a||100)/100); }
+/* a scramble team's handicap: course handicaps low→high, weighted by the scramble percentages */
+function scrambleTeamPH(pub,members){ const chs=members.map(p=>p.ch).filter(v=>typeof v==='number').sort((a,b)=>a-b); if(chs.length!==members.length||!chs.length) return null;
+  const A=allowOf(pub), pct=A['scramble'+chs.length]||A.scramble4.slice(0,chs.length); return whsRound(chs.reduce((t,ch,i)=>t+ch*(+pct[i]||0)/100,0)); }
+/* teams in playing order; the first player listed carries the team's score on scramble holes */
+function groupTeams(g){ const m=new Map(); for(const p of g.players||[]){ const k=teamKey(p); if(!m.has(k)) m.set(k,[]); m.get(k).push(p); } return [...m.entries()].map(([k,ms])=>({key:k,members:ms,captain:ms[0]})); }
+/* one team's result on one hole: {gross, net, par, by} (by = player whose ball counted, if any) */
+function teamHole(pub,c,t,h,scores){
+  const fmt=holeFormat(pub,h), hcpOf=p=>(c.hcp[p.set||'M']||c.hcp.M)[h-1], parOf=p=>(c.par[p.set||'M']||c.par.M)[h-1];
+  if(fmt==='scramble'){ const s=+((scores[t.captain.id]||{})[h]); if(!s) return null; const tph=scrambleTeamPH(pub,t.members);
+    return {gross:s,net:tph==null?null:s-strokesOn(tph,hcpOf(t.captain)),par:parOf(t.captain),by:null,fmt}; }
+  let best=null; for(const p of t.members){ const s=+((scores[p.id]||{})[h]); if(!s) continue; const ph=segPH(pub,p,fmt), k=ph==null?0:strokesOn(ph,hcpOf(p)), par=parOf(p);
+    const cand={gross:s,net:ph==null?null:s-k,par,by:p.id,fmt}; const key=pub.scoring==='net'&&cand.net!=null?cand.net-par:s-par;
+    if(!best||key<best.key) best=Object.assign(cand,{key}); }
+  return best;
+}
+function teamBoard(pub,scores,opt){
+  opt=opt||{}; const rows=[];
+  for(const g of pub.groups||[]){ const c=pub.courses[g.course]; if(!c) continue;
+    for(const t of groupTeams(g)){ let n=0,gross=0,toPar=0,net=0,netToPar=0,netOK=true;
+      for(let h=1;h<=18;h++){ const r=teamHole(pub,c,t,h,scores); if(!r) continue; n++; gross+=r.gross; toPar+=r.gross-r.par; if(r.net==null) netOK=false; else { net+=r.net; netToPar+=r.net-r.par; } }
+      const fl=[...new Set(t.members.map(p=>p.flight).filter(Boolean))];
+      rows.push({id:t.key,name:t.members.map(p=>p.name).join(' / '),members:t.members.map(p=>p.id),group:g.label||'',groupId:g.id,course:g.course,courseName:c.name,
+        n,gross,toPar,thru:n===18?'F':String(n),net:netOK?net:null,netToPar:netOK?netToPar:null,flight:fl.join('/'),team:true}); } }
+  const byNet=opt.sort==='net', key=r=>byNet?(r.netToPar==null?9999:r.netToPar):r.toPar;
+  const pool=opt.flight?rows.filter(r=>r.flight===opt.flight):rows;
+  const played=pool.filter(r=>r.n>0).sort((a,b)=>key(a)-key(b)||b.n-a.n||a.gross-b.gross||a.name.localeCompare(b.name)), idle=pool.filter(r=>!r.n).sort((a,b)=>a.name.localeCompare(b.name));
+  let pos=0,prev=null; played.forEach((r,i)=>{ const k=key(r); if(prev===null||k!==prev){ pos=i+1; prev=k; } r.pos=pos; });
+  played.forEach(r=>{ r.posTxt=(played.filter(x=>x.pos===r.pos).length>1?'T':'')+r.pos; }); idle.forEach(r=>{ r.posTxt='—'; });
+  return played.concat(idle);
+}
+/* team events rank teams (players view only makes sense without scramble holes) */
+function eventBoard(pub,scores,opt){ opt=opt||{}; const noPlayers=eventFormats(pub).includes('scramble');
+  return isTeamEvent(pub)&&(opt.view!=='players'||noPlayers)?teamBoard(pub,scores,opt):leaderboard(pub,scores,opt); }
+function bestBallBoard(pub,scores,opt){ return teamBoard(pub,scores,opt); }
 
 const $=id=>document.getElementById(id);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -301,7 +360,7 @@ async function boot(){
   const {data,error}=await sb.rpc('golf_event',{p_slug:SLUG});
   if(error) return fail('Couldn’t reach live scoring. Check your signal and reload.');
   if(!data) return fail('No event found for this link. Check the link with the committee.');
-  pub=data; $('evName').textContent=pub.name; $('evSub').textContent=[pub.date&&new Date(pub.date+'T12:00').toLocaleDateString('en-US',{month:'short',day:'numeric'}),FORMAT_LABEL[pub.format]||'Stroke play',pub.club].filter(Boolean).join(' · ');
+  pub=data; $('evName').textContent=pub.name; $('evSub').textContent=[pub.date&&new Date(pub.date+'T12:00').toLocaleDateString('en-US',{month:'short',day:'numeric'}),formatSummary(pub),pub.club].filter(Boolean).join(' · ');
   document.title=pub.name+' · Live Scoring';
   await loadScores();
   sb.channel('s-'+pub.id).on('postgres_changes',{event:'*',schema:'public',table:'golf_scores',filter:'event_id=eq.'+pub.id},p=>{
@@ -362,38 +421,40 @@ function renderJoin(){
   $('lbBtn').onclick=async()=>{ await loadScores(); renderBoard(true); };
 }
 function renderHole(){
-  const g=group(), c=pub.courses[g.course], order=playOrder(g.startHole), h=order[holeIdx], live=pub.status==='live';
-  const par=p=>(c.par[p.set||'M']||c.par.M)[h-1];
-  const yards=p=>((c.tees||{})[p.tee]||[])[h-1];
+  const g=group(), c=pub.courses[g.course], order=playOrder(g.startHole), h=order[holeIdx], live=pub.status==='live', fmt=holeFormat(pub,h);
+  const par=p=>(c.par[p.set||'M']||c.par.M)[h-1], hcpH=p=>(c.hcp[p.set||'M']||c.hcp.M)[h-1];
   const p0=g.players[0]||{}; const teeYds=[...new Set(g.players.map(p=>p.tee))].map(t=>{ const y=((c.tees||{})[t]||[])[h-1]; return y?`${t} ${y}`:''; }).filter(Boolean).join(' · ');
+  const teams=groupTeams(g);
+  // who enters a score on this hole: every player, or one entry per team on scramble holes
+  const rows=fmt==='scramble'?teams.map(t=>({id:t.captain.id,label:t.members.map(p=>p.name.split(' ')[0]).join(' & '),p:t.captain,k:(()=>{ const tph=scrambleTeamPH(pub,t.members); return tph==null?0:strokesOn(tph,hcpH(t.captain)); })(),team:t}))
+    :g.players.map(p=>{ const ph=pub.format==='stroke'?p.ph:segPH(pub,p,fmt); return {id:p.id,label:p.name,p,k:typeof ph==='number'?strokesOn(ph,hcpH(p)):0}; });
+  const thru=r=>{ if(r.team){ let n=0,rel=0; for(let hh=1;hh<=18;hh++){ const x=teamHole(pub,c,r.team,hh,scores); if(x){ n++; rel+=(pub.scoring==='net'&&x.net!=null?x.net:x.gross)-x.par; } } return 'Team · '+(n?toParTxt(rel)+(pub.scoring==='net'?' net':'')+' thru '+n:'not started'); }
+    const tot=Object.entries(scores[r.id]||{}).filter(([hh])=>holeFormat(pub,+hh)!=='scramble'); const rel=tot.reduce((a,[hh,v])=>a+v-(c.par[r.p.set||'M']||c.par.M)[hh-1],0); return tot.length?toParTxt(rel)+' thru '+tot.length:'Not started'; };
   $('main').innerHTML=`${!live?`<div class="banner">${pub.status==='final'?'Scoring is closed — scores can no longer be changed.':'Scoring hasn’t opened yet. Scores will save once the committee opens it.'}</div>`:''}
   <div class="card" style="overflow:hidden">
    <div class="pad" style="padding-bottom:12px"><div class="holehead"><button class="nav" id="prev" aria-label="Previous hole"${holeIdx===0?' disabled':''}>‹</button>
-     <div style="text-align:center"><div class="n">Hole ${h}</div><div class="meta">Par <b>${par(p0)}</b>${teeYds?' · '+esc(teeYds)+' yds':''} · Hcp ${(c.hcp[p0.set||'M']||c.hcp.M)[h-1]}</div></div>
+     <div style="text-align:center"><div class="n">Hole ${h}</div><div class="meta">Par <b>${par(p0)}</b>${teeYds?' · '+esc(teeYds)+' yds':''} · Hcp ${hcpH(p0)}</div></div>
      <button class="nav" id="next" aria-label="Next hole"${holeIdx===17?' disabled':''}>›</button></div>
-     <div class="muted" style="text-align:center;font-size:13px">${esc(c.name)}${g.label?' · '+esc(g.label):''} · Group ${esc(code)} · ${holeIdx+1} of 18</div></div>
-   ${g.players.map(p=>{ const v=(scores[p.id]||{})[h], pr=par(p); const tot=Object.entries(scores[p.id]||{}); const rel=tot.reduce((a,[hh,s])=>a+s-(c.par[p.set||'M']||c.par.M)[hh-1],0);
-     const hc=(c.hcp[p.set||'M']||c.hcp.M), k=typeof p.ph==='number'?strokesOn(p.ph,hc[h-1]):0;
-     const netRel=typeof p.ph==='number'?rel-tot.reduce((a,[hh])=>a+strokesOn(p.ph,hc[hh-1]),0):null;
-     return `<div class="pl"><div style="min-width:0"><div class="nm">${esc(p.name)}${k>0?'<span class="pop" title="Gets a stroke"></span>'.repeat(k):''}</div><div class="sub">${tot.length?toParTxt(rel)+(netRel!=null?' · net '+toParTxt(netRel):'')+' thru '+tot.length:'Not started'}${p.flight?' · Flight '+esc(p.flight):''}</div></div>
-      <button class="step" data-m="${p.id}" aria-label="One less for ${esc(p.name)}"${live?'':' disabled'}>−</button>
+     <div class="muted" style="text-align:center;font-size:13px">${esc(c.name)}${g.label?' · '+esc(g.label):''} · Group ${esc(code)} · ${holeIdx+1} of 18</div>
+     ${pub.format==='split'||fmt!=='stroke'?`<div style="text-align:center;margin-top:8px"><span class="fmtpill">${esc(FORMAT_LABEL[fmt])}${fmt==='scramble'?' · one score per team':''}</span></div>`:''}</div>
+   ${rows.map(r=>{ const v=(scores[r.id]||{})[h], pr=par(r.p);
+     return `<div class="pl"><div style="min-width:0"><div class="nm">${esc(r.label)}${r.k>0?'<span class="pop" title="Gets a stroke"></span>'.repeat(Math.min(r.k,2)):''}</div><div class="sub">${thru(r)}${r.p.flight?' · Flight '+esc(r.p.flight):''}</div></div>
+      <button class="step" data-m="${r.id}" aria-label="One less for ${esc(r.label)}"${live?'':' disabled'}>−</button>
       <div class="val num ${v?(v<pr?'under':v>pr?'over':''):'empty'}" aria-live="polite">${v||pr}</div>
-      <button class="step" data-p="${p.id}" aria-label="One more for ${esc(p.name)}"${live?'':' disabled'}>+</button></div>`; }).join('')}
-   ${pub.format==='bestball'?(()=>{ const teams=[...new Set(g.players.map(p=>p.team||p.id))]; return `<div class="pad" style="padding:10px 14px;border-top:1px solid var(--line);background:var(--ivory);display:flex;flex-direction:column;gap:4px">${teams.map((tk,ti)=>{ const ms=g.players.filter(p=>(p.team||p.id)===tk); const posted=ms.filter(p=>(scores[p.id]||{})[h]);
-       const best=posted.length?Math.min(...posted.map(p=>(scores[p.id]||{})[h])):null;
-       const bestNet=posted.length&&ms.every(p=>typeof p.ph==='number')?Math.min(...posted.map(p=>(scores[p.id]||{})[h]-strokesOn(p.ph,(c.hcp[p.set||'M']||c.hcp.M)[h-1]))):null;
-       return `<div style="display:flex;justify-content:space-between;font-size:14px"><span class="muted">${esc(ms.map(p=>p.name.split(' ')[0]).join(' & '))}</span><b>${best==null?'—':'Best '+best}${bestNet!=null&&bestNet!==best?' · net '+bestNet:''}</b></div>`; }).join('')}</div>`; })():''}
+      <button class="step" data-p="${r.id}" aria-label="One more for ${esc(r.label)}"${live?'':' disabled'}>+</button></div>`; }).join('')}
+   ${fmt==='bestball'||fmt==='shamble'?`<div class="pad" style="padding:10px 14px;border-top:1px solid var(--line);background:var(--ivory);display:flex;flex-direction:column;gap:4px">${teams.map(t=>{ const x=teamHole(pub,c,t,h,scores);
+       return `<div style="display:flex;justify-content:space-between;font-size:14px"><span class="muted">${esc(t.members.map(p=>p.name.split(' ')[0]).join(' & '))}</span><b>${x?'Best '+x.gross+(x.net!=null&&x.net!==x.gross?' · net '+x.net:''):'—'}</b></div>`; }).join('')}</div>`:''}
    <div class="pad" style="padding-top:14px;display:flex;gap:10px"><button class="btn" id="parAll" style="flex:1"${live?'':' disabled'}>All par</button><button class="btn pri" id="nextBtn" style="flex:2">${holeIdx===17?'Review scorecard':'Save & next hole'}</button></div>
   </div>
-  <div class="strip" aria-label="Holes">${order.map((hh,i)=>{ const n=g.players.filter(p=>(scores[p.id]||{})[hh]).length; return `<button data-go="${i}" class="${n===g.players.length?'done':n?'part':''}${i===holeIdx?' cur':''}" aria-label="Hole ${hh}">${hh}</button>`; }).join('')}</div>
+  <div class="strip" aria-label="Holes">${order.map((hh,i)=>{ const who=holeFormat(pub,hh)==='scramble'?teams.map(t=>t.captain):g.players; const n=who.filter(p=>(scores[p.id]||{})[hh]).length; return `<button data-go="${i}" class="${n===who.length?'done':n?'part':''}${i===holeIdx?' cur':''}" aria-label="Hole ${hh}">${hh}</button>`; }).join('')}</div>
   <p style="text-align:center;margin-top:18px"><button class="btn" id="leave" style="height:40px;font-size:13px">Not your group? Switch group ID</button></p>`;
-  const bump=(pid,d)=>{ const p=g.players.find(x=>x.id===pid), cur=(scores[pid]||{})[h]; const nv=Math.max(1,Math.min(20,(cur||par(p))+(cur?d:(d>0?0:-1)))); setStroke(pid,h,nv); renderHole(); };
+  const bump=(id,d)=>{ const r=rows.find(x=>x.id===id), cur=(scores[id]||{})[h]; const nv=Math.max(1,Math.min(20,(cur||par(r.p))+(cur?d:(d>0?0:-1)))); setStroke(id,h,nv); renderHole(); };
   document.querySelectorAll('[data-m]').forEach(b=>b.onclick=()=>bump(b.dataset.m,-1));
   document.querySelectorAll('[data-p]').forEach(b=>b.onclick=()=>bump(b.dataset.p,1));
-  $('parAll').onclick=()=>{ g.players.forEach(p=>{ if(!(scores[p.id]||{})[h]) setStroke(p.id,h,par(p)); }); renderHole(); };
+  $('parAll').onclick=()=>{ rows.forEach(r=>{ if(!(scores[r.id]||{})[h]) setStroke(r.id,h,par(r.p)); }); renderHole(); };
   $('prev').onclick=()=>{ holeIdx=Math.max(0,holeIdx-1); renderHole(); };
   $('next').onclick=()=>{ holeIdx=Math.min(17,holeIdx+1); renderHole(); };
-  $('nextBtn').onclick=()=>{ if(live) g.players.forEach(p=>{ if(!(scores[p.id]||{})[h]) setStroke(p.id,h,par(p)); });
+  $('nextBtn').onclick=()=>{ if(live) rows.forEach(r=>{ if(!(scores[r.id]||{})[h]) setStroke(r.id,h,par(r.p)); });
     if(holeIdx===17){ tab='card'; render(); } else { holeIdx++; renderHole(); } window.scrollTo(0,0); };
   document.querySelectorAll('.strip [data-go]').forEach(b=>b.onclick=()=>{ holeIdx=+b.dataset.go; renderHole(); });
   $('leave').onclick=()=>{ if(queue.length&&!confirm('Some scores haven’t reached the server yet. Switch anyway? They’ll keep trying in the background.')) return; groupId=null; code=''; localStorage.removeItem(KEY); render(); };
@@ -412,17 +473,17 @@ function showCardFor(gid,pid){
 }
 function renderBoard(fromJoin){
   if(lbSort==null) lbSort=pub.scoring||'gross';
-  const flights=pub.flights||[], hasNet=(pub.groups||[]).some(g=>g.players.some(p=>typeof p.ph==='number')), net=lbSort==='net'&&hasNet;
+  const flights=pub.flights||[], hasNet=(pub.groups||[]).some(g=>g.players.some(p=>typeof p.ph==='number'||typeof p.ch==='number')), net=lbSort==='net'&&hasNet;
   const mine=new Set((group()||{players:[]}).players.map(p=>p.id));
   if(!BIG&&!lbFlight&&group()&&flights.length){ const me=group().players.find(p=>p.flight); if(me&&renderBoard.first!==false){ lbFlight=me.flight; renderBoard.first=false; } }
-  const BB=pub.format==='bestball';
+  const BB=isTeamEvent(pub), noPl=eventFormats(pub).includes('scramble'); if(noPl) lbView='teams';
   const lb=eventBoard(pub,scores,{flight:lbFlight,sort:net?'net':'gross',view:BB?lbView:'players'});
   $('main').innerHTML=`${BIG?`<h1 style="font-size:44px;margin:6px 4px 16px">${esc(pub.name)}${lbFlight?' · Flight '+esc(lbFlight):''}</h1>`:''}
-   ${!BIG&&(flights.length||hasNet||BB)?`<div class="chips">${BB?[['teams','Teams'],['players','Players']].map(([k,l])=>`<button data-vw="${k}" class="${lbView===k?'on':''}">${l}</button>`).join(''):''}${hasNet?['gross','net'].map(x=>`<button data-sort="${x}" class="${(net?'net':'gross')===x?'on':''}">${x==='net'?'Net':'Gross'}</button>`).join(''):''}${flights.length?['',...flights].map(f=>`<button data-fl="${f}" class="${lbFlight===f?'on':''}">${f?'Flight '+f:'All'}</button>`).join(''):''}</div>`:''}
+   ${!BIG&&(flights.length||hasNet||BB)?`<div class="chips">${BB&&!noPl?[['teams','Teams'],['players','Players']].map(([k,l])=>`<button data-vw="${k}" class="${lbView===k?'on':''}">${l}</button>`).join(''):''}${hasNet?['gross','net'].map(x=>`<button data-sort="${x}" class="${(net?'net':'gross')===x?'on':''}">${x==='net'?'Net':'Gross'}</button>`).join(''):''}${flights.length?['',...flights].map(f=>`<button data-fl="${f}" class="${lbFlight===f?'on':''}">${f?'Flight '+f:'All'}</button>`).join(''):''}</div>`:''}
    <div class="card" style="overflow:hidden">
    <div class="lb h"><span>Pos</span><span>${BB&&lbView==='teams'?'Team':'Player'}</span><span class="r">Thru</span><span class="r">${net?'Net':'To par'}</span></div>
    ${lb.map(r=>`<div class="lb num${mine.has(r.id)||(r.members||[]).some(id=>mine.has(id))?' me':''}" data-card="${esc(r.groupId)}|${esc(r.team?(r.members||[])[0]:r.id)}" style="cursor:pointer"><b>${r.posTxt}</b><div style="min-width:0"><div style="font-weight:700;${r.team?'line-height:1.25':'overflow:hidden;text-overflow:ellipsis;white-space:nowrap'}" title="${esc(r.name)}">${r.team?r.name.split(' / ').map(esc).join('<br>'):esc(r.name)}</div>${BIG?'':`<div class="muted" style="font-size:12px">${esc(r.courseName.replace(' Course',''))}${r.flight&&!lbFlight?' · Flt '+esc(r.flight):''}${r.n?' · '+r.gross+(net&&r.net!=null?' / net '+r.net:''):''}</div>`}</div><span class="r muted">${r.n?r.thru:'—'}</span>${(()=>{ const v=net?r.netToPar:r.toPar; return `<span class="tp ${r.n&&v<0?'pos':r.n?'':'muted'}">${r.n&&v!=null?toParTxt(v):'—'}</span>`; })()}</div>`).join('')||'<div class="lb"><span></span><span class="muted">No players yet.</span></div>'}
-  </div><p class="muted" style="text-align:center;font-size:12.5px">${pub.status==='final'?'Final · ':''}${net?'Net':'Gross'} ${BB&&lbView==='teams'?'best ball':'stroke play'}${BIG?'':' · tap a row for the scorecard'}${lbFlight?' · Flight '+esc(lbFlight):''} · updates live</p>${fromJoin?'<p style="text-align:center"><button class="btn" id="backJoin">Back</button></p>':''}`;
+  </div><p class="muted" style="text-align:center;font-size:12.5px">${pub.status==='final'?'Final · ':''}${net?'Net':'Gross'} ${BB&&lbView==='teams'?formatSummary(pub).toLowerCase():'stroke play'}${BIG?'':' · tap a row for the scorecard'}${lbFlight?' · Flight '+esc(lbFlight):''} · updates live</p>${fromJoin?'<p style="text-align:center"><button class="btn" id="backJoin">Back</button></p>':''}`;
   const bj=$('backJoin'); if(bj) bj.onclick=()=>renderJoin();
   document.querySelectorAll('[data-fl]').forEach(b=>b.onclick=()=>{ lbFlight=b.dataset.fl; renderBoard.first=false; renderBoard(fromJoin); });
   document.querySelectorAll('[data-sort]').forEach(b=>b.onclick=()=>{ lbSort=b.dataset.sort; renderBoard(fromJoin); });
