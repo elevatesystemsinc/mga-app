@@ -81,6 +81,15 @@ Each tournament has a **Calcutta** tab.
 - **By flight:** teams sold, gross, expense share, net pot, and the payout by place from each
   flight's net (40/30/20/10 by default, editable, any number of places).
 - **Export results:** a workbook with Lots, Bidders (what each owes), By flight and Expenses.
+- **Payments:** totals by Cash, Zelle, Credit card and Check, what's still owed, and a **cash drawer**
+  check — starting cash + cash payments = what should be in the drawer; enter the count to see over/short.
+- **Cashier link** (one-time setup: run `calcutta-setup.sql`, and upload `cashier.html` with `index.html`):
+  **Create cashier link** gives a private address for the cashiers' laptops — no board password. They can
+  record sales and pool decisions, add and edit bidders (players in the field come up as they type), mark
+  bidders paid by method, and count the cash drawer. Several cashiers can work at once; each change saves
+  on its own and appears everywhere within a few seconds (the hub included). Edits to different teams or
+  bidders never overwrite each other; on the same one, the latest wins. A laptop that drops offline keeps
+  its changes and saves them when it reconnects. **Turn off** locks the link immediately; the data stays.
 - The Calcutta lives in the hub only; syncing with the current Member-Member app never touches it.
 
 ## Live scoring (Golf)

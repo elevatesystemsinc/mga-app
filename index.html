@@ -2823,7 +2823,7 @@ async function syncAll(){
   if(!drawerOpen()&&(before!==after||view.page==='tournament'||view.page==='dash')) render();
 }
 function syncSoon(ms){ clearTimeout(syncTimer); syncTimer=setTimeout(syncAll,ms||2500); }
-function afterPersist(){ if(syncSuppress||!CLOUD||!sessionOK) return; if(db.tournaments.some(isSynced)) syncSoon(2500); startSyncWatch(); }
+function afterPersist(){ if(!syncSuppress&&typeof calcAfterPersist==='function') calcAfterPersist(); if(syncSuppress||!CLOUD||!sessionOK) return; if(db.tournaments.some(isSynced)) syncSoon(2500); startSyncWatch(); }
 function startSyncWatch(){
   if(syncStarted||!CLOUD||!sessionOK) return; syncStarted=true;
   sb.channel('mm-sync').on('postgres_changes',{event:'*',schema:'public',table:'mm_tournament',filter:'id=eq.main'},()=>{ if(db.tournaments.some(isSynced)) syncSoon(800); }).subscribe();
@@ -2864,6 +2864,90 @@ function openSync(t){
 document.addEventListener('click',e=>{ const b=e.target.closest('[data-sync]'); if(!b) return; const t=T(); if(t) openSync(t); });
 
 /* =====================================================================
+   Calcutta core — pure logic shared by the hub and the cashier page.
+   ===================================================================== */
+const c0=v=>{ const x=parseFloat(v); return isFinite(x)?x:0; };
+const flightName=f=>/^\d+$/.test(String(f))?'Flight '+f:String(f||'—');
+const idxTxt2=v=>v==null||v===''?'—':(+v<0?'+'+Math.abs(+v).toFixed(1):(+v).toFixed(1));
+const teamName=l=>l&&l.isPool?`The Pool (${l.count} team${l.count===1?'':'s'})`:`${l.p1} & ${l.p2}`;
+/* teams that didn't reach the minimum; sold together as one extra lot after the last one */
+const poolTeams=c=>c.lots.filter(l=>l.pooled);
+const poolLotNum=c=>c.lots.reduce((a,l)=>Math.max(a,+l.lot||0),0)+1;
+function poolLot(c){ const ts=poolTeams(c); return ts.length?{id:'__pool',isPool:true,lot:poolLotNum(c),count:ts.length,teams:ts,bidderId:c.pool.bidderId,price:c0(c.pool.price),flight:'Pool'}:null; }
+const auctionSeq=c=>{ const p=poolLot(c); return c.lots.concat(p?[p]:[]); };
+function setPooled(c,l,on){ l.pooled=!!on; if(on){ l.price=0; l.bidderId=''; } if(!poolTeams(c).length) c.pool={bidderId:'',price:0}; }
+function calcTotalsC(c){
+  const flights=[...new Set(c.lots.map(l=>flightName(l.flight)))].sort((a,b)=>a.localeCompare(b,undefined,{numeric:true}));
+  const exp=c.expenses.reduce((a,e)=>a+c0(e.amount),0), share=flights.length?exp/flights.length:0;
+  const pt=poolTeams(c), pp=c0(c.pool.price), perPoolTeam=pt.length&&pp>0?pp/pt.length:0;   // pool price shared by its teams' flights
+  const byF=flights.map(f=>{ const ls=c.lots.filter(l=>flightName(l.flight)===f);
+    const sold=ls.filter(l=>!l.pooled&&c0(l.price)>0), inPool=ls.filter(l=>l.pooled);
+    const fromPool=inPool.length*perPoolTeam, gross=sold.reduce((a,l)=>a+c0(l.price),0)+fromPool, net=gross-share;
+    return {flight:f,teams:ls.length,sold:sold.length,pooled:inPool.length,fromPool,gross,share,net,places:c.payout.map(p=>Math.max(0,net)*c0(p)/100)}; });
+  const pot=byF.reduce((a,f)=>a+f.gross,0), soldLots=c.lots.filter(l=>!l.pooled&&c0(l.price)>0);
+  const prices=soldLots.map(l=>c0(l.price)).concat(pp>0?[pp]:[]);
+  return {flights,byF,exp,share,pot,net:pot-exp,sold:soldLots.length+(pp>0?pt.length:0),lots:c.lots.length,pooled:pt.length,poolPrice:pp,poolLot:pt.length?poolLotNum(c):null,
+          top:prices.reduce((a,v)=>Math.max(a,v),0),avg:prices.length?prices.reduce((a,v)=>a+v,0)/prices.length:0,payPct:c.payout.reduce((a,p)=>a+c0(p),0)};
+}
+const bidderById=(c,id)=>c.bidders.find(b=>b.id===id);
+const bidderByNum=(c,n)=>c.bidders.find(b=>String(b.num)===String(n).trim());
+const bidderLabel=b=>b?`#${b.num} ${b.name}`:'—';
+function bidderOwes(c,b){ const ls=c.lots.filter(l=>!l.pooled&&l.bidderId===b.id&&c0(l.price)>0); const p=poolLot(c); if(p&&p.bidderId===b.id&&p.price>0) ls.push(p); return {lots:ls,total:ls.reduce((a,l)=>a+c0(l.price),0)}; }
+
+
+/* payments: what's been collected, by method, and what's still owed */
+const PAY_METHODS=['Cash','Zelle','Credit card','Check'];
+function calcPayments(c){
+  const by={}; PAY_METHODS.forEach(m=>by[m]=0); let outstanding=0, buyers=0, paid=0, notRecorded=0;
+  for(const b of c.bidders){ const o=bidderOwes(c,b); if(!(o.total>0)) continue; buyers++;
+    if(b.paid){ paid++; if(b.method&&by[b.method]!=null) by[b.method]+=o.total; else notRecorded+=o.total; } else outstanding+=o.total; }
+  const collected=PAY_METHODS.reduce((a,m)=>a+by[m],0)+notRecorded;
+  const hasCount=c.cashCount!=null&&c.cashCount!=='';
+  const expectedCash=c0(c.cashFloat)+by.Cash;
+  return {by,notRecorded,collected,outstanding,buyers,paid,expectedCash,cashCount:hasCount?c0(c.cashCount):null,overShort:hasCount?c0(c.cashCount)-expectedCash:null};
+}
+/* ---------- shared editing (hub + cashiers) ----------
+   Each team, bidder and expense carries a last-changed time (u). Before saving, anything that changed
+   since the last sync is stamped; when two copies meet, the newer version of each item wins, deletes
+   travel as tombstones, and settings (minimum, payout, pool, cash counts) merge as one unit. */
+const CALC_KINDS=['lots','bidders','expenses'];
+const CALC_SET=['minBid','payout','pool','cashCount','cashFloat','file','importedAt'];
+function calcStable(x){ if(Array.isArray(x)) return '['+x.map(calcStable).join(',')+']'; if(x&&typeof x==='object') return '{'+Object.keys(x).filter(k=>x[k]!==undefined).sort().map(k=>JSON.stringify(k)+':'+calcStable(x[k])).join(',')+'}'; return JSON.stringify(x===undefined?null:x); }
+const calcStrip=e=>{ const o=Object.assign({},e); delete o.u; return o; };
+const calcSettings=c=>{ const o={}; CALC_SET.forEach(k=>{ o[k]=c[k]===undefined?null:c[k]; }); return o; };
+function calcDoc(c){ const d={}; CALC_KINDS.forEach(k=>d[k]=JSON.parse(JSON.stringify(c[k]||[]))); CALC_SET.forEach(k=>{ if(c[k]!==undefined) d[k]=JSON.parse(JSON.stringify(c[k])); });
+  d._su=c._su||0; d._del=JSON.parse(JSON.stringify(c._del||[])); if(c.people) d.people=c.people; if(c.name) d.name=c.name; return d; }
+function calcStamp(c,base,now){
+  now=now||Date.now(); base=base||{}; c._del=c._del||[];
+  for(const k of CALC_KINDS){ const bm=new Map((base[k]||[]).map(e=>[e.id,calcStable(calcStrip(e))])); const ids=new Set();
+    for(const e of c[k]||[]){ ids.add(e.id); if(bm.get(e.id)!==calcStable(calcStrip(e))) e.u=now; }
+    for(const id of bm.keys()) if(!ids.has(id)&&!c._del.some(d=>d.kind===k&&d.id===id)) c._del.push({kind:k,id,u:now}); }
+  if(calcStable(calcSettings(c))!==calcStable(calcSettings(base))) c._su=now;
+}
+function calcMerge(r,l){
+  r=r||{}; l=l||{}; const out={};
+  const dm=new Map(); for(const d of (r._del||[]).concat(l._del||[])){ const key=d.kind+'|'+d.id; if(!dm.has(key)||dm.get(key).u<d.u) dm.set(key,d); }
+  const cutoff=Date.now()-3*864e5; out._del=[...dm.values()].filter(d=>d.u>cutoff);
+  for(const k of CALC_KINDS){ const m=new Map(); for(const e of r[k]||[]) m.set(e.id,e);
+    for(const e of l[k]||[]){ const cur=m.get(e.id); if(!cur||(e.u||0)>=(cur.u||0)) m.set(e.id,e); }
+    out[k]=[...m.values()].filter(e=>{ const d=dm.get(k+'|'+e.id); return !d||d.u<(e.u||0); }); }
+  out.lots.sort((a,b)=>(+a.lot||0)-(+b.lot||0)); out.bidders.sort((a,b)=>(+a.num||0)-(+b.num||0));
+  const win=(l._su||0)>=(r._su||0)?l:r; CALC_SET.forEach(k=>{ const v=win[k]!==undefined?win[k]:(win===l?r[k]:l[k]); if(v!==undefined) out[k]=v; }); out._su=Math.max(l._su||0,r._su||0);
+  out.people=l.people||r.people; out.name=l.name||r.name;
+  return out;
+}
+/* one save round-trip: merge with the latest copy and write it only if nobody saved in between */
+async function calcSyncOnce(get,put,local){
+  for(let n=0;n<4;n++){
+    const rem=await get(); const merged=calcMerge(rem.doc,local);
+    if(calcStable(merged)===calcStable(rem.doc)) return {doc:rem.doc,version:rem.version,wrote:false};
+    try{ const v=await put(merged,rem.version); return {doc:merged,version:v,wrote:true}; }
+    catch(e){ if(!/conflict/i.test(e.message||'')) throw e; }
+  }
+  throw new Error('Too many people saving at once — try again');
+}
+
+/* =====================================================================
    Calcutta (players auction) — per tournament.
    t.calcutta = { lots:[{id,lot,p1,i1,p2,i2,flight,idx,fun,bidderId,price}],
                   bidders:[{id,num,name,memberId,paid,method}],
@@ -2875,33 +2959,7 @@ const CALC_PAYOUT=[40,30,20,10];
 function calc(t){ if(!t.calcutta) t.calcutta={lots:[],bidders:[],expenses:[],payout:CALC_PAYOUT.slice(),minBid:250}; const c=t.calcutta;
   if(c.minBid==null) c.minBid=250; c.pool=c.pool||{bidderId:'',price:0};
   c.lots=c.lots||[]; c.bidders=c.bidders||[]; c.expenses=c.expenses||[]; c.payout=c.payout&&c.payout.length?c.payout:CALC_PAYOUT.slice(); return c; }
-const flightName=f=>/^\d+$/.test(String(f))?'Flight '+f:String(f||'—');
-const idxTxt2=v=>v==null||v===''?'—':(+v<0?'+'+Math.abs(+v).toFixed(1):(+v).toFixed(1));
-const teamName=l=>l&&l.isPool?`The Pool (${l.count} team${l.count===1?'':'s'})`:`${l.p1} & ${l.p2}`;
-/* teams that didn't reach the minimum; sold together as one extra lot after the last one */
-const poolTeams=c=>c.lots.filter(l=>l.pooled);
-const poolLotNum=c=>c.lots.reduce((a,l)=>Math.max(a,+l.lot||0),0)+1;
-function poolLot(c){ const ts=poolTeams(c); return ts.length?{id:'__pool',isPool:true,lot:poolLotNum(c),count:ts.length,teams:ts,bidderId:c.pool.bidderId,price:n0(c.pool.price),flight:'Pool'}:null; }
-const auctionSeq=c=>{ const p=poolLot(c); return c.lots.concat(p?[p]:[]); };
-function setPooled(c,l,on){ l.pooled=!!on; if(on){ l.price=0; l.bidderId=''; } if(!poolTeams(c).length) c.pool={bidderId:'',price:0}; }
-function calcTotals(t){
-  const c=calc(t), flights=[...new Set(c.lots.map(l=>flightName(l.flight)))].sort((a,b)=>a.localeCompare(b,undefined,{numeric:true}));
-  const exp=c.expenses.reduce((a,e)=>a+n0(e.amount),0), share=flights.length?exp/flights.length:0;
-  const pt=poolTeams(c), pp=n0(c.pool.price), perPoolTeam=pt.length&&pp>0?pp/pt.length:0;   // pool price shared by its teams' flights
-  const byF=flights.map(f=>{ const ls=c.lots.filter(l=>flightName(l.flight)===f);
-    const sold=ls.filter(l=>!l.pooled&&n0(l.price)>0), inPool=ls.filter(l=>l.pooled);
-    const fromPool=inPool.length*perPoolTeam, gross=sold.reduce((a,l)=>a+n0(l.price),0)+fromPool, net=gross-share;
-    return {flight:f,teams:ls.length,sold:sold.length,pooled:inPool.length,fromPool,gross,share,net,places:c.payout.map(p=>Math.max(0,net)*n0(p)/100)}; });
-  const pot=byF.reduce((a,f)=>a+f.gross,0), soldLots=c.lots.filter(l=>!l.pooled&&n0(l.price)>0);
-  const prices=soldLots.map(l=>n0(l.price)).concat(pp>0?[pp]:[]);
-  return {flights,byF,exp,share,pot,net:pot-exp,sold:soldLots.length+(pp>0?pt.length:0),lots:c.lots.length,pooled:pt.length,poolPrice:pp,poolLot:pt.length?poolLotNum(c):null,
-          top:prices.reduce((a,v)=>Math.max(a,v),0),avg:prices.length?prices.reduce((a,v)=>a+v,0)/prices.length:0,payPct:c.payout.reduce((a,p)=>a+n0(p),0)};
-}
-const bidderById=(c,id)=>c.bidders.find(b=>b.id===id);
-const bidderByNum=(c,n)=>c.bidders.find(b=>String(b.num)===String(n).trim());
-const bidderLabel=b=>b?`#${b.num} ${b.name}`:'—';
-function bidderOwes(c,b){ const ls=c.lots.filter(l=>!l.pooled&&l.bidderId===b.id&&n0(l.price)>0); const p=poolLot(c); if(p&&p.bidderId===b.id&&p.price>0) ls.push(p); return {lots:ls,total:ls.reduce((a,l)=>a+n0(l.price),0)}; }
-
+const calcTotals=t=>calcTotalsC(calc(t));
 /* ---------- import (the auction-order sheet or the fun-team sheet) ---------- */
 function parseCalcSheet(rows){
   const low=r=>r.map(c=>String(c||'').trim().toLowerCase());
@@ -3153,6 +3211,7 @@ function tCalcutta(el,t){
   const lcols='grid-template-columns:54px minmax(0,1.6fr) 84px 70px minmax(0,1fr) 100px 40px';
   el.innerHTML=`
   <div class="grid g4">${kpi('Pot',fmt(T2.pot),`${T2.sold} of ${T2.lots} teams sold`)}${kpi('Expenses',fmt(T2.exp),`${fmt(T2.share)} from each of ${T2.flights.length} flights`)}${kpi('Net to flights',fmt(T2.net),'after expenses',T2.net>=0?'pos':'neg')}${kpi('Top price',fmt(T2.top),T2.sold?`average ${fmt(T2.avg)}`:'no sales yet')}</div>
+  ${cashierCard(t)}
   <div class="card pad" style="display:flex;gap:14px 24px;align-items:center;flex-wrap:wrap"><div class="cell2" style="flex:1 1 320px"><span class="lbl">Minimum bid</span><b style="font-size:18px">${c.minBid?fmt(c.minBid):'None'}</b><small class="muted">${c.minBid?`Teams that don’t reach it go into the pool, auctioned together as Lot ${T2.poolLot||poolLotNum(c)}.`:'Every team sells for whatever it brings.'}${T2.pooled?` <b>${T2.pooled} team${T2.pooled===1?'':'s'} in the pool${T2.poolPrice?` · sold ${fmt(T2.poolPrice)}`:''}.</b>`:''}</small></div><div class="actions">${T2.pooled?`<button class="btn sm" id="ccPool">The pool</button>`:''}<button class="btn sm" id="ccMin">Change minimum</button></div></div>
   <div class="toolbar"><div class="actions"><button class="btn pri" id="ccRun">Run the auction</button><button class="btn" id="ccImp">${I.down}Upload team sheet</button><button class="btn" id="ccExp">${I.down}Export results</button></div>
     <span class="muted" style="margin-left:auto;font-size:13px">${c.file?esc(c.file)+' · ':''}${c.bidders.length} bidders</span></div>
@@ -3162,10 +3221,11 @@ function tCalcutta(el,t){
     <div class="tr num tot" style="${fcols}"><b>Total</b><span class="r">${T2.sold}/${T2.lots}</span><b class="r">${fmt(T2.pot)}</b><b class="r neg">−${fmt(T2.exp)}</b><b class="r">${fmt(T2.net)}</b>${c.payout.map((p,i)=>`<b class="r">${fmt(T2.byF.reduce((a,f)=>a+f.places[i],0))}</b>`).join('')}</div></div></div>
     ${Math.abs(T2.payPct-100)>0.01?`<div class="banner" style="margin:12px 22px 18px">Payout adds up to ${T2.payPct}% of each flight’s net pot.</div>`:''}</div>
   <div class="grid g2" style="align-items:start">
+    <div style="display:flex;flex-direction:column;gap:20px">${paymentsCard(t)}
     <div class="card" style="overflow:hidden"><div class="cardhead"><div><h2 class="h2">Expenses</h2><span class="muted">Paid out of the Calcutta, split evenly by flight</span></div><button class="btn sm" id="ccAddE">${I.plus}Add</button></div>
       ${c.expenses.length?c.expenses.map(e=>`<div class="tr num click" data-ce="${e.id}" style="grid-template-columns:minmax(0,1fr) 100px 100px 40px"><div class="cell2"><b class="trunc">${esc(e.desc)}</b>${e.notes?`<small class="trunc">${esc(e.notes)}</small>`:''}</div><span class="r">${fmt(e.amount)}</span><span class="r muted">${fmt(n0(e.amount)/(T2.flights.length||1))}/flight</span><span class="ib">${I.edit}</span></div>`).join('')+
         `<div class="tr num tot" style="grid-template-columns:minmax(0,1fr) 100px 100px 40px"><b>Total</b><b class="r">${fmt(T2.exp)}</b><b class="r">${fmt(T2.share)}/flight</b><span></span></div>`
-        :'<div class="empty" style="padding:22px"><span>No expenses yet — for example, the auction dinner.</span></div>'}</div>
+        :'<div class="empty" style="padding:22px"><span>No expenses yet — for example, the auction dinner.</span></div>'}</div></div>
     <div class="card" style="overflow:hidden"><div class="cardhead"><div><h2 class="h2">Bidders</h2><span class="muted">${c.bidders.filter(b=>b.paid).length} of ${c.bidders.filter(b=>bidderOwes(c,b).total>0).length} buyers paid</span></div><div class="actions">${c.bidders.length?`<button class="btn sm" id="ccClr">Remove all numbers</button>`:''}<button class="btn sm" id="ccBulk">Number the players</button><button class="btn sm" id="ccAddB">${I.plus}Add</button></div></div>
       <div style="max-height:420px;overflow:auto">${c.bidders.length?c.bidders.map(b=>{ const o=bidderOwes(c,b); return `<div class="tr num click" data-cb="${b.id}" style="grid-template-columns:56px minmax(0,1fr) 50px 96px 64px"><b>#${esc(b.num)}</b><span class="trunc">${esc(b.name)}</span><span class="r muted">${o.lots.length||''}</span><span class="r">${o.total?fmt(o.total):'—'}</span><span class="r">${o.total?(b.paid?`<span class="chip ok">Paid</span>`:'<span class="chip warn">Owes</span>'):''}</span></div>`; }).join('')
         :'<div class="empty" style="padding:22px"><span>Add bidders one at a time, or number every player in the field.</span></div>'}</div></div>
@@ -3178,7 +3238,10 @@ function tCalcutta(el,t){
       return `<div class="tr num click" data-cl="${l.id}" style="${lcols}${l.pooled?';opacity:.72':''}"><b>${l.lot}</b><span class="trunc">${l.fun?'<span style="color:var(--gold)" title="Fun team">★</span> ':''}${esc(teamName(l))}</span><span class="muted">${esc(flightName(l.flight))}</span><span class="r muted">${idxTxt2(l.idx)}</span><span class="trunc">${l.pooled?`<span class="chip">In the pool · Lot ${poolLotNum(c)}</span>`:n0(l.price)>0?esc(bidderLabel(b)):'<span class="muted">—</span>'}</span><b class="r">${!l.pooled&&n0(l.price)>0?fmt(l.price):''}</b><span class="ib">${I.edit}</span></div>`; }).join('')||'<div class="empty" style="padding:22px"><span>No lots match.</span></div>'}
     </div></div></div>`;
   $('ccRun').onclick=()=>runAuction(t); $('ccImp').onclick=()=>importCalcutta(t); $('ccExp').onclick=()=>exportCalcutta(t);
-  $('ccPay').onclick=()=>editPayout(t); $('ccMin').onclick=()=>editMinBid(t); const pbn=$('ccPool'); if(pbn) pbn.onclick=()=>editPool(t); $('ccAddE').onclick=()=>editCalcExpense(t,null); $('ccAddB').onclick=()=>editBidder(t,null); $('ccBulk').onclick=()=>bulkBidders(t);
+  $('ccPay').onclick=()=>editPayout(t); $('ccCash').onclick=()=>editCash(t);
+  const sh=$('ccShare'); if(sh) sh.onclick=()=>startCashierLink(t);
+  const cp=$('ccCopy'); if(cp) cp.onclick=async()=>{ const l=cashierLink(t); try{ await navigator.clipboard.writeText(l); toast('Link copied'); }catch(_){ prompt('Copy this link:',l); } };
+  const st=$('ccStop'); if(st) st.onclick=()=>stopCashierLink(t); $('ccMin').onclick=()=>editMinBid(t); const pbn=$('ccPool'); if(pbn) pbn.onclick=()=>editPool(t); $('ccAddE').onclick=()=>editCalcExpense(t,null); $('ccAddB').onclick=()=>editBidder(t,null); $('ccBulk').onclick=()=>bulkBidders(t);
   const cl=$('ccClr'); if(cl) cl.onclick=()=>clearBidders(t);
   el.querySelectorAll('[data-ce]').forEach(r=>r.onclick=()=>editCalcExpense(t,c.expenses.find(e=>e.id===r.dataset.ce)));
   el.querySelectorAll('[data-cb]').forEach(r=>r.onclick=()=>editBidder(t,c.bidders.find(b=>b.id===r.dataset.cb)));
@@ -3199,8 +3262,82 @@ async function exportCalcutta(t){
   const fl=[['Flight','Teams sold','Teams in pool','Pool share','Gross','Expense share','Net pot'].concat(c.payout.map((p,i)=>`${plc[i]||i+1} (${p}%)`))].concat(T2.byF.map(f=>[f.flight,f.sold,f.pooled,f.fromPool,f.gross,f.share,f.net].concat(f.places)))
     .concat([['Total',T2.sold,T2.pooled,T2.poolPrice,T2.pot,T2.exp,T2.net].concat(c.payout.map((p,i)=>T2.byF.reduce((a,f)=>a+f.places[i],0)))]);
   XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(fl),'By flight');
+  const P=calcPayments(c); XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([['Payments','Amount']].concat(PAY_METHODS.map(m=>[m,P.by[m]])).concat(P.notRecorded?[['Paid, method not recorded',P.notRecorded]]:[]).concat([['Collected',P.collected],['Still owed',P.outstanding],[],['Starting cash',c0(c.cashFloat)],['Should be in the drawer',P.expectedCash],['Cash counted',P.cashCount==null?'':P.cashCount],['Over (+) / short (−)',P.overShort==null?'':P.overShort]])),'Payments');
   XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([['Expense','Amount','Per flight','Notes']].concat(c.expenses.map(e=>[e.desc,n0(e.amount),n0(e.amount)/(T2.flights.length||1),e.notes||'']))),'Expenses');
   XLSX.writeFile(wb,`${(t.name||'Tournament').replace(/[^\w]+/g,'-')}-Calcutta-${new Date().toISOString().slice(0,10)}.xlsx`);
+}
+
+/* ============ Cashier link: share this Calcutta with the cashiers' laptops ============ */
+const cashierLink=t=>location.href.split('#')[0].split('?')[0].replace(/[^/]*$/,'')+'cashier.html?k='+encodeURIComponent(calc(t).share.token);
+const newToken=()=>Array.from(crypto.getRandomValues(new Uint8Array(24)),b=>'abcdefghijkmnpqrstuvwxyz23456789'[b%32]).join('');
+function calcPeople(t){ return (t.field||[]).map(p=>{ const m=memberById(p.memberId); return m?{id:m.id,name:tidyName(memberName(m))}:null; }).filter(Boolean).sort((a,b)=>a.name.localeCompare(b.name)); }
+async function calcShareSync(t){
+  const c=calc(t); if(!c.share||!c.share.token||!CLOUD||!sessionOK) return false;
+  c.people=calcPeople(t); c.name=t.name;
+  calcStamp(c,c._base);
+  const token=c.share.token;
+  const get=async()=>{ const {data,error}=await sb.rpc('calcutta_get',{p_token:token}); if(error) throw new Error(error.message); if(!data) throw new Error('The cashier link is off'); return data; };
+  const put=async(doc,ver)=>{ const {data,error}=await sb.rpc('calcutta_put',{p_token:token,p_doc:doc,p_version:ver}); if(error) throw new Error(error.message); return data; };
+  try{
+    const before=calcStable(calcDoc(c));
+    const res=await calcSyncOnce(get,put,calcDoc(c));
+    const d=res.doc; CALC_KINDS.forEach(k=>c[k]=d[k]||[]); CALC_SET.forEach(k=>{ if(d[k]!==undefined) c[k]=d[k]; }); c._su=d._su||0; c._del=d._del||[];
+    c._base=JSON.parse(JSON.stringify(d)); c._ver=res.version; c.share.state='live'; c.share.at=new Date().toISOString(); c.share.msg='';
+    return calcStable(calcDoc(c))!==before;
+  }catch(e){ c.share.state='error'; c.share.msg=e.message; return false; }
+}
+let calcShareTimer=null, calcShareBusy=false;
+async function calcShareAll(){
+  if(calcShareBusy) return; const ts=db.tournaments.filter(t=>t.calcutta&&t.calcutta.share&&t.calcutta.share.token); if(!ts.length) return;
+  if(drawerOpen()){ clearTimeout(calcShareTimer); calcShareTimer=setTimeout(calcShareAll,1500); return; }   // never swap records under an open editor
+  calcShareBusy=true; let changed=false;
+  try{ for(const t of ts) changed=(await calcShareSync(t))||changed; } finally{ calcShareBusy=false; }
+  if(typeof syncSuppress!=='undefined'){ syncSuppress=true; persist(); syncSuppress=false; } else persist();
+  if(!drawerOpen()&&view.page==='tournament'&&view.ttab==='calcutta') render();
+}
+function calcAfterPersist(){ if(calcShareBusy||!CLOUD||!sessionOK) return; if(!db.tournaments.some(t=>t.calcutta&&t.calcutta.share&&t.calcutta.share.token)) return; clearTimeout(calcShareTimer); calcShareTimer=setTimeout(calcShareAll,700); }
+setInterval(()=>{ if(document.visibilityState==='visible'&&view.page==='tournament'&&view.ttab==='calcutta'&&!calcShareBusy) calcShareAll(); },4000);
+async function startCashierLink(t){
+  const c=calc(t); if(!CLOUD||!sessionOK){ toast('The cashier link needs the cloud sign-in'); return; }
+  const token=newToken(); c.people=calcPeople(t); c.name=t.name; c._del=c._del||[];
+  const doc=calcDoc(c);
+  const {error}=await sb.from('calcutta_share').upsert({tid:t.id,token,name:t.name,doc,version:1,updated_at:new Date().toISOString()});
+  if(error){ toast(/relation|does not exist/i.test(error.message)?'Run calcutta-setup.sql in Supabase to turn on cashier links':'Couldn’t create the link: '+error.message); return; }
+  c.share={token,state:'live',at:new Date().toISOString(),created:new Date().toISOString()}; c._base=JSON.parse(JSON.stringify(doc)); c._ver=1;
+  persist(); render(); toast('Cashier link ready');
+}
+function stopCashierLink(t){
+  const c=calc(t);
+  openDrawer({kicker:t.name+' · Calcutta',title:'Turn off the cashier link?',saveLabel:'Turn it off',
+    body:'<p style="margin:0">Anyone with the link loses access right away. Everything they recorded stays in the hub. You can create a new link later — it will have a different address.</p>',
+    save:()=>{ (async()=>{ await calcShareAll(); await sb.from('calcutta_share').update({token:null}).eq('tid',t.id); delete c.share; persist(); render(); toast('Cashier link turned off'); })(); }});
+}
+function editCash(t){
+  const c=calc(t), P=calcPayments(c);
+  openDrawer({kicker:t.name+' · Calcutta',title:'Cash drawer',
+    body:field('Starting cash in the drawer','ccFl',c.cashFloat??'',{type:'number',hint:'Change the cashiers started with, if any.'})+
+      field('Cash counted','ccCt',c.cashCount??'',{type:'number',hint:`Expected: ${fmt(P.expectedCash)} (starting cash + ${fmt(P.by.Cash)} cash payments). Leave blank until you count.`}),
+    save:()=>{ const f=fv('ccFl'), k=fv('ccCt'); c.cashFloat=f===''?null:fnum('ccFl'); c.cashCount=k===''?null:fnum('ccCt'); }});
+}
+function paymentsCard(t){
+  const c=calc(t), P=calcPayments(c), T2=calcTotalsC(c);
+  const row=(l,v,cls='')=>`<div class="tr num" style="grid-template-columns:minmax(0,1fr) 110px"><span class="${cls}">${l}</span><b class="r ${cls}">${v}</b></div>`;
+  return `<div class="card" style="overflow:hidden"><div class="cardhead"><div><h2 class="h2">Payments</h2><span class="muted">${P.paid} of ${P.buyers} buyers paid</span></div><button class="btn sm" id="ccCash">Count cash</button></div>
+    ${PAY_METHODS.map(m=>row(m,fmt(P.by[m]))).join('')}${P.notRecorded?row('Paid, method not recorded',fmt(P.notRecorded),'neg'):''}
+    <div class="tr num tot" style="grid-template-columns:minmax(0,1fr) 110px"><b>Collected</b><b class="r">${fmt(P.collected)}</b></div>
+    ${row('Still owed',fmt(P.outstanding),P.outstanding>0?'neg':'')}
+    <div class="tr num" style="grid-template-columns:minmax(0,1fr) 110px"><span class="muted">Pot (sold)</span><span class="r muted">${fmt(T2.pot)}</span></div>
+    <div style="padding:12px 22px 16px;border-top:1px solid var(--line);display:flex;flex-direction:column;gap:6px">
+      <span class="lbl">Cash drawer</span>
+      <div class="mini">${[['Starting cash',fmt(c0(c.cashFloat))],['+ Cash payments',fmt(P.by.Cash)],['Should be in the drawer',fmt(P.expectedCash)],['Counted',P.cashCount==null?'—':fmt(P.cashCount)]].map(([a,v])=>`<div class="mr num" style="grid-template-columns:minmax(0,1fr) auto"><span class="muted">${a}</span><b>${v}</b></div>`).join('')}
+      ${P.overShort==null?'':`<div class="mr num" style="grid-template-columns:minmax(0,1fr) auto"><b>${Math.abs(P.overShort)<0.005?'Balanced':P.overShort>0?'Over':'Short'}</b><b class="${Math.abs(P.overShort)<0.005?'pos':'neg'}">${Math.abs(P.overShort)<0.005?'✓':fmt(Math.abs(P.overShort))}</b></div>`}</div></div></div>`;
+}
+function cashierCard(t){
+  const c=calc(t);
+  if(!c.share) return `<div class="card pad" style="display:flex;gap:14px 24px;align-items:center;flex-wrap:wrap"><div class="cell2" style="flex:1 1 340px"><span class="lbl">Cashier link</span><b>Let the cashiers record sales and payments from their laptops</b><small class="muted">A private link — no board password. Sales, bidders and payments they enter show up here within seconds, and yours show up for them.${!CLOUD||!sessionOK?' Needs the cloud sign-in.':''}</small></div><button class="btn pri" id="ccShare"${!CLOUD||!sessionOK?' disabled':''}>Create cashier link</button></div>`;
+  const link=cashierLink(t), s=c.share;
+  return `<div class="card pad" style="display:flex;gap:14px 24px;align-items:center;flex-wrap:wrap;border-color:${s.state==='error'?'#EBC2B3':'#BCD9C7'}"><div class="cell2" style="flex:1 1 340px;min-width:0"><span class="lbl">Cashier link · ${s.state==='error'?'<span class="neg">problem</span>':'<span class="pos">● live</span>'}</span><a href="${esc(link)}" target="_blank" rel="noopener" class="trunc" style="font-weight:600">${esc(link)}</a><small class="muted">${s.state==='error'?esc(s.msg||''):'In sync'+(s.at?' · '+new Date(s.at).toLocaleTimeString([], {hour:'numeric',minute:'2-digit',second:'2-digit'}):'')} · anyone with this link can record sales and payments for this Calcutta.</small></div>
+    <div class="actions"><button class="btn sm" id="ccCopy">Copy link</button><a class="btn sm" href="${esc(link)}" target="_blank" rel="noopener">Open</a><button class="btn sm" id="ccStop">Turn off</button></div></div>`;
 }
 
 boot();
