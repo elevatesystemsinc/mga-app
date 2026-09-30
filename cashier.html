@@ -35,7 +35,7 @@ main{max-width:1100px;margin:0 auto;padding:18px 18px 60px}
 .bar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:12px}
 .inp{height:42px;border:1px solid #CFC6AE;border-radius:9px;padding:0 12px;background:#fff;min-width:0}
 .search{flex:1 1 260px}
-.chips{display:flex;gap:6px} .chips button{height:34px;padding:0 13px;border-radius:999px;border:1px solid var(--line);background:#fff;font-weight:700;font-size:13px;color:var(--muted)} .chips button.on{background:var(--navy);border-color:var(--navy);color:#fff}
+.chips{display:flex;gap:6px;flex-wrap:wrap} .chips button{height:34px;padding:0 13px;border-radius:999px;border:1px solid var(--line);background:#fff;font-weight:700;font-size:13px;color:var(--muted)} .chips button.on{background:var(--navy);border-color:var(--navy);color:#fff}
 .btn{white-space:nowrap;height:42px;padding:0 16px;border-radius:9px;border:1px solid var(--line);background:#fff;color:var(--navy);font-weight:700;display:inline-flex;align-items:center;gap:6px}
 .btn.pri{background:var(--navy);border-color:var(--navy);color:#fff} .btn.warn{color:var(--neg)} .btn[disabled]{opacity:.45}
 .card{background:#fff;border:1px solid var(--line);border-radius:12px;overflow:hidden}
@@ -99,22 +99,31 @@ const flightName=f=>/^\d+$/.test(String(f))?'Flight '+f:String(f||'—');
 const idxTxt2=v=>v==null||v===''?'—':(+v<0?'+'+Math.abs(+v).toFixed(1):(+v).toFixed(1));
 const teamName=l=>l&&l.isPool?`The Pool (${l.count} team${l.count===1?'':'s'})`:`${l.p1} & ${l.p2}`;
 /* teams that didn't reach the minimum; sold together as one extra lot after the last one */
-const poolTeams=c=>c.lots.filter(l=>l.pooled);
+/* team buy-in: every team owns a share of itself (default 25% for $300) before the auction;
+   a team can pre-buy the rest (default $900 more) and then isn't auctioned at all */
+const BUYIN_DEFAULT={on:false,pct:25,amount:300,prebuyExtra:900};   // off unless turned on for this Calcutta
+const buyInOf=c=>Object.assign({},BUYIN_DEFAULT,c.buyIn||{});
+function teamDue(c,l){ const bi=buyInOf(c); if(!bi.on) return 0; return c0(bi.amount)+(l.prebuy?c0(bi.prebuyExtra):0); }
+const ownership=(c,l)=>{ const bi=buyInOf(c); return l.prebuy?{team:100,buyer:0}:(bi.on?{team:c0(bi.pct),buyer:100-c0(bi.pct)}:{team:0,buyer:100}); };
+const poolTeams=c=>c.lots.filter(l=>l.pooled&&!l.prebuy);
 const poolLotNum=c=>c.lots.reduce((a,l)=>Math.max(a,+l.lot||0),0)+1;
 function poolLot(c){ const ts=poolTeams(c); return ts.length?{id:'__pool',isPool:true,lot:poolLotNum(c),count:ts.length,teams:ts,bidderId:c.pool.bidderId,price:c0(c.pool.price),flight:'Pool'}:null; }
-const auctionSeq=c=>{ const p=poolLot(c); return c.lots.concat(p?[p]:[]); };
-function setPooled(c,l,on){ l.pooled=!!on; if(on){ l.price=0; l.bidderId=''; } if(!poolTeams(c).length) c.pool={bidderId:'',price:0}; }
+const auctionSeq=c=>{ const p=poolLot(c); return c.lots.filter(l=>!l.prebuy).concat(p?[p]:[]); };
+function setPooled(c,l,on){ l.pooled=!!on; if(on){ l.price=0; l.bidderId=''; l.prebuy=false; } if(!poolTeams(c).length) c.pool={bidderId:'',price:0}; }
+function setPrebuy(c,l,on){ l.prebuy=!!on; if(on){ l.price=0; l.bidderId=''; l.pooled=false; } if(!poolTeams(c).length) c.pool={bidderId:'',price:0}; }
 function calcTotalsC(c){
   const flights=[...new Set(c.lots.map(l=>flightName(l.flight)))].sort((a,b)=>a.localeCompare(b,undefined,{numeric:true}));
   const exp=c.expenses.reduce((a,e)=>a+c0(e.amount),0), share=flights.length?exp/flights.length:0;
   const pt=poolTeams(c), pp=c0(c.pool.price), perPoolTeam=pt.length&&pp>0?pp/pt.length:0;   // pool price shared by its teams' flights
   const byF=flights.map(f=>{ const ls=c.lots.filter(l=>flightName(l.flight)===f);
-    const sold=ls.filter(l=>!l.pooled&&c0(l.price)>0), inPool=ls.filter(l=>l.pooled);
-    const fromPool=inPool.length*perPoolTeam, gross=sold.reduce((a,l)=>a+c0(l.price),0)+fromPool, net=gross-share;
-    return {flight:f,teams:ls.length,sold:sold.length,pooled:inPool.length,fromPool,gross,share,net,places:c.payout.map(p=>Math.max(0,net)*c0(p)/100)}; });
-  const pot=byF.reduce((a,f)=>a+f.gross,0), soldLots=c.lots.filter(l=>!l.pooled&&c0(l.price)>0);
+    const sold=ls.filter(l=>!l.pooled&&!l.prebuy&&c0(l.price)>0), inPool=ls.filter(l=>l.pooled&&!l.prebuy), pre=ls.filter(l=>l.prebuy);
+    const fromPool=inPool.length*perPoolTeam, auction=sold.reduce((a,l)=>a+c0(l.price),0), buyIns=ls.reduce((a,l)=>a+teamDue(c,l),0);
+    const gross=auction+fromPool+buyIns, net=gross-share;
+    return {flight:f,teams:ls.length,sold:sold.length,pooled:inPool.length,prebuy:pre.length,fromPool,auction,buyIns,gross,share,net,places:c.payout.map(p=>Math.max(0,net)*c0(p)/100)}; });
+  const pot=byF.reduce((a,f)=>a+f.gross,0), soldLots=c.lots.filter(l=>!l.pooled&&!l.prebuy&&c0(l.price)>0), pre=c.lots.filter(l=>l.prebuy).length;
+  const buyIns=byF.reduce((a,f)=>a+f.buyIns,0), auctionTotal=byF.reduce((a,f)=>a+f.auction,0)+pp;
   const prices=soldLots.map(l=>c0(l.price)).concat(pp>0?[pp]:[]);
-  return {flights,byF,exp,share,pot,net:pot-exp,sold:soldLots.length+(pp>0?pt.length:0),lots:c.lots.length,pooled:pt.length,poolPrice:pp,poolLot:pt.length?poolLotNum(c):null,
+  return {flights,byF,exp,share,pot,net:pot-exp,sold:soldLots.length+(pp>0?pt.length:0),auctionLots:c.lots.length-pre,prebuy:pre,buyIns,auctionTotal,lots:c.lots.length,pooled:pt.length,poolPrice:pp,poolLot:pt.length?poolLotNum(c):null,
           top:prices.reduce((a,v)=>Math.max(a,v),0),avg:prices.length?prices.reduce((a,v)=>a+v,0)/prices.length:0,payPct:c.payout.reduce((a,p)=>a+c0(p),0)};
 }
 const bidderById=(c,id)=>c.bidders.find(b=>b.id===id);
@@ -126,20 +135,23 @@ function bidderOwes(c,b){ const ls=c.lots.filter(l=>!l.pooled&&l.bidderId===b.id
 /* payments: what's been collected, by method, and what's still owed */
 const PAY_METHODS=['Cash','Zelle','Credit card','Check'];
 function calcPayments(c){
-  const by={}; PAY_METHODS.forEach(m=>by[m]=0); let outstanding=0, buyers=0, paid=0, notRecorded=0;
+  const by={}; PAY_METHODS.forEach(m=>by[m]=0); let outstanding=0, buyers=0, paid=0, notRecorded=0, biDue=0, biPaid=0, biOwed=0, biTeams=0, biTeamsPaid=0;
+  for(const l of c.lots){ const due=teamDue(c,l); if(!(due>0)) continue; biTeams++; biDue+=due; const b=l.buyIn||{};
+    if(b.paid){ biTeamsPaid++; biPaid+=due; if(b.method&&by[b.method]!=null) by[b.method]+=due; else notRecorded+=due; } else { biOwed+=due; outstanding+=due; } }
+  let bidPaid=0;
   for(const b of c.bidders){ const o=bidderOwes(c,b); if(!(o.total>0)) continue; buyers++;
-    if(b.paid){ paid++; if(b.method&&by[b.method]!=null) by[b.method]+=o.total; else notRecorded+=o.total; } else outstanding+=o.total; }
+    if(b.paid){ paid++; bidPaid+=o.total; if(b.method&&by[b.method]!=null) by[b.method]+=o.total; else notRecorded+=o.total; } else outstanding+=o.total; }
   const collected=PAY_METHODS.reduce((a,m)=>a+by[m],0)+notRecorded;
   const hasCount=c.cashCount!=null&&c.cashCount!=='';
   const expectedCash=c0(c.cashFloat)+by.Cash;
-  return {by,notRecorded,collected,outstanding,buyers,paid,expectedCash,cashCount:hasCount?c0(c.cashCount):null,overShort:hasCount?c0(c.cashCount)-expectedCash:null};
+  return {by,notRecorded,collected,outstanding,buyers,paid,bidPaid,biDue,biPaid,biOwed,biTeams,biTeamsPaid,expectedCash,cashCount:hasCount?c0(c.cashCount):null,overShort:hasCount?c0(c.cashCount)-expectedCash:null};
 }
 /* ---------- shared editing (hub + cashiers) ----------
    Each team, bidder and expense carries a last-changed time (u). Before saving, anything that changed
    since the last sync is stamped; when two copies meet, the newer version of each item wins, deletes
    travel as tombstones, and settings (minimum, payout, pool, cash counts) merge as one unit. */
 const CALC_KINDS=['lots','bidders','expenses'];
-const CALC_SET=['minBid','payout','pool','cashCount','cashFloat','file','importedAt'];
+const CALC_SET=['minBid','payout','pool','cashCount','cashFloat','file','importedAt','buyIn'];
 function calcStable(x){ if(Array.isArray(x)) return '['+x.map(calcStable).join(',')+']'; if(x&&typeof x==='object') return '{'+Object.keys(x).filter(k=>x[k]!==undefined).sort().map(k=>JSON.stringify(k)+':'+calcStable(x[k])).join(',')+'}'; return JSON.stringify(x===undefined?null:x); }
 const calcStrip=e=>{ const o=Object.assign({},e); delete o.u; return o; };
 const calcSettings=c=>{ const o={}; CALC_SET.forEach(k=>{ o[k]=c[k]===undefined?null:c[k]; }); return o; };
@@ -222,10 +234,10 @@ function render(){
   if(!doc) return; const T=calcTotalsC(doc), P=calcPayments(doc);
   const act=document.activeElement&&document.activeElement.id, selS=act&&document.activeElement.selectionStart;
   $('main').innerHTML=`<div class="kpis">
-      <div class="kpi"><span>Pot</span><b class="num">${fmt(T.pot)}</b><small>${T.sold} of ${T.lots} teams sold</small></div>
+      <div class="kpi"><span>Pot</span><b class="num">${fmt(T.pot)}</b><small>${T.sold} of ${T.auctionLots} auctioned sold${T.prebuy?` · ${T.prebuy} pre-bought`:''}</small></div>
       <div class="kpi"><span>The pool</span><b class="num">${T.pooled?T.pooled+' team'+(T.pooled===1?'':'s'):'—'}</b><small>${T.pooled?`Lot ${T.poolLot}${T.poolPrice?' · sold '+fmt(T.poolPrice):''}`:(doc.minBid?`under ${fmt(doc.minBid)} goes here`:'no minimum')}</small></div>
       <div class="kpi"><span>Collected</span><b class="num pos">${fmt(P.collected)}</b><small>${P.paid} of ${P.buyers} buyers paid</small></div>
-      <div class="kpi"><span>Still owed</span><b class="num ${P.outstanding>0?'neg':''}">${fmt(P.outstanding)}</b><small>${P.buyers-P.paid} buyer${P.buyers-P.paid===1?'':'s'}</small></div></div>
+      <div class="kpi"><span>Still owed</span><b class="num ${P.outstanding>0?'neg':''}">${fmt(P.outstanding)}</b><small>${P.buyers-P.paid} buyer${P.buyers-P.paid===1?'':'s'}${buyInOf(doc).on&&P.biTeams-P.biTeamsPaid?` · ${P.biTeams-P.biTeamsPaid} buy-in${P.biTeams-P.biTeamsPaid===1?'':'s'}`:''}</small></div></div>
     <div class="tabs">${[['sales','Sales'],['bidders','Bidders & payments'],['totals','Totals']].map(([k,l])=>`<button data-tab="${k}" class="${tab===k?'on':''}">${l}</button>`).join('')}</div>
     <div id="pane"></div>`;
   document.querySelectorAll('[data-tab]').forEach(b=>b.onclick=()=>{ tab=b.dataset.tab; render(); });
@@ -233,15 +245,16 @@ function render(){
   if(act&&$(act)){ $(act).focus(); try{ $(act).setSelectionRange(selS,selS); }catch(_){} }
 }
 function paneSales(el,T){
-  const seq=auctionSeq(doc), ql=q.toLowerCase().trim();
-  const rows=seq.filter(l=>{ if(filt==='open'&&(l.isPool?l.price>0:(l.pooled||c0(l.price)>0))) return false; if(filt==='pool'&&!(l.isPool||l.pooled)) return false;
+  const BI=buyInOf(doc).on, seq=doc.lots.concat(poolLot(doc)?[poolLot(doc)]:[]), ql=q.toLowerCase().trim();
+  const rows=seq.filter(l=>{ if(filt==='open'&&(l.isPool?l.price>0:(l.prebuy||l.pooled||c0(l.price)>0))) return false; if(filt==='pool'&&!(l.isPool||(l.pooled&&!l.prebuy))) return false;
+    if(filt==='prebuy'&&!l.prebuy) return false; if(filt==='due'&&(l.isPool||!(teamDue(doc,l)>0)||(l.buyIn&&l.buyIn.paid))) return false;
     if(!ql) return true; return String(l.lot)===ql||teamName(l).toLowerCase().includes(ql)||(l.isPool&&'pool'.includes(ql)); });
   const cols='grid-template-columns:56px minmax(0,1.6fr) 80px minmax(0,1fr) 100px';
-  el.innerHTML=`<div class="bar"><input class="inp search" id="q" placeholder="Find a lot — number or player name" value="${esc(q)}" autocomplete="off"><div class="chips">${[['all','All'],['open','Unsold'],['pool','Pool']].map(([k,l])=>`<button data-f="${k}" class="${filt===k?'on':''}">${l}</button>`).join('')}</div></div>
+  el.innerHTML=`<div class="bar"><input class="inp search" id="q" placeholder="Find a lot — number or player name" value="${esc(q)}" autocomplete="off"><div class="chips">${[['all','All'],['open','Unsold'],['pool','Pool']].concat(BI?[['prebuy','Pre-bought'],['due','Buy-in due']]:[]).map(([k,l])=>`<button data-f="${k}" class="${filt===k?'on':''}">${l}</button>`).join('')}</div></div>
     ${doc.minBid?`<p class="muted" style="margin:0 0 10px;font-size:13px">Minimum bid ${fmt(doc.minBid)} — teams under it go into the pool${T.pooled?` (Lot ${T.poolLot})`:''}.</p>`:''}
     <div class="card"><div class="row h lots" style="${cols}"><span>Lot</span><span>Team</span><span>Flight</span><span>Bought by</span><span class="r">Price</span></div>
     ${rows.map(l=>l.isPool?`<div class="row lot click pool" data-l="__pool" style="${cols}"><b class="c-lot">${l.lot}</b><span class="c-team trunc"><b>The Pool</b> · ${l.count} team${l.count===1?'':'s'}</span><span class="meta"><span class="muted">Mixed</span><span class="trunc">${l.price>0?esc(bidderName(l.bidderId)):'<span class="muted">not sold yet</span>'}</span></span><b class="c-price r num">${l.price>0?fmt(l.price):''}</b></div>`
-      :`<div class="row lot click${l.pooled?' dim':''}" data-l="${l.id}" style="${cols}"><b class="c-lot">${l.lot}</b><span class="c-team trunc">${esc(teamName(l))}</span><span class="meta"><span class="muted">${esc(flightName(l.flight))}</span><span class="trunc">${l.pooled?'<span class="tag p">In the pool</span>':c0(l.price)>0?esc(bidderName(l.bidderId)):'<span class="muted">—</span>'}</span></span><b class="c-price r num">${!l.pooled&&c0(l.price)>0?fmt(l.price):''}</b></div>`).join('')||'<div class="row"><span class="muted">No lots match.</span></div>'}</div>`;
+      :`<div class="row lot click${l.pooled?' dim':''}" data-l="${l.id}" style="${cols}"><b class="c-lot">${l.lot}</b><span class="c-team trunc">${esc(teamName(l))}</span><span class="meta"><span class="muted">${esc(flightName(l.flight))}</span><span class="trunc">${l.prebuy?'<span class="tag ok">Pre-bought</span>':l.pooled?'<span class="tag p">In the pool</span>':c0(l.price)>0?esc(bidderName(l.bidderId)):'<span class="muted">—</span>'}</span>${BI&&teamDue(doc,l)>0&&!(l.buyIn&&l.buyIn.paid)?'<span class="tag due">Buy-in due</span>':''}</span><b class="c-price r num">${l.prebuy?fmt(teamDue(doc,l)):!l.pooled&&c0(l.price)>0?fmt(l.price):''}</b></div>`).join('')||'<div class="row"><span class="muted">No lots match.</span></div>'}</div>`;
   $('q').oninput=e=>{ q=e.target.value; paneSales(el,T); const i=$('q'); i.focus(); i.setSelectionRange(q.length,q.length); };
   $('q').onkeydown=e=>{ if(e.key==='Enter'){ const first=el.querySelector('[data-l]'); if(first) first.click(); } };
   el.querySelectorAll('[data-f]').forEach(b=>b.onclick=()=>{ filt=b.dataset.f; render(); });
@@ -251,13 +264,26 @@ function modal(html,wire){ modalOpen=true; const m=document.createElement('div')
   const close=()=>{ m.remove(); modalOpen=false; render(); }; m.onclick=e=>{ if(e.target===m) close(); }; m.onkeydown=e=>{ if(e.key==='Escape') close(); }; wire(m,close); }
 function openLot(id){
   const P=id==='__pool', l=P?poolLot(doc):doc.lots.find(x=>x.id===id); if(!l) return;
-  const b=bidderById(doc,l.bidderId);
-  modal(`<div class="hd"><div class="n"><small>LOT</small>${l.lot}</div><div style="min-width:0">${P?`<b>The Pool</b><span>${l.count} team${l.count===1?'':'s'} under ${fmt(doc.minBid)}, sold together</span>`:`<b>${esc(l.p1)}<br>${esc(l.p2)}</b><span>${esc(flightName(l.flight))} · team index ${idxTxt2(l.idx)}</span>`}</div></div>
+  const b=bidderById(doc,l.bidderId), bi=buyInOf(doc), BI=bi.on&&!P, pre=!!l.prebuy, own=ownership(doc,Object.assign({},l,{prebuy:false}));
+  const payOpts=(cur)=>`<option value="">Not paid</option>${PAY_METHODS.map(mm=>`<option${cur===mm?' selected':''}>${mm}</option>`).join('')}`;
+  modal(`<div class="hd"><div class="n"><small>LOT</small>${l.lot}</div><div style="min-width:0">${P?`<b>The Pool</b><span>${l.count} team${l.count===1?'':'s'} under ${fmt(doc.minBid)}, sold together</span>`:`<b>${esc(l.p1)}<br>${esc(l.p2)}</b><span>${esc(flightName(l.flight))} · team index ${idxTxt2(l.idx)}${pre?' · <b style="color:#bfe8cf">pre-bought</b>':''}</span>`}</div></div>
     <div class="bd">${P?`<div class="card">${l.teams.map(x=>`<div class="row" style="grid-template-columns:60px minmax(0,1fr) 80px;min-height:38px"><span class="muted">Lot ${x.lot}</span><span class="trunc">${esc(teamName(x))}</span><span class="muted">${esc(flightName(x.flight))}</span></div>`).join('')}</div>`:''}
+      ${pre?`<p style="margin:0">This team pre-bought itself for <b>${fmt(teamDue(doc,l))}</b> — it owns 100% and isn’t auctioned.</p>`:`
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px"><div class="fld"><label for="mB">Bidder number</label><input class="inp num" id="mB" inputmode="numeric" value="${esc(b?b.num:'')}" autocomplete="off"><div class="hint" id="mBn"></div></div>
       <div class="fld"><label for="mP">Price</label><input class="inp num" id="mP" inputmode="decimal" value="${c0(l.price)||''}" placeholder="0" autocomplete="off"><div class="hint">${P||!doc.minBid?'':'Minimum '+fmt(doc.minBid)}</div></div></div>
-      <div class="acts"><button class="btn pri" id="mSold">Sold</button>${P?'':`<button class="btn" id="mPool">${l.pooled?'Keep in the pool':'Into the pool'}</button>`}<button class="btn warn" id="mClr">Clear</button><button class="btn" id="mX">Cancel</button></div></div>`,
-  (m,close)=>{ const bi=m.querySelector('#mB'), pi=m.querySelector('#mP'), hn=m.querySelector('#mBn');
+      ${BI?`<p class="hint" style="margin:-4px 0 0">Buyer gets ${own.buyer}% · the team keeps ${own.team}%.</p>`:''}
+      <div class="acts"><button class="btn pri" id="mSold">Sold</button>${P?'':`<button class="btn" id="mPool">${l.pooled?'Keep in the pool':'Into the pool'}</button>`}<button class="btn warn" id="mClr">Clear</button><button class="btn" id="mX">Cancel</button></div>`}
+      ${BI?`<div class="card" style="padding:12px 14px;display:flex;flex-direction:column;gap:10px"><div style="display:flex;justify-content:space-between;gap:10px;align-items:center"><div><b>Team buy-in · ${fmt(teamDue(doc,l))}</b><div class="hint">${pre?`${fmt(bi.amount)} + ${fmt(bi.prebuyExtra)} pre-buy`:`${bi.pct}% of their own team`}</div></div>
+          <select class="pay${(l.buyIn||{}).paid?' paid':''}" id="mBi" style="max-width:170px" aria-label="Team buy-in payment">${payOpts((l.buyIn||{}).paid?(l.buyIn||{}).method:'')}</select></div>
+        <button class="btn" id="mPre">${pre?'Undo pre-buy — put back in the auction':`Pre-bought · ${fmt(c0(bi.amount)+c0(bi.prebuyExtra))} (owns 100%)`}</button></div>`:''}
+      ${pre?'<div class="acts"><button class="btn" id="mX">Close</button></div>':''}</div>`,
+  (m,close)=>{ const bi2=m.querySelector('#mBi');
+    if(bi2) bi2.onchange=()=>{ const v=bi2.value; edit(d=>{ const t=d.lots.find(z=>z.id===id); t.buyIn={paid:!!v,method:v||''}; }); bi2.className='pay'+(v?' paid':''); toast(v?`Buy-in paid · ${v}`:'Buy-in marked not paid'); };
+    const pb2=m.querySelector('#mPre'); if(pb2) pb2.onclick=()=>{ if(!pre&&c0(l.price)>0&&!confirm(`This team already sold for ${fmt(l.price)}. Mark it pre-bought and clear that sale?`)) return;
+      edit(d=>setPrebuy(d,d.lots.find(z=>z.id===id),!pre)); close(); toast(pre?'Back in the auction':`Lot ${l.lot} pre-bought — skipped in the auction`); };
+    m.querySelector('#mX').onclick=close;
+    if(pre) return;
+    const bi=m.querySelector('#mB'), pi=m.querySelector('#mP'), hn=m.querySelector('#mBn');
     const upd=()=>{ const x=bidderByNum(doc,bi.value); hn.textContent=bi.value?(x?x.name:'New bidder number — it will be added'):''; }; bi.oninput=upd; upd(); setTimeout(()=>bi.focus(),30);
     const sold=()=>{ const num=bi.value.trim(), price=c0(String(pi.value).replace(/[$,]/g,''));
       if(!(price>0)){ toast('Enter the price'); pi.focus(); return; } if(!num){ toast('Enter the bidder number'); bi.focus(); return; }
@@ -267,7 +293,7 @@ function openLot(id){
     m.querySelector('#mSold').onclick=sold; [bi,pi].forEach(e=>e.onkeydown=ev=>{ if(ev.key==='Enter'){ ev.preventDefault(); if(e===bi) pi.focus(); else sold(); } });
     const pb=m.querySelector('#mPool'); if(pb) pb.onclick=()=>{ edit(d=>setPooled(d,d.lots.find(x=>x.id===id),true)); close(); toast(`Lot ${l.lot} → the pool`); };
     m.querySelector('#mClr').onclick=()=>{ if(!confirm('Clear this lot’s sale?')) return; edit(d=>{ if(P) d.pool={bidderId:'',price:0}; else { const t=d.lots.find(z=>z.id===id); setPooled(d,t,false); t.price=0; t.bidderId=''; } }); close(); };
-    m.querySelector('#mX').onclick=close; });
+  });
 }
 function paneBidders(el){
   const ql=bq.toLowerCase().trim();
@@ -312,7 +338,7 @@ function paneTotals(el,T,P){
   const plc=['1st','2nd','3rd','4th','5th','6th','7th','8th'], fc=`grid-template-columns:minmax(0,1fr) 60px 100px 96px 100px ${doc.payout.map(()=>'84px').join(' ')}`;
   el.innerHTML=`<div class="card" style="margin-bottom:16px"><h2 class="h2">By flight</h2><div class="sub">Expenses (${fmt(T.exp)}) come out evenly across ${T.flights.length} flights${T.pooled?'; the pool’s price is shared by its teams’ flights':''}.</div>
       <div class="fcards">${T.byF.map(f=>`<div class="fcard"><div class="fc1"><b>${esc(f.flight)}</b><b class="num ${f.net<0?'neg':''}">${fmt(f.net)} <small class="muted">net</small></b></div>
-          <div class="fc2 num muted">${fmt(f.gross)} gross · −${fmt(f.share)} expenses · ${f.sold}/${f.teams} sold${f.pooled?` · ${f.pooled} in pool`:''}</div>
+          <div class="fc2 num muted">${fmt(f.gross)} gross${f.buyIns?` (${fmt(f.auction+f.fromPool)} auction · ${fmt(f.buyIns)} buy-ins)`:''} · −${fmt(f.share)} expenses · ${f.sold}/${f.teams-f.prebuy} sold${f.pooled?` · ${f.pooled} in pool`:''}${f.prebuy?` · ${f.prebuy} pre-bought`:''}</div>
           <div class="fc3 num">${doc.payout.map((p,i)=>`<span><small class="muted">${plc[i]||i+1}</small> ${fmt(f.places[i])}</span>`).join('')}</div></div>`).join('')}
         <div class="fcard tot"><div class="fc1"><b>Total</b><b class="num">${fmt(T.net)} <small class="muted">net</small></b></div><div class="fc2 num muted">${fmt(T.pot)} gross · −${fmt(T.exp)} expenses · ${T.sold}/${T.lots} sold</div></div></div>
       <div class="ftable" style="overflow-x:auto;-webkit-overflow-scrolling:touch"><div style="min-width:${520+doc.payout.length*84}px"><div class="row h" style="${fc}"><span>Flight</span><span class="r">Sold</span><span class="r">Gross</span><span class="r">Expenses</span><span class="r">Net pot</span>${doc.payout.map((p,i)=>`<span class="r">${plc[i]||i+1} ${p}%</span>`).join('')}</div>
@@ -322,6 +348,7 @@ function paneTotals(el,T,P){
       ${PAY_METHODS.map(m=>`<div class="row num" style="grid-template-columns:minmax(0,1fr) 110px"><span>${m}</span><b class="r">${fmt(P.by[m])}</b></div>`).join('')}
       ${P.notRecorded?`<div class="row num" style="grid-template-columns:minmax(0,1fr) 110px"><span class="neg">Paid, method not recorded</span><b class="r neg">${fmt(P.notRecorded)}</b></div>`:''}
       <div class="row num tot" style="grid-template-columns:minmax(0,1fr) 110px"><span>Collected</span><span class="r">${fmt(P.collected)}</span></div>
+      ${buyInOf(doc).on?`<div class="row num" style="grid-template-columns:minmax(0,1fr) 110px"><span class="muted">&nbsp;&nbsp;from auction buyers</span><span class="r muted">${fmt(P.bidPaid)}</span></div><div class="row num" style="grid-template-columns:minmax(0,1fr) 110px"><span class="muted">&nbsp;&nbsp;from team buy-ins (${P.biTeamsPaid} of ${P.biTeams})</span><span class="r muted">${fmt(P.biPaid)}</span></div>`:''}
       <div class="row num" style="grid-template-columns:minmax(0,1fr) 110px"><span>Still owed</span><b class="r ${P.outstanding>0?'neg':''}">${fmt(P.outstanding)}</b></div></div>
     <div class="card"><h2 class="h2">Cash drawer</h2><div class="sub">Count the cash and compare it with what the payments say should be there.</div>
       <div style="padding:0 16px 16px;display:flex;flex-direction:column;gap:10px">
