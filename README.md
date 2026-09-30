@@ -59,6 +59,25 @@ anything beyond that is listed in the preview before you push.
 No Supabase access? Download a backup from the current app (⋯ → Backup all data)
 and choose it when the import asks.
 
+## Calcutta (players auction)
+
+Each tournament has a **Calcutta** tab.
+
+- **Upload team sheet:** the auction-order spreadsheet (Lot, Team, Flight, Team index…) or the team
+  sheet (Player 1, Player 2, Flight…). Buyers and prices already filled in come across. Re-uploading
+  keeps every recorded sale (teams are matched by their players).
+- **Bidders:** add one at a time (member or guest) or **Number the players** to give everyone in the
+  field a bidder number (last-name order, choose the starting number). Each bidder shows what they
+  bought, what they owe, and paid / paid-by.
+- **Run the auction:** a live screen for the night — type the bidder number, Enter, the price, Enter,
+  and it moves to the next lot. Back and Skip are there; any lot can be edited from the Lots list.
+  A bidder number that doesn't exist yet is added on the spot.
+- **Expenses** (e.g. the auction dinner) come out of the pot **evenly across every flight**.
+- **By flight:** teams sold, gross, expense share, net pot, and the payout by place from each
+  flight's net (40/30/20/10 by default, editable, any number of places).
+- **Export results:** a workbook with Lots, Bidders (what each owes), By flight and Expenses.
+- The Calcutta lives in the hub only; syncing with the current Member-Member app never touches it.
+
 ## Live scoring (Golf)
 
 One-time: Supabase → SQL Editor → run `golf-setup.sql`. Upload `score.html` alongside
