@@ -2872,24 +2872,35 @@ document.addEventListener('click',e=>{ const b=e.target.closest('[data-sync]'); 
    ===================================================================== */
 TT.splice(TT.findIndex(x=>x[0]==='budget')+1,0,['calcutta','Calcutta']);
 const CALC_PAYOUT=[40,30,20,10];
-function calc(t){ if(!t.calcutta) t.calcutta={lots:[],bidders:[],expenses:[],payout:CALC_PAYOUT.slice()}; const c=t.calcutta;
+function calc(t){ if(!t.calcutta) t.calcutta={lots:[],bidders:[],expenses:[],payout:CALC_PAYOUT.slice(),minBid:250}; const c=t.calcutta;
+  if(c.minBid==null) c.minBid=250; c.pool=c.pool||{bidderId:'',price:0};
   c.lots=c.lots||[]; c.bidders=c.bidders||[]; c.expenses=c.expenses||[]; c.payout=c.payout&&c.payout.length?c.payout:CALC_PAYOUT.slice(); return c; }
 const flightName=f=>/^\d+$/.test(String(f))?'Flight '+f:String(f||'—');
 const idxTxt2=v=>v==null||v===''?'—':(+v<0?'+'+Math.abs(+v).toFixed(1):(+v).toFixed(1));
-const teamName=l=>`${l.p1} & ${l.p2}`;
+const teamName=l=>l&&l.isPool?`The Pool (${l.count} team${l.count===1?'':'s'})`:`${l.p1} & ${l.p2}`;
+/* teams that didn't reach the minimum; sold together as one extra lot after the last one */
+const poolTeams=c=>c.lots.filter(l=>l.pooled);
+const poolLotNum=c=>c.lots.reduce((a,l)=>Math.max(a,+l.lot||0),0)+1;
+function poolLot(c){ const ts=poolTeams(c); return ts.length?{id:'__pool',isPool:true,lot:poolLotNum(c),count:ts.length,teams:ts,bidderId:c.pool.bidderId,price:n0(c.pool.price),flight:'Pool'}:null; }
+const auctionSeq=c=>{ const p=poolLot(c); return c.lots.concat(p?[p]:[]); };
+function setPooled(c,l,on){ l.pooled=!!on; if(on){ l.price=0; l.bidderId=''; } if(!poolTeams(c).length) c.pool={bidderId:'',price:0}; }
 function calcTotals(t){
   const c=calc(t), flights=[...new Set(c.lots.map(l=>flightName(l.flight)))].sort((a,b)=>a.localeCompare(b,undefined,{numeric:true}));
   const exp=c.expenses.reduce((a,e)=>a+n0(e.amount),0), share=flights.length?exp/flights.length:0;
-  const byF=flights.map(f=>{ const ls=c.lots.filter(l=>flightName(l.flight)===f), sold=ls.filter(l=>n0(l.price)>0), gross=sold.reduce((a,l)=>a+n0(l.price),0), net=gross-share;
-    return {flight:f,teams:ls.length,sold:sold.length,gross,share,net,places:c.payout.map(p=>Math.max(0,net)*n0(p)/100)}; });
-  const pot=byF.reduce((a,f)=>a+f.gross,0), sold=c.lots.filter(l=>n0(l.price)>0);
-  return {flights,byF,exp,share,pot,net:pot-exp,sold:sold.length,lots:c.lots.length,top:sold.reduce((a,l)=>Math.max(a,n0(l.price)),0),avg:sold.length?pot/sold.length:0,
-          payPct:c.payout.reduce((a,p)=>a+n0(p),0)};
+  const pt=poolTeams(c), pp=n0(c.pool.price), perPoolTeam=pt.length&&pp>0?pp/pt.length:0;   // pool price shared by its teams' flights
+  const byF=flights.map(f=>{ const ls=c.lots.filter(l=>flightName(l.flight)===f);
+    const sold=ls.filter(l=>!l.pooled&&n0(l.price)>0), inPool=ls.filter(l=>l.pooled);
+    const fromPool=inPool.length*perPoolTeam, gross=sold.reduce((a,l)=>a+n0(l.price),0)+fromPool, net=gross-share;
+    return {flight:f,teams:ls.length,sold:sold.length,pooled:inPool.length,fromPool,gross,share,net,places:c.payout.map(p=>Math.max(0,net)*n0(p)/100)}; });
+  const pot=byF.reduce((a,f)=>a+f.gross,0), soldLots=c.lots.filter(l=>!l.pooled&&n0(l.price)>0);
+  const prices=soldLots.map(l=>n0(l.price)).concat(pp>0?[pp]:[]);
+  return {flights,byF,exp,share,pot,net:pot-exp,sold:soldLots.length+(pp>0?pt.length:0),lots:c.lots.length,pooled:pt.length,poolPrice:pp,poolLot:pt.length?poolLotNum(c):null,
+          top:prices.reduce((a,v)=>Math.max(a,v),0),avg:prices.length?prices.reduce((a,v)=>a+v,0)/prices.length:0,payPct:c.payout.reduce((a,p)=>a+n0(p),0)};
 }
 const bidderById=(c,id)=>c.bidders.find(b=>b.id===id);
 const bidderByNum=(c,n)=>c.bidders.find(b=>String(b.num)===String(n).trim());
 const bidderLabel=b=>b?`#${b.num} ${b.name}`:'—';
-function bidderOwes(c,b){ const ls=c.lots.filter(l=>l.bidderId===b.id&&n0(l.price)>0); return {lots:ls,total:ls.reduce((a,l)=>a+n0(l.price),0)}; }
+function bidderOwes(c,b){ const ls=c.lots.filter(l=>!l.pooled&&l.bidderId===b.id&&n0(l.price)>0); const p=poolLot(c); if(p&&p.bidderId===b.id&&p.price>0) ls.push(p); return {lots:ls,total:ls.reduce((a,l)=>a+n0(l.price),0)}; }
 
 /* ---------- import (the auction-order sheet or the fun-team sheet) ---------- */
 function parseCalcSheet(rows){
@@ -2947,21 +2958,74 @@ function tidyName(n){ n=String(n||'').trim(); if(!n) return n;
 const nextBidderNum=c=>c.bidders.reduce((a,b)=>Math.max(a,parseInt(b.num,10)||0),0)+1;
 
 /* ---------- bidders ---------- */
+/* type-ahead: members ranked by how closely they match what's typed (field players first) */
+function memberMatches(t,q,limit){
+  q=String(q||'').trim().toLowerCase().replace(/\s+/g,' '); if(!q) return [];
+  if(q.includes(',')){ const [a,b]=q.split(',').map(x=>x.trim()); q=(b+' '+a).trim(); }       // "Last, First"
+  const inField=new Set((t.field||[]).map(p=>p.memberId));
+  const lev=(a,b)=>{ const d=Array.from({length:a.length+1},(_,i)=>[i]); for(let j=1;j<=b.length;j++) d[0][j]=j;
+    for(let i=1;i<=a.length;i++) for(let j=1;j<=b.length;j++) d[i][j]=Math.min(d[i-1][j]+1,d[i][j-1]+1,d[i-1][j-1]+(a[i-1]===b[j-1]?0:1)); return d[a.length][b.length]; };
+  const qt=q.split(' ');
+  return db.members.map(m=>{ const name=tidyName(memberName(m)), n=name.toLowerCase(), toks=n.split(/[\s-]+/);
+      let sc=0;
+      if(n.startsWith(q)) sc=100;
+      else if(qt.every(w=>toks.some(x=>x.startsWith(w)))) sc=90;
+      else if(n.includes(q)) sc=75;
+      else { const best=Math.min(...qt.map(w=>Math.min(...toks.map(x=>lev(w,x.slice(0,Math.max(w.length,1)))))));   // typo-tolerant
+        const tol=q.length<=3?0:q.length<=4?1:2; if(best<=tol) sc=60-best*10+(qt.some(w=>toks.some(x=>x[0]===w[0]))?5:0); }
+      if(sc&&inField.has(m.id)) sc+=5;
+      return {m,name,sc}; }).filter(x=>x.sc>0).sort((a,b)=>b.sc-a.sc||a.name.localeCompare(b.name)).slice(0,limit||6);
+}
 function editBidder(t,b){
   const c=calc(t), isNew=!b; b=b||{id:uid(),num:nextBidderNum(c),name:'',memberId:'',paid:false,method:''};
   const owed=isNew?{lots:[],total:0}:bidderOwes(c,b);
-  const memOpts=[['','— Not a member / guest —']].concat(db.members.slice().sort((a,z)=>memberName(a).localeCompare(memberName(z))).map(m=>[m.id,memberName(m)]));
+  let linked=b.memberId||'';
   openDrawer({kicker:t.name+' · Calcutta',title:isNew?'Add bidder':`Bidder #${b.num}`,
-    body:pair(field('Bidder number','cbN',b.num,{type:'number'}),field('Member','cbM',b.memberId,{type:'select',options:memOpts}))+field('Name','cbName',b.name,{ph:'Name on the card'})+
+    body:`<div class="fld" style="position:relative"><label class="lbl" for="cbName">Name</label>
+        <input class="inp" id="cbName" value="${esc(b.name)}" placeholder="Start typing a name…" autocomplete="off" role="combobox" aria-autocomplete="list" aria-controls="cbList" aria-expanded="false">
+        <div id="cbList" role="listbox" class="card" style="position:absolute;left:0;right:0;top:100%;margin-top:4px;z-index:5;overflow:hidden;display:none;box-shadow:0 12px 30px rgba(10,28,39,.18)"></div>
+        <span class="hint" id="cbWho"></span></div>`+
+      field('Bidder number','cbN',b.num,{type:'number'})+
       (owed.lots.length?`<div class="fld"><span class="lbl">Bought</span><div class="mini">${owed.lots.map(l=>`<div class="mr num" style="grid-template-columns:50px minmax(0,1fr) 90px"><span class="muted">Lot ${l.lot}</span><span class="trunc">${esc(teamName(l))}</span><b class="r">${fmt(l.price)}</b></div>`).join('')}<div class="mr num" style="grid-template-columns:minmax(0,1fr) 90px"><b>Owes</b><b class="r">${fmt(owed.total)}</b></div></div></div>`:'')+
       pair(field('Paid','cbPaid',b.paid?'yes':'',{type:'select',options:[['','Not yet'],['yes','Paid']]}),field('Paid by','cbMeth',b.method||'',{type:'select',options:[['','—'],['Cash','Cash'],['Zelle','Zelle'],['Credit card','Credit card'],['Check','Check']]})),
-    wire:r=>{ r.querySelector('#cbM').onchange=e=>{ const m=memberById(e.target.value); if(m&&!r.querySelector('#cbName').value) r.querySelector('#cbName').value=tidyName(memberName(m)); }; },
-    save:()=>{ const num=String(fv('cbN')).trim(), name=fv('cbName')||(memberById(fv('cbM'))?tidyName(memberName(memberById(fv('cbM')))):'');
+    wire:r=>{ const inp=r.querySelector('#cbName'), list=r.querySelector('#cbList'), who=r.querySelector('#cbWho');
+      let hits=[], cur=0;
+      const other=id=>c.bidders.find(x=>x!==b&&x.memberId&&x.memberId===id);
+      const showWho=()=>{ const m=linked&&memberById(linked); const o=m&&other(m.id);
+        who.innerHTML=m?`Member: <b>${esc(tidyName(memberName(m)))}</b>${(t.field||[]).some(p=>p.memberId===m.id)?' · in this tournament':''}${o?` · <span class="neg">already bidder #${esc(o.num)}</span>`:''}`:(inp.value.trim()?'Guest — not matched to a member':''); };
+      const close=()=>{ list.style.display='none'; inp.setAttribute('aria-expanded','false'); };
+      const pick=h=>{ linked=h.m.id; inp.value=h.name; close(); showWho(); };
+      const draw=()=>{ hits=memberMatches(t,inp.value,6); cur=0;
+        if(!hits.length){ close(); return; }
+        list.innerHTML=hits.map((h,k)=>{ const o=other(h.m.id); return `<div role="option" data-k="${k}" aria-selected="${k===cur}" style="padding:9px 12px;cursor:pointer;display:flex;justify-content:space-between;gap:10px;${k===cur?'background:#F6ECCF':''}"><span>${esc(h.name)}</span><span class="muted" style="font-size:12px">${o?'#'+esc(o.num):(t.field||[]).some(p=>p.memberId===h.m.id)?'in field':''}</span></div>`; }).join('');
+        list.style.display='block'; inp.setAttribute('aria-expanded','true');
+        list.querySelectorAll('[data-k]').forEach(d=>d.onmousedown=e=>{ e.preventDefault(); pick(hits[+d.dataset.k]); }); };
+      inp.oninput=()=>{ linked=''; draw(); showWho(); };
+      inp.onkeydown=e=>{ if(list.style.display==='none'){ if(e.key==='ArrowDown'){ draw(); e.preventDefault(); } return; }
+        if(e.key==='ArrowDown'||e.key==='ArrowUp'){ cur=(cur+(e.key==='ArrowDown'?1:-1)+hits.length)%hits.length; list.querySelectorAll('[data-k]').forEach((d,k)=>{ d.style.background=k===cur?'#F6ECCF':''; d.setAttribute('aria-selected',k===cur); }); e.preventDefault(); }
+        else if(e.key==='Enter'||e.key==='Tab'){ if(hits[cur]){ pick(hits[cur]); if(e.key==='Enter') e.preventDefault(); } }
+        else if(e.key==='Escape'){ close(); e.stopPropagation(); } };
+      inp.onblur=()=>setTimeout(close,120);
+      showWho(); },
+    save:()=>{ const num=String(fv('cbN')).trim(), name=tidyName(fv('cbName'));
       if(!num){ toast('Give the bidder a number'); return false; } if(!name){ toast('Enter a name'); return false; }
       if(c.bidders.some(x=>x!==b&&String(x.num)===num)){ toast(`Bidder #${num} is already taken`); return false; }
-      Object.assign(b,{num,name,memberId:fv('cbM'),paid:fv('cbPaid')==='yes',method:fv('cbMeth')}); if(isNew) c.bidders.push(b); c.bidders.sort((a,z)=>(+a.num||0)-(+z.num||0)); },
+      const dup=linked&&c.bidders.find(x=>x!==b&&x.memberId===linked); if(dup){ toast(`${name} is already bidder #${dup.num}`); return false; }
+      Object.assign(b,{num,name,memberId:linked,paid:fv('cbPaid')==='yes',method:fv('cbMeth')}); if(isNew) c.bidders.push(b); c.bidders.sort((a,z)=>(+a.num||0)-(+z.num||0)); },
     del:isNew?null:()=>{ if(owed.lots.length&&!confirm(`Bidder #${b.num} bought ${owed.lots.length} team${owed.lots.length>1?'s':''}. Remove them anyway? Those sales will show no buyer.`)) return false;
       c.lots.forEach(l=>{ if(l.bidderId===b.id) l.bidderId=''; }); c.bidders=c.bidders.filter(x=>x!==b); },delLabel:'Remove bidder'});
+}
+/* clear every bidder number (confirmed; warns when any of them already bought a team) */
+function clearBidders(t){
+  const c=calc(t); if(!c.bidders.length){ toast('There are no bidder numbers to remove'); return; }
+  const buyers=c.bidders.filter(b=>bidderOwes(c,b).lots.length), sales=c.lots.filter(l=>l.bidderId&&n0(l.price)>0);
+  openDrawer({kicker:t.name+' · Calcutta',title:'Remove all bidder numbers?',saveLabel:`Remove all ${c.bidders.length}`,
+    body:`<p style="margin:0">This removes all <b>${c.bidders.length}</b> bidder numbers so you can start numbering again. It can’t be undone.</p>
+      ${buyers.length?`<div class="banner" style="background:#F8E6DF;border-color:#EBC2B3;color:#6E2A1B"><b>${buyers.length} of these bidders already bought teams</b> (${sales.length} sale${sales.length===1?'':'s'}). The prices stay recorded, but those lots will show no buyer until you assign one again.</div>`
+        :'<p class="hint">No sales are recorded against these bidders.</p>'}
+      <label class="check"><input type="checkbox" id="clrOk"> Yes, remove every bidder number</label>`,
+    save:()=>{ if(!$('clrOk').checked){ toast('Tick the box to confirm'); return false; }
+      const n=c.bidders.length; c.lots.forEach(l=>{ l.bidderId=''; }); c.bidders=[]; toast(`${n} bidder numbers removed`); }});
 }
 function bulkBidders(t){
   const c=calc(t), players=(t.field||[]).map(p=>memberById(p.memberId)).filter(Boolean);
@@ -2976,40 +3040,81 @@ function bulkBidders(t){
 
 /* ---------- selling ---------- */
 function editLot(t,l){
-  const c=calc(t);
+  const c=calc(t); if(l&&l.isPool) return editPool(t);
+  const st=l.pooled?'pool':(n0(l.price)>0?'sold':'open');
   openDrawer({kicker:`${t.name} · Lot ${l.lot}`,title:teamName(l),
     body:`<p class="muted" style="margin:0">${esc(flightName(l.flight))} · team index ${idxTxt2(l.idx)} · ${esc(l.p1)} ${idxTxt2(l.i1)} · ${esc(l.p2)} ${idxTxt2(l.i2)}</p>`+
-      pair(field('Bidder number','clB',(bidderById(c,l.bidderId)||{}).num||'',{ph:'e.g. 27',hint:'<span id="clBn"></span>'}),field('Sold for','clP',n0(l.price)||'',{type:'number',ph:'0'}))+
-      pair(field('Lot number','clL',l.lot,{type:'number'}),field('Flight','clF',l.flight))+
-      '<p class="hint">Clear the price to mark the team unsold.</p>',
-    wire:r=>{ const upd=()=>{ const b=bidderByNum(c,r.querySelector('#clB').value); r.querySelector('#clBn').textContent=r.querySelector('#clB').value?(b?b.name:'No bidder with that number yet — it will be added'):''; }; r.querySelector('#clB').oninput=upd; upd(); },
-    save:()=>{ const num=String(fv('clB')).trim(), price=fnum('clP');
+      `<div class="fld"><span class="lbl">Result</span>${seg('clS',[['sold','Sold'],['pool','Into the pool'],['open','Not sold yet']],st)}</div>`+
+      `<div id="clSold">${pair(field('Bidder number','clB',(bidderById(c,l.bidderId)||{}).num||'',{ph:'e.g. 27',hint:'<span id="clBn"></span>'}),field('Sold for','clP',n0(l.price)||'',{type:'number',ph:'0',hint:c.minBid?`Minimum bid ${fmt(c.minBid)}`:''}))}</div>`+
+      `<p class="hint" id="clPoolNote">Goes into the pool — auctioned with the other unsold teams as Lot ${poolLot(c)&&l.pooled?poolLot(c).lot:poolLotNum(c)}.</p>`+
+      pair(field('Lot number','clL',l.lot,{type:'number'}),field('Flight','clF',l.flight)),
+    wire:r=>{ const upd=()=>{ const b=bidderByNum(c,r.querySelector('#clB').value); r.querySelector('#clBn').textContent=r.querySelector('#clB').value?(b?b.name:'No bidder with that number yet — it will be added'):''; }; r.querySelector('#clB').oninput=upd; upd();
+      const mode=()=>{ const v=r.querySelector('#clS').dataset.val; r.querySelector('#clSold').style.display=v==='sold'?'':'none'; r.querySelector('#clPoolNote').style.display=v==='pool'?'':'none'; };
+      wireSeg(r,'clS',mode); mode(); },
+    save:()=>{ const mode=$('clS').dataset.val, lotNo=parseInt(fv('clL'),10)||l.lot, fl=fv('clF');
+      if(mode==='pool'){ setPooled(c,l,true); }
+      else if(mode==='open'){ setPooled(c,l,false); l.price=0; l.bidderId=''; }
+      else { const num=String(fv('clB')).trim(), price=fnum('clP');
+        if(!(price>0)){ toast('Enter the price, or choose Into the pool / Not sold yet'); return false; }
+        if(!num){ toast('Enter the bidder number'); return false; }
+        if(c.minBid&&price<c.minBid&&!confirm(`${fmt(price)} is under the ${fmt(c.minBid)} minimum. Record it as sold anyway?\n\nCancel, then choose “Into the pool” to send the team to the pool instead.`)) return false;
+        let b=bidderByNum(c,num); if(!b){ b={id:uid(),num,name:'Bidder '+num,memberId:'',paid:false,method:''}; c.bidders.push(b); c.bidders.sort((a,z)=>(+a.num||0)-(+z.num||0)); }
+        setPooled(c,l,false); l.bidderId=b.id; l.price=price; }
+      l.lot=lotNo; l.flight=fl; c.lots.sort((a,z)=>a.lot-z.lot); }});
+}
+function editPool(t){
+  const c=calc(t), p=poolLot(c); if(!p){ toast('No teams are in the pool'); return; }
+  openDrawer({kicker:`${t.name} · Lot ${p.lot}`,title:`The Pool — ${p.count} team${p.count===1?'':'s'}`,
+    body:`<p style="margin:0">Teams that didn’t reach the ${fmt(c.minBid)} minimum, sold together to one bidder. The price is shared by the flights in proportion to their teams in the pool.</p>
+      <div class="mini">${p.teams.map(l=>`<div class="mr num" style="grid-template-columns:60px minmax(0,1fr) 80px 110px"><span class="muted">Lot ${l.lot}</span><span class="trunc">${esc(teamName(l))}</span><span class="muted">${esc(flightName(l.flight))}</span><button class="btn sm" type="button" data-unpool="${l.id}">Take out</button></div>`).join('')}</div>`+
+      pair(field('Bidder number','cpB',(bidderById(c,c.pool.bidderId)||{}).num||'',{ph:'e.g. 27',hint:'<span id="cpBn"></span>'}),field('Sold for','cpP',n0(c.pool.price)||'',{type:'number',ph:'0'})),
+    wire:r=>{ const upd=()=>{ const b=bidderByNum(c,r.querySelector('#cpB').value); r.querySelector('#cpBn').textContent=r.querySelector('#cpB').value?(b?b.name:'No bidder with that number yet — it will be added'):''; }; r.querySelector('#cpB').oninput=upd; upd();
+      r.querySelectorAll('[data-unpool]').forEach(bt=>bt.onclick=()=>{ const l=c.lots.find(x=>x.id===bt.dataset.unpool); if(!l) return;
+        if(n0(c.pool.price)>0&&poolTeams(c).length>1&&!confirm(`The pool already sold for ${fmt(c.pool.price)}. Taking this team out leaves that price with ${poolTeams(c).length-1} team${poolTeams(c).length-1===1?'':'s'}. Continue?`)) return;
+        setPooled(c,l,false); persist(); closeDrawer(); render(); toast(`${teamName(l)} taken out of the pool — record its sale from the Lots list`); }); },
+    save:()=>{ const num=String(fv('cpB')).trim(), price=fnum('cpP');
       if(price>0&&!num){ toast('Enter the bidder number'); return false; }
       let b=num?bidderByNum(c,num):null; if(num&&!b){ b={id:uid(),num,name:'Bidder '+num,memberId:'',paid:false,method:''}; c.bidders.push(b); c.bidders.sort((a,z)=>(+a.num||0)-(+z.num||0)); }
-      Object.assign(l,{bidderId:price>0&&b?b.id:'',price:price>0?price:0,lot:parseInt(fv('clL'),10)||l.lot,flight:fv('clF')}); c.lots.sort((a,z)=>a.lot-z.lot); }});
+      c.pool={bidderId:price>0&&b?b.id:'',price:price>0?price:0}; }});
+}
+function editMinBid(t){
+  const c=calc(t);
+  openDrawer({kicker:t.name+' · Calcutta',title:'Minimum bid',
+    body:field('Minimum bid','cmB',c.minBid||'',{type:'number',hint:'Teams that don’t reach it go into the pool, auctioned together as one lot after the last team. Leave blank for no minimum.'}),
+    save:()=>{ c.minBid=fnum('cmB')||0; }});
 }
 function runAuction(t,startId){
   const c=calc(t); if(!c.lots.length){ toast('Import the team sheet first'); return; }
-  let i=startId?c.lots.findIndex(l=>l.id===startId):c.lots.findIndex(l=>!(n0(l.price)>0)); if(i<0) i=0;
-  const draw=r=>{ const l=c.lots[i], nx=c.lots[i+1], tot=calcTotals(t), b=bidderById(c,l.bidderId);
+  let seq=auctionSeq(c), i=startId?seq.findIndex(l=>l.id===startId):seq.findIndex(l=>!l.pooled&&!(n0(l.price)>0)&&!(l.isPool&&l.price>0)); if(i<0) i=0;
+  const addBidder=num=>{ let x=bidderByNum(c,num); if(!x){ x={id:uid(),num,name:'Bidder '+num,memberId:'',paid:false,method:''}; c.bidders.push(x); c.bidders.sort((a,z)=>(+a.num||0)-(+z.num||0)); } return x; };
+  const draw=r=>{ seq=auctionSeq(c); if(i>=seq.length) i=seq.length-1; const l=seq[i], nx=seq[i+1], tot=calcTotals(t), b=bidderById(c,l.bidderId), P=!!l.isPool;
+    const status=l.pooled?`<b style="color:#E8A08A">in the pool (Lot ${poolLotNum(c)})</b>`:(n0(l.price)>0?`<b style="color:#D8B75F">sold ${fmt(l.price)} to ${esc(bidderLabel(b))}</b>`:'');
     r.innerHTML=`<div class="card pad" style="display:flex;gap:18px;align-items:center;background:var(--navy);color:#fff;border-color:var(--navy)">
-        <div style="text-align:center;min-width:92px"><div style="font-size:11px;font-weight:800;letter-spacing:.14em;color:#D8B75F">LOT</div><div style="font-family:var(--serif,Georgia);font-size:52px;font-weight:700;line-height:1">${l.lot}</div><div style="font-size:12px;color:#AEB8BE">of ${c.lots.length}</div></div>
-        <div style="min-width:0"><div style="font-family:var(--serif,Georgia);font-size:26px;font-weight:700;line-height:1.15">${esc(l.p1)}<br>${esc(l.p2)}</div><div style="margin-top:6px;color:#C9CFD2;font-size:13.5px">${esc(flightName(l.flight))} · team index ${idxTxt2(l.idx)}${n0(l.price)>0?` · <b style="color:#D8B75F">sold ${fmt(l.price)} to ${esc(bidderLabel(b))}</b>`:''}</div></div></div>
-      ${pair(field('Bidder number','raB',b?b.num:'',{ph:'e.g. 27',hint:'<span id="raBn"></span>'}),field('Price','raP',n0(l.price)||'',{type:'number',ph:'0'}))}
-      <div class="actions"><button class="btn pri" type="button" id="raSold" style="flex:1">Sold — next lot</button><button class="btn" type="button" id="raPrev"${i===0?' disabled':''}>‹ Back</button><button class="btn" type="button" id="raSkip">Skip</button></div>
-      <div class="mini">${[['Pot',fmt(tot.pot)],['Sold',`${tot.sold} of ${tot.lots}`],['Top price',fmt(tot.top)]].map(([a,v])=>`<div class="mr num" style="grid-template-columns:minmax(0,1fr) auto"><span class="muted">${a}</span><b>${v}</b></div>`).join('')}</div>
-      ${nx?`<p class="hint">Up next: Lot ${nx.lot} · ${esc(teamName(nx))} · ${esc(flightName(nx.flight))}</p>`:'<p class="hint">This is the last lot.</p>'}`;
+        <div style="text-align:center;min-width:92px"><div style="font-size:11px;font-weight:800;letter-spacing:.14em;color:#D8B75F">LOT</div><div style="font-family:var(--serif,Georgia);font-size:52px;font-weight:700;line-height:1">${l.lot}</div><div style="font-size:12px;color:#AEB8BE">${P?'the pool':'of '+c.lots.length}</div></div>
+        <div style="min-width:0">${P?`<div style="font-family:var(--serif,Georgia);font-size:26px;font-weight:700;line-height:1.15">The Pool</div><div style="margin-top:6px;color:#C9CFD2;font-size:13.5px">${l.count} team${l.count===1?'':'s'} that didn’t reach ${fmt(c.minBid)}, sold together${l.price>0?` · <b style="color:#D8B75F">sold ${fmt(l.price)} to ${esc(bidderLabel(b))}</b>`:''}</div>`
+          :`<div style="font-family:var(--serif,Georgia);font-size:26px;font-weight:700;line-height:1.15">${esc(l.p1)}<br>${esc(l.p2)}</div><div style="margin-top:6px;color:#C9CFD2;font-size:13.5px">${esc(flightName(l.flight))} · team index ${idxTxt2(l.idx)}${status?' · '+status:''}</div>`}</div></div>
+      ${P?`<div class="mini" style="max-height:220px;overflow:auto">${l.teams.map(x=>`<div class="mr num" style="grid-template-columns:60px minmax(0,1fr) 80px"><span class="muted">Lot ${x.lot}</span><span class="trunc">${esc(teamName(x))}</span><span class="muted">${esc(flightName(x.flight))}</span></div>`).join('')}</div>`:''}
+      ${pair(field('Bidder number','raB',b?b.num:'',{ph:'e.g. 27',hint:'<span id="raBn"></span>'}),field('Price','raP',n0(l.price)||'',{type:'number',ph:'0',hint:!P&&c.minBid?`Minimum ${fmt(c.minBid)}`:''}))}
+      <div class="actions"><button class="btn pri" type="button" id="raSold" style="flex:1">${P?'Sold':'Sold — next lot'}</button>${P?'':`<button class="btn" type="button" id="raPool">No sale → pool</button>`}<button class="btn" type="button" id="raPrev"${i===0?' disabled':''}>‹ Back</button><button class="btn" type="button" id="raSkip"${i>=seq.length-1?' disabled':''}>Skip</button></div>
+      <div class="mini">${[['Pot',fmt(tot.pot)],['Sold',`${tot.sold} of ${tot.lots}`],['In the pool',tot.pooled?`${tot.pooled} team${tot.pooled===1?'':'s'} · Lot ${tot.poolLot}`:'none'],['Top price',fmt(tot.top)]].map(([a,v])=>`<div class="mr num" style="grid-template-columns:minmax(0,1fr) auto"><span class="muted">${a}</span><b>${v}</b></div>`).join('')}</div>
+      ${nx?`<p class="hint">Up next: Lot ${nx.lot} · ${esc(teamName(nx))}${nx.isPool?'':' · '+esc(flightName(nx.flight))}</p>`:(P?'<p class="hint">The pool is the final lot.</p>':`<p class="hint">Last team.${poolTeams(c).length?` The pool (Lot ${poolLotNum(c)}) comes up next.`:''}</p>`)}`;
     const bIn=r.querySelector('#raB'), pIn=r.querySelector('#raP'), bn=r.querySelector('#raBn');
     const upd=()=>{ const x=bidderByNum(c,bIn.value); bn.textContent=bIn.value?(x?x.name:'New bidder number — it will be added'):''; }; bIn.oninput=upd; upd();
+    const next=()=>{ seq=auctionSeq(c); if(i<seq.length-1) i++; draw(r); };
+    const toPool=()=>{ setPooled(c,l,true); persist(); toast(`${teamName(l)} → the pool (Lot ${poolLotNum(c)})`); next(); };
     const sell=()=>{ const num=String(bIn.value).trim(), price=parseFloat(String(pIn.value).replace(/[$,]/g,''))||0;
+      if(!P&&!(price>0)){ if(confirm('No price entered. Send this team to the pool?')) toPool(); else pIn.focus(); return; }
       if(price>0&&!num){ toast('Enter the bidder number'); bIn.focus(); return; }
-      let x=num?bidderByNum(c,num):null; if(num&&!x){ x={id:uid(),num,name:'Bidder '+num,memberId:'',paid:false,method:''}; c.bidders.push(x); c.bidders.sort((a,z)=>(+a.num||0)-(+z.num||0)); }
-      l.bidderId=price>0&&x?x.id:''; l.price=price>0?price:0; persist();
-      if(i<c.lots.length-1){ i++; draw(r); } else { toast('That was the last lot'); draw(r); } };
+      if(!P&&c.minBid&&price<c.minBid){ if(confirm(`${fmt(price)} is under the ${fmt(c.minBid)} minimum.\n\nOK sends the team to the pool. Cancel lets you change the price.`)) toPool(); else pIn.focus(); return; }
+      const x=num?addBidder(num):null;
+      if(P) c.pool={bidderId:price>0&&x?x.id:'',price:price>0?price:0};
+      else { setPooled(c,l,false); l.bidderId=price>0&&x?x.id:''; l.price=price>0?price:0; }
+      persist(); if(P){ toast('The pool is sold'); draw(r); } else next(); };
     r.querySelector('#raSold').onclick=sell;
+    const pb=r.querySelector('#raPool'); if(pb) pb.onclick=toPool;
     [bIn,pIn].forEach(e=>e.onkeydown=ev=>{ if(ev.key==='Enter'){ ev.preventDefault(); if(e===bIn) pIn.focus(); else sell(); } });
     r.querySelector('#raPrev').onclick=()=>{ i=Math.max(0,i-1); draw(r); };
-    r.querySelector('#raSkip').onclick=()=>{ if(i<c.lots.length-1){ i++; draw(r); } };
+    r.querySelector('#raSkip').onclick=next;
     setTimeout(()=>bIn.focus(),30);
   };
   openDrawer({kicker:t.name+' · Calcutta',title:'Run the auction',saveLabel:'Done',wide:true,body:'<div id="raBody" style="display:flex;flex-direction:column;gap:14px"></div>',wire:r=>draw(r.querySelector('#raBody')),save:()=>{}});
@@ -3042,17 +3147,18 @@ function tCalcutta(el,t){
   const c=calc(t), T2=calcTotals(t);
   if(!c.lots.length){ el.innerHTML=`<div class="card"><div class="empty"><b>No Calcutta teams yet</b><span>Upload the auction-order spreadsheet (or the team sheet). The lot order, flights and indexes come in, ready for bidder numbers and sales.</span><button class="btn pri" id="ccImp">${I.down}Upload team sheet</button></div></div>`; $('ccImp').onclick=()=>importCalcutta(t); return; }
   view.cclot=view.cclot||'all';
-  const lots=c.lots.filter(l=>view.cclot==='all'||(view.cclot==='open'?!(n0(l.price)>0):flightName(l.flight)===view.cclot));
+  const lots=auctionSeq(c).filter(l=>l.isPool?(view.cclot==='all'||view.cclot==='pool'):(view.cclot==='all'||(view.cclot==='open'?!l.pooled&&!(n0(l.price)>0):view.cclot==='pool'?l.pooled:flightName(l.flight)===view.cclot)));
   const plc=['1st','2nd','3rd','4th','5th','6th','7th','8th'];
   const fcols=`grid-template-columns:minmax(0,1fr) 70px 110px 110px 110px ${c.payout.map(()=>'90px').join(' ')}`;
   const lcols='grid-template-columns:54px minmax(0,1.6fr) 84px 70px minmax(0,1fr) 100px 40px';
   el.innerHTML=`
   <div class="grid g4">${kpi('Pot',fmt(T2.pot),`${T2.sold} of ${T2.lots} teams sold`)}${kpi('Expenses',fmt(T2.exp),`${fmt(T2.share)} from each of ${T2.flights.length} flights`)}${kpi('Net to flights',fmt(T2.net),'after expenses',T2.net>=0?'pos':'neg')}${kpi('Top price',fmt(T2.top),T2.sold?`average ${fmt(T2.avg)}`:'no sales yet')}</div>
+  <div class="card pad" style="display:flex;gap:14px 24px;align-items:center;flex-wrap:wrap"><div class="cell2" style="flex:1 1 320px"><span class="lbl">Minimum bid</span><b style="font-size:18px">${c.minBid?fmt(c.minBid):'None'}</b><small class="muted">${c.minBid?`Teams that don’t reach it go into the pool, auctioned together as Lot ${T2.poolLot||poolLotNum(c)}.`:'Every team sells for whatever it brings.'}${T2.pooled?` <b>${T2.pooled} team${T2.pooled===1?'':'s'} in the pool${T2.poolPrice?` · sold ${fmt(T2.poolPrice)}`:''}.</b>`:''}</small></div><div class="actions">${T2.pooled?`<button class="btn sm" id="ccPool">The pool</button>`:''}<button class="btn sm" id="ccMin">Change minimum</button></div></div>
   <div class="toolbar"><div class="actions"><button class="btn pri" id="ccRun">Run the auction</button><button class="btn" id="ccImp">${I.down}Upload team sheet</button><button class="btn" id="ccExp">${I.down}Export results</button></div>
     <span class="muted" style="margin-left:auto;font-size:13px">${c.file?esc(c.file)+' · ':''}${c.bidders.length} bidders</span></div>
-  <div class="card" style="overflow:hidden"><div class="cardhead"><div><h2 class="h2">By flight</h2><span class="muted">Expenses come out evenly across all ${T2.flights.length} flights. Payout by place is from each flight’s net.</span></div><button class="btn sm" id="ccPay">Payout ${c.payout.join(' / ')}%</button></div>
+  <div class="card" style="overflow:hidden"><div class="cardhead"><div><h2 class="h2">By flight</h2><span class="muted">Expenses come out evenly across all ${T2.flights.length} flights${T2.pooled?'; the pool’s price is shared by its teams’ flights':''}. Payout by place is from each flight’s net.</span></div><button class="btn sm" id="ccPay">Payout ${c.payout.join(' / ')}%</button></div>
     <div class="tw"><div class="t" style="min-width:${560+c.payout.length*90}px"><div class="tr th" style="${fcols}"><span>Flight</span><span class="r">Sold</span><span class="r">Gross</span><span class="r">Expenses</span><span class="r">Net pot</span>${c.payout.map((p,i)=>`<span class="r">${plc[i]||i+1} · ${p}%</span>`).join('')}</div>
-    ${T2.byF.map(f=>`<div class="tr num" style="${fcols}"><b>${esc(f.flight)}</b><span class="r muted">${f.sold}/${f.teams}</span><span class="r">${fmt(f.gross)}</span><span class="r neg">−${fmt(f.share).replace('$','$')}</span><b class="r ${f.net<0?'neg':''}">${fmt(f.net)}</b>${f.places.map(v=>`<span class="r">${fmt(v)}</span>`).join('')}</div>`).join('')}
+    ${T2.byF.map(f=>`<div class="tr num" style="${fcols}"><b>${esc(f.flight)}</b><span class="r muted">${f.sold}/${f.teams}${f.pooled?` <small title="In the pool">+${f.pooled}P</small>`:''}</span><span class="r">${fmt(f.gross)}</span><span class="r neg">−${fmt(f.share).replace('$','$')}</span><b class="r ${f.net<0?'neg':''}">${fmt(f.net)}</b>${f.places.map(v=>`<span class="r">${fmt(v)}</span>`).join('')}</div>`).join('')}
     <div class="tr num tot" style="${fcols}"><b>Total</b><span class="r">${T2.sold}/${T2.lots}</span><b class="r">${fmt(T2.pot)}</b><b class="r neg">−${fmt(T2.exp)}</b><b class="r">${fmt(T2.net)}</b>${c.payout.map((p,i)=>`<b class="r">${fmt(T2.byF.reduce((a,f)=>a+f.places[i],0))}</b>`).join('')}</div></div></div>
     ${Math.abs(T2.payPct-100)>0.01?`<div class="banner" style="margin:12px 22px 18px">Payout adds up to ${T2.payPct}% of each flight’s net pot.</div>`:''}</div>
   <div class="grid g2" style="align-items:start">
@@ -3060,33 +3166,38 @@ function tCalcutta(el,t){
       ${c.expenses.length?c.expenses.map(e=>`<div class="tr num click" data-ce="${e.id}" style="grid-template-columns:minmax(0,1fr) 100px 100px 40px"><div class="cell2"><b class="trunc">${esc(e.desc)}</b>${e.notes?`<small class="trunc">${esc(e.notes)}</small>`:''}</div><span class="r">${fmt(e.amount)}</span><span class="r muted">${fmt(n0(e.amount)/(T2.flights.length||1))}/flight</span><span class="ib">${I.edit}</span></div>`).join('')+
         `<div class="tr num tot" style="grid-template-columns:minmax(0,1fr) 100px 100px 40px"><b>Total</b><b class="r">${fmt(T2.exp)}</b><b class="r">${fmt(T2.share)}/flight</b><span></span></div>`
         :'<div class="empty" style="padding:22px"><span>No expenses yet — for example, the auction dinner.</span></div>'}</div>
-    <div class="card" style="overflow:hidden"><div class="cardhead"><div><h2 class="h2">Bidders</h2><span class="muted">${c.bidders.filter(b=>b.paid).length} of ${c.bidders.filter(b=>bidderOwes(c,b).total>0).length} buyers paid</span></div><div class="actions"><button class="btn sm" id="ccBulk">Number the players</button><button class="btn sm" id="ccAddB">${I.plus}Add</button></div></div>
+    <div class="card" style="overflow:hidden"><div class="cardhead"><div><h2 class="h2">Bidders</h2><span class="muted">${c.bidders.filter(b=>b.paid).length} of ${c.bidders.filter(b=>bidderOwes(c,b).total>0).length} buyers paid</span></div><div class="actions">${c.bidders.length?`<button class="btn sm" id="ccClr">Remove all numbers</button>`:''}<button class="btn sm" id="ccBulk">Number the players</button><button class="btn sm" id="ccAddB">${I.plus}Add</button></div></div>
       <div style="max-height:420px;overflow:auto">${c.bidders.length?c.bidders.map(b=>{ const o=bidderOwes(c,b); return `<div class="tr num click" data-cb="${b.id}" style="grid-template-columns:56px minmax(0,1fr) 50px 96px 64px"><b>#${esc(b.num)}</b><span class="trunc">${esc(b.name)}</span><span class="r muted">${o.lots.length||''}</span><span class="r">${o.total?fmt(o.total):'—'}</span><span class="r">${o.total?(b.paid?`<span class="chip ok">Paid</span>`:'<span class="chip warn">Owes</span>'):''}</span></div>`; }).join('')
         :'<div class="empty" style="padding:22px"><span>Add bidders one at a time, or number every player in the field.</span></div>'}</div></div>
   </div>
   <div class="card" style="overflow:hidden"><div class="cardhead"><div><h2 class="h2">Lots</h2><span class="muted">Click a lot to record or change a sale</span></div>
-    <div class="seg">${[['all','All'],['open','Unsold']].concat(T2.flights.map(f=>[f,f.replace('Flight ','F')])).map(([k,l])=>`<button class="${view.cclot===k?'on':''}" data-ccf="${esc(k)}">${esc(l)}</button>`).join('')}</div></div>
+    <div class="seg">${[['all','All'],['open','Unsold']].concat(poolTeams(c).length?[['pool','Pool']]:[]).concat(T2.flights.map(f=>[f,f.replace('Flight ','F')])).map(([k,l])=>`<button class="${view.cclot===k?'on':''}" data-ccf="${esc(k)}">${esc(l)}</button>`).join('')}</div></div>
     <div class="tw"><div class="t" style="min-width:760px"><div class="tr th" style="${lcols}"><span>Lot</span><span>Team</span><span>Flight</span><span class="r">Index</span><span>Bought by</span><span class="r">Price</span><span></span></div>
-    ${lots.map(l=>{ const b=bidderById(c,l.bidderId); return `<div class="tr num click" data-cl="${l.id}" style="${lcols}"><b>${l.lot}</b><span class="trunc">${l.fun?'<span style="color:var(--gold)" title="Fun team">★</span> ':''}${esc(teamName(l))}</span><span class="muted">${esc(flightName(l.flight))}</span><span class="r muted">${idxTxt2(l.idx)}</span><span class="trunc">${n0(l.price)>0?esc(bidderLabel(b)):'<span class="muted">—</span>'}</span><b class="r">${n0(l.price)>0?fmt(l.price):''}</b><span class="ib">${I.edit}</span></div>`; }).join('')||'<div class="empty" style="padding:22px"><span>No lots match.</span></div>'}
+    ${lots.map(l=>{ const b=bidderById(c,l.bidderId);
+      if(l.isPool) return `<div class="tr num click" data-cl="__pool" style="${lcols};background:#F6ECCF"><b>${l.lot}</b><span class="trunc"><b>The Pool</b> · ${l.count} team${l.count===1?'':'s'} under ${fmt(c.minBid)}</span><span class="muted">Mixed</span><span></span><span class="trunc">${l.price>0?esc(bidderLabel(b)):'<span class="muted">—</span>'}</span><b class="r">${l.price>0?fmt(l.price):''}</b><span class="ib">${I.edit}</span></div>`;
+      return `<div class="tr num click" data-cl="${l.id}" style="${lcols}${l.pooled?';opacity:.72':''}"><b>${l.lot}</b><span class="trunc">${l.fun?'<span style="color:var(--gold)" title="Fun team">★</span> ':''}${esc(teamName(l))}</span><span class="muted">${esc(flightName(l.flight))}</span><span class="r muted">${idxTxt2(l.idx)}</span><span class="trunc">${l.pooled?`<span class="chip">In the pool · Lot ${poolLotNum(c)}</span>`:n0(l.price)>0?esc(bidderLabel(b)):'<span class="muted">—</span>'}</span><b class="r">${!l.pooled&&n0(l.price)>0?fmt(l.price):''}</b><span class="ib">${I.edit}</span></div>`; }).join('')||'<div class="empty" style="padding:22px"><span>No lots match.</span></div>'}
     </div></div></div>`;
   $('ccRun').onclick=()=>runAuction(t); $('ccImp').onclick=()=>importCalcutta(t); $('ccExp').onclick=()=>exportCalcutta(t);
-  $('ccPay').onclick=()=>editPayout(t); $('ccAddE').onclick=()=>editCalcExpense(t,null); $('ccAddB').onclick=()=>editBidder(t,null); $('ccBulk').onclick=()=>bulkBidders(t);
+  $('ccPay').onclick=()=>editPayout(t); $('ccMin').onclick=()=>editMinBid(t); const pbn=$('ccPool'); if(pbn) pbn.onclick=()=>editPool(t); $('ccAddE').onclick=()=>editCalcExpense(t,null); $('ccAddB').onclick=()=>editBidder(t,null); $('ccBulk').onclick=()=>bulkBidders(t);
+  const cl=$('ccClr'); if(cl) cl.onclick=()=>clearBidders(t);
   el.querySelectorAll('[data-ce]').forEach(r=>r.onclick=()=>editCalcExpense(t,c.expenses.find(e=>e.id===r.dataset.ce)));
   el.querySelectorAll('[data-cb]').forEach(r=>r.onclick=()=>editBidder(t,c.bidders.find(b=>b.id===r.dataset.cb)));
-  el.querySelectorAll('[data-cl]').forEach(r=>r.onclick=()=>editLot(t,c.lots.find(l=>l.id===r.dataset.cl)));
+  el.querySelectorAll('[data-cl]').forEach(r=>r.onclick=()=>r.dataset.cl==='__pool'?editPool(t):editLot(t,c.lots.find(l=>l.id===r.dataset.cl)));
   el.querySelectorAll('[data-ccf]').forEach(b=>b.onclick=()=>{ view.cclot=b.dataset.ccf; render(); });
 }
 /* results workbook: lots, bidders (what each owes), flights with expenses and payouts */
 async function exportCalcutta(t){
   const c=calc(t), T2=calcTotals(t); try{ await loadXLSX(); }catch(e){ toast(e.message); return; }
   const wb=XLSX.utils.book_new();
-  const lots=[['Lot','Team','Flight','Team index','Bidder #','Bought by','Price']].concat(c.lots.map(l=>{ const b=bidderById(c,l.bidderId); return [l.lot,teamName(l),flightName(l.flight),l.idx,b?b.num:'',b?b.name:'',n0(l.price)||'']; }));
+  const pl=poolLot(c);
+  const lots=[['Lot','Team','Flight','Team index','Bidder #','Bought by','Price','Result']].concat(c.lots.map(l=>{ const b=bidderById(c,l.bidderId); return [l.lot,teamName(l),flightName(l.flight),l.idx,l.pooled?'':(b?b.num:''),l.pooled?'':(b?b.name:''),l.pooled?'':(n0(l.price)||''),l.pooled?`In the pool (Lot ${pl.lot})`:(n0(l.price)>0?'Sold':'')]; }))
+    .concat(pl?[[pl.lot,`The Pool: ${pl.teams.map(teamName).join('; ')}`,'Mixed','',(bidderById(c,pl.bidderId)||{}).num||'',(bidderById(c,pl.bidderId)||{}).name||'',pl.price||'','Pool']]:[]);
   XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(lots),'Lots');
   const bid=[['Bidder #','Name','Teams','Owes','Paid','Paid by']].concat(c.bidders.map(b=>{ const o=bidderOwes(c,b); return [b.num,b.name,o.lots.map(l=>'Lot '+l.lot).join(', '),o.total,b.paid?'Yes':'',b.method||'']; }));
   XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(bid),'Bidders');
   const plc=['1st','2nd','3rd','4th','5th','6th','7th','8th'];
-  const fl=[['Flight','Teams sold','Gross','Expense share','Net pot'].concat(c.payout.map((p,i)=>`${plc[i]||i+1} (${p}%)`))].concat(T2.byF.map(f=>[f.flight,f.sold,f.gross,f.share,f.net].concat(f.places)))
-    .concat([['Total',T2.sold,T2.pot,T2.exp,T2.net].concat(c.payout.map((p,i)=>T2.byF.reduce((a,f)=>a+f.places[i],0)))]);
+  const fl=[['Flight','Teams sold','Teams in pool','Pool share','Gross','Expense share','Net pot'].concat(c.payout.map((p,i)=>`${plc[i]||i+1} (${p}%)`))].concat(T2.byF.map(f=>[f.flight,f.sold,f.pooled,f.fromPool,f.gross,f.share,f.net].concat(f.places)))
+    .concat([['Total',T2.sold,T2.pooled,T2.poolPrice,T2.pot,T2.exp,T2.net].concat(c.payout.map((p,i)=>T2.byF.reduce((a,f)=>a+f.places[i],0)))]);
   XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(fl),'By flight');
   XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([['Expense','Amount','Per flight','Notes']].concat(c.expenses.map(e=>[e.desc,n0(e.amount),n0(e.amount)/(T2.flights.length||1),e.notes||'']))),'Expenses');
   XLSX.writeFile(wb,`${(t.name||'Tournament').replace(/[^\w]+/g,'-')}-Calcutta-${new Date().toISOString().slice(0,10)}.xlsx`);

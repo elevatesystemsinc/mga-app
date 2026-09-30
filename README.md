@@ -72,6 +72,11 @@ Each tournament has a **Calcutta** tab.
 - **Run the auction:** a live screen for the night — type the bidder number, Enter, the price, Enter,
   and it moves to the next lot. Back and Skip are there; any lot can be edited from the Lots list.
   A bidder number that doesn't exist yet is added on the spot.
+- **Minimum bid** (default $250, editable): a team that doesn't reach it — a lower bid, **No sale →
+  pool**, or no price — goes into **the pool**, auctioned together as one extra lot numbered after the
+  last team (Lot 75 for 74 teams). It comes up on the live screen after the last team and sells to one
+  bidder for one price. That price is shared by the flights in proportion to their teams in the pool.
+  Teams can be taken back out of the pool (the Pool button or the Lots list).
 - **Expenses** (e.g. the auction dinner) come out of the pot **evenly across every flight**.
 - **By flight:** teams sold, gross, expense share, net pot, and the payout by place from each
   flight's net (40/30/20/10 by default, editable, any number of places).
