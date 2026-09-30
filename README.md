@@ -82,7 +82,7 @@ Each tournament has a **Calcutta** tab.
   rest. A team can **pre-buy** the remainder at registration (default $900 more, $1,200 in all): it then
   owns 100% and is **skipped in the auction**. Buy-ins go into each team's flight pot. Three payments are kept
   separate, each with its own paid status and method: the **auction purchase** (paid by the buyer, marked on
-  the bidder), the team's **buy-in**, and its **pre-buy**. Payments totals show every method split by kind.
+  the bidder), each player's share of the team **buy-in** (e.g. $150 each), and the team's **pre-buy**. Payments totals show every method split by kind.
 - **Expenses** (e.g. the auction dinner) come out of the pot **evenly across every flight**.
 - **By flight:** teams sold, gross, expense share, net pot, and the payout by place from each
   flight's net (40/30/20/10 by default, editable, any number of places).
