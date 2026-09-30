@@ -17,7 +17,7 @@
 body{font-family:var(--sans);background:var(--paper);color:var(--ink);font-size:15px;line-height:1.4;-webkit-font-smoothing:antialiased}
 button,input,select{font:inherit;color:inherit} button{cursor:pointer}
 :focus-visible{outline:2px solid var(--gold);outline-offset:2px}
-.num{font-variant-numeric:tabular-nums} .muted{color:var(--muted)} .pos{color:var(--pos)} .neg{color:var(--neg)} .r{text-align:right}
+body{font-variant-numeric:lining-nums} .num{font-variant-numeric:lining-nums tabular-nums} .muted{color:var(--muted)} .pos{color:var(--pos)} .neg{color:var(--neg)} .r{text-align:right}
 .top{background:var(--navy);color:#fff;padding:calc(12px + env(safe-area-inset-top,0px)) 20px 12px;display:flex;align-items:center;gap:14px;position:sticky;top:0;z-index:20}
 .top img{width:34px;height:44px;object-fit:contain}
 .top .t{flex:1;min-width:0} .top b{display:block;font-family:var(--serif);font-size:22px;line-height:1.05;white-space:nowrap;overflow:hidden;text-overflow:ellipsis} .top small{color:var(--goldl);font-size:12.5px}
@@ -36,7 +36,7 @@ main{max-width:1100px;margin:0 auto;padding:18px 18px 60px}
 .inp{height:42px;border:1px solid #CFC6AE;border-radius:9px;padding:0 12px;background:#fff;min-width:0}
 .search{flex:1 1 260px}
 .chips{display:flex;gap:6px} .chips button{height:34px;padding:0 13px;border-radius:999px;border:1px solid var(--line);background:#fff;font-weight:700;font-size:13px;color:var(--muted)} .chips button.on{background:var(--navy);border-color:var(--navy);color:#fff}
-.btn{height:42px;padding:0 16px;border-radius:9px;border:1px solid var(--line);background:#fff;color:var(--navy);font-weight:700;display:inline-flex;align-items:center;gap:6px}
+.btn{white-space:nowrap;height:42px;padding:0 16px;border-radius:9px;border:1px solid var(--line);background:#fff;color:var(--navy);font-weight:700;display:inline-flex;align-items:center;gap:6px}
 .btn.pri{background:var(--navy);border-color:var(--navy);color:#fff} .btn.warn{color:var(--neg)} .btn[disabled]{opacity:.45}
 .card{background:#fff;border:1px solid var(--line);border-radius:12px;overflow:hidden}
 .row{display:grid;align-items:center;gap:10px;padding:10px 14px;border-top:1px solid var(--line);min-height:48px}
@@ -65,10 +65,30 @@ select.pay.paid{background:#E3F0E8;border-color:#BCD9C7;color:var(--pos)}
 .toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--navy);color:#fff;padding:12px 18px;border-radius:10px;font-weight:600;z-index:60;box-shadow:0 10px 30px rgba(0,0,0,.3)}
 .banner{background:#F6ECCF;border:1px solid #E5CF8E;color:#5C4410;border-radius:10px;padding:12px 14px;font-size:14px;margin-bottom:12px}
 @media (max-width:760px){ .kpis{grid-template-columns:1fr 1fr} .two{grid-template-columns:1fr} }
+.meta{display:contents}
+.fcards{display:none}
+.fcard{padding:10px 16px;border-top:1px solid var(--line)} .fcard.tot{background:var(--ivory)}
+.fc1{display:flex;justify-content:space-between;gap:10px;font-size:16px} .fc2{font-size:12.5px;margin-top:2px} .fc3{display:flex;gap:14px;flex-wrap:wrap;margin-top:6px;font-size:14px;font-weight:700}
+@media (max-width:640px){ .fcards{display:block} .ftable{display:none} }
+@media (max-width:640px){
+  main{padding:14px 12px 60px} .kpi{padding:12px} .kpi b{font-size:24px}
+  .tabs{overflow-x:auto} .tabs button{white-space:nowrap;padding:10px 10px}
+  .bar .chips{width:100%} .bar .btn{width:100%;justify-content:center}
+  .row.h.lots,.row.h.bids{display:none}
+  .row.lot{grid-template-columns:40px minmax(0,1fr) auto!important;grid-template-areas:"lot team price" "lot meta price";row-gap:3px;padding:10px 12px}
+  .row.lot>.c-lot{grid-area:lot;font-size:17px} .row.lot>.c-team{grid-area:team;white-space:normal;font-weight:600} .row.lot>.c-price{grid-area:price;font-size:16px}
+  .row.lot>.meta{grid-area:meta;display:flex;gap:8px;flex-wrap:wrap;font-size:13px;min-width:0} .row.lot .meta>span{white-space:nowrap}
+  .row.bid{grid-template-columns:52px minmax(0,1fr) auto!important;grid-template-areas:"num name edit" "num meta owes" "pay pay pay";row-gap:6px;padding:10px 12px}
+  .row.bid>.c-num{grid-area:num} .row.bid>.c-name{grid-area:name;white-space:normal;font-weight:600} .row.bid>.c-edit{grid-area:edit;justify-self:end;width:40px;justify-content:center}
+  .row.bid>.c-bought{grid-area:meta;font-size:12.5px} .row.bid>.c-owes{grid-area:owes} .row.bid>.c-pay{grid-area:pay}
+  .sheet .hd .n{font-size:32px;min-width:48px} .sheet .hd b{font-size:19px}
+  .modal{padding:4vh 10px}
+  .acts .btn{flex:1 1 0;white-space:nowrap;padding:0 10px} .acts .btn.pri{flex:1 1 100%;height:50px;font-size:16px}
+}
 </style>
 </head>
 <body>
-<header class="top"><img src="crest.png?v=2" alt=""><div class="t"><b id="tName">Calcutta</b><small>Cashier</small></div><span class="pill" id="sync">Connecting…</span></header>
+<header class="top"><img src="crest.png?v=2" alt=""><div class="t"><b id="tName">Calcutta</b><small>Calcutta · Cashier</small></div><span class="pill" id="sync">Connecting…</span></header>
 <main id="main"><div class="card" style="padding:22px"><p class="muted">Loading…</p></div></main>
 <script>
 /* =====================================================================
@@ -189,7 +209,7 @@ async function boot(){
     if(saved&&saved.dirty&&saved.doc){ doc=calcMerge(r.doc,saved.doc); dirty=true; }   // changes made while offline, then the page was closed
   }catch(e){ if(e.message==='LINKOFF') return fail('This cashier link has been turned off. Ask the committee for a new one.'); return fail('Couldn’t reach the Calcutta. Check the connection and reload.'); }
   doc.lots=doc.lots||[]; doc.bidders=doc.bidders||[]; doc.expenses=doc.expenses||[]; doc.pool=doc.pool||{bidderId:'',price:0}; doc.payout=doc.payout&&doc.payout.length?doc.payout:[40,30,20,10];
-  $('tName').textContent=(doc.name||'Calcutta')+' · Calcutta'; document.title=(doc.name||'Calcutta')+' · Cashier';
+  $('tName').textContent=doc.name||'Calcutta'; document.title=(doc.name||'Calcutta')+' · Cashier';
   render(); setPill(); if(dirty) saveSoon(0);
   setInterval(()=>{ if(!modalOpen&&!saving&&document.visibilityState==='visible') syncNow(); },4000);
   addEventListener('online',()=>saveSoon(0));
@@ -219,9 +239,9 @@ function paneSales(el,T){
   const cols='grid-template-columns:56px minmax(0,1.6fr) 80px minmax(0,1fr) 100px';
   el.innerHTML=`<div class="bar"><input class="inp search" id="q" placeholder="Find a lot — number or player name" value="${esc(q)}" autocomplete="off"><div class="chips">${[['all','All'],['open','Unsold'],['pool','Pool']].map(([k,l])=>`<button data-f="${k}" class="${filt===k?'on':''}">${l}</button>`).join('')}</div></div>
     ${doc.minBid?`<p class="muted" style="margin:0 0 10px;font-size:13px">Minimum bid ${fmt(doc.minBid)} — teams under it go into the pool${T.pooled?` (Lot ${T.poolLot})`:''}.</p>`:''}
-    <div class="card"><div class="row h" style="${cols}"><span>Lot</span><span>Team</span><span>Flight</span><span>Bought by</span><span class="r">Price</span></div>
-    ${rows.map(l=>l.isPool?`<div class="row click pool" data-l="__pool" style="${cols}"><b>${l.lot}</b><span class="trunc"><b>The Pool</b> · ${l.count} team${l.count===1?'':'s'}</span><span class="muted">Mixed</span><span class="trunc">${l.price>0?esc(bidderName(l.bidderId)):'<span class="muted">—</span>'}</span><b class="r num">${l.price>0?fmt(l.price):''}</b></div>`
-      :`<div class="row click${l.pooled?' dim':''}" data-l="${l.id}" style="${cols}"><b>${l.lot}</b><span class="trunc">${esc(teamName(l))}</span><span class="muted">${esc(flightName(l.flight))}</span><span class="trunc">${l.pooled?'<span class="tag p">In the pool</span>':c0(l.price)>0?esc(bidderName(l.bidderId)):'<span class="muted">—</span>'}</span><b class="r num">${!l.pooled&&c0(l.price)>0?fmt(l.price):''}</b></div>`).join('')||'<div class="row"><span class="muted">No lots match.</span></div>'}</div>`;
+    <div class="card"><div class="row h lots" style="${cols}"><span>Lot</span><span>Team</span><span>Flight</span><span>Bought by</span><span class="r">Price</span></div>
+    ${rows.map(l=>l.isPool?`<div class="row lot click pool" data-l="__pool" style="${cols}"><b class="c-lot">${l.lot}</b><span class="c-team trunc"><b>The Pool</b> · ${l.count} team${l.count===1?'':'s'}</span><span class="meta"><span class="muted">Mixed</span><span class="trunc">${l.price>0?esc(bidderName(l.bidderId)):'<span class="muted">not sold yet</span>'}</span></span><b class="c-price r num">${l.price>0?fmt(l.price):''}</b></div>`
+      :`<div class="row lot click${l.pooled?' dim':''}" data-l="${l.id}" style="${cols}"><b class="c-lot">${l.lot}</b><span class="c-team trunc">${esc(teamName(l))}</span><span class="meta"><span class="muted">${esc(flightName(l.flight))}</span><span class="trunc">${l.pooled?'<span class="tag p">In the pool</span>':c0(l.price)>0?esc(bidderName(l.bidderId)):'<span class="muted">—</span>'}</span></span><b class="c-price r num">${!l.pooled&&c0(l.price)>0?fmt(l.price):''}</b></div>`).join('')||'<div class="row"><span class="muted">No lots match.</span></div>'}</div>`;
   $('q').oninput=e=>{ q=e.target.value; paneSales(el,T); const i=$('q'); i.focus(); i.setSelectionRange(q.length,q.length); };
   $('q').onkeydown=e=>{ if(e.key==='Enter'){ const first=el.querySelector('[data-l]'); if(first) first.click(); } };
   el.querySelectorAll('[data-f]').forEach(b=>b.onclick=()=>{ filt=b.dataset.f; render(); });
@@ -254,10 +274,10 @@ function paneBidders(el){
   const rows=doc.bidders.filter(b=>!ql||String(b.num)===ql||b.name.toLowerCase().includes(ql)).map(b=>({b,o:bidderOwes(doc,b)}));
   const cols='grid-template-columns:64px minmax(0,1.4fr) minmax(0,1fr) 100px 150px 36px';
   el.innerHTML=`<div class="bar"><input class="inp search" id="bq" placeholder="Find a bidder — number or name" value="${esc(bq)}" autocomplete="off"><button class="btn pri" id="bAdd">+ Add bidder</button></div>
-    <div class="card"><div class="row h" style="${cols}"><span>#</span><span>Name</span><span>Bought</span><span class="r">Owes</span><span>Paid</span><span></span></div>
-    ${rows.map(({b,o})=>`<div class="row" style="${cols}"><b>#${esc(b.num)}</b><span class="trunc">${esc(b.name)}</span><span class="trunc muted" style="font-size:13px">${o.lots.map(l=>l.isPool?'Pool':'Lot '+l.lot).join(', ')||'—'}</span><b class="r num">${o.total?fmt(o.total):'—'}</b>
-      <span>${o.total?`<select class="pay${b.paid?' paid':''}" data-pay="${b.id}" aria-label="Payment for bidder ${esc(b.num)}"><option value="">Not paid</option>${PAY_METHODS.map(mm=>`<option${b.paid&&b.method===mm?' selected':''}>${mm}</option>`).join('')}</select>`:'<span class="muted" style="font-size:13px">nothing bought</span>'}</span>
-      <button class="btn" data-eb="${b.id}" style="height:34px;padding:0 10px" aria-label="Edit bidder ${esc(b.num)}">✎</button></div>`).join('')||'<div class="row"><span class="muted">No bidders yet.</span></div>'}</div>`;
+    <div class="card"><div class="row h bids" style="${cols}"><span>#</span><span>Name</span><span>Bought</span><span class="r">Owes</span><span>Paid</span><span></span></div>
+    ${rows.map(({b,o})=>`<div class="row bid" style="${cols}"><b class="c-num">#${esc(b.num)}</b><span class="c-name trunc">${esc(b.name)}</span><span class="c-bought trunc muted" style="font-size:13px">${o.lots.map(l=>l.isPool?'Pool':'Lot '+l.lot).join(', ')||'Nothing bought yet'}</span><b class="c-owes r num">${o.total?fmt(o.total):''}</b>
+      <span class="c-pay">${o.total?`<select class="pay${b.paid?' paid':''}" data-pay="${b.id}" aria-label="Payment for bidder ${esc(b.num)}"><option value="">Not paid</option>${PAY_METHODS.map(mm=>`<option${b.paid&&b.method===mm?' selected':''}>${mm}</option>`).join('')}</select>`:''}</span>
+      <button class="btn c-edit" data-eb="${b.id}" style="height:34px;padding:0 10px" aria-label="Edit bidder ${esc(b.num)}">✎</button></div>`).join('')||'<div class="row"><span class="muted">No bidders yet.</span></div>'}</div>`;
   $('bq').oninput=e=>{ bq=e.target.value; paneBidders(el); const i=$('bq'); i.focus(); i.setSelectionRange(bq.length,bq.length); };
   $('bAdd').onclick=()=>openBidder(null);
   el.querySelectorAll('[data-pay]').forEach(s=>s.onchange=()=>{ const v=s.value; edit(d=>{ const b=d.bidders.find(x=>x.id===s.dataset.pay); b.paid=!!v; b.method=v||''; }); toast(v?`Marked paid · ${v}`:'Marked not paid'); });
@@ -291,7 +311,11 @@ function openBidder(id){
 function paneTotals(el,T,P){
   const plc=['1st','2nd','3rd','4th','5th','6th','7th','8th'], fc=`grid-template-columns:minmax(0,1fr) 60px 100px 96px 100px ${doc.payout.map(()=>'84px').join(' ')}`;
   el.innerHTML=`<div class="card" style="margin-bottom:16px"><h2 class="h2">By flight</h2><div class="sub">Expenses (${fmt(T.exp)}) come out evenly across ${T.flights.length} flights${T.pooled?'; the pool’s price is shared by its teams’ flights':''}.</div>
-      <div style="overflow-x:auto"><div style="min-width:${520+doc.payout.length*84}px"><div class="row h" style="${fc}"><span>Flight</span><span class="r">Sold</span><span class="r">Gross</span><span class="r">Expenses</span><span class="r">Net pot</span>${doc.payout.map((p,i)=>`<span class="r">${plc[i]||i+1} ${p}%</span>`).join('')}</div>
+      <div class="fcards">${T.byF.map(f=>`<div class="fcard"><div class="fc1"><b>${esc(f.flight)}</b><b class="num ${f.net<0?'neg':''}">${fmt(f.net)} <small class="muted">net</small></b></div>
+          <div class="fc2 num muted">${fmt(f.gross)} gross · −${fmt(f.share)} expenses · ${f.sold}/${f.teams} sold${f.pooled?` · ${f.pooled} in pool`:''}</div>
+          <div class="fc3 num">${doc.payout.map((p,i)=>`<span><small class="muted">${plc[i]||i+1}</small> ${fmt(f.places[i])}</span>`).join('')}</div></div>`).join('')}
+        <div class="fcard tot"><div class="fc1"><b>Total</b><b class="num">${fmt(T.net)} <small class="muted">net</small></b></div><div class="fc2 num muted">${fmt(T.pot)} gross · −${fmt(T.exp)} expenses · ${T.sold}/${T.lots} sold</div></div></div>
+      <div class="ftable" style="overflow-x:auto;-webkit-overflow-scrolling:touch"><div style="min-width:${520+doc.payout.length*84}px"><div class="row h" style="${fc}"><span>Flight</span><span class="r">Sold</span><span class="r">Gross</span><span class="r">Expenses</span><span class="r">Net pot</span>${doc.payout.map((p,i)=>`<span class="r">${plc[i]||i+1} ${p}%</span>`).join('')}</div>
       ${T.byF.map(f=>`<div class="row num" style="${fc}"><b>${esc(f.flight)}</b><span class="r muted">${f.sold}/${f.teams}</span><span class="r">${fmt(f.gross)}</span><span class="r neg">−${fmt(f.share)}</span><b class="r ${f.net<0?'neg':''}">${fmt(f.net)}</b>${f.places.map(v=>`<span class="r">${fmt(v)}</span>`).join('')}</div>`).join('')}
       <div class="row num tot" style="${fc}"><span>Total</span><span class="r">${T.sold}/${T.lots}</span><span class="r">${fmt(T.pot)}</span><span class="r neg">−${fmt(T.exp)}</span><span class="r">${fmt(T.net)}</span>${doc.payout.map((p,i)=>`<span class="r">${fmt(T.byF.reduce((a,f)=>a+f.places[i],0))}</span>`).join('')}</div></div></div></div>
     <div class="two"><div class="card"><h2 class="h2">Payments</h2><div class="sub">${P.paid} of ${P.buyers} buyers paid</div>

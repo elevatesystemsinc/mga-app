@@ -17,7 +17,8 @@
 body{font-family:var(--sans);background:var(--paper);color:var(--ink);font-size:15px;line-height:1.4;-webkit-font-smoothing:antialiased;-webkit-tap-highlight-color:transparent}
 button,input{font:inherit;color:inherit} button{cursor:pointer}
 :focus-visible{outline:2px solid var(--gold);outline-offset:2px}
-.num{font-variant-numeric:tabular-nums}
+body{font-variant-numeric:lining-nums}
+.num{font-variant-numeric:lining-nums tabular-nums}
 .top{background:var(--navy);color:#fff;padding:calc(12px + env(safe-area-inset-top,0px)) 16px 14px;display:flex;align-items:center;gap:12px;position:sticky;top:0;z-index:10}
 .top img{width:34px;height:44px;object-fit:contain}
 .top .t{display:flex;flex-direction:column;min-width:0;flex:1}
@@ -185,7 +186,7 @@ const WC_CSS=`
 .wc-top .ev{text-align:right;font-size:12.5px;color:#56626A} .wc-top .ev b{display:block;color:#14222B;font-size:14px}
 .wc-final{display:inline-block;margin-top:4px;padding:2px 8px;border:1.5px solid #1F6B4A;color:#1F6B4A;border-radius:4px;font-weight:800;font-size:11px;letter-spacing:.08em;transform:rotate(-3deg)}
 .wc-wrap{overflow-x:auto}
-.wc table{border-collapse:collapse;width:100%;font-variant-numeric:tabular-nums;font-size:13px}
+.wc table{border-collapse:collapse;width:100%;font-variant-numeric:lining-nums tabular-nums;font-size:13px}
 .wc th,.wc td{border:1px solid var(--wc-line);text-align:center;padding:0;height:34px;min-width:30px}
 .wc th:first-child,.wc td:first-child{text-align:left;padding:0 10px;min-width:128px;white-space:nowrap;position:sticky;left:0;background:inherit;z-index:1}
 .wc .wc-h th,.wc .wc-h td{background:var(--wc-accent,var(--wc-navy));color:#fff;font-weight:700}
