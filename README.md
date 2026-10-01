@@ -68,6 +68,15 @@ matched by id — and saves the combined result. Changes to different things nev
 change the very same field, the later edit wins. Incoming changes merge into your screen instead of
 replacing it, and they wait while you have an editor open, so nothing is lost mid-edit. No setup needed.
 
+## Checklist
+
+Each tournament has a **Checklist** tab. **Start a checklist** from the 2026 Member-Member weekend checklist
+(95 tasks across Pre-event, Thursday set-up and each tournament day, with the NEW / FIX marks), by copying
+another tournament's checklist (tasks come over open and unassigned), or blank. Click any task to edit it,
+**assign** it (type a name — board members come first, with their roles), add **notes**, or mark it done;
+checkboxes work right in the list. Filter by person, Open / Done / Unassigned, or search. **Print** the whole
+checklist or one person's tasks, with names in the Assigned-to column. Add days, sections and tasks anywhere.
+
 ## Calcutta (players auction)
 
 Each tournament has a **Calcutta** tab.
