@@ -79,7 +79,9 @@ checklist or one person's tasks, with names in the Assigned-to column. Add days,
 
 ## Calcutta (players auction)
 
-Each tournament has a **Calcutta** tab.
+Each tournament has a **Calcutta** tab, split into sub-tabs — **Lots**, **Bidders**, **Buyers & shares**,
+**Money** (by flight, payments, expenses, cash drawer) and **Setup** (cashier link, minimum bid, buy-in,
+team sheet) — with the totals and Run the auction / Export results always at the top.
 
 - **Upload team sheet:** the auction-order spreadsheet (Lot, Team, Flight, Team index…) or the team
   sheet (Player 1, Player 2, Flight…). Buyers and prices already filled in come across. Re-uploading
