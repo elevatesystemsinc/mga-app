@@ -497,22 +497,82 @@ function setSync(s,err){
     if(m!==lastSyncErr) toast('Cloud save failed: '+m); lastSyncErr=m; $('syncErr').textContent=m; $('syncErr').hidden=false; }
   else { lastSyncErr=''; $('syncErr').hidden=true; }
 }
+/* ---------- collaborative saving ----------
+   Several board members can work at once. Each save is a compare-and-swap on a revision number
+   kept inside the record (_rev): it only lands if nobody saved since we last saw the server copy.
+   If someone did, we fetch theirs, three-way merge (their copy, ours, and the last copy we both
+   shared) and try again. Merging works item by item — tournaments, lots, bidders, members, ledger
+   lines are matched by id — so edits to different things never collide; when two people change
+   the very same field, the later edit wins. Incoming changes merge into ours the same way, so
+   unsaved local edits survive. */
+let base=null;   // the last server copy we know about
+const SKIP_KEYS={_w:1,_at:1,_rev:1};
+const isObj=x=>x&&typeof x==='object'&&!Array.isArray(x);
+const sameJ=(a,b)=>a===b||stable(a)===stable(b);
+function byIdList(...arrs){ return arrs.every(a=>a===undefined||(Array.isArray(a)&&a.length>0&&a.every(e=>isObj(e)&&e.id!=null))); }
+function merge3(b,l,r){
+  if(sameJ(l,r)) return l; if(sameJ(b,l)) return r; if(sameJ(b,r)) return l;
+  if(isObj(l)&&isObj(r)){ const out={}, bb=isObj(b)?b:{};
+    for(const k of new Set(Object.keys(l).concat(Object.keys(r)))){ if(SKIP_KEYS[k]) continue; const v=merge3(bb[k],l[k],r[k]); if(v!==undefined) out[k]=v; }
+    return out; }
+  if(Array.isArray(l)&&Array.isArray(r)&&(l.length||r.length)&&byIdList(l.length?l:undefined,r.length?r:undefined,Array.isArray(b)&&b.length?b:undefined)){
+    const bm=new Map((Array.isArray(b)?b:[]).map(e=>[e.id,e])), lm=new Map(l.map(e=>[e.id,e])), rm=new Map(r.map(e=>[e.id,e])), out=[];
+    const pick=id=>{ const B=bm.get(id), L=lm.get(id), R=rm.get(id);
+      if(L&&R) return merge3(B,L,R);
+      if(L&&!R) return B&&sameJ(B,L)?undefined:L;           // they deleted it: gone, unless we changed it since
+      if(R&&!L) return B&&sameJ(B,R)?undefined:R;           // we deleted it: gone, unless they changed it since
+      return undefined; };
+    const seen=new Set();
+    for(const e of l){ seen.add(e.id); const v=pick(e.id); if(v!==undefined) out.push(v); }
+    for(const e of r){ if(seen.has(e.id)) continue; seen.add(e.id); const v=pick(e.id); if(v!==undefined) out.push(v); }
+    return out; }
+  if(l===undefined) return r; if(r===undefined) return l;   // keep data rather than lose it
+  return l;                                                  // same field changed on both sides: ours is the later edit
+}
 function persist(){
   db._w=CLIENT; db._at=Date.now(); store.save(db); if(typeof afterPersist==='function') afterPersist();
   if(!CLOUD||!sessionOK){ setSync('local'); return; }
-  setSync('saving'); clearTimeout(saveT); saveT=setTimeout(pushCloud,700);
+  setSync('saving'); clearTimeout(saveT); saveT=setTimeout(pushCloud,600);
 }
+let pushing=false, pushAgain=false;
+async function fetchHub(){ const {data:row,error}=await sb.from('mga_hub').select('data').eq('id','main').maybeSingle(); if(error) throw error; return row&&row.data; }
 async function pushCloud(){
-  const snap=stable(db);
-  const {error}=await sb.from('mga_hub').upsert({id:'main',data:db,updated_at:new Date().toISOString()});
-  if(error){ setSync('offline',error); return; }
-  lastPushed=snap; setSync('synced');
+  if(pushing){ pushAgain=true; return; } pushing=true;
+  try{
+    for(let n=0;n<6;n++){
+      const rev=base&&base._rev!=null?+base._rev:null;
+      const next=Object.assign({},db,{_rev:(rev||0)+1,_w:CLIENT,_at:Date.now()});
+      let q=sb.from('mga_hub').update({data:next,updated_at:new Date().toISOString()}).eq('id','main');
+      q=rev==null?q.is('data->>_rev',null):q.eq('data->>_rev',String(rev));
+      const {data:rows,error}=await q.select('id');
+      if(error){ setSync('offline',error); return; }
+      if(rows&&rows.length){ base=JSON.parse(JSON.stringify(next)); db._rev=next._rev; store.save(db); lastPushed=stable(db); setSync('synced'); return; }
+      // someone saved since we last looked: merge theirs into ours and try again
+      const remote=await fetchHub();
+      if(!remote){ const {error:e2}=await sb.from('mga_hub').upsert({id:'main',data:next,updated_at:new Date().toISOString()}); if(e2){ setSync('offline',e2); return; } base=JSON.parse(JSON.stringify(next)); setSync('synced'); return; }
+      mergeIn(remote,{quiet:true});
+    }
+    setSync('offline',{message:'Too many people saving at once — retrying'}); setTimeout(pushCloud,1500);
+  }catch(e){ setSync('offline',e); }
+  finally{ pushing=false; if(pushAgain){ pushAgain=false; setTimeout(pushCloud,50); } }
+}
+/* bring someone else's saved copy into ours */
+function mergeIn(remote,opt){
+  const before=stable(db);
+  const merged=normalize(merge3(base||remote,db,remote));
+  merged._rev=remote._rev; merged._w=db._w; merged._at=db._at;
+  base=JSON.parse(JSON.stringify(remote)); db=merged; store.save(db);
+  const changed=stable(db)!==before;
+  if(changed&&!(opt&&opt.noRender)) render();
+  if(changed&&!(opt&&opt.quiet)) toast('Updated from another device');
+  return changed;
 }
 function applyRemote(remote){
-  remote=normalize(remote);
-  if(stable(remote)===stable(db)) return;
-  if(drawerOpen()){ pendingRemote=remote; return; }
-  db=remote; store.save(db); render(); toast('Updated from another device');
+  if(base&&remote._rev!=null&&base._rev===remote._rev) return;     // already have it
+  if(drawerOpen()){ pendingRemote=remote; return; }                 // don't swap records under an open editor
+  const hadLocal=base&&stable(db)!==stable(Object.assign({},base,{_w:db._w,_at:db._at}));
+  mergeIn(remote);
+  if(hadLocal) persist();                                            // our unsaved edits still need to go up
 }
 let sessionOK=false, cloudReady=false;
 async function startCloud(){
@@ -520,17 +580,18 @@ async function startCloud(){
   const {data:row,error}=await sb.from('mga_hub').select('data').eq('id','main').maybeSingle();
   if(error){ setSync('offline',/relation|does not exist/i.test(error.message)?{message:'The mga_hub table is missing — run hub-setup.sql in Supabase'}:error); render(); return; }
   cloudReady=true;
-  if(row&&row.data){ db=normalize(row.data); store.save(db); setSync('synced'); }
-  else await pushCloud();
+  if(row&&row.data){ const local=db; base=JSON.parse(JSON.stringify(row.data)); db=normalize(row.data);
+    // edits made on this device while it was offline: merge them in and save
+    if(local&&local._w===CLIENT&&local._rev===row.data._rev&&stable(local)!==stable(db)){ db=normalize(merge3(row.data,local,row.data)); }
+    store.save(db); setSync('synced'); }
+  else { base=null; await pushCloud(); }
   render(); if(typeof startSyncWatch==='function') startSyncWatch();
   sb.channel('mga-hub').on('postgres_changes',{event:'*',schema:'public',table:'mga_hub',filter:'id=eq.main'},p=>{
-    const r=p.new&&p.new.data; if(!r||r._w===CLIENT) return; applyRemote(r);
+    const r=p.new&&p.new.data; if(!r||r._w===CLIENT&&base&&r._rev===base._rev) return; applyRemote(r);
   }).subscribe();
-  document.addEventListener('visibilitychange',async()=>{
-    if(document.visibilityState!=='visible') return;
-    const {data:r}=await sb.from('mga_hub').select('data').eq('id','main').maybeSingle();
-    if(r&&r.data&&r.data._w!==CLIENT) applyRemote(r.data);
-  });
+  const check=async()=>{ try{ const r=await fetchHub(); if(r&&(!base||r._rev!==base._rev)) applyRemote(r); }catch(_){} };
+  document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='visible') check(); });
+  setInterval(()=>{ if(document.visibilityState==='visible'&&!pushing) check(); },15000);   // a safety net if a live update is missed
 }
 /* Read-only fetch of the current app's state, for import + verify. */
 async function fetchMMState(){
@@ -589,7 +650,7 @@ function openDrawer({kicker='',title,body,save,saveLabel='Save',del,delLabel='De
   const f=$('dBody').querySelector('input:not([type=checkbox]),select,textarea'); if(f) setTimeout(()=>f.focus(),60);
 }
 function closeDrawer(){ $('drawer').classList.remove('show'); $('scrim').classList.remove('show'); drawerCtx=null;
-  if(pendingRemote){ const r=pendingRemote; pendingRemote=null; db=r; store.save(db); render(); toast('Updated from another device'); } }
+  if(pendingRemote){ const r=pendingRemote; pendingRemote=null; setTimeout(()=>applyRemote(r),0); } }
 const fv=id=>{ const e=$(id); return e?e.value.trim():''; };
 const fnum=id=>n0(fv(id));
 function field(label,id,val,o={}){
