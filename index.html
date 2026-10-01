@@ -223,6 +223,8 @@ textarea.inp{height:auto;min-height:84px;padding:10px 12px;resize:vertical}
 .ck-who{display:flex;align-items:center;gap:8px;min-width:0;font-size:13.5px;justify-content:flex-start}
 .ck-row.done .ck-text{text-decoration:line-through;color:var(--muted)}
 @media (max-width:640px){ .ck-row{grid-template-columns:34px minmax(0,1fr);padding:10px 14px} .ck-who{grid-column:2;font-size:12.5px} .ck-g{padding:10px 14px 4px} .ck-sec .cardhead{flex-wrap:wrap;gap:10px} }
+/* Calcutta search */
+.cc-search{height:38px;width:240px;max-width:100%} @media (max-width:640px){ .cc-search{width:100%} }
 /* Calcutta sub-tabs */
 .subtabs{display:flex;gap:6px;flex-wrap:wrap;position:sticky;top:0;z-index:4;background:var(--paper,#F4F0E6);padding:6px 0 10px;margin-bottom:-4px}
 .subtabs button{height:38px;padding:0 15px;border-radius:999px;border:1px solid var(--line);background:#fff;font-weight:700;font-size:13.5px;color:var(--muted);display:inline-flex;align-items:center;gap:7px}
@@ -3404,7 +3406,8 @@ function tCalcutta(el,t){
   if(!c.lots.length){ el.innerHTML=`<div class="card"><div class="empty"><b>No Calcutta teams yet</b><span>Upload the auction-order spreadsheet (or the team sheet). The lot order, flights and indexes come in, ready for bidder numbers and sales.</span><button class="btn pri" id="ccImp">${I.down}Upload team sheet</button></div></div>`; $('ccImp').onclick=()=>importCalcutta(t); return; }
   view.cclot=view.cclot||'all'; view.ccTab=view.ccTab||'lots';
   const allSeq=c.lots.concat(poolLot(c)?[poolLot(c)]:[]);
-  const lots=allSeq.filter(l=>{ const v=view.cclot; if(l.isPool) return v==='all'||v==='pool';
+  view.ccLQ=view.ccLQ||''; view.ccBQ=view.ccBQ||'';
+  const lots=allSeq.filter(l=>lotMatches(c,l,view.ccLQ)).filter(l=>{ const v=view.cclot; if(l.isPool) return v==='all'||v==='pool';
     if(v==='all') return true; if(v==='open') return !l.prebuy&&!l.pooled&&!(n0(l.price)>0); if(v==='pool') return l.pooled&&!l.prebuy;
     if(v==='prebuy') return l.prebuy; if(v==='due') return teamParts(c,l).some(p=>!p.pay.paid); return flightName(l.flight)===v; });
   const plc=['1st','2nd','3rd','4th','5th','6th','7th','8th'];
@@ -3418,16 +3421,16 @@ function tCalcutta(el,t){
     return `<div class="subtabs" role="tablist">${n('lots','Lots',c.lots.length)}${n('bidders','Bidders',c.bidders.length)}${n('buyers','Buyers &amp; shares',calcHoldings(c).length)}${n('money','Money','')}${n('setup','Setup','')}</div>`; })()}
   <div class="cc-pane" data-pane="lots"${view.ccTab!=='lots'?' hidden':''}>
   <div class="card cc-card cc-lots" style="overflow:hidden"><div class="cardhead"><div><h2 class="h2">Lots</h2><span class="muted">Click a lot to record or change a sale</span></div>
-    <div class="seg">${[['all','All'],['open','Unsold']].concat(poolTeams(c).length?[['pool','Pool']]:[]).concat(buyInOf(c).on?[['prebuy','Pre-bought'],['due','Team payment due']]:[]).concat(T2.flights.map(f=>[f,f.replace('Flight ','F')])).map(([k,l])=>`<button class="${view.cclot===k?'on':''}" data-ccf="${esc(k)}">${esc(l)}</button>`).join('')}</div></div>
+    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;justify-content:flex-end">${searchBox('ccLQ',view.ccLQ,'Find a lot, player or paddle #')}<div class="seg">${[['all','All'],['open','Unsold']].concat(poolTeams(c).length?[['pool','Pool']]:[]).concat(buyInOf(c).on?[['prebuy','Pre-bought'],['due','Team payment due']]:[]).concat(T2.flights.map(f=>[f,f.replace('Flight ','F')])).map(([k,l])=>`<button class="${view.cclot===k?'on':''}" data-ccf="${esc(k)}">${esc(l)}</button>`).join('')}</div></div></div>
     <div class="tw"><div class="t" style="min-width:760px"><div class="tr th" style="${lcols}"><span>Lot</span><span>Team</span><span>Flight</span><span class="r">Index</span><span>Bought by</span><span class="r">Price</span><span></span></div>
     ${lots.map(l=>{ const b=bidderById(c,l.bidderId);
       if(l.isPool) return `<div class="tr num click cc-lot" data-cl="__pool" style="${lcols};background:#F6ECCF"><b class="l-n">${l.lot}</b><span class="trunc l-t"><b>The Pool</b> · ${l.count} team${l.count===1?'':'s'} under ${fmt(c.minBid)}</span><span class="muted l-f">Mixed</span><span class="l-i"></span><span class="trunc l-b">${l.price>0?esc(bidderLabel(b)):'<span class="muted">—</span>'}</span><b class="r l-p">${l.price>0?fmt(l.price):''}</b><span class="ib l-e">${I.edit}</span></div>`;
-      return `<div class="tr num click cc-lot" data-cl="${l.id}" style="${lcols}${l.pooled?';opacity:.72':''}"><b class="l-n">${l.lot}</b><span class="trunc l-t">${l.fun?'<span style="color:var(--gold)" title="Fun team">★</span> ':''}${esc(teamName(l))}</span><span class="muted l-f">${esc(flightName(l.flight))}</span><span class="r muted l-i">${idxTxt2(l.idx)}</span><span class="trunc l-b">${l.prebuy?`<span class="chip ok">Pre-bought · ${esc(captainName(l))}${(()=>{ const cb=captainBidder(c,l); return cb?' #'+esc(cb.num):''; })()}</span>`:l.pooled?`<span class="chip">In the pool · Lot ${poolLotNum(c)}</span>`:n0(l.price)>0?esc(bidderLabel(b)):'<span class="muted">—</span>'}${(()=>{ const due=teamParts(c,l).filter(p=>!p.pay.paid), bd=due.filter(p=>p.kind==='buyin'), n=teamPlayers(l).length; return (bd.length?` <span class="chip warn" title="${esc(bd.map(p=>p.name).join(', '))} not paid">buy-in due${bd.length<n?' · '+esc(bd.map(p=>p.name.split(' ')[0]).join(', ')):''}</span>`:'')+(due.some(p=>p.kind==='prebuy')?' <span class="chip warn">pre-buy due</span>':''); })()}</span><b class="r l-p">${l.prebuy?fmt(teamDue(c,l)):!l.pooled&&n0(l.price)>0?fmt(l.price):''}</b><span class="ib l-e">${I.edit}</span></div>`; }).join('')||'<div class="empty" style="padding:22px"><span>No lots match.</span></div>'}
+      return `<div class="tr num click cc-lot" data-cl="${l.id}" style="${lcols}${l.pooled?';opacity:.72':''}"><b class="l-n">${l.lot}</b><span class="trunc l-t">${l.fun?'<span style="color:var(--gold)" title="Fun team">★</span> ':''}${esc(teamName(l))}</span><span class="muted l-f">${esc(flightName(l.flight))}</span><span class="r muted l-i">${idxTxt2(l.idx)}</span><span class="trunc l-b">${l.prebuy?`<span class="chip ok">Pre-bought · ${esc(captainName(l))}${(()=>{ const cb=captainBidder(c,l); return cb?' #'+esc(cb.num):''; })()}</span>`:l.pooled?`<span class="chip">In the pool · Lot ${poolLotNum(c)}</span>`:n0(l.price)>0?esc(bidderLabel(b)):'<span class="muted">—</span>'}${(()=>{ const due=teamParts(c,l).filter(p=>!p.pay.paid), bd=due.filter(p=>p.kind==='buyin'), n=teamPlayers(l).length; return (bd.length?` <span class="chip warn" title="${esc(bd.map(p=>p.name).join(', '))} not paid">buy-in due${bd.length<n?' · '+esc(bd.map(p=>p.name.split(' ')[0]).join(', ')):''}</span>`:'')+(due.some(p=>p.kind==='prebuy')?' <span class="chip warn">pre-buy due</span>':''); })()}</span><b class="r l-p">${l.prebuy?fmt(teamDue(c,l)):!l.pooled&&n0(l.price)>0?fmt(l.price):''}</b><span class="ib l-e">${I.edit}</span></div>`; }).join('')||`<div class="empty" style="padding:22px"><span>No lots match${view.ccLQ?` “${esc(view.ccLQ)}”`:''}.</span></div>`}
     </div></div></div>
   </div>
   <div class="cc-pane" data-pane="bidders"${view.ccTab!=='bidders'?' hidden':''}>
-    <div class="card cc-card" style="overflow:hidden"><div class="cardhead"><div><h2 class="h2">Bidders</h2><span class="muted">${c.bidders.filter(b=>b.paid).length} of ${c.bidders.filter(b=>bidderOwes(c,b).total>0).length} buyers paid</span></div><div class="actions">${c.bidders.length?`<button class="btn sm" id="ccClr">Remove all numbers</button>`:''}<button class="btn sm" id="ccBulk">Number the players</button><button class="btn sm" id="ccAddB">${I.plus}Add</button></div></div>
-      <div style="max-height:420px;overflow:auto">${c.bidders.length?c.bidders.map(b=>{ const o=bidderOwes(c,b); return `<div class="tr num click cc-bid" data-cb="${b.id}" style="grid-template-columns:56px minmax(0,1fr) 50px 96px 64px"><b>#${esc(b.num)}</b><span class="trunc">${esc(b.name)}</span><span class="r muted cc-n">${o.lots.length||''}</span><span class="r">${o.total?fmt(o.total):'—'}</span><span class="r">${o.total?(b.paid?`<span class="chip ok">Paid</span>`:'<span class="chip warn">Owes</span>'):''}</span></div>`; }).join('')
+    <div class="card cc-card" style="overflow:hidden"><div class="cardhead"><div><h2 class="h2">Bidders</h2><span class="muted">${c.bidders.filter(b=>b.paid).length} of ${c.bidders.filter(b=>bidderOwes(c,b).total>0).length} buyers paid</span></div>${searchBox('ccBQ',view.ccBQ,'Find a paddle #, name or lot')}<div class="actions">${c.bidders.length?`<button class="btn sm" id="ccClr">Remove all numbers</button>`:''}<button class="btn sm" id="ccBulk">Number the players</button><button class="btn sm" id="ccAddB">${I.plus}Add</button></div></div>
+      <div style="max-height:420px;overflow:auto">${c.bidders.length?(c.bidders.filter(b=>bidderMatches(c,b,view.ccBQ)).map(b=>{ const o=bidderOwes(c,b); return `<div class="tr num click cc-bid" data-cb="${b.id}" style="grid-template-columns:56px minmax(0,1fr) 50px 96px 64px"><b>#${esc(b.num)}</b><span class="trunc">${esc(b.name)}</span><span class="r muted cc-n">${o.lots.length||''}</span><span class="r">${o.total?fmt(o.total):'—'}</span><span class="r">${o.total?(b.paid?`<span class="chip ok">Paid</span>`:'<span class="chip warn">Owes</span>'):''}</span></div>`; }).join('')||`<div class="tr"><span class="muted">No bidders match “${esc(view.ccBQ)}”.</span></div>`)
         :'<div class="empty" style="padding:22px"><span>Add bidders one at a time, or number every player in the field.</span></div>'}</div></div>
   
   </div>
@@ -3471,7 +3474,7 @@ function tCalcutta(el,t){
   el.querySelectorAll('[data-cb]').forEach(r=>r.onclick=()=>editBidder(t,c.bidders.find(b=>b.id===r.dataset.cb)));
   el.querySelectorAll('[data-cl]').forEach(r=>r.onclick=()=>r.dataset.cl==='__pool'?editPool(t):editLot(t,c.lots.find(l=>l.id===r.dataset.cl)));
   el.querySelectorAll('[data-ccf]').forEach(b=>b.onclick=()=>{ view.cclot=b.dataset.ccf; render(); });
-  const hq=$('ccHq'); if(hq) hq.oninput=e=>{ view.ccH=e.target.value; clearTimeout(window.__hq); window.__hq=setTimeout(()=>{ render(); const i=$('ccHq'); if(i){ i.focus(); i.setSelectionRange(view.ccH.length,view.ccH.length); } },250); };
+  wireSearch('ccLQ','ccLQ'); wireSearch('ccBQ','ccBQ'); wireSearch('ccHq','ccH');
 }
 /* results workbook: lots, bidders (what each owes), flights with expenses and payouts */
 async function exportCalcutta(t){
@@ -3574,13 +3577,29 @@ function cashierCard(t){
     <div class="actions"><button class="btn sm" id="ccCopy">Copy link</button><a class="btn sm" href="${esc(link)}" target="_blank" rel="noopener">Open</a><button class="btn sm" id="ccStop">Turn off</button></div></div>`;
 }
 
+/* search: a lot matches its number, either player, the captain, the buyer's name or paddle */
+function lotMatches(c,l,q){ q=String(q||'').trim().toLowerCase().replace(/^#/,''); if(!q) return true;
+  if(l.isPool){ const b=bidderById(c,l.bidderId); return /pool/.test(q)||String(l.lot)===q||(b&&(String(b.num)===q||b.name.toLowerCase().includes(q)))||l.teams.some(x=>lotMatches(c,x,q)); }
+  if(String(l.lot)===q) return true;
+  const b=bidderById(c,l.bidderId), cb=l.prebuy?captainBidder(c,l):null, pb=l.pooled&&c.pool&&bidderById(c,c.pool.bidderId);
+  if(/^\d+$/.test(q)) return [b,cb,pb].some(x=>x&&String(x.num)===q);   // a bare number is a lot or a paddle, exactly
+  const hay=[l.p1,l.p2,flightName(l.flight),b&&b.name,pb&&pb.name,cb&&cb.name].filter(Boolean).join(' ').toLowerCase();
+  if(hay.includes(q)) return true;
+  return [b,cb,pb].some(x=>x&&String(x.num)===q);
+}
+function bidderMatches(c,b,q){ q=String(q||'').trim().toLowerCase().replace(/^#/,''); if(!q) return true;
+  if(String(b.num)===q||b.name.toLowerCase().includes(q)) return true;
+  return bidderOwes(c,b).lots.some(l=>String(l.lot)===q||(!l.isPool&&teamName(l).toLowerCase().includes(q))); }
+const searchBox=(id,val,ph)=>`<input class="inp cc-search" id="${id}" type="search" placeholder="${ph}" value="${esc(val||'')}" autocomplete="off" aria-label="${ph}">`;
+/* re-render after typing, keeping the cursor in the box */
+function wireSearch(id,key){ const i=$(id); if(!i) return; i.oninput=e=>{ view[key]=e.target.value; clearTimeout(window['__s'+id]); window['__s'+id]=setTimeout(()=>{ render(); const n=$(id); if(n){ n.focus(); const L=(view[key]||'').length; try{ n.setSelectionRange(L,L); }catch(_){} } },200); }; }
 /* everyone who'll be paid out, paddle or not */
 function holdingsCard(t){
   const c=calc(t), H=calcHoldings(c); if(!H.length) return '';
   const flagged=c.lots.filter(l=>l.capFlag&&!l.capSet&&buyInOf(c).on).length;
   view.ccH=view.ccH||'';
-  const q=view.ccH.toLowerCase(), rows=H.filter(h=>!q||h.name.toLowerCase().includes(q)||String(h.num||'')===q);
-  return `<div class="card cc-card" style="overflow:hidden"><div class="cardhead"><div><h2 class="h2">Buyers &amp; shares</h2><span class="muted">Everyone who owns part of a team — the people to pay out. Captains own their team’s share with or without a paddle.${flagged?` <span class="neg">${flagged} team${flagged===1?'':'s'} need a captain check.</span>`:''}</span></div><input class="inp" id="ccHq" placeholder="Find a buyer" value="${esc(view.ccH)}" style="max-width:220px;height:36px"></div>
+  const q=view.ccH.trim().toLowerCase().replace(/^#/,''), rows=H.filter(h=>!q||h.name.toLowerCase().includes(q)||String(h.num||'')===q||h.stakes.some(st=>String(st.lot.lot)===q||teamName(st.lot).toLowerCase().includes(q)));
+  return `<div class="card cc-card" style="overflow:hidden"><div class="cardhead"><div><h2 class="h2">Buyers &amp; shares</h2><span class="muted">Everyone who owns part of a team — the people to pay out. Captains own their team’s share with or without a paddle.${flagged?` <span class="neg">${flagged} team${flagged===1?'':'s'} need a captain check.</span>`:''}</span></div>${searchBox('ccHq',view.ccH,'Find a buyer or paddle #')}</div>
     <div style="max-height:460px;overflow:auto">${rows.map(h=>`<div class="tr" style="grid-template-columns:70px minmax(0,1fr) minmax(0,2fr);align-items:start"><b class="num">${h.num?'#'+esc(h.num):'<span class="muted" style="font-weight:500;font-size:12px">no paddle</span>'}</b><b class="trunc">${esc(h.name)}</b>
       <span style="display:flex;flex-wrap:wrap;gap:6px">${h.stakes.map(s=>`<span class="chip ${s.kind==='prebuy'?'ok':s.kind==='team'?'':'gold'}" title="${esc(teamName(s.lot))}">Lot ${s.lot.lot} · ${s.pct}%${s.kind==='prebuy'?' · pre-bought':s.kind==='team'?' · own team':s.kind==='pool'?' · pool':''}</span>`).join('')}</span></div>`).join('')||'<div class="tr"><span class="muted">No one matches.</span></div>'}</div></div>`;
 }

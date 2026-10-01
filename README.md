@@ -81,7 +81,8 @@ checklist or one person's tasks, with names in the Assigned-to column. Add days,
 
 Each tournament has a **Calcutta** tab, split into sub-tabs — **Lots**, **Bidders**, **Buyers & shares**,
 **Money** (by flight, payments, expenses, cash drawer) and **Setup** (cashier link, minimum bid, buy-in,
-team sheet) — with the totals and Run the auction / Export results always at the top.
+team sheet) — with the totals and Run the auction / Export results always at the top. Lots, Bidders and Buyers & shares
+each have a search box: names, paddle numbers (101 or #101), lot numbers, flights; it combines with the filters.
 
 - **Upload team sheet:** the auction-order spreadsheet (Lot, Team, Flight, Team index…) or the team
   sheet (Player 1, Player 2, Flight…). Buyers and prices already filled in come across. Re-uploading
