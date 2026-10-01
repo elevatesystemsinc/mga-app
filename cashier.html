@@ -202,6 +202,39 @@ async function calcSyncOnce(get,put,local){
   throw new Error('Too many people saving at once — try again');
 }
 
+/* ---------- captains, buyers and shares ----------
+   Each team has a captain: the player with the lower Handicap Index (plus handicaps are lower).
+   The captain is the buyer of the team's own share — 100% of a pre-bought team, or the team's
+   buy-in share (e.g. 25%) of a team that goes to auction — and is paid that share. Buyers don't
+   need bidder numbers; if a captain later takes a paddle, everything they own joins that number. */
+const nameKey=n=>String(n||'').toLowerCase().replace(/[^a-z\s]/g,' ').split(/\s+/).filter(Boolean).sort().join(' ');
+const capIdx=l=>l.cap===1?1:0;
+const captainName=l=>[l.p1,l.p2][capIdx(l)]||l.p1||'';
+const captainMember=l=>[l.m1,l.m2][capIdx(l)]||'';
+function captainBidder(c,l){ const m=captainMember(l), k=nameKey(captainName(l));
+  return (m&&c.bidders.find(b=>b.memberId===m))||c.bidders.find(b=>nameKey(b.name)===k)||null; }
+/* every share of every team, and who holds it */
+function calcStakes(c){
+  const bi=buyInOf(c), teamPct=bi.on?c0(bi.pct):0, out=[], pl=poolLot(c);
+  const cap=l=>{ const b=captainBidder(c,l); return b?{key:'b:'+b.id,bidderId:b.id,num:b.num,name:b.name,captainOf:l.id}:{key:'m:'+(captainMember(l)||nameKey(captainName(l))),memberId:captainMember(l),name:captainName(l),captainOf:l.id}; };
+  const bid=b=>({key:'b:'+b.id,bidderId:b.id,num:b.num,name:b.name});
+  for(const l of c.lots){
+    if(l.prebuy){ out.push({lot:l,pct:100,kind:'prebuy',owner:cap(l)}); continue; }
+    let buyer=null;
+    if(l.pooled&&!l.prebuy){ const pb=pl&&pl.price>0?bidderById(c,c.pool.bidderId):null; if(pb) buyer={owner:bid(pb),kind:'pool'}; }
+    else if(c0(l.price)>0){ const b=bidderById(c,l.bidderId); if(b) buyer={owner:bid(b),kind:'auction'}; }
+    if(buyer) out.push({lot:l,pct:100-teamPct,kind:buyer.kind,owner:buyer.owner});
+    if(teamPct>0) out.push({lot:l,pct:teamPct,kind:'team',owner:cap(l)});
+  }
+  return out;
+}
+function calcHoldings(c){
+  const m=new Map();
+  for(const s of calcStakes(c)){ const k=s.owner.key; if(!m.has(k)) m.set(k,{...s.owner,stakes:[]}); const h=m.get(k); h.stakes.push(s); if(s.owner.num&&!h.num){ h.num=s.owner.num; h.bidderId=s.owner.bidderId; } }
+  return [...m.values()].sort((a,b)=>(a.num?0:1)-(b.num?0:1)||(+a.num||0)-(+b.num||0)||a.name.localeCompare(b.name));
+}
+const STAKE_LABEL={prebuy:'pre-bought, own team',team:'own team',auction:'bought',pool:'in the pool'};
+
 const $=id=>document.getElementById(id);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const fmt=v=>{ const n=Math.round(c0(v)); return (n<0?'−$':'$')+Math.abs(n).toLocaleString('en-US'); };
@@ -269,7 +302,7 @@ function paneSales(el,T){
     ${doc.minBid?`<p class="muted" style="margin:0 0 10px;font-size:13px">Minimum bid ${fmt(doc.minBid)} — teams under it go into the pool${T.pooled?` (Lot ${T.poolLot})`:''}.</p>`:''}
     <div class="card"><div class="row h lots" style="${cols}"><span>Lot</span><span>Team</span><span>Flight</span><span>Bought by</span><span class="r">Price</span></div>
     ${rows.map(l=>l.isPool?`<div class="row lot click pool" data-l="__pool" style="${cols}"><b class="c-lot">${l.lot}</b><span class="c-team trunc"><b>The Pool</b> · ${l.count} team${l.count===1?'':'s'}</span><span class="meta"><span class="muted">Mixed</span><span class="trunc">${l.price>0?esc(bidderName(l.bidderId)):'<span class="muted">not sold yet</span>'}</span></span><b class="c-price r num">${l.price>0?fmt(l.price):''}</b></div>`
-      :`<div class="row lot click${l.pooled?' dim':''}" data-l="${l.id}" style="${cols}"><b class="c-lot">${l.lot}</b><span class="c-team trunc">${esc(teamName(l))}</span><span class="meta"><span class="muted">${esc(flightName(l.flight))}</span><span class="trunc">${l.prebuy?'<span class="tag ok">Pre-bought</span>':l.pooled?'<span class="tag p">In the pool</span>':c0(l.price)>0?esc(bidderName(l.bidderId)):'<span class="muted">—</span>'}</span>${BI?(()=>{ const due=teamParts(doc,l).filter(p=>!p.pay.paid), bd=due.filter(p=>p.kind==='buyin'), n=teamPlayers(l).length; return (bd.length?`<span class="tag due">Buy-in due${bd.length<n?' · '+esc(bd.map(p=>p.name.split(' ')[0]).join(', ')):''}</span>`:'')+(due.some(p=>p.kind==='prebuy')?'<span class="tag due">Pre-buy due</span>':''); })():''}</span><b class="c-price r num">${l.prebuy?fmt(teamDue(doc,l)):!l.pooled&&c0(l.price)>0?fmt(l.price):''}</b></div>`).join('')||'<div class="row"><span class="muted">No lots match.</span></div>'}</div>`;
+      :`<div class="row lot click${l.pooled?' dim':''}" data-l="${l.id}" style="${cols}"><b class="c-lot">${l.lot}</b><span class="c-team trunc">${esc(teamName(l))}</span><span class="meta"><span class="muted">${esc(flightName(l.flight))}</span><span class="trunc">${l.prebuy?`<span class="tag ok">Pre-bought · ${esc(captainName(l))}${(()=>{ const cb=captainBidder(doc,l); return cb?' #'+esc(cb.num):''; })()}</span>`:l.pooled?'<span class="tag p">In the pool</span>':c0(l.price)>0?esc(bidderName(l.bidderId)):'<span class="muted">—</span>'}</span>${BI?(()=>{ const due=teamParts(doc,l).filter(p=>!p.pay.paid), bd=due.filter(p=>p.kind==='buyin'), n=teamPlayers(l).length; return (bd.length?`<span class="tag due">Buy-in due${bd.length<n?' · '+esc(bd.map(p=>p.name.split(' ')[0]).join(', ')):''}</span>`:'')+(due.some(p=>p.kind==='prebuy')?'<span class="tag due">Pre-buy due</span>':''); })():''}</span><b class="c-price r num">${l.prebuy?fmt(teamDue(doc,l)):!l.pooled&&c0(l.price)>0?fmt(l.price):''}</b></div>`).join('')||'<div class="row"><span class="muted">No lots match.</span></div>'}</div>`;
   $('q').oninput=e=>{ q=e.target.value; paneSales(el,T); const i=$('q'); i.focus(); i.setSelectionRange(q.length,q.length); };
   $('q').onkeydown=e=>{ if(e.key==='Enter'){ const first=el.querySelector('[data-l]'); if(first) first.click(); } };
   el.querySelectorAll('[data-f]').forEach(b=>b.onclick=()=>{ filt=b.dataset.f; render(); });
@@ -290,7 +323,9 @@ function openLot(id){
       <div class="acts"><button class="btn pri" id="mSold">Sold</button>${P?'':`<button class="btn" id="mPool">${l.pooled?'Keep in the pool':'Into the pool'}</button>`}<button class="btn warn" id="mClr">Clear</button><button class="btn" id="mX">Cancel</button></div>`}
       ${BI?`<div class="card" style="padding:12px 14px;display:flex;flex-direction:column;gap:10px">
         ${!pre&&c0(l.price)>0&&b?`<div style="display:flex;justify-content:space-between;gap:10px;align-items:center;padding-bottom:10px;border-bottom:1px solid var(--line)"><div><b>Auction purchase · ${fmt(l.price)}</b><div class="hint">Paid by the buyer, ${esc(bidderName(l.bidderId))} — marked on the Bidders tab</div></div><span class="tag ${b.paid?'ok':'due'}">${b.paid?'Paid'+(b.method?' · '+esc(b.method):''):'Not paid'}</span></div>`:''}
-        <div><b>Team buy-in · ${fmt(bi.amount)}</b><div class="hint">${fmt(c0(bi.amount)/(teamPlayers(l).length||1))} per player · ${bi.pct}% of the team</div></div>
+        <div style="display:flex;justify-content:space-between;gap:10px;align-items:center;padding-bottom:10px;border-bottom:1px solid var(--line)"><div style="min-width:0"><b>Captain · ${esc(captainName(l))}</b><div class="hint">The team’s buyer — paid its ${pre?'100%':bi.pct+'%'}.${(()=>{ const cb=captainBidder(doc,l); return cb?` Paddle #${esc(cb.num)}.`:' No paddle needed.'; })()}${l.capFlag&&!l.capSet?' <span class="neg">Check: indexes didn’t decide it.</span>':''}</div></div>
+          <button class="btn" id="mCap" style="height:36px;font-size:13px">Make ${esc((l.cap===1?l.p1:l.p2)||'').split(' ')[0]} captain</button></div>
+        <div><b>Team buy-in · ${fmt(bi.amount)}</b><div class="hint">${fmt(c0(bi.amount)/(teamPlayers(l).length||1))} collected from each player · the team’s ${pre?'100%':bi.pct+'%'} pays out to the captain</div></div>
         ${teamPlayers(l).map((nm,k)=>{ const pp=(l.buyInP||[])[k]||{}; return `<div style="display:flex;justify-content:space-between;gap:10px;align-items:center"><div style="min-width:0"><b class="trunc" style="display:block">${esc(nm)}</b><div class="hint">${fmt(c0(bi.amount)/(teamPlayers(l).length||1))} buy-in</div></div>
           <select class="pay${pp.paid?' paid':''}" data-bi="${k}" style="max-width:170px" aria-label="${esc(nm)} buy-in payment">${payOpts(pp.paid?pp.method:'')}</select></div>`; }).join('')}
         ${pre?`<div style="display:flex;justify-content:space-between;gap:10px;align-items:center"><div><b>Pre-buy · ${fmt(bi.prebuyExtra)}</b><div class="hint">Paid by the team · the rest of itself</div></div>
@@ -302,6 +337,7 @@ function openLot(id){
     const pb3=m.querySelector('#mPb'); if(pb3) pb3.onchange=()=>{ const v=pb3.value; edit(d=>{ const t=d.lots.find(z=>z.id===id); t.prebuyPay={paid:!!v,method:v||''}; }); pb3.className='pay'+(v?' paid':''); toast(v?`Pre-buy paid · ${v}`:'Pre-buy marked not paid'); };
     const pb2=m.querySelector('#mPre'); if(pb2) pb2.onclick=()=>{ if(!pre&&c0(l.price)>0&&!confirm(`This team already sold for ${fmt(l.price)}. Mark it pre-bought and clear that sale?`)) return;
       edit(d=>setPrebuy(d,d.lots.find(z=>z.id===id),!pre)); close(); toast(pre?'Back in the auction':`Lot ${l.lot} pre-bought — skipped in the auction`); };
+    const capB=m.querySelector('#mCap'); if(capB) capB.onclick=()=>{ edit(d=>{ const t=d.lots.find(z=>z.id===id); t.cap=t.cap===1?0:1; t.capSet=true; t.capFlag=false; }); close(); toast(`Captain: ${captainName(doc.lots.find(z=>z.id===id))}`); };
     m.querySelector('#mX').onclick=close;
     if(pre) return;
     const bi=m.querySelector('#mB'), pi=m.querySelector('#mP'), hn=m.querySelector('#mBn');
@@ -318,11 +354,11 @@ function openLot(id){
 }
 function paneBidders(el){
   const ql=bq.toLowerCase().trim();
-  const rows=doc.bidders.filter(b=>!ql||String(b.num)===ql||b.name.toLowerCase().includes(ql)).map(b=>({b,o:bidderOwes(doc,b)}));
+  const rows=doc.bidders.filter(b=>!ql||String(b.num)===ql||b.name.toLowerCase().includes(ql)).map(b=>({b,o:bidderOwes(doc,b)})), HOLD=calcHoldings(doc);
   const cols='grid-template-columns:64px minmax(0,1.4fr) minmax(0,1fr) 100px 150px 36px';
   el.innerHTML=`<div class="bar"><input class="inp search" id="bq" placeholder="Find a bidder — number or name" value="${esc(bq)}" autocomplete="off"><button class="btn pri" id="bAdd">+ Add bidder</button></div>
     <div class="card"><div class="row h bids" style="${cols}"><span>#</span><span>Name</span><span>Bought</span><span class="r">Owes</span><span>Paid</span><span></span></div>
-    ${rows.map(({b,o})=>`<div class="row bid" style="${cols}"><b class="c-num">#${esc(b.num)}</b><span class="c-name trunc">${esc(b.name)}</span><span class="c-bought trunc muted" style="font-size:13px">${o.lots.map(l=>l.isPool?'Pool':'Lot '+l.lot).join(', ')||'Nothing bought yet'}</span><b class="c-owes r num">${o.total?fmt(o.total):''}</b>
+    ${rows.map(({b,o})=>`<div class="row bid" style="${cols}"><b class="c-num">#${esc(b.num)}</b><span class="c-name trunc">${esc(b.name)}</span><span class="c-bought trunc muted" style="font-size:13px">${(()=>{ const h=HOLD.find(x=>x.bidderId===b.id); const caps=h?h.stakes.filter(s=>s.kind==='prebuy'||s.kind==='team').map(s=>`Lot ${s.lot.lot} ${s.kind==='prebuy'?'pre-bought':s.pct+'% own team'}`):[]; return o.lots.map(l=>l.isPool?'Pool':'Lot '+l.lot).concat(caps).join(', ')||'Nothing bought yet'; })()}</span><b class="c-owes r num">${o.total?fmt(o.total):''}</b>
       <span class="c-pay">${o.total?`<select class="pay${b.paid?' paid':''}" data-pay="${b.id}" aria-label="Payment for bidder ${esc(b.num)}"><option value="">Not paid</option>${PAY_METHODS.map(mm=>`<option${b.paid&&b.method===mm?' selected':''}>${mm}</option>`).join('')}</select>`:''}</span>
       <button class="btn c-edit" data-eb="${b.id}" style="height:34px;padding:0 10px" aria-label="Edit bidder ${esc(b.num)}">✎</button></div>`).join('')||'<div class="row"><span class="muted">No bidders yet.</span></div>'}</div>`;
   $('bq').oninput=e=>{ bq=e.target.value; paneBidders(el); const i=$('bq'); i.focus(); i.setSelectionRange(bq.length,bq.length); };
@@ -365,6 +401,8 @@ function paneTotals(el,T,P){
       <div class="ftable" style="overflow-x:auto;-webkit-overflow-scrolling:touch"><div style="min-width:${520+doc.payout.length*84}px"><div class="row h" style="${fc}"><span>Flight</span><span class="r">Sold</span><span class="r">Gross</span><span class="r">Expenses</span><span class="r">Net pot</span>${doc.payout.map((p,i)=>`<span class="r">${plc[i]||i+1} ${p}%</span>`).join('')}</div>
       ${T.byF.map(f=>`<div class="row num" style="${fc}"><b>${esc(f.flight)}</b><span class="r muted">${f.sold}/${f.teams}</span><span class="r">${fmt(f.gross)}</span><span class="r neg">−${fmt(f.share)}</span><b class="r ${f.net<0?'neg':''}">${fmt(f.net)}</b>${f.places.map(v=>`<span class="r">${fmt(v)}</span>`).join('')}</div>`).join('')}
       <div class="row num tot" style="${fc}"><span>Total</span><span class="r">${T.sold}/${T.lots}</span><span class="r">${fmt(T.pot)}</span><span class="r neg">−${fmt(T.exp)}</span><span class="r">${fmt(T.net)}</span>${doc.payout.map((p,i)=>`<span class="r">${fmt(T.byF.reduce((a,f)=>a+f.places[i],0))}</span>`).join('')}</div></div></div></div>
+    <div class="card" style="margin-bottom:16px"><h2 class="h2">Buyers &amp; shares</h2><div class="sub">Everyone to pay out — captains own their team’s share with or without a paddle.</div>
+      ${calcHoldings(doc).map(h=>`<div class="row" style="grid-template-columns:62px minmax(0,1fr);align-items:start"><b class="num">${h.num?'#'+esc(h.num):'<span class="muted" style="font-size:12px;font-weight:500">no paddle</span>'}</b><div style="min-width:0"><b>${esc(h.name)}</b><div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:4px">${h.stakes.map(st=>`<span class="tag ${st.kind==='prebuy'?'ok':st.kind==='team'?'':'p'}">Lot ${st.lot.lot} · ${st.pct}%${st.kind==='prebuy'?' · pre-bought':st.kind==='team'?' · own team':st.kind==='pool'?' · pool':''}</span>`).join('')}</div></div></div>`).join('')||'<div class="row"><span class="muted">No buyers yet.</span></div>'}</div>
     <div class="two"><div class="card"><h2 class="h2">Payments</h2><div class="sub">${buyInOf(doc).on?'Auction purchases are paid by the buyer; buy-ins and pre-buys by the team.':`${P.paid} of ${P.buyers} buyers paid`}</div>
       ${(()=>{ const BI=buyInOf(doc).on, K=BI?[['auction','Auction'],['buyin','Buy-ins'],['prebuy','Pre-buys']]:[['auction','Auction']];
         const cols=`grid-template-columns:minmax(0,1fr) ${K.map(()=>'minmax(64px,auto)').join(' ')}${BI?' minmax(70px,auto)':''}`;

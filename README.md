@@ -101,6 +101,13 @@ Each tournament has a **Calcutta** tab.
   owns 100% and is **skipped in the auction**. Buy-ins go into each team's flight pot. Three payments are kept
   separate, each with its own paid status and method: the **auction purchase** (paid by the buyer, marked on
   the bidder), each player's share of the team **buy-in** (e.g. $150 each), and the team's **pre-buy**. Payments totals show every method split by kind.
+- **Captains and buyers:** every team's captain is the player with the lower Handicap Index (plus handicaps
+  count as lower; ties or missing indexes are flagged; switch it by hand on any lot). The captain is the
+  buyer of the team's own share — 100% of a pre-bought team, the buy-in share (25%) of an auctioned team —
+  and is paid it, with or without a paddle. Each player's $150 buy-in is tracked separately but is a team
+  payment only. Bidder numbers are for the auction: when a captain takes a paddle (picked by name), their
+  shares join that number automatically. **Buyers & shares** lists everyone to pay out and what they own;
+  the export has the same sheet.
 - **Expenses** (e.g. the auction dinner) come out of the pot **evenly across every flight**.
 - **By flight:** teams sold, gross, expense share, net pot, and the payout by place from each
   flight's net (40/30/20/10 by default, editable, any number of places).
