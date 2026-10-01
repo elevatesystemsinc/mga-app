@@ -59,6 +59,13 @@ anything beyond that is listed in the preview before you push.
 No Supabase access? Download a backup from the current app (⋯ → Backup all data)
 and choose it when the import asks.
 
+## Staying up to date
+
+`version.json` is written by every build. The hub, cashier and scoring pages check it about once a minute
+and reload themselves when a newer build is live — only at a safe moment (nothing unsaved, no editor or
+sale panel open, not mid-typing; the scoring page waits for its offline queue to empty). Upload
+`version.json` along with the pages each time.
+
 ## Working together
 
 Several board members can use the hub at the same time. Every save is checked against the latest

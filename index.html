@@ -572,6 +572,8 @@ function persist(){
   setSync('saving'); clearTimeout(saveT); saveT=setTimeout(pushCloud,300);
 }
 let pushing=false, pushAgain=false;
+/* safe to reload for an update: nothing unsaved, not mid-save, no editor open */
+window.__canReload=()=>!pushing&&!(typeof drawerOpen==='function'&&drawerOpen())&&(!CLOUD||!sessionOK||!base||stable(Object.assign({},db,{_w:0,_at:0,_rev:0}))===stable(Object.assign({},base,{_w:0,_at:0,_rev:0})));
 async function fetchHub(){ const {data:row,error}=await sb.from('mga_hub').select('data').eq('id','main').maybeSingle(); if(error) throw error; return row&&row.data; }
 async function pushCloud(){
   if(pushing){ pushAgain=true; return; }
@@ -3572,7 +3574,7 @@ async function calcShareAll(){
 }
 function calcStampNow(){ for(const t of db.tournaments){ const c=t.calcutta; if(!(c&&c.share&&c.share.token)) continue; const b0=shareBase.get(t); if(b0&&b0.doc) calcStamp(c,b0.doc); } }
 function calcAfterPersist(){ if(calcShareBusy||!CLOUD||!sessionOK) return; if(!db.tournaments.some(t=>t.calcutta&&t.calcutta.share&&t.calcutta.share.token)) return; clearTimeout(calcShareTimer); calcShareTimer=setTimeout(calcShareAll,700); }
-setInterval(()=>{ if(document.visibilityState==='visible'&&view.page==='tournament'&&view.ttab==='calcutta'&&!calcShareBusy) calcShareAll(); },4000);
+setInterval(()=>{ if(document.visibilityState==='visible'&&!calcShareBusy&&db.tournaments.some(t=>t.calcutta&&t.calcutta.share&&t.calcutta.share.token)) calcShareAll(); },view&&view.ttab==='calcutta'?3000:4000);
 async function startCashierLink(t){
   const c=calc(t); if(!CLOUD||!sessionOK){ toast('The cashier link needs the cloud sign-in'); return; }
   const token=newToken(); c.people=calcPeople(t); c.name=t.name; c._del=c._del||[];
@@ -3800,6 +3802,19 @@ function printChecklist(t){
       <script>setTimeout(()=>print(),300)<\/script></body></html>`;
       const w=window.open(URL.createObjectURL(new Blob([html],{type:'text/html'})),'_blank'); if(!w){ toast('Allow pop-ups to print'); return false; } }});
 }
+
+/* Keeps every open device on the latest version: checks version.json about once a minute and, when a
+   newer build is live, reloads at a safe moment (nothing unsaved, no editor open, not mid-typing). */
+(function(){
+  const ME='20261001184330'; let ready=false, lastCheck=0;
+  const typing=()=>{ const a=document.activeElement; return a&&/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)&&a.value&&a.type!=='search'; };
+  const safe=()=>!typing()&&(typeof window.__canReload!=='function'||window.__canReload());
+  async function check(){ lastCheck=Date.now(); if(location.protocol==='file:') return;
+    try{ const r=await fetch('version.json?t='+Date.now(),{cache:'no-store'}); if(!r.ok) return; const v=await r.json(); if(v&&v.build&&v.build!==ME) ready=true; }catch(_){} }
+  setInterval(()=>{ if(ready){ if(safe()) location.reload(); } else if(Date.now()-lastCheck>60000) check(); },3000);
+  document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='visible') check(); });
+  window.__build=ME;
+})();
 
 boot();
 </script>
