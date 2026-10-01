@@ -65,8 +65,9 @@ Several board members can use the hub at the same time. Every save is checked ag
 server copy (a revision number inside the record); if someone else saved in between, the hub fetches
 their version, merges it with yours item by item — tournaments, lots, bidders, members, ledger lines are
 matched by id — and saves the combined result. Changes to different things never collide; if two people
-change the very same field, the later edit wins. Incoming changes merge into your screen instead of
-replacing it, and they wait while you have an editor open, so nothing is lost mid-edit. No setup needed.
+change the very same field, the later edit wins. Incoming changes merge into the records on your screen in place
+— even with an editor open — so you see others' work live, your typing and scroll position are kept, and
+nothing you're editing is lost. Edits made while a save is still uploading go up right after. No setup needed.
 
 ## Checklist
 

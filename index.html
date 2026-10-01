@@ -510,7 +510,7 @@ function stable(o){ if(Array.isArray(o)) return '['+o.map(stable).join(',')+']';
 let lastSyncErr='';
 function setSync(s,err){
   const d=$('syncDot'), t=$('syncTxt'); d.className='dot '+s;
-  t.textContent={synced:'All changes saved',saving:'Saving…',offline:'Not saving to cloud — tap to retry',local:'This device only'}[s]||s;
+  t.textContent=({synced:'All changes saved',saving:'Saving…',offline:'Not saving to cloud — tap to retry',local:'This device only'}[s]||s)+(t.dataset.upd&&s!=='offline'?` · updated ${t.dataset.upd}`:'');
   if(s==='offline'){ const m=err?(err.message||String(err))+(err.code?' ('+err.code+')':''):'Cloud unreachable';
     if(m!==lastSyncErr) toast('Cloud save failed: '+m); lastSyncErr=m; $('syncErr').textContent=m; $('syncErr').hidden=false; }
   else { lastSyncErr=''; $('syncErr').hidden=true; }
@@ -547,10 +547,28 @@ function merge3(b,l,r){
   if(l===undefined) return r; if(r===undefined) return l;   // keep data rather than lose it
   return l;                                                  // same field changed on both sides: ours is the later edit
 }
+/* Bring `t` to match `s` without replacing objects that already exist: open editors and pending
+   saves keep pointing at the live records, so nothing they save goes astray. */
+function syncTo(t,s){
+  if(t===s) return t;
+  for(const k of Object.keys(t)) if(!(k in s)&&!SKIP_KEYS[k]) delete t[k];
+  for(const k of Object.keys(s)){ const a=t[k], b=s[k];
+    if(Array.isArray(a)&&Array.isArray(b)) syncArr(a,b);
+    else if(isObj(a)&&isObj(b)) syncTo(a,b);
+    else if(!sameJ(a,b)) t[k]=b; }
+  return t;
+}
+function syncArr(ta,sa){
+  if(ta===sa) return ta;
+  if(sa.length&&sa.every(e=>isObj(e)&&e.id!=null)){ const m=new Map(ta.filter(e=>isObj(e)&&e.id!=null).map(e=>[e.id,e]));
+    const out=sa.map(e=>{ const o=m.get(e.id); return o?syncTo(o,e):e; }); ta.splice(0,ta.length,...out); return ta; }
+  if(!sameJ(ta,sa)) ta.splice(0,ta.length,...sa); return ta;
+}
+let lastRemoteAt=0;
 function persist(){
   db._w=CLIENT; db._at=Date.now(); store.save(db); if(typeof afterPersist==='function') afterPersist();
   if(!CLOUD||!sessionOK){ setSync('local'); return; }
-  setSync('saving'); clearTimeout(saveT); saveT=setTimeout(pushCloud,600);
+  setSync('saving'); clearTimeout(saveT); saveT=setTimeout(pushCloud,300);
 }
 let pushing=false, pushAgain=false;
 async function fetchHub(){ const {data:row,error}=await sb.from('mga_hub').select('data').eq('id','main').maybeSingle(); if(error) throw error; return row&&row.data; }
@@ -559,12 +577,15 @@ async function pushCloud(){
   try{
     for(let n=0;n<6;n++){
       const rev=base&&base._rev!=null?+base._rev:null;
-      const next=Object.assign({},db,{_rev:(rev||0)+1,_w:CLIENT,_at:Date.now()});
+      // a frozen copy of exactly what we send — edits made while it's in flight must not be mistaken for saved
+      const next=JSON.parse(JSON.stringify(Object.assign({},db,{_rev:(rev||0)+1,_w:CLIENT,_at:Date.now()})));
       let q=sb.from('mga_hub').update({data:next,updated_at:new Date().toISOString()}).eq('id','main');
       q=rev==null?q.is('data->>_rev',null):q.eq('data->>_rev',String(rev));
       const {data:rows,error}=await q.select('id');
       if(error){ setSync('offline',error); return; }
-      if(rows&&rows.length){ base=JSON.parse(JSON.stringify(next)); db._rev=next._rev; store.save(db); lastPushed=stable(db); setSync('synced'); return; }
+      if(rows&&rows.length){ base=next; db._rev=next._rev; store.save(db); lastPushed=stable(next);
+        const pendingEdits=stable(Object.assign({},db,{_w:0,_at:0,_rev:0}))!==stable(Object.assign({},next,{_w:0,_at:0,_rev:0}));
+        if(pendingEdits){ pushAgain=true; setSync('saving'); } else setSync('synced'); return; }
       // someone saved since we last looked: merge theirs into ours and try again
       const remote=await fetchHub();
       if(!remote){ const {error:e2}=await sb.from('mga_hub').upsert({id:'main',data:next,updated_at:new Date().toISOString()}); if(e2){ setSync('offline',e2); return; } base=JSON.parse(JSON.stringify(next)); setSync('synced'); return; }
@@ -577,17 +598,17 @@ async function pushCloud(){
 /* bring someone else's saved copy into ours */
 function mergeIn(remote,opt){
   const before=stable(db);
-  const merged=normalize(merge3(base||remote,db,remote));
-  merged._rev=remote._rev; merged._w=db._w; merged._at=db._at;
-  base=JSON.parse(JSON.stringify(remote)); db=merged; store.save(db);
+  const merged=normalize(JSON.parse(JSON.stringify(merge3(base||remote,db,remote))));
+  base=JSON.parse(JSON.stringify(remote));
+  syncTo(db,merged); db._rev=remote._rev; store.save(db);          // same objects, new values
   const changed=stable(db)!==before;
-  if(changed&&!(opt&&opt.noRender)) render();
-  if(changed&&!(opt&&opt.quiet)) toast('Updated from another device');
+  if(changed){ lastRemoteAt=Date.now(); if(!(opt&&opt.noRender)) render(); if(!(opt&&opt.quiet)) noteRemote(); }
   return changed;
 }
+function noteRemote(){ const t=$('syncTxt'); if(!t) return; t.dataset.upd=new Date().toLocaleTimeString([], {hour:'numeric',minute:'2-digit'}); setSync(pushing?'saving':'synced'); }
 function applyRemote(remote){
   if(base&&remote._rev!=null&&base._rev===remote._rev) return;     // already have it
-  if(drawerOpen()){ pendingRemote=remote; return; }                 // don't swap records under an open editor
+  // merged in place, so it's safe even with an editor open: the editor keeps the live record
   const hadLocal=base&&stable(db)!==stable(Object.assign({},base,{_w:db._w,_at:db._at}));
   mergeIn(remote);
   if(hadLocal) persist();                                            // our unsaved edits still need to go up
@@ -691,6 +712,12 @@ function statusChip(t){ const d=daysOut(t); const st=t.status||'Planning';
 
 /* ---------- render root ---------- */
 function render(){
+  const ae=document.activeElement, keep=ae&&ae.id&&/^(INPUT|TEXTAREA|SELECT)$/.test(ae.tagName)&&!ae.closest('#drawer')?{id:ae.id,s:ae.selectionStart,e:ae.selectionEnd,v:ae.value}:null, sy=window.scrollY;
+  renderInner();
+  if(keep){ const n=document.getElementById(keep.id); if(n){ if(n.value!==keep.v&&n.tagName!=='SELECT') n.value=keep.v; n.focus({preventScroll:true}); try{ n.setSelectionRange(keep.s,keep.e); }catch(_){} } }
+  if(Math.abs(window.scrollY-sy)>2) window.scrollTo(0,sy);
+}
+function renderInner(){
   const ys=Object.keys(db.seasons).sort((a,b)=>b-a);
   $('seasonSel').innerHTML=ys.map(y=>`<option value="${y}"${y===Y()?' selected':''}>${y} season</option>`).join('')+'<option value="__new">+ New season…</option>';
   const live=typeof liveEvents==='function'?liveEvents():[];
@@ -3512,7 +3539,7 @@ async function calcShareSync(t){
   try{
     const before=calcStable(calcDoc(c));
     const res=await calcSyncOnce(get,put,calcDoc(c));
-    const d=res.doc; CALC_KINDS.forEach(k=>c[k]=d[k]||[]); CALC_SET.forEach(k=>{ if(d[k]!==undefined) c[k]=d[k]; }); c._su=d._su||0; c._del=d._del||[];
+    const d=JSON.parse(JSON.stringify(res.doc)); CALC_KINDS.forEach(k=>{ c[k]=c[k]||[]; syncArr(c[k],d[k]||[]); }); CALC_SET.forEach(k=>{ if(d[k]!==undefined&&!sameJ(c[k],d[k])) c[k]=isObj(c[k])&&isObj(d[k])?syncTo(c[k],d[k]):d[k]; }); c._su=d._su||0; c._del=d._del||[];
     c._base=JSON.parse(JSON.stringify(d)); c._ver=res.version; c.share.state='live'; c.share.at=new Date().toISOString(); c.share.msg='';
     return calcStable(calcDoc(c))!==before;
   }catch(e){ c.share.state='error'; c.share.msg=e.message; return false; }
@@ -3520,11 +3547,10 @@ async function calcShareSync(t){
 let calcShareTimer=null, calcShareBusy=false;
 async function calcShareAll(){
   if(calcShareBusy) return; const ts=db.tournaments.filter(t=>t.calcutta&&t.calcutta.share&&t.calcutta.share.token); if(!ts.length) return;
-  if(drawerOpen()){ clearTimeout(calcShareTimer); calcShareTimer=setTimeout(calcShareAll,1500); return; }   // never swap records under an open editor
   calcShareBusy=true; let changed=false;
   try{ for(const t of ts) changed=(await calcShareSync(t))||changed; } finally{ calcShareBusy=false; }
   if(typeof syncSuppress!=='undefined'){ syncSuppress=true; persist(); syncSuppress=false; } else persist();
-  if(!drawerOpen()&&view.page==='tournament'&&view.ttab==='calcutta') render();
+  if(changed&&view.page==='tournament'&&view.ttab==='calcutta') render();
 }
 function calcAfterPersist(){ if(calcShareBusy||!CLOUD||!sessionOK) return; if(!db.tournaments.some(t=>t.calcutta&&t.calcutta.share&&t.calcutta.share.token)) return; clearTimeout(calcShareTimer); calcShareTimer=setTimeout(calcShareAll,700); }
 setInterval(()=>{ if(document.visibilityState==='visible'&&view.page==='tournament'&&view.ttab==='calcutta'&&!calcShareBusy) calcShareAll(); },4000);
