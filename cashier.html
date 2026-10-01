@@ -174,10 +174,11 @@ function calcDoc(c){ const d={}; CALC_KINDS.forEach(k=>d[k]=JSON.parse(JSON.stri
   d._su=c._su||0; d._del=JSON.parse(JSON.stringify(c._del||[])); if(c.people) d.people=c.people; if(c.name) d.name=c.name; return d; }
 function calcStamp(c,base,now){
   now=now||Date.now(); base=base||{}; c._del=c._del||[];
-  for(const k of CALC_KINDS){ const bm=new Map((base[k]||[]).map(e=>[e.id,calcStable(calcStrip(e))])); const ids=new Set();
-    for(const e of c[k]||[]){ ids.add(e.id); if(bm.get(e.id)!==calcStable(calcStrip(e))) e.u=now; }
+  for(const k of CALC_KINDS){ const bm=new Map((base[k]||[]).map(e=>[e.id,{s:calcStable(calcStrip(e)),u:e.u||0}])); const ids=new Set();
+    for(const e of c[k]||[]){ ids.add(e.id); const b0=bm.get(e.id);
+      if(!b0||b0.s!==calcStable(calcStrip(e))){ if(!((e.u||0)>(b0?b0.u:0))) e.u=now; } }   // stamp once per change, not on every check
     for(const id of bm.keys()) if(!ids.has(id)&&!c._del.some(d=>d.kind===k&&d.id===id)) c._del.push({kind:k,id,u:now}); }
-  if(calcStable(calcSettings(c))!==calcStable(calcSettings(base))) c._su=now;
+  if(calcStable(calcSettings(c))!==calcStable(calcSettings(base))&&!((c._su||0)>(base._su||0))) c._su=now;
 }
 function calcMerge(r,l){
   r=r||{}; l=l||{}; const out={};

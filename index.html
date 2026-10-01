@@ -505,7 +505,7 @@ let db=normalize(store.load()||emptyHub());
 let saveT=null, pendingRemote=null, lastPushed='';
 /* Stable stringify: Postgres jsonb reorders keys, so plain JSON.stringify can't tell "same data" apart. */
 function stable(o){ if(Array.isArray(o)) return '['+o.map(stable).join(',')+']';
-  if(o&&typeof o==='object') return '{'+Object.keys(o).filter(k=>k!=='_w'&&k!=='_at').sort().map(k=>JSON.stringify(k)+':'+stable(o[k])).join(',')+'}';
+  if(o&&typeof o==='object') return '{'+Object.keys(o).filter(k=>k!=='_w'&&k!=='_at'&&o[k]!==undefined).sort().map(k=>JSON.stringify(k)+':'+stable(o[k])).join(',')+'}';
   return JSON.stringify(o); }
 let lastSyncErr='';
 function setSync(s,err){
@@ -566,6 +566,7 @@ function syncArr(ta,sa){
 }
 let lastRemoteAt=0;
 function persist(){
+  if(typeof calcStampNow==='function') calcStampNow();   // mark what changed in shared Calcuttas before this save goes out
   db._w=CLIENT; db._at=Date.now(); store.save(db); if(typeof afterPersist==='function') afterPersist();
   if(!CLOUD||!sessionOK){ setSync('local'); return; }
   setSync('saving'); clearTimeout(saveT); saveT=setTimeout(pushCloud,300);
@@ -573,7 +574,10 @@ function persist(){
 let pushing=false, pushAgain=false;
 async function fetchHub(){ const {data:row,error}=await sb.from('mga_hub').select('data').eq('id','main').maybeSingle(); if(error) throw error; return row&&row.data; }
 async function pushCloud(){
-  if(pushing){ pushAgain=true; return; } pushing=true;
+  if(pushing){ pushAgain=true; return; }
+  const bare=x=>stable(Object.assign({},x,{_w:0,_at:0,_rev:0}));
+  if(base&&bare(db)===bare(base)){ setSync('synced'); return; }        // nothing actually changed: don't write (or ping anyone)
+  pushing=true;
   try{
     for(let n=0;n<6;n++){
       const rev=base&&base._rev!=null?+base._rev:null;
@@ -607,7 +611,7 @@ function mergeIn(remote,opt){
 }
 function noteRemote(){ const t=$('syncTxt'); if(!t) return; t.dataset.upd=new Date().toLocaleTimeString([], {hour:'numeric',minute:'2-digit'}); setSync(pushing?'saving':'synced'); }
 function applyRemote(remote){
-  if(base&&remote._rev!=null&&base._rev===remote._rev) return;     // already have it
+  if(base&&remote._rev!=null&&base._rev!=null&&+remote._rev<=+base._rev) return;   // already have it — or it's an older copy arriving late
   // merged in place, so it's safe even with an editor open: the editor keeps the live record
   const hadLocal=base&&stable(db)!==stable(Object.assign({},base,{_w:db._w,_at:db._at}));
   mergeIn(remote);
@@ -2914,7 +2918,11 @@ function mergeFromMM(t,live){
   Object.assign(t,saved); t.source=src; t.source.raw=clone(live);
 }
 let syncBusy=false, syncTimer=null, syncSuppress=false, syncStarted=false;
-function syncState(t,state,extra){ t.sync=Object.assign(t.sync||{},{state,at:new Date().toISOString()},extra||{}); }
+/* "last checked", "in sync", conflicts… are this device's view, not shared data — keeping them out of the
+   record means a background check never counts as an edit (and never pings everyone else) */
+const SYNC_ST={};
+function syncState(t,state,extra){ SYNC_ST[t.id]=Object.assign(SYNC_ST[t.id]||{},{state,at:new Date().toISOString()},extra||{}); }
+const syncSt=t=>Object.assign({},SYNC_ST[t.id]||{},{off:!!(t.sync&&t.sync.off)});
 async function syncTournament(t,depth){
   if(!CLOUD||!sessionOK||!isSynced(t)) return;
   const yr=t.source.year; let st;
@@ -2937,11 +2945,12 @@ async function syncTournament(t,depth){
 }
 async function syncAll(){
   if(syncBusy){ syncSoon(); return; } syncBusy=true;
-  const before=stable(db.tournaments.filter(isSynced).map(t=>[t.id,t.sync&&t.sync.state]));
+  db.tournaments.forEach(t=>{ if(t.sync&&Object.keys(t.sync).some(k=>k!=='off')) t.sync={off:!!t.sync.off}; });   // drop status saved by older versions
+  const dataBefore=stable(db), before=stable(db.tournaments.filter(isSynced).map(t=>[t.id,(SYNC_ST[t.id]||{}).state]));
   try{ for(const t of db.tournaments.filter(isSynced)) await syncTournament(t); }
   finally{ syncBusy=false; }
-  syncSuppress=true; persist(); syncSuppress=false;
-  const after=stable(db.tournaments.filter(isSynced).map(t=>[t.id,t.sync&&t.sync.state]));
+  if(stable(db)!==dataBefore){ syncSuppress=true; persist(); syncSuppress=false; }   // save only if a check actually brought in a change
+  const after=stable(db.tournaments.filter(isSynced).map(t=>[t.id,(SYNC_ST[t.id]||{}).state]));
   if(!drawerOpen()&&(before!==after||view.page==='tournament'||view.page==='dash')) render();
 }
 function syncSoon(ms){ clearTimeout(syncTimer); syncTimer=setTimeout(syncAll,ms||2500); }
@@ -2958,14 +2967,14 @@ function syncChip(t){
   if(!t.source||t.source.kind!=='mm-app') return '';
   if(t.sync&&t.sync.off) return '<button class="chip" data-sync="1" style="cursor:pointer">Sync off</button>';
   if(!CLOUD||!sessionOK) return '<span class="chip">Sync needs the cloud sign-in</span>';
-  const s=t.sync||{}, when=s.at?new Date(s.at).toLocaleTimeString([], {hour:'numeric',minute:'2-digit'}):'';
+  const s=syncSt(t), when=s.at?new Date(s.at).toLocaleTimeString([], {hour:'numeric',minute:'2-digit'}):'';
   if(s.state==='conflict') return '<button class="chip warn" data-sync="1" style="cursor:pointer">⇄ Conflict — choose a version</button>';
   if(s.state==='error') return `<button class="chip warn" data-sync="1" style="cursor:pointer" title="${esc(s.msg||'')}">⇄ Sync problem — retry</button>`;
   if(s.state==='synced') return `<button class="chip ok" data-sync="1" style="cursor:pointer" title="In sync with the current Member-Member app">⇄ In sync · ${when}</button>`;
   return '<span class="chip">⇄ Checking…</span>';
 }
 function openSync(t){
-  const s=t.sync||{};
+  const s=syncSt(t);
   if(s.state==='conflict'){
     openDrawer({kicker:t.name,title:'Both versions changed',saveLabel:'Keep the hub’s',delPlain:true,
       body:`<p style="margin:0">Since the last sync, this tournament was edited in <b>both</b> the hub and the current Member-Member app. Nothing has been overwritten. Pick which version wins — the other side’s recent edits will be replaced.</p>
@@ -3068,10 +3077,11 @@ function calcDoc(c){ const d={}; CALC_KINDS.forEach(k=>d[k]=JSON.parse(JSON.stri
   d._su=c._su||0; d._del=JSON.parse(JSON.stringify(c._del||[])); if(c.people) d.people=c.people; if(c.name) d.name=c.name; return d; }
 function calcStamp(c,base,now){
   now=now||Date.now(); base=base||{}; c._del=c._del||[];
-  for(const k of CALC_KINDS){ const bm=new Map((base[k]||[]).map(e=>[e.id,calcStable(calcStrip(e))])); const ids=new Set();
-    for(const e of c[k]||[]){ ids.add(e.id); if(bm.get(e.id)!==calcStable(calcStrip(e))) e.u=now; }
+  for(const k of CALC_KINDS){ const bm=new Map((base[k]||[]).map(e=>[e.id,{s:calcStable(calcStrip(e)),u:e.u||0}])); const ids=new Set();
+    for(const e of c[k]||[]){ ids.add(e.id); const b0=bm.get(e.id);
+      if(!b0||b0.s!==calcStable(calcStrip(e))){ if(!((e.u||0)>(b0?b0.u:0))) e.u=now; } }   // stamp once per change, not on every check
     for(const id of bm.keys()) if(!ids.has(id)&&!c._del.some(d=>d.kind===k&&d.id===id)) c._del.push({kind:k,id,u:now}); }
-  if(calcStable(calcSettings(c))!==calcStable(calcSettings(base))) c._su=now;
+  if(calcStable(calcSettings(c))!==calcStable(calcSettings(base))&&!((c._su||0)>(base._su||0))) c._su=now;
 }
 function calcMerge(r,l){
   r=r||{}; l=l||{}; const out={};
@@ -3529,10 +3539,16 @@ async function exportCalcutta(t){
 const cashierLink=t=>location.href.split('#')[0].split('?')[0].replace(/[^/]*$/,'')+'cashier.html?k='+encodeURIComponent(calc(t).share.token);
 const newToken=()=>Array.from(crypto.getRandomValues(new Uint8Array(24)),b=>'abcdefghijkmnpqrstuvwxyz23456789'[b%32]).join('');
 function calcPeople(t){ return (t.field||[]).map(p=>{ const m=memberById(p.memberId); return m?{id:m.id,name:tidyName(memberName(m))}:null; }).filter(Boolean).sort((a,b)=>a.name.localeCompare(b.name)); }
+const SHARE_ST={};
+/* the last cashier copy this device merged with — needed to tell what changed here; kept per device */
+const shareBase={ get(t){ const c=calc(t); if(c._base){ this.set(t,c._base,c._ver); delete c._base; delete c._ver; }   // move older shared copies here
+    try{ return JSON.parse(localStorage.getItem('mga_cbase_'+t.id)||'null'); }catch(_){ return null; } },
+  set(t,doc,ver){ try{ localStorage.setItem('mga_cbase_'+t.id,JSON.stringify({doc,ver})); }catch(_){} } };
+const shareSt=t=>Object.assign({},calc(t).share||{},SHARE_ST[t.id]||{});
 async function calcShareSync(t){
   const c=calc(t); if(!c.share||!c.share.token||!CLOUD||!sessionOK) return false;
   c.people=calcPeople(t); c.name=t.name;
-  calcStamp(c,c._base);
+  const sb0=shareBase.get(t); calcStamp(c,sb0&&sb0.doc);
   const token=c.share.token;
   const get=async()=>{ const {data,error}=await sb.rpc('calcutta_get',{p_token:token}); if(error) throw new Error(error.message); if(!data) throw new Error('The cashier link is off'); return data; };
   const put=async(doc,ver)=>{ const {data,error}=await sb.rpc('calcutta_put',{p_token:token,p_doc:doc,p_version:ver}); if(error) throw new Error(error.message); return data; };
@@ -3540,18 +3556,21 @@ async function calcShareSync(t){
     const before=calcStable(calcDoc(c));
     const res=await calcSyncOnce(get,put,calcDoc(c));
     const d=JSON.parse(JSON.stringify(res.doc)); CALC_KINDS.forEach(k=>{ c[k]=c[k]||[]; syncArr(c[k],d[k]||[]); }); CALC_SET.forEach(k=>{ if(d[k]!==undefined&&!sameJ(c[k],d[k])) c[k]=isObj(c[k])&&isObj(d[k])?syncTo(c[k],d[k]):d[k]; }); c._su=d._su||0; c._del=d._del||[];
-    c._base=JSON.parse(JSON.stringify(d)); c._ver=res.version; c.share.state='live'; c.share.at=new Date().toISOString(); c.share.msg='';
+    shareBase.set(t,JSON.parse(JSON.stringify(res.doc)),res.version); SHARE_ST[t.id]={state:'live',at:new Date().toISOString(),msg:''};
     return calcStable(calcDoc(c))!==before;
-  }catch(e){ c.share.state='error'; c.share.msg=e.message; return false; }
+  }catch(e){ SHARE_ST[t.id]={state:'error',msg:e.message,at:(SHARE_ST[t.id]||{}).at}; return false; }
 }
 let calcShareTimer=null, calcShareBusy=false;
 async function calcShareAll(){
   if(calcShareBusy) return; const ts=db.tournaments.filter(t=>t.calcutta&&t.calcutta.share&&t.calcutta.share.token); if(!ts.length) return;
+  db.tournaments.forEach(x=>{ const sh=x.calcutta&&x.calcutta.share; if(sh&&('state' in sh||'at' in sh||'msg' in sh)) x.calcutta.share={token:sh.token,created:sh.created}; if(x.calcutta&&x.calcutta._base) shareBase.get(x); });
+  const dataBefore=stable(db);
   calcShareBusy=true; let changed=false;
   try{ for(const t of ts) changed=(await calcShareSync(t))||changed; } finally{ calcShareBusy=false; }
-  if(typeof syncSuppress!=='undefined'){ syncSuppress=true; persist(); syncSuppress=false; } else persist();
+  if(stable(db)!==dataBefore){ if(typeof syncSuppress!=='undefined'){ syncSuppress=true; persist(); syncSuppress=false; } else persist(); }
   if(changed&&view.page==='tournament'&&view.ttab==='calcutta') render();
 }
+function calcStampNow(){ for(const t of db.tournaments){ const c=t.calcutta; if(!(c&&c.share&&c.share.token)) continue; const b0=shareBase.get(t); if(b0&&b0.doc) calcStamp(c,b0.doc); } }
 function calcAfterPersist(){ if(calcShareBusy||!CLOUD||!sessionOK) return; if(!db.tournaments.some(t=>t.calcutta&&t.calcutta.share&&t.calcutta.share.token)) return; clearTimeout(calcShareTimer); calcShareTimer=setTimeout(calcShareAll,700); }
 setInterval(()=>{ if(document.visibilityState==='visible'&&view.page==='tournament'&&view.ttab==='calcutta'&&!calcShareBusy) calcShareAll(); },4000);
 async function startCashierLink(t){
@@ -3560,7 +3579,7 @@ async function startCashierLink(t){
   const doc=calcDoc(c);
   const {error}=await sb.from('calcutta_share').upsert({tid:t.id,token,name:t.name,doc,version:1,updated_at:new Date().toISOString()});
   if(error){ toast(/relation|does not exist/i.test(error.message)?'Run calcutta-setup.sql in Supabase to turn on cashier links':'Couldn’t create the link: '+error.message); return; }
-  c.share={token,state:'live',at:new Date().toISOString(),created:new Date().toISOString()}; c._base=JSON.parse(JSON.stringify(doc)); c._ver=1;
+  c.share={token,created:new Date().toISOString()}; SHARE_ST[t.id]={state:'live',at:new Date().toISOString()}; shareBase.set(t,JSON.parse(JSON.stringify(doc)),1);
   persist(); render(); toast('Cashier link ready');
 }
 function stopCashierLink(t){
@@ -3598,7 +3617,7 @@ function paymentsCard(t){
 function cashierCard(t){
   const c=calc(t);
   if(!c.share) return `<div class="card pad" style="display:flex;gap:14px 24px;align-items:center;flex-wrap:wrap"><div class="cell2" style="flex:1 1 340px"><span class="lbl">Cashier link</span><b>Let the cashiers record sales and payments from their laptops</b><small class="muted">A private link — no board password. Sales, bidders and payments they enter show up here within seconds, and yours show up for them.${!CLOUD||!sessionOK?' Needs the cloud sign-in.':''}</small></div><button class="btn pri" id="ccShare"${!CLOUD||!sessionOK?' disabled':''}>Create cashier link</button></div>`;
-  const link=cashierLink(t), s=c.share;
+  const link=cashierLink(t), s=shareSt(t);
   return `<div class="card pad" style="display:flex;gap:14px 24px;align-items:center;flex-wrap:wrap;border-color:${s.state==='error'?'#EBC2B3':'#BCD9C7'}"><div class="cell2" style="flex:1 1 340px;min-width:0"><span class="lbl">Cashier link · ${s.state==='error'?'<span class="neg">problem</span>':'<span class="pos">● live</span>'}</span><a href="${esc(link)}" target="_blank" rel="noopener" class="trunc" style="font-weight:600">${esc(link)}</a><small class="muted">${s.state==='error'?esc(s.msg||''):'In sync'+(s.at?' · '+new Date(s.at).toLocaleTimeString([], {hour:'numeric',minute:'2-digit',second:'2-digit'}):'')} · anyone with this link can record sales and payments for this Calcutta.</small></div>
     <div class="actions"><button class="btn sm" id="ccCopy">Copy link</button><a class="btn sm" href="${esc(link)}" target="_blank" rel="noopener">Open</a><button class="btn sm" id="ccStop">Turn off</button></div></div>`;
 }
