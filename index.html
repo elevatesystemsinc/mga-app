@@ -761,7 +761,7 @@ function vDash(m){
       <div class="tr th" style="${cols}"><span>Tournament</span><span>Dates</span><span class="r">Revenue</span><span class="r">Expenses</span><span class="r">Net</span></div>
       ${sc.ts.map(({t,c})=>`<div class="tr num click" data-open="${t.id}" style="${cols}"><div class="cell2"><b class="trunc" style="color:var(--navy)">${esc(t.name)}</b><small>${t.days} day${t.days>1?'s':''} · ${esc(t.status||'Planning')}</small></div><span>${dateRange(t).replace(/, \d{4}$/,'')}</span><span class="r">${fmt(c.revenue)}</span><span class="r">${fmt(c.expenses)}</span><b class="r ${netCls(c.net)}">${fmtS(c.net)}</b></div>`).join('')}
       <div class="tr tot num" style="${cols}"><span>Tournaments total</span><span></span><span class="r">${fmt(sc.tRev)}</span><span class="r">${fmt(sc.tExp)}</span><span class="r ${netCls(sc.tRev-sc.tExp)}">${fmtS(sc.tRev-sc.tExp)}</span></div>
-      </div></div>`:`<div class="empty"><b>No tournaments yet</b><span>Add the season’s first event, or import Member-Member from the current app.</span><div class="actions"><button class="btn pri" id="dNew2">${I.plus}New tournament</button><button class="btn" id="dImp">${I.down}Import Member-Member</button></div></div>`}
+      </div></div>`:`<div class="empty"><b>No tournaments yet</b><span>Add the season’s first event${legacyRetired()?'':', or import Member-Member from the current app'}.</span><div class="actions"><button class="btn pri" id="dNew2">${I.plus}New tournament</button>${legacyRetired()?'':`<button class="btn" id="dImp">${I.down}Import Member-Member</button>`}</div></div>`}
     </div>
     <div style="display:flex;flex-direction:column;gap:20px">
       ${typeof liveBoardCard==='function'?liveBoardCard():''}
@@ -785,14 +785,14 @@ function wireCommon(root){
 function vTournaments(m){
   const all=seasonTournaments(Y()), now=all.filter(t=>{const d=daysOut(t);return view.tfilter==='All'||(view.tfilter==='Upcoming'?(d===null||d>=0)&&t.status!=='Complete':t.status==='Complete'||(d!==null&&d<0));});
   const cols='grid-template-columns:minmax(160px,2fr) 150px 80px 110px 150px 110px 40px';
-  m.innerHTML=head('Tournaments',`Every event on the ${Y()} calendar. Each budget rolls up into the season.`,btn('Import Member-Member','tImp','',I.down)+btn('New tournament','tNew','pri',I.plus))+`
+  m.innerHTML=head('Tournaments',`Every event on the ${Y()} calendar. Each budget rolls up into the season.`,(legacyRetired()?'':btn('Import Member-Member','tImp','',I.down))+btn('New tournament','tNew','pri',I.plus))+`
   <div class="tabs">${['All','Upcoming','Completed'].map(f=>`<button class="tab${view.tfilter===f?' on':''}" data-f="${f}">${f}${f==='All'?' · '+all.length:''}</button>`).join('')}</div>
   <div class="card" style="overflow:hidden">${now.length?`<div class="tw"><div class="t">
     <div class="tr th" style="${cols}"><span>Tournament</span><span>Dates</span><span>Length</span><span>Field</span><span>Sponsors</span><span class="r">Net</span><span></span></div>
     ${now.map(t=>{const c=tcalc(t);return `<div class="tr num click" data-open="${t.id}" style="${cols}"><div class="cell2"><b class="trunc" style="color:var(--navy)">${esc(t.name)}</b><small>${esc(t.venue||'')}</small></div><span>${dateRange(t)}</span><span class="muted">${t.days} day${t.days>1?'s':''}</span><span>${t.field.length?t.field.length+' signed up':c.players?c.players+' planned':'—'}</span><span>${t.sponsors.length?fmt(c.received)+' of '+fmt(c.pledged):'—'}</span><b class="r ${netCls(c.net)}">${fmtS(c.net)}</b><span class="ib">${I.chev}</span></div>`;}).join('')}
   </div></div>`:`<div class="empty"><b>Nothing here yet</b><span>Create a tournament to start its schedule, field and budget.</span></div>`}</div>`;
   m.querySelectorAll('[data-f]').forEach(b=>b.onclick=()=>{view.tfilter=b.dataset.f;render();});
-  $('tNew').onclick=editNewTournament; $('tImp').onclick=importMM; wireCommon(m);
+  $('tNew').onclick=editNewTournament; const ti=$('tImp'); if(ti) ti.onclick=importMM; wireCommon(m);
 }
 function editNewTournament(){
   const prev=db.tournaments.filter(t=>t.season!==Y()||true).sort((a,b)=>(b.startDate||'').localeCompare(a.startDate||''));
@@ -857,18 +857,19 @@ function chooseMMYear(state,from){
 const TT=[['overview','Overview'],['meals','Meals & events'],['field','Field'],['sponsors','Sponsors'],['budget','Budget']];
 function vTournament(m){
   const t=T(); if(!t){ go('tournaments'); return; }
-  const tabs=TT.concat(t.source?[['verify','Verify']]:[]);
+  const tabs=TT.concat(t.source&&!legacyRetired()?[['verify','Verify']]:[]);
+  if(view.ttab==='verify'&&legacyRetired()) view.ttab='overview';
   if(!tabs.some(x=>x[0]===view.ttab)) view.ttab='budget';
   m.innerHTML=`<div class="crumb"><button data-go="tournaments">Tournaments</button><span class="muted">/</span><span class="muted">${esc(t.name)}</span></div>
   <div class="phead"><div><h1 class="h1">${esc(t.name)}</h1>
     <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap"><span class="chip navy">${t.days} day${t.days>1?'s':''}</span><span class="chip">${dateRange(t)}</span><span class="chip">${tcalc(t).players} players ${t.budgetBasis==='field'?'in field':'planned'}</span>${statusChip(t)}${typeof syncChip==='function'?syncChip(t):''}</div></div>
-    <div class="actions">${t.source&&t.source.kind==='mm-app'?`<button class="btn" id="tPush" title="Send this tournament’s edits to the Member-Member app">${I.refresh}Push to current app</button>`:''}<button class="btn" id="tEdit">${I.edit}Tournament details</button></div></div>
+    <div class="actions">${t.source&&t.source.kind==='mm-app'&&!legacyRetired()?`<button class="btn" id="tRetire" title="Move to the hub for good">Retire current app</button><button class="btn" id="tPush" title="Send this tournament’s edits to the Member-Member app">${I.refresh}Push to current app</button>`:''}<button class="btn" id="tEdit">${I.edit}Tournament details</button></div></div>
   <div class="tabs">${tabs.map(([k,l])=>`<button class="tab${view.ttab===k?' on':''}" data-tab="${k}">${l}</button>`).join('')}</div>
   <div id="tbody" style="display:flex;flex-direction:column;gap:20px"></div>`;
   wireCommon(m);
   m.querySelectorAll('[data-tab]').forEach(b=>b.onclick=()=>{view.ttab=b.dataset.tab;render();});
   $('tEdit').onclick=()=>editTournament(t);
-  const tp=$('tPush'); if(tp) tp.onclick=()=>pushToMM(t);
+  const tp=$('tPush'); if(tp) tp.onclick=()=>pushToMM(t); const tr=$('tRetire'); if(tr) tr.onclick=retireLegacy;
   ({overview:tOverview,meals:tMeals,field:tField,sponsors:tSponsors,budget:tBudget,verify:tVerify,calcutta:tCalcutta,checklist:tChecklist}[view.ttab])($('tbody'),t);
 }
 function editTournament(t){
@@ -2886,7 +2887,7 @@ async function pushToMM(t){
    when the tab comes back into view, and every minute.
    ===================================================================== */
 const SYNC_IDS={carry:'mm-carry',mga:'mm-mga',raffle:'mm-raffle',pp:'mm-proshop',flight:'mm-flight'};
-const isSynced=t=>t&&t.source&&t.source.kind==='mm-app'&&!(t.sync&&t.sync.off);
+const isSynced=t=>!(typeof legacyRetired==='function'&&legacyRetired())&&t&&t.source&&t.source.kind==='mm-app'&&!(t.sync&&t.sync.off);
 /* bring the current app's year into a hub tournament, keeping what only the hub knows */
 function mergeFromMM(t,live){
   const fresh=convertMM(live,t.source.year);
@@ -2966,6 +2967,7 @@ function startSyncWatch(){
 }
 /* header chip + conflict resolver */
 function syncChip(t){
+  if(typeof legacyRetired==='function'&&legacyRetired()) return '';
   if(!t.source||t.source.kind!=='mm-app') return '';
   if(t.sync&&t.sync.off) return '<button class="chip" data-sync="1" style="cursor:pointer">Sync off</button>';
   if(!CLOUD||!sessionOK) return '<span class="chip">Sync needs the cloud sign-in</span>';
@@ -2988,9 +2990,10 @@ function openSync(t){
         t.source.raw=clone(st.years[t.source.year]); await syncTournament(t); syncSuppress=true; persist(); syncSuppress=false; render(); toast('Kept the hub’s version · backup saved'); })(); return undefined; }});
     return;
   }
-  openDrawer({kicker:t.name,title:'Sync with the current app',saveLabel:'Save',
+  openDrawer({kicker:t.name,title:'Sync with the current app',saveLabel:'Save',wire:r=>{ const x=r.querySelector('#syRetire'); if(x) x.onclick=()=>{ closeDrawer(); retireLegacy(); }; },
     body:`<label class="check" style="align-items:flex-start"><input type="checkbox" id="syOn"${t.sync&&t.sync.off?'':' checked'}><span>Keep this tournament in sync with the current Member-Member app <span class="muted">(${esc(t.source.year)})</span></span></label>
       <p class="hint">Hub edits go to the current app a couple of seconds after you make them; edits made there show up here live. The field, flights and anything the current app can’t hold stay in the hub only. If both sides change at once, you’ll be asked which version to keep.</p>
+      <p class="hint" style="border-top:1px solid var(--line);padding-top:12px">Moving to the hub for good? <button class="btn sm" type="button" id="syRetire">Retire the current app</button></p>
       <p class="hint">${s.state==='error'?esc(s.msg||''):s.at?'Last checked '+new Date(s.at).toLocaleString()+(s.last?` · last ${s.last==='pushed'?'sent to':'received from'} the current app`:''):''}</p>`,
     save:()=>{ t.sync=Object.assign(t.sync||{},{off:!$('syOn').checked}); if(!t.sync.off) syncSoon(300); }});
 }
@@ -3803,10 +3806,38 @@ function printChecklist(t){
       const w=window.open(URL.createObjectURL(new Blob([html],{type:'text/html'})),'_blank'); if(!w){ toast('Allow pop-ups to print'); return false; } }});
 }
 
+/* =====================================================================
+   Retiring the current Member-Member app (app.wcccmga.org). One-time, board-wide:
+   a last sync so nothing entered there is lost, an archive download of its data, then the hub
+   stops talking to it — no sync checks, pushes, Verify tab or import button. Its table in
+   Supabase is left untouched as an archive.
+   ===================================================================== */
+const legacyRetired=()=>!!(db.legacy&&db.legacy.retired);
+function retireLegacy(){
+  const linked=db.tournaments.filter(t=>t.source&&t.source.kind==='mm-app');
+  openDrawer({kicker:'Member-Member app',title:'Retire the current app',saveLabel:'Retire it',
+    body:`<p style="margin:0">The hub takes over from <b>app.wcccmga.org</b> for good. This will:</p>
+      <div class="mini">${[['1','Run one last sync, so anything entered in the current app reaches the hub'],['2','Download an archive copy of the current app’s data (its table in Supabase is also left as is)'],['3','Stop all syncing with it — no checks, no pushes; the Verify tab, sync chip and import buttons go away']].map(([n,t])=>`<div class="mr" style="grid-template-columns:24px minmax(0,1fr)"><b>${n}</b><span>${t}</span></div>`).join('')}</div>
+      <p class="hint">${linked.length?`Linked tournament${linked.length===1?'':'s'}: ${linked.map(t=>esc(t.name)).join(', ')}.`:'No tournaments are linked to it.'} Then upload the forwarding page to app.wcccmga.org so old bookmarks land in the hub.</p>
+      ${!CLOUD||!sessionOK?'<div class="banner">Sign in to the cloud first — the last sync needs it.</div>':''}`,
+    save:()=>{ if(!CLOUD||!sessionOK){ toast('Sign in to the cloud first'); return false; }
+      (async()=>{
+        toast('Running the last sync…');
+        for(const t of linked){ if(t.sync&&t.sync.off) continue; await syncTournament(t);
+          const st=syncSt(t).state;
+          if(st==='conflict'){ toast(`${t.name}: both versions changed — choose one, then retire again`); openSync(t); return; }
+          if(st==='error'){ toast(`${t.name}: ${(syncSt(t).msg)||'couldn’t reach the current app'} — nothing retired`); return; } }
+        try{ const st=await fetchMMState(); dl(JSON.stringify(st,null,2),'application/json',`member-member-app-archive-${new Date().toISOString().slice(0,10)}.json`); }
+        catch(e){ toast('Couldn’t download the archive: '+e.message+' — nothing retired'); return; }
+        db.legacy={retired:true,at:new Date().toISOString()}; linked.forEach(t=>{ t.sync={off:true}; });
+        persist(); view.ttab=view.ttab==='verify'?'overview':view.ttab; render(); toast('Current app retired · archive downloaded');
+      })(); }});
+}
+
 /* Keeps every open device on the latest version: checks version.json about once a minute and, when a
    newer build is live, reloads at a safe moment (nothing unsaved, no editor open, not mid-typing). */
 (function(){
-  const ME='20261001184330'; let ready=false, lastCheck=0;
+  const ME='20261001185826'; let ready=false, lastCheck=0;
   const typing=()=>{ const a=document.activeElement; return a&&/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)&&a.value&&a.type!=='search'; };
   const safe=()=>!typing()&&(typeof window.__canReload!=='function'||window.__canReload());
   async function check(){ lastCheck=Date.now(); if(location.protocol==='file:') return;

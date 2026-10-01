@@ -59,6 +59,13 @@ anything beyond that is listed in the preview before you push.
 No Supabase access? Download a backup from the current app (⋯ → Backup all data)
 and choose it when the import asks.
 
+## Retiring the current app
+
+**Retire current app** (tournament header, or the sync panel) moves the board to the hub for good: a last
+sync from app.wcccmga.org, an archive download of its data, then the hub stops all contact with it — the
+sync chip, Push, Verify tab and import buttons disappear on every device. The old app's `mm_tournament`
+table in Supabase is left untouched. Put the forwarding page on the old site so bookmarks land in the hub.
+
 ## Staying up to date
 
 `version.json` is written by every build. The hub, cashier and scoring pages check it about once a minute
