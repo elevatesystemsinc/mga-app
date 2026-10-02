@@ -3480,6 +3480,7 @@ function tCalcutta(el,t){
   ${(()=>{ const n=(k,l,x)=>`<button class="${view.ccTab===k?'on':''}" data-cctab="${k}">${l}${x!=null&&x!==''?` <span class="cnt">${x}</span>`:''}</button>`;
     return `<div class="subtabs" role="tablist">${n('lots','Lots',c.lots.length)}${n('bidders','Bidders',c.bidders.length)}${n('buyers','Buyers &amp; shares',calcHoldings(c).length)}${n('money','Money','')}${n('setup','Setup','')}</div>`; })()}
   <div class="cc-pane" data-pane="lots"${view.ccTab!=='lots'?' hidden':''}>
+  ${missingTeamsBanner(t)}
   <div class="actions" style="justify-content:flex-end"><button class="btn" id="ccOrd">${I.down}Download order (Excel)</button><button class="btn" id="ccSheet">${I.down}Bidder sheet (PDF)</button></div>
   <div class="card cc-card cc-lots" style="overflow:hidden"><div class="cardhead"><div><h2 class="h2">Lots</h2><span class="muted">Click a lot to record or change a sale</span></div>
     <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;justify-content:flex-end">${searchBox('ccLQ',view.ccLQ,'Find a lot, player or paddle #')}<div class="seg">${[['all','All'],['open','Unsold']].concat(poolTeams(c).length?[['pool','Pool']]:[]).concat(buyInOf(c).on?[['prebuy','Pre-bought'],['due','Team payment due']]:[]).concat(T2.flights.map(f=>[f,f.replace('Flight ','F')])).map(([k,l])=>`<button class="${view.cclot===k?'on':''}" data-ccf="${esc(k)}">${esc(l)}</button>`).join('')}</div></div></div>
@@ -3520,12 +3521,12 @@ function tCalcutta(el,t){
   <div class="card pad" style="display:flex;gap:14px 24px;align-items:center;flex-wrap:wrap"><div class="cell2" style="flex:1 1 320px"><span class="lbl">Minimum bid</span><b style="font-size:18px">${c.minBid?fmt(c.minBid):'None'}</b><small class="muted">${c.minBid?`Teams that don’t reach it go into the pool, auctioned together as Lot ${T2.poolLot||poolLotNum(c)}.`:'Every team sells for whatever it brings.'}${T2.pooled?` <b>${T2.pooled} team${T2.pooled===1?'':'s'} in the pool${T2.poolPrice?` · sold ${fmt(T2.poolPrice)}`:''}.</b>`:''}</small></div><div class="actions">${T2.pooled?`<button class="btn sm" id="ccPool">The pool</button>`:''}<button class="btn sm" id="ccMin">Change minimum</button></div>
     <div class="cell2" style="flex:1 1 320px;border-top:1px solid var(--line);padding-top:12px"><span class="lbl">Team buy-in</span>${(()=>{ const bi=buyInOf(c), PP=calcPayments(c); return bi.on?`<b style="font-size:16px">Each team owns ${bi.pct}% for ${fmt(bi.amount)} (${fmt(n0(bi.amount)/2)} a player) · pre-buy the rest for ${fmt(bi.prebuyExtra)} more (${fmt(n0(bi.amount)+n0(bi.prebuyExtra))})</b><small class="muted">${T2.prebuy} team${T2.prebuy===1?'':'s'} pre-bought — skipped in the auction. Buy-ins: ${PP.g.buyin.countPaid} of ${PP.g.buyin.count} players paid; ${fmt(PP.biPaid)} of ${fmt(PP.biDue)} in.</small>`:'<b style="font-size:16px">Off for this Calcutta</b><small class="muted">Buyers get 100% of the teams they buy. Turn it on if teams own part of themselves or can pre-buy.</small>'; })()}</div>
     <div class="actions" style="border-top:1px solid var(--line);padding-top:12px"><button class="btn sm" id="ccBi">${buyInOf(c).on?'Buy-in settings':'Turn on buy-in'}</button></div></div>
-  <div class="card pad" style="display:flex;gap:14px 24px;align-items:center;flex-wrap:wrap"><div class="cell2" style="flex:1 1 320px"><span class="lbl">Team sheet</span><b>${c.file?esc(c.file):'Uploaded team sheet'}</b><small class="muted">${c.lots.length} teams${c.importedAt?' · imported '+new Date(c.importedAt).toLocaleString([], {month:'short',day:'numeric',hour:'numeric',minute:'2-digit'}):''}. Re-uploading keeps every sale already recorded.</small></div><button class="btn" id="ccImp">${I.down}Upload team sheet</button></div>
+  <div class="card pad" style="display:flex;gap:14px 24px;align-items:center;flex-wrap:wrap"><div class="cell2" style="flex:1 1 320px"><span class="lbl">Team sheet</span><b>${c.file?esc(c.file):'Uploaded team sheet'}</b><small class="muted">${c.lots.length} teams${c.importedAt?' · imported '+new Date(c.importedAt).toLocaleString([], {month:'short',day:'numeric',hour:'numeric',minute:'2-digit'}):''}. Re-uploading keeps every sale already recorded.</small></div><div class="actions"><button class="btn" id="ccAddF2">${I.plus}Add teams from the field${fieldTeamsMissing(t).length?` (${fieldTeamsMissing(t).length})`:''}</button><button class="btn" id="ccImp">${I.down}Upload team sheet</button></div></div>
 
   </div>
 `;
   el.querySelectorAll('[data-cctab]').forEach(b=>b.onclick=()=>{ view.ccTab=b.dataset.cctab; el.querySelectorAll('.cc-pane').forEach(p=>p.hidden=p.dataset.pane!==view.ccTab); el.querySelectorAll('[data-cctab]').forEach(x=>x.classList.toggle('on',x===b)); });
-  $('ccRun').onclick=()=>runAuction(t); const co=$('ccOrd'); if(co) co.onclick=()=>exportOrder(t); const cs=$('ccSheet'); if(cs) cs.onclick=()=>downloadBidSheet(t); $('ccImp').onclick=()=>importCalcutta(t); $('ccExp').onclick=()=>exportCalcutta(t);
+  $('ccRun').onclick=()=>runAuction(t); const af=$('ccAddF'); if(af) af.onclick=()=>addFieldTeams(t); const af2=$('ccAddF2'); if(af2) af2.onclick=()=>addFieldTeams(t); const co=$('ccOrd'); if(co) co.onclick=()=>exportOrder(t); const cs=$('ccSheet'); if(cs) cs.onclick=()=>downloadBidSheet(t); $('ccImp').onclick=()=>importCalcutta(t); $('ccExp').onclick=()=>exportCalcutta(t);
   $('ccPay').onclick=()=>editPayout(t); $('ccCash').onclick=()=>editCash(t);
   const sh=$('ccShare'); if(sh) sh.onclick=()=>startCashierLink(t);
   const cp=$('ccCopy'); if(cp) cp.onclick=async()=>{ const l=cashierLink(t); try{ await navigator.clipboard.writeText(l); toast('Link copied'); }catch(_){ prompt('Copy this link:',l); } };
@@ -3767,6 +3768,47 @@ async function downloadBidSheet(t){
   doc.setProperties({title:`${t.name} — Calcutta Bidder Sheet`,subject:'Players Auction',creator:'MGA Hub'});
   doc.save(`${(t.name||'Tournament').replace(/[^\w]+/g,'-')}-Calcutta-Bidder-Sheet.pdf`);
 }
+
+/* ============ Teams in the field that aren't in the Calcutta yet ============ */
+function fieldTeamsMissing(t){
+  const c=calc(t), byTeam=new Map();
+  for(const p of t.field||[]){ if(!p.memberId) continue; const a=byTeam.get(p.team)||[]; a.push(p); byTeam.set(p.team,a); }
+  const have=new Set(), haveNames=new Set();
+  c.lots.forEach(l=>{ [l.m1,l.m2].filter(Boolean).forEach(id=>have.add(id)); [l.p1,l.p2].forEach(n=>haveNames.add(nameKey(n))); });
+  const out=[];
+  for(const [team,ps] of byTeam){ if(ps.length<1) continue;
+    const ms=ps.map(p=>memberById(p.memberId)).filter(Boolean); if(!ms.length) continue;
+    if(ms.some(m=>have.has(m.id)||haveNames.has(nameKey(memberName(m))))) continue;      // already a lot
+    const idx=ms.map(m=>typeof parseIndex==='function'?parseIndex(m.hcp):null);
+    out.push({team,members:ms,names:ms.map(m=>tidyName(memberName(m))),i:idx,idx:idx.every(v=>v!=null)?Math.round(idx.reduce((a,v)=>a+v,0)*10)/10:null}); }
+  return out.sort((a,b)=>a.team-b.team);
+}
+/* suggest a flight from where the team index falls among the existing flights */
+function suggestFlight(c,idx){
+  const F=new Map(); c.lots.forEach(l=>{ if(l.idx==null||l.idx==='') return; const f=String(l.flight); const r=F.get(f)||[Infinity,-Infinity]; r[0]=Math.min(r[0],+l.idx); r[1]=Math.max(r[1],+l.idx); F.set(f,r); });
+  if(idx==null||!F.size) return [...F.keys()][0]||'';
+  let best='',d=Infinity; for(const [f,[lo,hi]] of F){ const dist=idx<lo?lo-idx:idx>hi?idx-hi:0; if(dist<d){ d=dist; best=f; } } return best; }
+function addFieldTeams(t){
+  const c=calc(t), miss=fieldTeamsMissing(t);
+  if(!miss.length){ toast('Every team in the field is already in the Calcutta'); return; }
+  const flights=[...new Set(c.lots.map(l=>String(l.flight)))].sort((a,b)=>a.localeCompare(b,undefined,{numeric:true}));
+  const next=c.lots.reduce((a,l)=>Math.max(a,+l.lot||0),0)+1;
+  openDrawer({kicker:t.name+' · Calcutta',title:`Add ${miss.length===1?'a team':miss.length+' teams'} from the field`,saveLabel:miss.length===1?'Add to the Calcutta':`Add ${miss.length} teams`,
+    body:`<p style="margin:0">${miss.length===1?'This team is':'These teams are'} in the tournament field but not in the Calcutta. Pick a flight and a lot number for each; the pool moves to the next number automatically.</p>
+      ${miss.map((m,k)=>{ const sug=suggestFlight(c,m.idx); return `<div class="card pad" style="display:flex;flex-direction:column;gap:10px">
+        <label class="check" style="font-size:15px"><input type="checkbox" id="afOn${k}" checked> <b>${esc(m.names.join(' & '))}</b> <span class="muted">· Team ${esc(m.team)}${m.idx!=null?` · team index ${idxTxt2(m.idx)}`:''}</span></label>
+        ${pair(field('Flight','afF'+k,sug,{type:'select',options:flights.map(f=>[f,flightName(f)]),hint:m.idx!=null&&sug?`Suggested from the team index (${idxTxt2(m.idx)}).`:''}),field('Lot number','afL'+k,next+k,{type:'number',hint:'Defaults to the end of the order. A number already in use moves that lot and the ones after it down one.'}))}</div>`; }).join('')}`,
+    save:()=>{ let added=0;
+      miss.forEach((m,k)=>{ if(!$('afOn'+k).checked) return;
+        const lot=Math.max(1,parseInt(fv('afL'+k),10)||next+k), flight=fv('afF'+k);
+        if(c.lots.some(l=>+l.lot===lot)) c.lots.forEach(l=>{ if(+l.lot>=lot) l.lot=+l.lot+1; });   // make room
+        c.lots.push({id:uid(),lot,p1:m.names[0],p2:m.names[1]||'',i1:m.i[0],i2:m.i[1]??null,idx:m.idx,flight,fun:false,bidderId:'',price:0,m1:m.members[0].id,m2:(m.members[1]||{}).id||''});
+        added++; });
+      if(!added){ toast('Nothing selected'); return false; }
+      c.lots.sort((a,b)=>a.lot-b.lot); toast(`${added} team${added===1?'':'s'} added to the Calcutta`); }});
+}
+function missingTeamsBanner(t){ const n=fieldTeamsMissing(t).length; if(!n) return '';
+  return `<div class="banner" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap"><span style="flex:1 1 260px"><b>${n} team${n===1?'':'s'} in the field ${n===1?'isn’t':'aren’t'} in the Calcutta yet.</b> ${esc(fieldTeamsMissing(t).map(m=>m.names.join(' & ')).join('; '))}</span><button class="btn sm pri" id="ccAddF">Add to the Calcutta</button></div>`; }
 
 /* =====================================================================
    Checklist — per tournament. t.checklist = { sections:[{id,title,sub}], tasks:[{id,section,group,
@@ -4063,7 +4105,7 @@ function retireLegacy(){
 /* Keeps every open device on the latest version: checks version.json about once a minute and, when a
    newer build is live, reloads at a safe moment (nothing unsaved, no editor open, not mid-typing). */
 (function(){
-  const ME='20261002163227'; let ready=false, lastCheck=0;
+  const ME='20261002185546'; let ready=false, lastCheck=0;
   const typing=()=>{ const a=document.activeElement; return a&&/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)&&a.value&&a.type!=='search'; };
   const safe=()=>!typing()&&(typeof window.__canReload!=='function'||window.__canReload());
   async function check(){ lastCheck=Date.now(); if(location.protocol==='file:') return;

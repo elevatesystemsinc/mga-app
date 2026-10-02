@@ -114,6 +114,9 @@ each have a search box: names, paddle numbers (101 or #101), lot numbers, flight
 - **Upload team sheet:** the auction-order spreadsheet (Lot, Team, Flight, Team index…) or the team
   sheet (Player 1, Player 2, Flight…). Buyers and prices already filled in come across. Re-uploading
   keeps every recorded sale (teams are matched by their players).
+- **Teams added to the field later:** the Lots sub-tab shows a notice when the field has teams the Calcutta
+  doesn't; **Add to the Calcutta** (also on Setup) adds them with a suggested flight (from the team index) and
+  the next lot number — or a lot number of your choice, moving later lots down one. The pool renumbers itself.
 - **Bidders:** add one at a time (member or guest) or **Number the players** to give everyone in the
   field a bidder number (last-name order, choose the starting number). Each bidder shows what they
   bought, what they owe, and paid / paid-by.
