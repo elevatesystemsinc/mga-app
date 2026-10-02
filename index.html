@@ -3671,44 +3671,85 @@ function printBidSheet(t){
     body:`<p style="margin:0">A packet for bettors: the full auction order, then one page per flight with room to write who bought each team and what it sold for, and a flight total.</p>
       <label class="check"><input type="radio" name="bsF" id="bsBlank" checked> Blank — for bettors to fill in</label>
       <label class="check"><input type="radio" name="bsF" id="bsFill"> Fill in sales recorded so far</label>
-      <label class="check"><input type="checkbox" id="bsPre" checked> List pre-bought teams (marked “not auctioned”)</label>`,
+      <label class="check"><input type="checkbox" id="bsPre" checked> List pre-bought teams (marked “not auctioned”)</label>
+      <p class="hint">In the print dialog choose <b>Save as PDF</b> (or your printer), paper <b>Letter</b>, margins <b>None</b>.</p>`,
     save:()=>{ const fill=$('bsFill').checked, showPre=$('bsPre').checked;
-      const pl=poolLot(c), crest=typeof crestSrc==='function'?crestSrc():new URL('crest.png',location.href).href, T2=calcTotalsC(c);
-      const buyer=l=>{ if(!fill) return ''; if(l.prebuy) return esc(captainName(l))+' (captain)'; if(l.pooled) return 'In the pool'; const b=bidderById(c,l.bidderId); return n0(l.price)>0&&b?esc(bidderLabel(b)):''; };
-      const price=l=>!fill||l.prebuy||l.pooled||!(n0(l.price)>0)?'':fmt(l.price);
-      const lots=c.lots.filter(l=>showPre||!l.prebuy);
-      const flights=T2.flights;
-      const head=(title,sub)=>`<header><img src="${crest}" alt=""><div><div class="k">${esc(t.name)} · Players Auction</div><h1>${title}</h1><div class="s">${sub}</div></div></header>`;
-      const row=l=>`<tr class="${l.prebuy?'pre':''}"><td class="n">${l.lot}</td><td class="tm"><b>${esc(teamName(l))}</b>${l.prebuy?'<span class="tag">Pre-bought — not auctioned</span>':''}</td><td class="fl">${esc(flightName(l.flight).replace('Flight ','F'))}</td><td class="w">${l.prebuy?'':buyer(l)}</td><td class="p">${l.prebuy?'—':price(l)}</td></tr>`;
-      const orderPage=`<section>${head('Auction order',`${c.lots.length} teams${T2.prebuy?` · ${T2.prebuy} pre-bought`:''}${c.minBid?` · minimum bid ${fmt(c.minBid)} — teams under it go into the pool`:''}`)}
-        <table><thead><tr><th class="n">Lot</th><th>Team</th><th class="fl">Flight</th><th class="w">Bought by</th><th class="p">Price</th></tr></thead><tbody>${lots.map(row).join('')}
-        ${pl||c.minBid?`<tr class="pool"><td class="n">${pl?pl.lot:poolLotNum(c)}</td><td class="tm"><b>The Pool</b><span class="tag">Teams that don’t reach the minimum, sold together${fill&&pl?': '+esc(pl.teams.map(x=>'Lot '+x.lot).join(', ')):''}</span></td><td class="fl">—</td><td class="w">${fill&&pl&&pl.price>0?esc(bidderLabel(bidderById(c,pl.bidderId))):''}</td><td class="p">${fill&&pl&&pl.price>0?fmt(pl.price):''}</td></tr>`:''}</tbody></table></section>`;
-      const flightPages=flights.map(f=>{ const ls=lots.filter(l=>flightName(l.flight)===f); const tot=fill?T2.byF.find(x=>x.flight===f):null;
-        return `<section class="fp">${head(esc(f),`${ls.length} teams · write in the buyer and price as each team sells`)}
-          <table class="big"><thead><tr><th class="n">Lot</th><th>Team</th><th class="w">Bought by</th><th class="p">Price</th></tr></thead><tbody>
-          ${ls.map(l=>`<tr class="${l.prebuy?'pre':''}"><td class="n">${l.lot}</td><td class="tm"><b>${esc(teamName(l))}</b>${l.prebuy?'<span class="tag">Pre-bought — not auctioned</span>':''}</td><td class="w">${l.prebuy?'':buyer(l)}</td><td class="p">${l.prebuy?'—':price(l)}</td></tr>`).join('')}
-          <tr class="extra"><td class="n"></td><td class="tm"><span class="tag">Pool teams from this flight / notes</span></td><td class="w"></td><td class="p"></td></tr>
-          </tbody></table>
-          <div class="total"><span>${esc(f)} total</span><b>${tot?fmt(tot.auction+tot.fromPool):''}</b></div></section>`; }).join('');
-      const html=`<!doctype html><html><head><meta charset="utf-8"><title>${esc(t.name)} · Calcutta bidder sheet</title><style>
-        @page{size:letter;margin:.45in .5in} *{box-sizing:border-box} body{margin:0;font-family:'Public Sans',Arial,sans-serif;color:#14222B;font-size:9.5pt;font-variant-numeric:lining-nums tabular-nums}
-        section{break-after:page} section:last-child{break-after:auto}
-        header{display:flex;align-items:center;gap:14px;padding:0 0 8px;margin-bottom:8px;border-bottom:3px solid #C7A13A}
-        header img{width:54px;height:auto} .k{font-size:7.5pt;font-weight:800;letter-spacing:.18em;text-transform:uppercase;color:#7E5F1A}
-        h1{font-family:Georgia,'Cormorant Garamond',serif;font-size:22pt;margin:2px 0 0;color:#0F2A38;line-height:1} .s{font-size:9pt;color:#56626A;margin-top:3px}
-        table{width:100%;border-collapse:collapse} thead{display:table-header-group} tr{break-inside:avoid}
-        th{background:#0F2A38;color:#fff;font-size:7.5pt;letter-spacing:.08em;text-transform:uppercase;text-align:left;padding:5px 8px}
-        td{border-bottom:1px solid #D9D2C0;padding:0 8px;height:.238in;vertical-align:middle}
-        .big td{height:.42in} .n{width:.45in;text-align:center;font-weight:800} .fl{width:.55in;text-align:center;color:#56626A}
-        .w{width:2.2in;border-left:1px solid #D9D2C0} .p{width:1in;border-left:1px solid #D9D2C0;text-align:right;font-weight:700}
-        .tm b{font-weight:600} .tag{display:block;font-size:7.5pt;color:#7E5F1A;font-weight:700;letter-spacing:.04em}
-        tr.pre td{background:#F4F0E6;color:#56626A} tr.pool td{background:#F6ECCF} tr.extra td{height:.6in}
-        th.w,th.p{border-left:1px solid #2E4D5E}
-        .total{display:flex;justify-content:flex-end;align-items:center;gap:14px;margin-top:14px}
-        .total span{font-size:9pt;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:#7E5F1A}
-        .total b{display:inline-block;min-width:1.6in;height:.45in;border:2px solid #0F2A38;border-radius:6px;text-align:right;padding:8px 10px;font-size:14pt}
-      </style></head><body>${orderPage}${flightPages}<script>window.onload=()=>setTimeout(()=>print(),400)<\/script></body></html>`;
+      const html=bidSheetHTML(t,{fill,showPre});
       const w=window.open(URL.createObjectURL(new Blob([html],{type:'text/html'})),'_blank'); if(!w){ toast('Allow pop-ups to print'); return false; } }});
+}
+/* the bidder sheet as fixed letter pages, styled like the rest of the tournament print pieces */
+function bidSheetHTML(t,opt){
+  const c=calc(t), fill=!!opt.fill, showPre=opt.showPre!==false;
+  const pl=poolLot(c), crest=typeof crestSrc==='function'?crestSrc():new URL('crest.png',location.href).href, T2=calcTotalsC(c);
+  const lots=c.lots.filter(l=>showPre||!l.prebuy);
+  const buyer=l=>{ if(!fill) return ''; if(l.pooled) return '<span class="soft">In the pool</span>'; const b=bidderById(c,l.bidderId); return n0(l.price)>0&&b?esc(bidderLabel(b)):''; };
+  const price=l=>!fill||l.pooled||!(n0(l.price)>0)?'':fmt(l.price);
+  const yr=String(t.season||'').trim()||(t.startDate||'').slice(0,4)||'';
+  const tname=esc(t.name||'Tournament');
+  const band=(kicker,title,sub,compact)=>`<div class="band${compact?' sm':''}"><img src="${crest}" alt=""><div class="bt"><div class="k">${kicker}</div><h1>${title}</h1>${sub?`<div class="s">${sub}</div>`:''}</div></div>`;
+  const preTag='', preBox=l=>`<span class="tag">Pre-bought</span><span class="cap">captain ${esc(captainName(l))}</span>`;
+  const orderRow=l=>`<tr class="${l.prebuy?'pre':''}"><td class="n">${l.lot}</td><td class="tm">${esc(teamName(l))}${l.prebuy?preTag:''}</td><td class="fl">${esc(flightName(l.flight).replace('Flight ',''))}</td><td class="w">${l.prebuy?preBox(l):buyer(l)}</td><td class="p">${l.prebuy?'<span class="soft">—</span>':price(l)}</td></tr>`;
+  const poolRow=(pl||c.minBid)?`<tr class="pool"><td class="n">${pl?pl.lot:poolLotNum(c)}</td><td class="tm">The Pool<span class="tag">Teams under the ${fmt(c.minBid)} minimum, sold together${fill&&pl?' · '+esc(pl.teams.map(x=>'Lot '+x.lot).join(', ')):''}</span></td><td class="fl">—</td><td class="w">${fill&&pl&&pl.price>0?esc(bidderLabel(bidderById(c,pl.bidderId))):''}</td><td class="p">${fill&&pl&&pl.price>0?fmt(pl.price):''}</td></tr>`:'';
+  // split the order evenly over as few pages as fit (about 36 rows on the first page, 40 after)
+  const rowsAll=lots.map(orderRow).concat(poolRow?[poolRow]:[]);
+  const nOrder=rowsAll.length<=36?1:1+Math.ceil((rowsAll.length-36)/40);
+  const per=Math.ceil(rowsAll.length/nOrder), chunks=[]; for(let k=0;k<nOrder;k++) chunks.push(rowsAll.slice(k*per,(k+1)*per));
+  const thead='<thead><tr><th class="n">Lot</th><th>Team</th><th class="fl">Flight</th><th class="w">Bought by</th><th class="p">Price</th></tr></thead>';
+  const pages=[];
+  chunks.forEach((rows,k)=>pages.push(`${k===0?band(`${tname}${yr?' · '+yr:''} · Players Auction`,'Auction Order',`${c.lots.length} teams in auction order${T2.prebuy?` · ${T2.prebuy} pre-bought`:''}${c.minBid?` · minimum bid ${fmt(c.minBid)}`:''}`):band(`${tname} · Players Auction`,'Auction Order <span class="cont">continued</span>','',true)}
+    <div class="card"><table class="ord">${thead}<tbody>${rows.join('')}</tbody></table></div>`));
+  T2.flights.forEach(f=>{ const ls=lots.filter(l=>flightName(l.flight)===f), tot=fill?T2.byF.find(x=>x.flight===f):null;
+    pages.push(`${band(`${tname} · Players Auction`,esc(f),`${ls.length} team${ls.length===1?'':'s'} · write in the buyer and price as each team sells`)}
+      <div class="card"><table class="fl-t"><thead><tr><th class="n">Lot</th><th>Team</th><th class="w">Bought by</th><th class="p">Price</th></tr></thead><tbody>
+      ${ls.map(l=>`<tr class="${l.prebuy?'pre':''}"><td class="n">${l.lot}</td><td class="tm">${esc(teamName(l))}${l.prebuy?preTag:''}</td><td class="w">${l.prebuy?preBox(l):buyer(l)}</td><td class="p">${l.prebuy?'<span class="soft">—</span>':price(l)}</td></tr>`).join('')}
+      <tr class="note"><td class="n"></td><td class="tm"><span class="tag">Pool teams from this flight · notes</span></td><td class="w"></td><td class="p"></td></tr>
+      </tbody></table></div>
+      <div class="total"><div><span class="tl">${esc(f)} total</span><span class="ts">Auction prices for this flight’s teams</span></div><div class="tb">${tot&&(tot.auction+tot.fromPool)>0?fmt(tot.auction+tot.fromPool):''}</div></div>`); });
+  const N=pages.length;
+  const doc=pages.map((p,k)=>`<section class="page">${p}<div class="foot"><span>${tname}${yr?' '+yr:''} · Calcutta bidder sheet</span><span>Page ${k+1} of ${N}</span></div></section>`).join('');
+  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>${tname} · Calcutta Bidder Sheet</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,600;0,700;1,700&family=Public+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+@page{size:8.5in 11in;margin:0}
+:root{--navy:#0F2A38;--gold:#C7A13A;--goldl:#D8B75F;--golddk:#7E5F1A;--ivory:#FBFAF5;--line:#E1D9C6;--ink:#14222B;--muted:#56626A}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{-webkit-print-color-adjust:exact;print-color-adjust:exact;background:#8B95A0}
+body{font-family:'Public Sans',Arial,sans-serif;color:var(--ink);font-size:9.6pt;line-height:1.3;font-variant-numeric:lining-nums tabular-nums}
+.page{width:8.5in;height:11in;margin:0 auto;background:var(--ivory);position:relative;overflow:hidden;padding:.45in .5in .7in;display:flex;flex-direction:column;gap:.16in;break-after:page;page-break-after:always}
+.page:last-child{break-after:auto;page-break-after:auto}
+@media screen{ .page{margin:.25in auto;box-shadow:0 8px 30px rgba(0,0,0,.25)} }
+.band{display:flex;align-items:center;gap:.2in;background:radial-gradient(circle at 12% 40%,#1B3D50,var(--navy) 65%);color:#fff;border-radius:10px;padding:.16in .22in;border-bottom:4px solid var(--gold)}
+.band img{width:.72in;height:auto;filter:drop-shadow(0 4px 10px rgba(0,0,0,.35))}
+.band .k{font-size:7pt;font-weight:800;letter-spacing:.2em;text-transform:uppercase;color:var(--goldl)}
+.band h1{font-family:'Cormorant Garamond',Georgia,serif;font-weight:700;font-size:25pt;line-height:1;margin-top:3px}
+.band h1 .cont{font-family:'Public Sans',sans-serif;font-size:9pt;font-weight:600;color:#C9CFD2;letter-spacing:.04em;margin-left:6px}
+.band .s{font-size:8.6pt;color:#D6DADC;margin-top:4px}
+.band.sm{padding:.1in .2in} .band.sm img{width:.46in} .band.sm h1{font-size:17pt}
+.card{background:#fff;border:1px solid var(--line);border-radius:10px;overflow:hidden}
+table{width:100%;border-collapse:collapse}
+th{background:var(--navy);color:#fff;font-size:7pt;font-weight:800;letter-spacing:.12em;text-transform:uppercase;text-align:left;padding:6px 10px}
+td{border-top:1px solid var(--line);padding:0 10px;vertical-align:middle}
+tbody tr:first-child td{border-top:none}
+.ord td{height:.215in;font-size:9pt;white-space:nowrap} .ord td.tm{max-width:0;overflow:hidden;text-overflow:ellipsis} .fl-t td{height:.43in;font-size:10.5pt}
+td.n,th.n{width:.5in;text-align:center} td.n{font-weight:800;color:var(--navy)}
+td.fl,th.fl{width:.55in;text-align:center} td.fl{color:var(--muted);font-weight:600}
+td.w,th.w{width:2.35in;border-left:1px solid var(--line)} td.p,th.p{width:1.05in;border-left:1px solid var(--line);text-align:right} td.p{font-weight:700}
+th.w,th.p{border-left-color:#2E4D5E} th.p{text-align:right}
+td.tm{font-weight:600}
+.tag{display:inline-block;font-size:6.4pt;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--golddk);background:#F6ECCF;border:1px solid #E5CF8E;border-radius:999px;padding:0 6px;vertical-align:1px;line-height:1.5}
+.cap{font-size:7.6pt;color:var(--muted);margin-left:6px} td.tm .tag{margin-left:8px}
+.fl-t .tag{font-size:6.8pt} tr.note .tag{background:none;border:none;margin-left:0;padding:0}
+tr.pre td{background:#F4F0E6;color:var(--muted)} tr.pre td.n{color:var(--muted)}
+tr.pool td{background:#F6ECCF} tr.pool .tag{background:#fff} tr.note td{height:.7in;vertical-align:top;padding-top:8px}
+.soft{color:#8B95A0;font-weight:500}
+.total{display:flex;justify-content:flex-end;align-items:center;gap:.18in;margin-top:auto}
+.total .tl{display:block;font-size:8pt;font-weight:800;letter-spacing:.16em;text-transform:uppercase;color:var(--golddk);text-align:right}
+.total .ts{display:block;font-size:7.6pt;color:var(--muted);text-align:right;margin-top:2px}
+.total .tb{width:2in;height:.6in;border:2px solid var(--navy);border-radius:8px;background:#fff;display:flex;align-items:center;justify-content:flex-end;padding:0 .14in;font-family:'Cormorant Garamond',Georgia,serif;font-size:20pt;font-weight:700;color:var(--navy)}
+.foot{position:absolute;left:.5in;right:.5in;bottom:.32in;display:flex;justify-content:space-between;font-size:7pt;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:#8B95A0;border-top:1px solid var(--line);padding-top:6px}
+</style></head><body>${doc}
+<script>(document.fonts&&document.fonts.ready?document.fonts.ready:Promise.resolve()).then(()=>setTimeout(()=>print(),250));<\/script></body></html>`;
 }
 
 /* =====================================================================
@@ -3894,7 +3935,7 @@ function retireLegacy(){
 /* Keeps every open device on the latest version: checks version.json about once a minute and, when a
    newer build is live, reloads at a safe moment (nothing unsaved, no editor open, not mid-typing). */
 (function(){
-  const ME='20261002133842'; let ready=false, lastCheck=0;
+  const ME='20261002134907'; let ready=false, lastCheck=0;
   const typing=()=>{ const a=document.activeElement; return a&&/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)&&a.value&&a.type!=='search'; };
   const safe=()=>!typing()&&(typeof window.__canReload!=='function'||window.__canReload());
   async function check(){ lastCheck=Date.now(); if(location.protocol==='file:') return;
