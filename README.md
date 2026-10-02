@@ -131,6 +131,9 @@ each have a search box: names, paddle numbers (101 or #101), lot numbers, flight
 - **Expenses** (e.g. the auction dinner) come out of the pot **evenly across every flight**.
 - **By flight:** teams sold, gross, expense share, net pot, and the payout by place from each
   flight's net (40/30/20/10 by default, editable, any number of places).
+- **Download order (Excel)** and **Print bidder sheet (PDF)** (Lots sub-tab): the auction order as a
+  spreadsheet, and a packet for bettors — the full order, then a page per flight with room to write the buyer
+  and price for every team and a flight total. Print it blank, or pre-filled with the sales recorded so far.
 - **Export results:** a workbook with Lots, Bidders (what each owes), By flight and Expenses.
 - **Payments:** totals by Cash, Zelle, Credit card and Check, what's still owed, and a **cash drawer**
   check — starting cash + cash payments = what should be in the drawer; enter the count to see over/short.

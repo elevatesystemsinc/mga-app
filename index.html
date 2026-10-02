@@ -3462,6 +3462,7 @@ function tCalcutta(el,t){
   ${(()=>{ const n=(k,l,x)=>`<button class="${view.ccTab===k?'on':''}" data-cctab="${k}">${l}${x!=null&&x!==''?` <span class="cnt">${x}</span>`:''}</button>`;
     return `<div class="subtabs" role="tablist">${n('lots','Lots',c.lots.length)}${n('bidders','Bidders',c.bidders.length)}${n('buyers','Buyers &amp; shares',calcHoldings(c).length)}${n('money','Money','')}${n('setup','Setup','')}</div>`; })()}
   <div class="cc-pane" data-pane="lots"${view.ccTab!=='lots'?' hidden':''}>
+  <div class="actions" style="justify-content:flex-end"><button class="btn" id="ccOrd">${I.down}Download order (Excel)</button><button class="btn" id="ccSheet">Print bidder sheet (PDF)</button></div>
   <div class="card cc-card cc-lots" style="overflow:hidden"><div class="cardhead"><div><h2 class="h2">Lots</h2><span class="muted">Click a lot to record or change a sale</span></div>
     <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;justify-content:flex-end">${searchBox('ccLQ',view.ccLQ,'Find a lot, player or paddle #')}<div class="seg">${[['all','All'],['open','Unsold']].concat(poolTeams(c).length?[['pool','Pool']]:[]).concat(buyInOf(c).on?[['prebuy','Pre-bought'],['due','Team payment due']]:[]).concat(T2.flights.map(f=>[f,f.replace('Flight ','F')])).map(([k,l])=>`<button class="${view.cclot===k?'on':''}" data-ccf="${esc(k)}">${esc(l)}</button>`).join('')}</div></div></div>
     <div class="tw"><div class="t" style="min-width:760px"><div class="tr th" style="${lcols}"><span>Lot</span><span>Team</span><span>Flight</span><span class="r">Index</span><span>Bought by</span><span class="r">Price</span><span></span></div>
@@ -3506,7 +3507,7 @@ function tCalcutta(el,t){
   </div>
 `;
   el.querySelectorAll('[data-cctab]').forEach(b=>b.onclick=()=>{ view.ccTab=b.dataset.cctab; el.querySelectorAll('.cc-pane').forEach(p=>p.hidden=p.dataset.pane!==view.ccTab); el.querySelectorAll('[data-cctab]').forEach(x=>x.classList.toggle('on',x===b)); });
-  $('ccRun').onclick=()=>runAuction(t); $('ccImp').onclick=()=>importCalcutta(t); $('ccExp').onclick=()=>exportCalcutta(t);
+  $('ccRun').onclick=()=>runAuction(t); const co=$('ccOrd'); if(co) co.onclick=()=>exportOrder(t); const cs=$('ccSheet'); if(cs) cs.onclick=()=>printBidSheet(t); $('ccImp').onclick=()=>importCalcutta(t); $('ccExp').onclick=()=>exportCalcutta(t);
   $('ccPay').onclick=()=>editPayout(t); $('ccCash').onclick=()=>editCash(t);
   const sh=$('ccShare'); if(sh) sh.onclick=()=>startCashierLink(t);
   const cp=$('ccCopy'); if(cp) cp.onclick=async()=>{ const l=cashierLink(t); try{ await navigator.clipboard.writeText(l); toast('Link copied'); }catch(_){ prompt('Copy this link:',l); } };
@@ -3652,6 +3653,62 @@ function holdingsCard(t){
   return `<div class="card cc-card" style="overflow:hidden"><div class="cardhead"><div><h2 class="h2">Buyers &amp; shares</h2><span class="muted">Everyone who owns part of a team — the people to pay out. Captains own their team’s share with or without a paddle.${flagged?` <span class="neg">${flagged} team${flagged===1?'':'s'} need a captain check.</span>`:''}</span></div>${searchBox('ccHq',view.ccH,'Find a buyer or paddle #')}</div>
     <div style="max-height:460px;overflow:auto">${rows.map(h=>`<div class="tr" style="grid-template-columns:70px minmax(0,1fr) minmax(0,2fr);align-items:start"><b class="num">${h.num?'#'+esc(h.num):'<span class="muted" style="font-weight:500;font-size:12px">no paddle</span>'}</b><b class="trunc">${esc(h.name)}</b>
       <span style="display:flex;flex-wrap:wrap;gap:6px">${h.stakes.map(s=>`<span class="chip ${s.kind==='prebuy'?'ok':s.kind==='team'?'':'gold'}" title="${esc(teamName(s.lot))}">Lot ${s.lot.lot} · ${s.pct}%${s.kind==='prebuy'?' · pre-bought':s.kind==='team'?' · own team':s.kind==='pool'?' · pool':''}</span>`).join('')}</span></div>`).join('')||'<div class="tr"><span class="muted">No one matches.</span></div>'}</div></div>`;
+}
+
+/* ============ Auction order export + printable bidder sheets ============ */
+async function exportOrder(t){
+  const c=calc(t); try{ await loadXLSX(); }catch(e){ toast(e.message); return; }
+  const pl=poolLot(c), cap=l=>captainName(l);
+  const rows=[['Lot','Team','Player 1','Player 2','Flight','Team index','Captain','Status']].concat(c.lots.map(l=>[l.lot,teamName(l),l.p1,l.p2,flightName(l.flight),l.idx??'',cap(l),l.prebuy?'Pre-bought — not auctioned':l.pooled?`In the pool (Lot ${pl.lot})`:'']));
+  if(pl) rows.push([pl.lot,`The Pool — ${pl.teams.map(teamName).join('; ')}`,'','','Mixed','','','Pool']);
+  const ws=XLSX.utils.aoa_to_sheet(rows); ws['!cols']=[{wch:5},{wch:38},{wch:20},{wch:20},{wch:9},{wch:10},{wch:20},{wch:26}];
+  const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,'Auction order');
+  XLSX.writeFile(wb,`${(t.name||'Tournament').replace(/[^\w]+/g,'-')}-Calcutta-Order.xlsx`);
+}
+function printBidSheet(t){
+  const c=calc(t);
+  openDrawer({kicker:t.name+' · Calcutta',title:'Print bidder sheet',saveLabel:'Open print preview',
+    body:`<p style="margin:0">A packet for bettors: the full auction order, then one page per flight with room to write who bought each team and what it sold for, and a flight total.</p>
+      <label class="check"><input type="radio" name="bsF" id="bsBlank" checked> Blank — for bettors to fill in</label>
+      <label class="check"><input type="radio" name="bsF" id="bsFill"> Fill in sales recorded so far</label>
+      <label class="check"><input type="checkbox" id="bsPre" checked> List pre-bought teams (marked “not auctioned”)</label>`,
+    save:()=>{ const fill=$('bsFill').checked, showPre=$('bsPre').checked;
+      const pl=poolLot(c), crest=typeof crestSrc==='function'?crestSrc():new URL('crest.png',location.href).href, T2=calcTotalsC(c);
+      const buyer=l=>{ if(!fill) return ''; if(l.prebuy) return esc(captainName(l))+' (captain)'; if(l.pooled) return 'In the pool'; const b=bidderById(c,l.bidderId); return n0(l.price)>0&&b?esc(bidderLabel(b)):''; };
+      const price=l=>!fill||l.prebuy||l.pooled||!(n0(l.price)>0)?'':fmt(l.price);
+      const lots=c.lots.filter(l=>showPre||!l.prebuy);
+      const flights=T2.flights;
+      const head=(title,sub)=>`<header><img src="${crest}" alt=""><div><div class="k">${esc(t.name)} · Players Auction</div><h1>${title}</h1><div class="s">${sub}</div></div></header>`;
+      const row=l=>`<tr class="${l.prebuy?'pre':''}"><td class="n">${l.lot}</td><td class="tm"><b>${esc(teamName(l))}</b>${l.prebuy?'<span class="tag">Pre-bought — not auctioned</span>':''}</td><td class="fl">${esc(flightName(l.flight).replace('Flight ','F'))}</td><td class="w">${l.prebuy?'':buyer(l)}</td><td class="p">${l.prebuy?'—':price(l)}</td></tr>`;
+      const orderPage=`<section>${head('Auction order',`${c.lots.length} teams${T2.prebuy?` · ${T2.prebuy} pre-bought`:''}${c.minBid?` · minimum bid ${fmt(c.minBid)} — teams under it go into the pool`:''}`)}
+        <table><thead><tr><th class="n">Lot</th><th>Team</th><th class="fl">Flight</th><th class="w">Bought by</th><th class="p">Price</th></tr></thead><tbody>${lots.map(row).join('')}
+        ${pl||c.minBid?`<tr class="pool"><td class="n">${pl?pl.lot:poolLotNum(c)}</td><td class="tm"><b>The Pool</b><span class="tag">Teams that don’t reach the minimum, sold together${fill&&pl?': '+esc(pl.teams.map(x=>'Lot '+x.lot).join(', ')):''}</span></td><td class="fl">—</td><td class="w">${fill&&pl&&pl.price>0?esc(bidderLabel(bidderById(c,pl.bidderId))):''}</td><td class="p">${fill&&pl&&pl.price>0?fmt(pl.price):''}</td></tr>`:''}</tbody></table></section>`;
+      const flightPages=flights.map(f=>{ const ls=lots.filter(l=>flightName(l.flight)===f); const tot=fill?T2.byF.find(x=>x.flight===f):null;
+        return `<section class="fp">${head(esc(f),`${ls.length} teams · write in the buyer and price as each team sells`)}
+          <table class="big"><thead><tr><th class="n">Lot</th><th>Team</th><th class="w">Bought by</th><th class="p">Price</th></tr></thead><tbody>
+          ${ls.map(l=>`<tr class="${l.prebuy?'pre':''}"><td class="n">${l.lot}</td><td class="tm"><b>${esc(teamName(l))}</b>${l.prebuy?'<span class="tag">Pre-bought — not auctioned</span>':''}</td><td class="w">${l.prebuy?'':buyer(l)}</td><td class="p">${l.prebuy?'—':price(l)}</td></tr>`).join('')}
+          <tr class="extra"><td class="n"></td><td class="tm"><span class="tag">Pool teams from this flight / notes</span></td><td class="w"></td><td class="p"></td></tr>
+          </tbody></table>
+          <div class="total"><span>${esc(f)} total</span><b>${tot?fmt(tot.auction+tot.fromPool):''}</b></div></section>`; }).join('');
+      const html=`<!doctype html><html><head><meta charset="utf-8"><title>${esc(t.name)} · Calcutta bidder sheet</title><style>
+        @page{size:letter;margin:.45in .5in} *{box-sizing:border-box} body{margin:0;font-family:'Public Sans',Arial,sans-serif;color:#14222B;font-size:9.5pt;font-variant-numeric:lining-nums tabular-nums}
+        section{break-after:page} section:last-child{break-after:auto}
+        header{display:flex;align-items:center;gap:14px;padding:0 0 8px;margin-bottom:8px;border-bottom:3px solid #C7A13A}
+        header img{width:54px;height:auto} .k{font-size:7.5pt;font-weight:800;letter-spacing:.18em;text-transform:uppercase;color:#7E5F1A}
+        h1{font-family:Georgia,'Cormorant Garamond',serif;font-size:22pt;margin:2px 0 0;color:#0F2A38;line-height:1} .s{font-size:9pt;color:#56626A;margin-top:3px}
+        table{width:100%;border-collapse:collapse} thead{display:table-header-group} tr{break-inside:avoid}
+        th{background:#0F2A38;color:#fff;font-size:7.5pt;letter-spacing:.08em;text-transform:uppercase;text-align:left;padding:5px 8px}
+        td{border-bottom:1px solid #D9D2C0;padding:0 8px;height:.238in;vertical-align:middle}
+        .big td{height:.42in} .n{width:.45in;text-align:center;font-weight:800} .fl{width:.55in;text-align:center;color:#56626A}
+        .w{width:2.2in;border-left:1px solid #D9D2C0} .p{width:1in;border-left:1px solid #D9D2C0;text-align:right;font-weight:700}
+        .tm b{font-weight:600} .tag{display:block;font-size:7.5pt;color:#7E5F1A;font-weight:700;letter-spacing:.04em}
+        tr.pre td{background:#F4F0E6;color:#56626A} tr.pool td{background:#F6ECCF} tr.extra td{height:.6in}
+        th.w,th.p{border-left:1px solid #2E4D5E}
+        .total{display:flex;justify-content:flex-end;align-items:center;gap:14px;margin-top:14px}
+        .total span{font-size:9pt;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:#7E5F1A}
+        .total b{display:inline-block;min-width:1.6in;height:.45in;border:2px solid #0F2A38;border-radius:6px;text-align:right;padding:8px 10px;font-size:14pt}
+      </style></head><body>${orderPage}${flightPages}<script>window.onload=()=>setTimeout(()=>print(),400)<\/script></body></html>`;
+      const w=window.open(URL.createObjectURL(new Blob([html],{type:'text/html'})),'_blank'); if(!w){ toast('Allow pop-ups to print'); return false; } }});
 }
 
 /* =====================================================================
@@ -3837,7 +3894,7 @@ function retireLegacy(){
 /* Keeps every open device on the latest version: checks version.json about once a minute and, when a
    newer build is live, reloads at a safe moment (nothing unsaved, no editor open, not mid-typing). */
 (function(){
-  const ME='20261001185826'; let ready=false, lastCheck=0;
+  const ME='20261002133842'; let ready=false, lastCheck=0;
   const typing=()=>{ const a=document.activeElement; return a&&/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)&&a.value&&a.type!=='search'; };
   const safe=()=>!typing()&&(typeof window.__canReload!=='function'||window.__canReload());
   async function check(){ lastCheck=Date.now(); if(location.protocol==='file:') return;
