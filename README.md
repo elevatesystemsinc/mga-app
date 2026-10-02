@@ -85,6 +85,16 @@ nothing you're editing is lost. Edits made while a save is still uploading go up
 records and the background sync checks never write anything, so nobody else's screen updates unless
 something actually changed. No setup needed.
 
+## Check-in
+
+Each tournament has a **Check-in** tab (next to Field) listing every player in the field, alphabetical by last
+name with letter dividers. Search a name (own name first; partners only if no one matches) or a team number;
+filter Not yet / Checked in / Par 3. **Check in** marks the time; tap again to undo. Counts show checked in,
+still to arrive and teams complete. **Create registration link** gives the registration table a private page
+(`checkin.html`, no board password) with the same list and big buttons — several devices can check players in
+at once, it keeps working through a dropped connection, and **Turn off** ends access. Uses the same Supabase
+setup as the cashier link (`calcutta-setup.sql`).
+
 ## Checklist
 
 Each tournament has a **Checklist** tab. **Start a checklist** from the 2026 Member-Member weekend checklist
