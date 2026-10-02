@@ -130,7 +130,7 @@ each have a search box: names, paddle numbers (101 or #101), lot numbers, flight
   rest. A team can **pre-buy** the remainder at registration (default $900 more, $1,200 in all): it then
   owns 100% and is **skipped in the auction**. Buy-ins go into each team's flight pot. Three payments are kept
   separate, each with its own paid status and method: the **auction purchase** (paid by the buyer, marked on
-  the bidder), each player's share of the team **buy-in** (e.g. $150 each), and the team's **pre-buy**. Payments totals show every method split by kind.
+  the bidder), each player's share of the team **buy-in** (e.g. $150 each) and of the **pre-buy** (e.g. $450 each). Payments totals show every method split by kind.
 - **Captains and buyers:** every team's captain is the player with the lower Handicap Index (plus handicaps
   count as lower; ties or missing indexes are flagged; switch it by hand on any lot). The captain is the
   buyer of the team's own share — 100% of a pre-bought team, the buy-in share (25%) of an auctioned team —

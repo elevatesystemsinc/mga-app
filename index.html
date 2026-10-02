@@ -3026,21 +3026,25 @@ function teamDue(c,l){ const bi=buyInOf(c); if(!bi.on) return 0; return c0(bi.am
 function teamParts(c,l){ const bi=buyInOf(c); if(!bi.on) return [];
   const ps=teamPlayers(l), each=c0(bi.amount)/(ps.length||1);
   const out=ps.map((name,i)=>({kind:'buyin',label:`${name} · buy-in`,player:i,name,amount:each,pay:(l.buyInP||[])[i]||{}}));
-  if(l.prebuy) out.push({kind:'prebuy',label:'Pre-buy',amount:c0(bi.prebuyExtra),pay:l.prebuyPay||{}}); return out; }
+  if(l.prebuy){ const pe=c0(bi.prebuyExtra)/(ps.length||1); ps.forEach((name,i)=>out.push({kind:'prebuy',label:`${name} · pre-buy`,player:i,name,amount:pe,pay:(l.prebuyP||[])[i]||{}})); }
+  return out; }
 /* older data kept the whole $1,200 on the buy-in; split it once */
 const teamPlayers=l=>[l.p1,l.p2].filter(Boolean);
 /* per-player buy-in payment: set one player's, keeping the other's */
 function setBuyInPay(l,i,pay){ const n=teamPlayers(l).length||1; l.buyInP=Array.from({length:n},(_,k)=>(l.buyInP||[])[k]||{paid:false,method:''}); l.buyInP[i]={paid:!!pay.paid,method:pay.paid?(pay.method||''):''}; }
 function calcNormalize(c){ for(const l of c.lots||[]){
     if(l.buyIn&&!l.buyInP){ const n=teamPlayers(l).length||1; l.buyInP=Array.from({length:n},()=>({paid:!!l.buyIn.paid,method:l.buyIn.paid?(l.buyIn.method||''):''})); }   // older data: one team payment → each player
-    if(l.prebuy&&l.buyIn&&l.buyIn.paid&&!l.prebuyPay) l.prebuyPay={paid:true,method:l.buyIn.method||''}; } return c; }
+    if(l.prebuy&&l.buyIn&&l.buyIn.paid&&!l.prebuyPay&&!l.prebuyP) l.prebuyPay={paid:true,method:l.buyIn.method||''};
+    if(l.prebuyPay&&!l.prebuyP){ const n=teamPlayers(l).length||1; l.prebuyP=Array.from({length:n},()=>({paid:!!l.prebuyPay.paid,method:l.prebuyPay.paid?(l.prebuyPay.method||''):''})); }   // one team payment → each player
+    delete l.prebuyPay; } return c; }
+function setPrebuyPay(l,i,pay){ const n=teamPlayers(l).length||1; l.prebuyP=Array.from({length:n},(_,k)=>(l.prebuyP||[])[k]||{paid:false,method:''}); l.prebuyP[i]={paid:!!pay.paid,method:pay.paid?(pay.method||''):''}; }
 const ownership=(c,l)=>{ const bi=buyInOf(c); return l.prebuy?{team:100,buyer:0}:(bi.on?{team:c0(bi.pct),buyer:100-c0(bi.pct)}:{team:0,buyer:100}); };
 const poolTeams=c=>c.lots.filter(l=>l.pooled&&!l.prebuy);
 const poolLotNum=c=>c.lots.reduce((a,l)=>Math.max(a,+l.lot||0),0)+1;
 function poolLot(c){ const ts=poolTeams(c); return ts.length?{id:'__pool',isPool:true,lot:poolLotNum(c),count:ts.length,teams:ts,bidderId:c.pool.bidderId,price:c0(c.pool.price),flight:'Pool'}:null; }
 const auctionSeq=c=>{ const p=poolLot(c); return c.lots.filter(l=>!l.prebuy).concat(p?[p]:[]); };
 function setPooled(c,l,on){ l.pooled=!!on; if(on){ l.price=0; l.bidderId=''; l.prebuy=false; } if(!poolTeams(c).length) c.pool={bidderId:'',price:0}; }
-function setPrebuy(c,l,on){ l.prebuy=!!on; if(on){ l.price=0; l.bidderId=''; l.pooled=false; if(!l.prebuyPay) l.prebuyPay={paid:false,method:''}; } if(!poolTeams(c).length) c.pool={bidderId:'',price:0}; }
+function setPrebuy(c,l,on){ l.prebuy=!!on; if(on){ l.price=0; l.bidderId=''; l.pooled=false; if(!l.prebuyP) l.prebuyP=teamPlayers(l).map(()=>({paid:false,method:''})); } if(!poolTeams(c).length) c.pool={bidderId:'',price:0}; }
 function calcTotalsC(c){
   const flights=[...new Set(c.lots.map(l=>flightName(l.flight)))].sort((a,b)=>a.localeCompare(b,undefined,{numeric:true}));
   const exp=c.expenses.reduce((a,e)=>a+c0(e.amount),0), share=flights.length?exp/flights.length:0;
@@ -3338,7 +3342,8 @@ function editLot(t,l){
       <div class="fld" id="clAuc"><span class="lbl">Auction purchase — paid by the buyer</span><div class="mini"><div class="mr" style="grid-template-columns:minmax(0,1fr) auto"><span id="clAucTxt">${(()=>{ const bb=bidderById(c,l.bidderId); if(l.pooled) return `In the pool — paid by the pool’s buyer${c.pool&&c.pool.bidderId?' ('+esc(bidderLabel(bidderById(c,c.pool.bidderId)))+')':''}`; if(!(n0(l.price)>0)||!bb) return 'Not sold yet'; return `${esc(bidderLabel(bb))} · ${fmt(l.price)} · ${bb.paid?'<b class="pos">paid'+(bb.method?' by '+esc(bb.method):'')+'</b>':'<b class="neg">not paid</b>'}`; })()}</span><span class="muted" style="font-size:12px">marked on the bidder</span></div></div></div>
       <div class="fld"><span class="lbl">Team buy-in · ${fmt(bi.amount)} — ${fmt(n0(bi.amount)/(teamPlayers(l).length||1))} collected from each player; the team’s share (${l.prebuy?'100%':bi.pct+'%'}) pays out to the captain</span>
         <div class="mini">${teamPlayers(l).map((nm,k)=>{ const pp=(l.buyInP||[])[k]||{}; return `<div class="mr" style="grid-template-columns:minmax(0,1fr) 150px"><span class="trunc"><b>${esc(nm)}</b> <span class="muted">· ${fmt(n0(bi.amount)/(teamPlayers(l).length||1))}</span></span><select class="inp" id="clBi${k}" aria-label="${esc(nm)} buy-in payment" style="height:34px"><option value="">Not paid</option>${PAY_METHODS.map(m=>`<option${pp.paid&&pp.method===m?' selected':''}>${m}</option>`).join('')}</select></div>`; }).join('')}</div></div>
-      <div class="fld" id="clPb"><span class="lbl">Pre-buy · ${fmt(bi.prebuyExtra)} — paid by the team</span>${pair(field('Paid','clPbP',(l.prebuyPay||{}).paid?'yes':'',{type:'select',options:[['','Not yet'],['yes','Paid']]}),field('Paid by','clPbM',(l.prebuyPay||{}).method||'',{type:'select',options:[['','—']].concat(PAY_METHODS.map(m=>[m,m]))}))}</div>`:'')+
+      <div class="fld" id="clPb"><span class="lbl">Pre-buy · ${fmt(bi.prebuyExtra)} — ${fmt(n0(bi.prebuyExtra)/(teamPlayers(l).length||1))} collected from each player</span>
+        <div class="mini">${teamPlayers(l).map((nm,k2)=>{ const pp=(l.prebuyP||[])[k2]||{}; return `<div class="mr" style="grid-template-columns:minmax(0,1fr) 150px"><span class="trunc"><b>${esc(nm)}</b> <span class="muted">· ${fmt(n0(bi.prebuyExtra)/(teamPlayers(l).length||1))}</span></span><select class="inp" id="clPb${k2}" aria-label="${esc(nm)} pre-buy payment" style="height:34px"><option value="">Not paid</option>${PAY_METHODS.map(m=>`<option${pp.paid&&pp.method===m?' selected':''}>${m}</option>`).join('')}</select></div>`; }).join('')}</div></div>`:'')+
       pair(field('Lot number','clL',l.lot,{type:'number'}),field('Flight','clF',l.flight)),
     wire:r=>{ const upd=()=>{ const b=bidderByNum(c,r.querySelector('#clB').value); r.querySelector('#clBn').textContent=r.querySelector('#clB').value?(b?b.name:'No bidder with that number yet — it will be added'):''; }; r.querySelector('#clB').oninput=upd; upd();
       const mode=()=>{ const v=r.querySelector('#clS').dataset.val; r.querySelector('#clSold').style.display=v==='sold'?'':'none'; r.querySelector('#clPoolNote').style.display=v==='pool'?'':'none';
@@ -3355,7 +3360,7 @@ function editLot(t,l){
         let b=bidderByNum(c,num); if(!b){ b={id:uid(),num,name:'Bidder '+num,memberId:'',paid:false,method:''}; c.bidders.push(b); c.bidders.sort((a,z)=>(+a.num||0)-(+z.num||0)); }
         setPrebuy(c,l,false); setPooled(c,l,false); l.bidderId=b.id; l.price=price; }
       teamPlayers(l).forEach((_,k)=>{ const el=$('clBi'+k); if(el) setBuyInPay(l,k,{paid:!!el.value,method:el.value}); }); delete l.buyIn;
-      if($('clPbP')&&l.prebuy) l.prebuyPay={paid:fv('clPbP')==='yes',method:fv('clPbP')==='yes'?fv('clPbM'):''};
+      if(l.prebuy) teamPlayers(l).forEach((_,k2)=>{ const el=$('clPb'+k2); if(el) setPrebuyPay(l,k2,{paid:!!el.value,method:el.value}); });
       const capEl=$('clCap'); if(capEl&&+capEl.dataset.val!==capIdx(l)){ l.cap=+capEl.dataset.val; l.capSet=true; l.capFlag=false; }
       l.lot=lotNo; l.flight=fl; c.lots.sort((a,z)=>a.lot-z.lot); }});
 }
@@ -3481,7 +3486,7 @@ function tCalcutta(el,t){
     <div class="tw"><div class="t" style="min-width:760px"><div class="tr th" style="${lcols}"><span>Lot</span><span>Team</span><span>Flight</span><span class="r">Index</span><span>Bought by</span><span class="r">Price</span><span></span></div>
     ${lots.map(l=>{ const b=bidderById(c,l.bidderId);
       if(l.isPool) return `<div class="tr num click cc-lot" data-cl="__pool" style="${lcols};background:#F6ECCF"><b class="l-n">${l.lot}</b><span class="trunc l-t"><b>The Pool</b> · ${l.count} team${l.count===1?'':'s'} under ${fmt(c.minBid)}</span><span class="muted l-f">Mixed</span><span class="l-i"></span><span class="trunc l-b">${l.price>0?esc(bidderLabel(b)):'<span class="muted">—</span>'}</span><b class="r l-p">${l.price>0?fmt(l.price):''}</b><span class="ib l-e">${I.edit}</span></div>`;
-      return `<div class="tr num click cc-lot" data-cl="${l.id}" style="${lcols}${l.pooled?';opacity:.72':''}"><b class="l-n">${l.lot}</b><span class="trunc l-t">${l.fun?'<span style="color:var(--gold)" title="Fun team">★</span> ':''}${esc(teamName(l))}</span><span class="muted l-f">${esc(flightName(l.flight))}</span><span class="r muted l-i">${idxTxt2(l.idx)}</span><span class="trunc l-b">${l.prebuy?`<span class="chip ok">Pre-bought · ${esc(captainName(l))}${(()=>{ const cb=captainBidder(c,l); return cb?' #'+esc(cb.num):''; })()}</span>`:l.pooled?`<span class="chip">In the pool · Lot ${poolLotNum(c)}</span>`:n0(l.price)>0?esc(bidderLabel(b)):'<span class="muted">—</span>'}${(()=>{ const due=teamParts(c,l).filter(p=>!p.pay.paid), bd=due.filter(p=>p.kind==='buyin'), n=teamPlayers(l).length; return (bd.length?` <span class="chip warn" title="${esc(bd.map(p=>p.name).join(', '))} not paid">buy-in due${bd.length<n?' · '+esc(bd.map(p=>p.name.split(' ')[0]).join(', ')):''}</span>`:'')+(due.some(p=>p.kind==='prebuy')?' <span class="chip warn">pre-buy due</span>':''); })()}</span><b class="r l-p">${l.prebuy?fmt(teamDue(c,l)):!l.pooled&&n0(l.price)>0?fmt(l.price):''}</b><span class="ib l-e">${I.edit}</span></div>`; }).join('')||`<div class="empty" style="padding:22px"><span>No lots match${view.ccLQ?` “${esc(view.ccLQ)}”`:''}.</span></div>`}
+      return `<div class="tr num click cc-lot" data-cl="${l.id}" style="${lcols}${l.pooled?';opacity:.72':''}"><b class="l-n">${l.lot}</b><span class="trunc l-t">${l.fun?'<span style="color:var(--gold)" title="Fun team">★</span> ':''}${esc(teamName(l))}</span><span class="muted l-f">${esc(flightName(l.flight))}</span><span class="r muted l-i">${idxTxt2(l.idx)}</span><span class="trunc l-b">${l.prebuy?`<span class="chip ok">Pre-bought · ${esc(captainName(l))}${(()=>{ const cb=captainBidder(c,l); return cb?' #'+esc(cb.num):''; })()}</span>`:l.pooled?`<span class="chip">In the pool · Lot ${poolLotNum(c)}</span>`:n0(l.price)>0?esc(bidderLabel(b)):'<span class="muted">—</span>'}${(()=>{ const due=teamParts(c,l).filter(p=>!p.pay.paid), bd=due.filter(p=>p.kind==='buyin'), n=teamPlayers(l).length; return (bd.length?` <span class="chip warn" title="${esc(bd.map(p=>p.name).join(', '))} not paid">buy-in due${bd.length<n?' · '+esc(bd.map(p=>p.name.split(' ')[0]).join(', ')):''}</span>`:'')+(()=>{ const pd=due.filter(p=>p.kind==='prebuy'); return pd.length?` <span class="chip warn" title="${esc(pd.map(p=>p.name).join(', '))} not paid">pre-buy due${pd.length<n?' · '+esc(pd.map(p=>p.name.split(' ')[0]).join(', ')):''}</span>`:''; })(); })()}</span><b class="r l-p">${l.prebuy?fmt(teamDue(c,l)):!l.pooled&&n0(l.price)>0?fmt(l.price):''}</b><span class="ib l-e">${I.edit}</span></div>`; }).join('')||`<div class="empty" style="padding:22px"><span>No lots match${view.ccLQ?` “${esc(view.ccLQ)}”`:''}.</span></div>`}
     </div></div></div>
   </div>
   <div class="cc-pane" data-pane="bidders"${view.ccTab!=='bidders'?' hidden':''}>
@@ -3537,8 +3542,8 @@ async function exportCalcutta(t){
   const c=calc(t), T2=calcTotals(t); try{ await loadXLSX(); }catch(e){ toast(e.message); return; }
   const wb=XLSX.utils.book_new();
   const pl=poolLot(c);
-  const lots=[['Lot','Team','Flight','Team index','Bidder #','Bought by','Price','Result','Buyer paid','Buyer paid by','Player 1 buy-in','Player 1 paid','Player 1 paid by','Player 2 buy-in','Player 2 paid','Player 2 paid by','Pre-buy','Pre-buy paid','Pre-buy paid by']].concat(c.lots.map(l=>{ const b=bidderById(c,l.bidderId); return [l.lot,teamName(l),flightName(l.flight),l.idx,l.pooled?'':(b?b.num:''),l.pooled?'':(b?b.name:''),l.pooled?'':(n0(l.price)||''),l.prebuy?'Pre-bought':l.pooled?`In the pool (Lot ${pl.lot})`:(n0(l.price)>0?'Sold':''),b&&!l.pooled&&n0(l.price)>0?(b.paid?'Yes':'No'):'',b&&b.paid&&!l.pooled?b.method||'':'',
-      ...[0,1].flatMap(k=>{ const pp=(l.buyInP||[])[k]||{}, nm=teamPlayers(l)[k]; return buyInOf(c).on&&nm?[n0(buyInOf(c).amount)/(teamPlayers(l).length||1),pp.paid?'Yes':'No',pp.paid?pp.method||'':'']:['','','']; }),l.prebuy?n0(buyInOf(c).prebuyExtra):'',l.prebuy?((l.prebuyPay||{}).paid?'Yes':'No'):'',l.prebuy?(l.prebuyPay||{}).method||'':'']; }))
+  const lots=[['Lot','Team','Flight','Team index','Bidder #','Bought by','Price','Result','Buyer paid','Buyer paid by','Player 1 buy-in','Player 1 paid','Player 1 paid by','Player 2 buy-in','Player 2 paid','Player 2 paid by','Player 1 pre-buy','Player 1 pre-buy paid','Player 1 pre-buy paid by','Player 2 pre-buy','Player 2 pre-buy paid','Player 2 pre-buy paid by']].concat(c.lots.map(l=>{ const b=bidderById(c,l.bidderId); return [l.lot,teamName(l),flightName(l.flight),l.idx,l.pooled?'':(b?b.num:''),l.pooled?'':(b?b.name:''),l.pooled?'':(n0(l.price)||''),l.prebuy?'Pre-bought':l.pooled?`In the pool (Lot ${pl.lot})`:(n0(l.price)>0?'Sold':''),b&&!l.pooled&&n0(l.price)>0?(b.paid?'Yes':'No'):'',b&&b.paid&&!l.pooled?b.method||'':'',
+      ...[0,1].flatMap(k=>{ const pp=(l.buyInP||[])[k]||{}, nm=teamPlayers(l)[k]; return buyInOf(c).on&&nm?[n0(buyInOf(c).amount)/(teamPlayers(l).length||1),pp.paid?'Yes':'No',pp.paid?pp.method||'':'']:['','','']; }),...[0,1].flatMap(k2=>{ const pp=(l.prebuyP||[])[k2]||{}, nm=teamPlayers(l)[k2]; return l.prebuy&&nm?[n0(buyInOf(c).prebuyExtra)/(teamPlayers(l).length||1),pp.paid?'Yes':'No',pp.paid?pp.method||'':'']:['','','']; })]; }))
     .concat(pl?[[pl.lot,`The Pool: ${pl.teams.map(teamName).join('; ')}`,'Mixed','',(bidderById(c,pl.bidderId)||{}).num||'',(bidderById(c,pl.bidderId)||{}).name||'',pl.price||'','Pool']]:[]);
   XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(lots),'Lots');
   const bid=[['Bidder #','Name','Teams','Owes','Paid','Paid by']].concat(c.bidders.map(b=>{ const o=bidderOwes(c,b); return [b.num,b.name,o.lots.map(l=>'Lot '+l.lot).join(', '),o.total,b.paid?'Yes':'',b.method||'']; }));
@@ -4058,7 +4063,7 @@ function retireLegacy(){
 /* Keeps every open device on the latest version: checks version.json about once a minute and, when a
    newer build is live, reloads at a safe moment (nothing unsaved, no editor open, not mid-typing). */
 (function(){
-  const ME='20261002153229'; let ready=false, lastCheck=0;
+  const ME='20261002163227'; let ready=false, lastCheck=0;
   const typing=()=>{ const a=document.activeElement; return a&&/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)&&a.value&&a.type!=='search'; };
   const safe=()=>!typing()&&(typeof window.__canReload!=='function'||window.__canReload());
   async function check(){ lastCheck=Date.now(); if(location.protocol==='file:') return;
