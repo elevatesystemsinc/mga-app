@@ -85,6 +85,18 @@ nothing you're editing is lost. Edits made while a save is still uploading go up
 records and the background sync checks never write anything, so nobody else's screen updates unless
 something actually changed. No setup needed.
 
+## 50/50 Drawing
+
+Each tournament has a **50/50 Drawing** tab. **Upload** the "All tickets sold" export (CSV or Excel): tickets are
+tournament + ticket number (numbers restart each tournament); tickets sold by hand without a number are included
+and identified by their sheet row. Players are identified by name — email and phone are ignored because they were
+often the seller's. **Look-alike names** (e.g. "Nate Huneycutt" / "Nate Honeycutt") must be ruled same or different
+before **locking**, which records a SHA-256 **fingerprint** of every ticket; the list can't change after. **Open the
+drawing screen** for the projector: each draw uses the browser's cryptographic random generator (every eligible
+ticket equally likely) and is saved the instant it's drawn; a winner's tickets all leave the drum before the next
+drawing. Voids need a written reason and stay in the log. **Official record (PDF)**: ticket list, fingerprint,
+method, each drawing (random value, eligible count, winning ticket and sheet row), witness lines, tickets by player.
+
 ## Check-in
 
 Each tournament has a **Check-in** tab (next to Field) listing every player in the field, alphabetical by last
