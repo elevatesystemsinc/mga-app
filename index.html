@@ -240,7 +240,15 @@ textarea.inp{height:auto;min-height:84px;padding:10px 12px;resize:vertical}
 .rf-ticket{width:min(780px,92vw);border:3px solid #C7A13A;border-radius:18px;background:rgba(10,28,39,.55);padding:26px 30px;box-shadow:0 30px 80px rgba(0,0,0,.45);position:relative}
 .rf-ticket::before,.rf-ticket::after{content:'';position:absolute;top:50%;width:28px;height:28px;border-radius:50%;background:#0F2A38;transform:translateY(-50%)} .rf-ticket::before{left:-16px} .rf-ticket::after{right:-16px}
 .rf-tk-top{font-size:13px;font-weight:800;letter-spacing:.2em;text-transform:uppercase;color:#AEB8BE} .rf-tk-name{font-family:var(--serif,Georgia),serif;font-size:min(9vw,76px);font-weight:700;line-height:1.1;margin-top:8px}
-.rf-tk-no{font-size:20px;color:#D6DADC;margin-top:6px;font-weight:600} .rf-ticket.rolling .rf-tk-name{color:#C9CFD2} .rf-ticket.won{border-color:#D8B75F;box-shadow:0 0 0 6px rgba(216,183,95,.25),0 30px 80px rgba(0,0,0,.45)} .rf-ticket.won .rf-tk-top{color:#D8B75F}
+.rf-tk-no{font-size:20px;color:#D6DADC;margin-top:6px;font-weight:600;min-height:26px} .rf-ticket{transition:transform .5s ease,box-shadow .5s ease,border-color .5s ease,background .5s ease}
+.rf-ticket.rolling .rf-tk-name{color:#C9CFD2;filter:blur(.4px)} .rf-ticket.rolling.slow .rf-tk-name{color:#fff;filter:none}
+.rf-ticket.hush{transform:scale(.97);background:rgba(5,14,20,.85);border-color:#7E5F1A} .rf-ticket.hush .rf-tk-name{color:#D8B75F;letter-spacing:.3em;animation:rfPulse 1.1s ease-in-out infinite}
+.rf-ticket.ticket .rf-tk-no{color:#D8B75F;font-size:26px;animation:rfIn .5s ease both} .rf-ticket.won{transform:scale(1.04)} .rf-ticket.won .rf-tk-name{animation:rfWin .9s cubic-bezier(.2,1.4,.4,1) both;color:#fff}
+@keyframes rfPulse{50%{opacity:.35}} @keyframes rfIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+@keyframes rfWin{0%{opacity:0;transform:scale(.6);text-shadow:0 0 0 rgba(216,183,95,0)}60%{opacity:1;transform:scale(1.08);text-shadow:0 0 40px rgba(216,183,95,.9)}100%{transform:scale(1);text-shadow:0 0 18px rgba(216,183,95,.45)}}
+.rf-confetti{position:absolute;inset:0;pointer-events:none;overflow:hidden} .rf-confetti i{position:absolute;top:46%;width:9px;height:14px;border-radius:2px;opacity:0;animation:rfConf 3.6s cubic-bezier(.15,.7,.3,1) forwards}
+@keyframes rfConf{0%{opacity:1;transform:translate(0,0) rotate(0)}70%{opacity:1}100%{opacity:0;transform:translate(var(--dx),calc(var(--dy) + 900px)) rotate(var(--r))}}
+.rf-snd{margin-right:8px} .rf-ticket.won{border-color:#D8B75F;box-shadow:0 0 0 6px rgba(216,183,95,.25),0 30px 80px rgba(0,0,0,.45)} .rf-ticket.won .rf-tk-top{color:#D8B75F}
 .rf-go{margin-top:10px;background:#C7A13A;color:#0A1C27;border:none;border-radius:12px;font-weight:800;font-size:20px;padding:16px 46px} .rf-go[disabled]{opacity:.6} .rf-hint{font-size:13px;color:#8FA0AD}
 .rf-sum{display:flex;flex-direction:column;gap:2px;padding:14px 30px;border:2px solid rgba(216,183,95,.5);border-radius:14px;min-width:min(620px,90vw)} .rf-sum span{font-size:13px;font-weight:800;letter-spacing:.16em;text-transform:uppercase;color:#D8B75F} .rf-sum b{font-family:var(--serif,Georgia),serif;font-size:44px} .rf-sum small{color:#C9CFD2;font-size:16px}
 .rf-facts{display:flex;justify-content:center;gap:12px 34px;flex-wrap:wrap;padding:16px 30px 22px;border-top:1px solid rgba(255,255,255,.1);color:#C9CFD2;font-size:15px} .rf-facts b{color:#fff} .rf-facts .mono{font-family:ui-monospace,Menlo,monospace;letter-spacing:.06em;color:#D8B75F}
@@ -4230,6 +4238,18 @@ function rfVoid(t,d){
   openDrawer({kicker:t.name+' · 50/50 Drawing',title:`Void drawing ${d.no}?`,saveLabel:'Void it',
     body:`<p style="margin:0">${esc(d.winner)} (${esc(tkLabel(d.ticket.tour,d.ticket.no))}) stays in the record, marked void with your reason. The drawing can then be held again; the voided winner goes back in the drum.</p>`+field('Reason (required)','rfVr','',{type:'textarea'}),
     save:()=>{ const why=fv('rfVr'); if(!why){ toast('A reason is required'); return false; } d.void={reason:why,at:new Date().toISOString()}; }}); }
+/* ---------- reset ---------- */
+function rfReset(t,full){
+  const R=t.raffle, live=R.draws.filter(d=>!d.void);
+  openDrawer({kicker:t.name+' · 50/50 Drawing',title:full?'Start over?':'Reset the drawings?',saveLabel:full?'Start over':'Reset drawings',
+    body:(full?`<p style="margin:0">Removes everything — the ticket list, name rulings, lock and all drawings — so you can upload a new list. Use this after a practice run or to load a corrected file.</p>`
+      :`<p style="margin:0">Clears the ${R.draws.length} drawing${R.draws.length===1?'':'s'} so far${live.length?` (${esc(live.map(d=>d.winner).join(', '))})`:''}. The locked ticket list and fingerprint stay. The reset is <b>logged on the official record</b> with your reason and who had been drawn.</p>`)+
+      field('Reason (required)','rfRr','',{type:'textarea',ph:full?'e.g. practice run before dinner':'e.g. drawings run as a test before the room was ready'})+
+      field('Type RESET to confirm','rfRc','',{ph:'RESET'}),
+    save:()=>{ const why=fv('rfRr'); if(!why){ toast('A reason is required'); return false; } if(fv('rfRc').trim().toUpperCase()!=='RESET'){ toast('Type RESET to confirm'); return false; }
+      if(full){ delete t.raffle; toast('50/50 drawing cleared'); }
+      else { R.resets=R.resets||[]; R.resets.push({at:new Date().toISOString(),reason:why,draws:R.draws.map(d=>({no:d.no,winner:d.winner,ticket:d.ticket,at:d.at,void:!!d.void}))}); R.draws=[]; toast('Drawings reset — logged on the record'); } }});
+}
 /* ---------- the tab ---------- */
 function tRaffle(el,t){
   const R=t.raffle;
@@ -4238,15 +4258,15 @@ function tRaffle(el,t){
   const sus=rfSuspects(R), live=R.draws.filter(d=>!d.void), left=R.prizes.length-live.length;
   const step=(n,title,state,body)=>`<div class="card pad rf-step ${state}"><div class="rf-n">${state==='done'?'✓':n}</div><div style="flex:1;min-width:0"><b class="rf-t">${title}</b>${body}</div></div>`;
   el.innerHTML=`<div class="grid g4">${kpi('Tickets',all.length.toLocaleString(),`${R.tours.length} tournaments`)}${kpi('Players',players.size,'by name')}${kpi('Drawings',`${live.length} / ${R.prizes.length}`,R.prizes.map(rfMoney).join(' + '))}${kpi('Fingerprint',R.locked?fpShort(R.locked.fp).split(' ').slice(0,2).join(' '):'—',R.locked?'list locked':'not locked yet')}</div>
-    ${step(1,'Ticket list','done',`<div class="muted" style="font-size:13.5px">${esc(R.file)} · imported ${new Date(R.importedAt).toLocaleString([], {month:'short',day:'numeric',hour:'numeric',minute:'2-digit'})} · ${R.tours.map(x=>`${esc(x)} ${all.filter(q=>q.tour===x).length}`).join(' · ')}</div>${R.locked?'':`<div class="actions" style="margin-top:8px"><button class="btn sm" id="rfImp">Replace the list</button><button class="btn sm" id="rfPz">Drawings &amp; prizes</button></div>`}`)}
+    ${step(1,'Ticket list','done',`<div class="muted" style="font-size:13.5px">${esc(R.file)} · imported ${new Date(R.importedAt).toLocaleString([], {month:'short',day:'numeric',hour:'numeric',minute:'2-digit'})} · ${R.tours.map(x=>`${esc(x)} ${all.filter(q=>q.tour===x).length}`).join(' · ')}</div><div class="actions" style="margin-top:8px">${R.locked?'':`<button class="btn sm" id="rfImp">Replace the list</button><button class="btn sm" id="rfPz">Drawings &amp; prizes</button>`}<button class="btn sm" id="rfStart">Start over</button></div>`)}
     ${step(2,'Look-alike names',sus.every(s=>s.decided)?'done':'todo',sus.length?`<div class="muted" style="font-size:13.5px;margin-bottom:6px">Decide whether these are the same person. Same person = one entry in the drum and can only win once.</div>${sus.map(s=>`<div class="rf-sus"><span><b>${esc(s.a.name)}</b> (${s.a.n}) and <b>${esc(s.b.name)}</b> (${s.b.n})</span>${s.decided?`<span class="chip ${s.decided==='same'?'gold':''}">${s.decided==='same'?'Same person':'Different people'}</span>${R.locked?'':`<button class="btn sm" data-rfu="${esc(s.id)}">Change</button>`}`:`<span class="actions"><button class="btn sm" data-rfs="${esc(s.id)}">Same person</button><button class="btn sm" data-rfd="${esc(s.id)}">Different people</button></span>`}</div>`).join('')}`:'<div class="muted" style="font-size:13.5px">None found — every name is distinct.</div>')}
     ${step(3,'Lock the ticket list',R.locked?'done':'todo',R.locked?`<div style="font-size:13.5px">Locked ${new Date(R.locked.at).toLocaleString([], {month:'short',day:'numeric',hour:'numeric',minute:'2-digit'})} · fingerprint <b style="font-family:ui-monospace,Menlo,monospace;letter-spacing:.04em">${fpShort(R.locked.fp)}</b></div>`:`<div class="muted" style="font-size:13.5px;margin-bottom:8px">Prizes: ${R.prizes.map((p,i)=>`drawing ${i+1} ${rfMoney(p)}`).join(', ')}. Locking fingerprints every ticket; the list can’t change after.</div><button class="btn pri" id="rfLock"${sus.every(s=>s.decided)?'':' disabled'}>Lock the ticket list</button>`)}
-    ${step(4,'Drawings',live.length===R.prizes.length?'done':R.locked?'todo':'wait',`${R.locked?`<div class="actions" style="margin:4px 0 10px"><button class="btn pri" id="rfShow">Open the drawing screen</button><button class="btn" id="rfRec">${I.down}Official record (PDF)</button></div>`:'<div class="muted" style="font-size:13.5px">Available once the list is locked.</div>'}
+    ${step(4,'Drawings',live.length===R.prizes.length?'done':R.locked?'todo':'wait',`${R.locked?`<div class="actions" style="margin:4px 0 10px"><button class="btn pri" id="rfShow">Open the drawing screen</button><button class="btn" id="rfRec">${I.down}Official record (PDF)</button>${R.draws.length?'<button class="btn" id="rfRst">Reset drawings</button>':''}</div>${(R.resets||[]).length?`<div class="muted" style="font-size:12.5px;margin-bottom:6px">Reset ${R.resets.length} time${R.resets.length===1?'':'s'} — ${esc(R.resets.map(x=>new Date(x.at).toLocaleTimeString([], {hour:'numeric',minute:'2-digit'})+': '+x.reason).join(' · '))}</div>`:''}`:'<div class="muted" style="font-size:13.5px">Available once the list is locked.</div>'}
       ${R.draws.map(d=>`<div class="rf-draw${d.void?' void':''}"><div><span class="lbl">Drawing ${d.no} · ${rfMoney(d.prize)}${d.void?' · VOID':''}</span><b style="font-size:17px">${esc(d.winner)}</b><small class="muted">${esc(tkLabel(d.ticket.tour,d.ticket.no))} (sheet row ${d.ticket.row}) · ${new Date(d.at).toLocaleTimeString([], {hour:'numeric',minute:'2-digit',second:'2-digit'})} · 1 of ${d.eligibleTickets.toLocaleString()} eligible tickets · random ${d.rand}${d.void?` · void: ${esc(d.void.reason)}`:''}</small></div>${d.void?'':`<button class="btn sm" data-rfv="${d.id}">Void</button>`}</div>`).join('')}`)}
     <div class="card" style="overflow:hidden"><div class="cardhead"><div><h2 class="h2">Tickets by player</h2><span class="muted">How many chances each player has — the same table is on the official record.</span></div></div>
       <div class="rf-ppl">${[...players.entries()].sort((a,b)=>b[1]-a[1]||rfPlayerName(R,a[0]).localeCompare(rfPlayerName(R,b[0]))).map(([k,n])=>`<div><span class="trunc">${esc(rfPlayerName(R,k))}${live.some(d=>d.playerKey===k)?' <span class="chip gold">winner</span>':''}</span><b class="num">${n}</b></div>`).join('')}</div></div>`;
   const on=(id,f)=>{ const e=$(id); if(e) e.onclick=f; };
-  on('rfImp',()=>rfImport(t)); on('rfPz',()=>rfPrizes(t)); on('rfLock',()=>rfLock(t)); on('rfShow',()=>rfShow(t)); on('rfRec',()=>rfRecord(t));
+  on('rfImp',()=>rfImport(t)); on('rfPz',()=>rfPrizes(t)); on('rfLock',()=>rfLock(t)); on('rfShow',()=>rfShow(t)); on('rfRec',()=>rfRecord(t)); on('rfRst',()=>rfReset(t,false)); on('rfStart',()=>rfReset(t,true));
   const rule=(id,v)=>{ R.rulings=R.rulings||{}; R.merges=R.merges||{}; const s=sus.find(x=>x.id===id); if(v) R.rulings[id]=v; else delete R.rulings[id];
     delete R.merges[s.a.key]; delete R.merges[s.b.key]; if(v==='same'){ const [keep,drop]=s.a.n>=s.b.n?[s.a,s.b]:[s.b,s.a]; R.merges[drop.key]=keep.key; } persist(); render(); };
   el.querySelectorAll('[data-rfs]').forEach(b=>b.onclick=()=>rule(b.dataset.rfs,'same'));
@@ -4260,10 +4280,10 @@ function rfShow(t){
   ov=document.createElement('div'); ov.id='rfShow'; ov.className='rf-show'; document.body.appendChild(ov);
   try{ ov.requestFullscreen&&ov.requestFullscreen(); }catch(_){}
   let anim=null;
-  const close=()=>{ clearInterval(anim); if(document.fullscreenElement) document.exitFullscreen().catch(()=>{}); ov.remove(); document.removeEventListener('keydown',key); render(); };
+  const close=()=>{ clearTimeout(anim); clearInterval(anim); running=false; if(document.fullscreenElement) document.exitFullscreen().catch(()=>{}); ov.remove(); document.removeEventListener('keydown',key); render(); };
   const draw=()=>{
     const live=R.draws.filter(d=>!d.void), no=live.length+1, elig=rfEligible(R), last=live[live.length-1];
-    const header=`<div class="rf-top"><img src="${typeof crestSrc==='function'?crestSrc():'crest.png'}" alt=""><div><div class="rf-k">${esc(t.name)} · ${esc(String(t.season||''))} MGA 50/50</div><div class="rf-h">Final Drawing</div></div><button class="rf-x" title="Close (Esc)">✕</button></div>`;
+    const header=`<div class="rf-top"><img src="${typeof crestSrc==='function'?crestSrc():'crest.png'}" alt=""><div><div class="rf-k">${esc(t.name)} · ${esc(String(t.season||''))} MGA 50/50</div><div class="rf-h">Final Drawing</div></div><button class="rf-x rf-snd" title="Sound on/off">${window.__rfSound?'🔊':'🔈'}</button><button class="rf-x" id="rfClose" title="Close (Esc)">✕</button></div>`;
     const facts=`<div class="rf-facts"><span><b>${elig.length.toLocaleString()}</b> tickets in the drum</span><span><b>${new Set(elig.map(x=>x.key)).size}</b> players</span><span>List fingerprint <b class="mono">${fpShort(R.locked.fp)}</b></span>${live.length?`<span>Previous winners’ tickets removed</span>`:''}</div>`;
     const done=live.length>=R.prizes.length;
     ov.innerHTML=header+`<div class="rf-stage">
@@ -4272,22 +4292,43 @@ function rfShow(t){
         <div class="rf-ticket" id="rfTicket"><div class="rf-tk-top">${last&&live.length?`Last winner: ${esc(last.winner)}`:'Ready to draw'}</div><div class="rf-tk-name" id="rfName">${elig.length.toLocaleString()} tickets</div><div class="rf-tk-no" id="rfNo">in the drum</div></div>
         <button class="rf-go" id="rfGo">Draw ticket</button><div class="rf-hint">or press the space bar</div>`}
       </div>`+facts;
-    ov.querySelector('.rf-x').onclick=close;
+    ov.querySelector('#rfClose').onclick=close; ov.querySelector('.rf-snd').onclick=e=>{ window.__rfSound=!window.__rfSound; e.currentTarget.textContent=window.__rfSound?'🔊':'🔈'; if(window.__rfSound) ac(); };
     const go=ov.querySelector('#rfGo'); if(go) go.onclick=run;
   };
   let running=false;
+  /* sound (optional): ticks that slow with the spin, a drumroll in the pause, a chime on the winner */
+  let AC=null; const snd=()=>window.__rfSound;
+  const ac=()=>{ if(!AC) try{ AC=new (window.AudioContext||window.webkitAudioContext)(); }catch(_){} return AC; };
+  const tick=(v=0.15)=>{ if(!snd()||!ac()) return; const o=AC.createOscillator(), g=AC.createGain(); o.type='square'; o.frequency.value=1800; g.gain.setValueAtTime(v,AC.currentTime); g.gain.exponentialRampToValueAtTime(0.0001,AC.currentTime+0.04); o.connect(g).connect(AC.destination); o.start(); o.stop(AC.currentTime+0.05); };
+  const roll=(sec)=>{ if(!snd()||!ac()) return; const n=Math.floor(AC.sampleRate*sec), b=AC.createBuffer(1,n,AC.sampleRate), d=b.getChannelData(0);
+    for(let i=0;i<n;i++){ const tt=i/AC.sampleRate; d[i]=(Math.random()*2-1)*(0.25+0.75*tt/sec)*(0.55+0.45*Math.abs(Math.sin(tt*Math.PI*28))); }
+    const src=AC.createBufferSource(), f=AC.createBiquadFilter(), g=AC.createGain(); f.type='bandpass'; f.frequency.value=1600; g.gain.value=0.22; src.buffer=b; src.connect(f).connect(g).connect(AC.destination); src.start(); };
+  const chime=()=>{ if(!snd()||!ac()) return; [523.25,659.25,783.99,1046.5].forEach((fq,k)=>{ const o=AC.createOscillator(), g=AC.createGain(), t0=AC.currentTime+k*0.11; o.type='triangle'; o.frequency.value=fq; g.gain.setValueAtTime(0.0001,t0); g.gain.exponentialRampToValueAtTime(0.22,t0+0.02); g.gain.exponentialRampToValueAtTime(0.0001,t0+1.4); o.connect(g).connect(AC.destination); o.start(t0); o.stop(t0+1.5); }); };
+  const confetti=()=>{ const box=document.createElement('div'); box.className='rf-confetti'; ov.appendChild(box); const cols=['#D8B75F','#C7A13A','#FFFFFF','#F6ECCF','#9FC3D5'];
+    for(let k=0;k<140;k++){ const p=document.createElement('i'); p.style.left=(50+(Math.random()-0.5)*30)+'%'; p.style.background=cols[k%cols.length]; p.style.setProperty('--dx',((Math.random()-0.5)*1200)+'px'); p.style.setProperty('--dy',(-200-Math.random()*520)+'px'); p.style.setProperty('--r',(Math.random()*900-450)+'deg'); p.style.animationDelay=(Math.random()*0.25)+'s'; box.appendChild(p); }
+    setTimeout(()=>box.remove(),4200); };
+  const wait=ms=>new Promise(r=>{ anim=setTimeout(r,ms); });
+  /* the pace: fast spin → slowing → a crawl (about 13 s), then a pause and a two-step reveal */
+  function schedule(){ const d=[]; for(let k=0;k<70;k++) d.push(55);                       // ~4 s fast
+    for(let k=0;k<28;k++){ const x=k/27; d.push(Math.round(60+x*x*440)); }                    // ~5.5 s slowing
+    [620,760,900,1080,1300].forEach(v=>d.push(v)); return d; }                                 // ~4.7 s crawl
   async function run(){ if(running) return; running=true; const go=ov.querySelector('#rfGo'); if(go){ go.disabled=true; go.textContent='Drawing…'; }
-    const pool=rfEligible(R); const d=await rfDraw(t);           // the winner is chosen and saved first
+    const pool=rfEligible(R); const d=await rfDraw(t);           // the winner is chosen and saved first; the rest is theatre
     if(!d){ running=false; draw(); return; }
-    const nm=ov.querySelector('#rfName'), tn=ov.querySelector('#rfNo'), tk=ov.querySelector('#rfTicket'); tk.classList.add('rolling');
-    let k=0; const total=42;
-    anim=setInterval(()=>{ k++; const x=pool[Math.floor(Math.random()*pool.length)]; nm.textContent=`${x.first} ${x.last}`; tn.textContent=tkLabel(x.tour,x.no);
-      if(k>=total){ clearInterval(anim); tk.classList.remove('rolling'); tk.classList.add('won');
-        nm.textContent=d.winner; tn.textContent=tkLabel(d.ticket.tour,d.ticket.no); ov.querySelector('.rf-tk-top').textContent=`Winner · ${rfMoney(d.prize)}`;
-        const left=rfEligible(R); ov.querySelector('.rf-facts').innerHTML=`<span>Drawn from <b>${d.eligibleTickets.toLocaleString()}</b> tickets</span><span><b>${esc(d.winner)}</b>’s ${d.winnerTickets} ticket${d.winnerTickets===1?'':'s'} now out of the drum</span><span><b>${left.length.toLocaleString()}</b> tickets remain</span><span>List fingerprint <b class="mono">${fpShort(R.locked.fp)}</b></span>`;
-        const go2=ov.querySelector('#rfGo'); if(go2){ const more=R.draws.filter(z=>!z.void).length<R.prizes.length; go2.disabled=false; go2.textContent=more?'Next drawing':'Finish'; go2.onclick=()=>{ running=false; draw(); }; }
-        running=false; } },Math.min(200,40+k*4));
-  }
+    const nm=ov.querySelector('#rfName'), tn=ov.querySelector('#rfNo'), tk=ov.querySelector('#rfTicket'), top=ov.querySelector('.rf-tk-top');
+    tk.classList.add('rolling'); top.textContent='Drawing…';
+    const steps=schedule(); let prev=null;
+    for(let k=0;k<steps.length;k++){ let x; do{ x=pool[Math.floor(Math.random()*pool.length)]; }while(pool.length>1&&prev&&x.key===prev.key); prev=x;
+      nm.textContent=`${x.first} ${x.last}`; tn.textContent=tkLabel(x.tour,x.no); tk.classList.toggle('slow',steps[k]>300); tick(steps[k]>300?0.22:0.08); await wait(steps[k]); }
+    // the pause
+    tk.classList.remove('rolling','slow'); tk.classList.add('hush'); top.textContent='And the winning ticket is…'; nm.textContent='• • •'; tn.textContent=''; roll(2.4); await wait(2400);
+    // ticket first …
+    tk.classList.remove('hush'); tk.classList.add('ticket'); tn.textContent=tkLabel(d.ticket.tour,d.ticket.no); top.textContent='Winning ticket'; tick(0.25); await wait(2200);
+    // … then the name
+    tk.classList.remove('ticket'); tk.classList.add('won'); nm.textContent=d.winner; top.textContent=`Winner · ${rfMoney(d.prize)}`; chime(); confetti();
+    const left=rfEligible(R); ov.querySelector('.rf-facts').innerHTML=`<span>Drawn from <b>${d.eligibleTickets.toLocaleString()}</b> tickets</span><span><b>${esc(d.winner)}</b>’s ${d.winnerTickets} ticket${d.winnerTickets===1?'':'s'} now out of the drum</span><span><b>${left.length.toLocaleString()}</b> tickets remain</span><span>List fingerprint <b class="mono">${fpShort(R.locked.fp)}</b></span>`;
+    const go2=ov.querySelector('#rfGo'); if(go2){ const more=R.draws.filter(z=>!z.void).length<R.prizes.length; go2.disabled=false; go2.textContent=more?'Next drawing':'Finish'; go2.onclick=()=>{ running=false; draw(); }; }
+    running=false; }
   const key=e=>{ if(e.key==='Escape') close(); if(e.code==='Space'){ e.preventDefault(); const g=ov.querySelector('#rfGo'); if(g&&!g.disabled) g.click(); } };
   document.addEventListener('keydown',key); draw();
 }
@@ -4329,6 +4370,9 @@ async function rfRecord(t){
     if(l3.length){ doc.setTextColor(161,64,43); doc.text(l3,L+12,yy); }
     y+=h+10; });
   if(!R.draws.length){ font('PublicSans','normal',9,MUTED); doc.text('No drawings yet.',L,y); y+=16; }
+  if((R.resets||[]).length){ y+=4; sec('Resets');
+    R.resets.forEach(x=>{ font('PublicSans','bold',8.8,INK); doc.text(`Reset ${new Date(x.at).toLocaleString()}`,L,y); font('PublicSans','normal',8.4,MUTED);
+      const ln=doc.splitTextToSize(`Reason: ${x.reason}. Drawings cleared: ${x.draws.length?x.draws.map(d=>`#${d.no} ${d.winner} (${tkLabel(d.ticket.tour,d.ticket.no)})${d.void?' [void]':''}`).join('; '):'none'}.`,R2-L); doc.text(ln,L,y+11); y+=13+11*ln.length; }); }
   y+=8; sec('Witnesses');
   [0,1].forEach(i=>{ const x=L+i*((R2-L)/2); doc.setDrawColor(...INK); doc.setLineWidth(.6); doc.line(x,y+22,x+(R2-L)/2-24,y+22); font('PublicSans','normal',7.6,MUTED); doc.text('Signature · printed name · date',x,y+33); });
   // appendix: tickets per player
@@ -4374,7 +4418,7 @@ function retireLegacy(){
 /* Keeps every open device on the latest version: checks version.json about once a minute and, when a
    newer build is live, reloads at a safe moment (nothing unsaved, no editor open, not mid-typing). */
 (function(){
-  const ME='20261003220730'; let ready=false, lastCheck=0;
+  const ME='20261003222122'; let ready=false, lastCheck=0;
   const typing=()=>{ const a=document.activeElement; return a&&/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)&&a.value&&a.type!=='search'; };
   const safe=()=>!typing()&&(typeof window.__canReload!=='function'||window.__canReload());
   async function check(){ lastCheck=Date.now(); if(location.protocol==='file:') return;
