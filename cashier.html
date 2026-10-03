@@ -41,7 +41,12 @@ main{max-width:1100px;margin:0 auto;padding:18px 18px 60px}
 .card{background:#fff;border:1px solid var(--line);border-radius:12px;overflow:hidden}
 .row{display:grid;align-items:center;gap:10px;padding:10px 14px;border-top:1px solid var(--line);min-height:48px}
 .row.h{border-top:none;background:var(--ivory);font-size:11.5px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);min-height:36px}
-.row.click{cursor:pointer} .row.click:hover{background:#FBF7EC}
+.row.click{cursor:pointer} .row.bid.exp{cursor:pointer}
+.bdet{background:var(--ivory);border-top:1px dashed var(--line);padding:6px 14px 10px 64px}
+.bdl{display:grid;grid-template-columns:62px minmax(0,1fr) auto;gap:10px;padding:6px 0;border-top:1px solid #EFE9DA;font-size:14px;align-items:center}
+.bdl:first-child{border-top:none} .bdl span{color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.bdl.tot{border-top:2px solid var(--navy);margin-top:4px;padding-top:8px} .bdl.tot b{font-size:15px}
+@media (max-width:640px){ .bdet{padding:6px 12px 10px} } .row.click:hover{background:#FBF7EC}
 .row.pool{background:#F6ECCF} .row.dim{opacity:.7} .row.tot{background:var(--ivory);font-weight:800}
 .trunc{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .tag{display:inline-block;font-size:11.5px;font-weight:800;padding:2px 8px;border-radius:999px;background:#EEF1F2;color:var(--muted)} .tag.p{background:#F6ECCF;color:#6B4F12} .tag.ok{background:#E3F0E8;color:var(--pos)} .tag.due{background:#F8E6DF;color:var(--neg)}
@@ -246,6 +251,7 @@ const fmt=v=>{ const n=Math.round(c0(v)); return (n<0?'−$':'$')+Math.abs(n).to
 const uid=()=>Math.random().toString(36).slice(2,10)+Date.now().toString(36).slice(-4);
 const CFG=window.MM_CONFIG||{}; const sb=(CFG.url&&CFG.anonKey&&window.supabase)?window.supabase.createClient(CFG.url,CFG.anonKey,{auth:{persistSession:false}}):null;
 const TOKEN=(new URLSearchParams(location.search).get('k')||'').trim(), LS='mga_cashier_'+TOKEN;
+let bf='all', bOpen={};
 let doc=null, base=null, version=0, tab='sales', filt='all', q='', bq='', dirty=false, saving=false, online=true, modalOpen=false, lastErr='';
 function toast(m){ const d=document.createElement('div'); d.className='toast'; d.textContent=m; document.body.appendChild(d); setTimeout(()=>d.remove(),2600); }
 function setPill(){ const s=$('sync'); if(!online){ s.className='pill off'; s.textContent=dirty?'Offline · changes waiting':'Offline'; return; }
@@ -360,15 +366,19 @@ function openLot(id){
 }
 function paneBidders(el){
   const ql=bq.toLowerCase().trim();
-  const rows=doc.bidders.filter(b=>!ql||String(b.num)===ql||b.name.toLowerCase().includes(ql)).map(b=>({b,o:bidderOwes(doc,b)})), HOLD=calcHoldings(doc);
+  const rows=doc.bidders.filter(b=>!ql||String(b.num)===ql||b.name.toLowerCase().includes(ql)).map(b=>({b,o:bidderOwes(doc,b)})).filter(({b,o})=>bf==='all'||(bf==='buyers'?o.total>0:o.total>0&&!b.paid)), HOLD=calcHoldings(doc);
+  const owedAll=doc.bidders.filter(b=>!b.paid).reduce((a,b)=>a+bidderOwes(doc,b).total,0);
   const cols='grid-template-columns:64px minmax(0,1.4fr) minmax(0,1fr) 100px 150px 36px';
   el.innerHTML=`<div class="bar"><input class="inp search" id="bq" placeholder="Find a bidder — number or name" value="${esc(bq)}" autocomplete="off"><button class="btn pri" id="bAdd">+ Add bidder</button></div>
+    <div class="bar" style="justify-content:space-between"><div class="chips">${[['all','All'],['buyers','Buyers'],['unpaid','Unpaid']].map(([k,l])=>`<button data-bf="${k}" class="${bf===k?'on':''}">${l}</button>`).join('')}</div><span class="muted" style="font-size:13px">${fmt(owedAll)} still owed · tap a buyer to see their lots</span></div>
     <div class="card"><div class="row h bids" style="${cols}"><span>#</span><span>Name</span><span>Bought</span><span class="r">Owes</span><span>Paid</span><span></span></div>
-    ${rows.map(({b,o})=>`<div class="row bid" style="${cols}"><b class="c-num">#${esc(b.num)}</b><span class="c-name trunc">${esc(b.name)}</span><span class="c-bought trunc muted" style="font-size:13px">${(()=>{ const h=HOLD.find(x=>x.bidderId===b.id); const caps=h?h.stakes.filter(s=>s.kind==='prebuy'||s.kind==='team').map(s=>`Lot ${s.lot.lot} ${s.kind==='prebuy'?'pre-bought':s.pct+'% own team'}`):[]; return o.lots.map(l=>l.isPool?'Pool':'Lot '+l.lot).concat(caps).join(', ')||'Nothing bought yet'; })()}</span><b class="c-owes r num">${o.total?fmt(o.total):''}</b>
+    ${rows.map(({b,o})=>`<div class="row bid${o.lots.length?' exp':''}" data-bx="${b.id}" style="${cols}"><b class="c-num">${o.lots.length?(bOpen[b.id]?'▾ ':'▸ '):''}#${esc(b.num)}</b><span class="c-name trunc">${esc(b.name)}</span><span class="c-bought trunc muted" style="font-size:13px">${(()=>{ const h=HOLD.find(x=>x.bidderId===b.id); const caps=h?h.stakes.filter(s=>s.kind==='prebuy'||s.kind==='team').map(s=>`Lot ${s.lot.lot} ${s.kind==='prebuy'?'pre-bought':s.pct+'% own team'}`):[]; return o.lots.map(l=>l.isPool?'Pool':'Lot '+l.lot).concat(caps).join(', ')||'Nothing bought yet'; })()}</span><b class="c-owes r num">${o.total?fmt(o.total):''}</b>
       <span class="c-pay">${o.total?`<select class="pay${b.paid?' paid':''}" data-pay="${b.id}" aria-label="Payment for bidder ${esc(b.num)}"><option value="">Not paid</option>${PAY_METHODS.map(mm=>`<option${b.paid&&b.method===mm?' selected':''}>${mm}</option>`).join('')}</select>`:''}</span>
-      <button class="btn c-edit" data-eb="${b.id}" style="height:34px;padding:0 10px" aria-label="Edit bidder ${esc(b.num)}">✎</button></div>`).join('')||'<div class="row"><span class="muted">No bidders yet.</span></div>'}</div>`;
+      <button class="btn c-edit" data-eb="${b.id}" style="height:34px;padding:0 10px" aria-label="Edit bidder ${esc(b.num)}">✎</button></div>${bOpen[b.id]&&o.lots.length?`<div class="bdet">${o.lots.map(l=>`<div class="bdl"><b>Lot ${l.lot}</b><span>${l.isPool?'The Pool · '+esc(l.teams.map(x=>teamName(x)).join(', ')):esc(teamName(l))+' · '+esc(flightName(l.flight))}</span><b class="num">${fmt(l.price)}</b></div>`).join('')}<div class="bdl tot"><b>Total</b><span>${b.paid?'Paid'+(b.method?' · '+esc(b.method):''):'Not paid yet'}</span><b class="num">${fmt(o.total)}</b></div></div>`:''}`).join('')||'<div class="row"><span class="muted">No bidders yet.</span></div>'}</div>`;
   $('bq').oninput=e=>{ bq=e.target.value; paneBidders(el); const i=$('bq'); i.focus(); i.setSelectionRange(bq.length,bq.length); };
   $('bAdd').onclick=()=>openBidder(null);
+  el.querySelectorAll('[data-bf]').forEach(x=>x.onclick=()=>{ bf=x.dataset.bf; paneBidders(el); });
+  el.querySelectorAll('[data-bx].exp').forEach(r=>r.onclick=e=>{ if(e.target.closest('select,button')) return; bOpen[r.dataset.bx]=!bOpen[r.dataset.bx]; paneBidders(el); });
   el.querySelectorAll('[data-pay]').forEach(s=>s.onchange=()=>{ const v=s.value; edit(d=>{ const b=d.bidders.find(x=>x.id===s.dataset.pay); b.paid=!!v; b.method=v||''; }); toast(v?`Marked paid · ${v}`:'Marked not paid'); });
   el.querySelectorAll('[data-eb]').forEach(x=>x.onclick=()=>openBidder(x.dataset.eb));
 }
@@ -432,7 +442,7 @@ window.__canReload=()=>!modalOpen&&!dirty&&!saving;
 /* Keeps every open device on the latest version: checks version.json about once a minute and, when a
    newer build is live, reloads at a safe moment (nothing unsaved, no editor open, not mid-typing). */
 (function(){
-  const ME='20261002185546'; let ready=false, lastCheck=0;
+  const ME='20261003014017'; let ready=false, lastCheck=0;
   const typing=()=>{ const a=document.activeElement; return a&&/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)&&a.value&&a.type!=='search'; };
   const safe=()=>!typing()&&(typeof window.__canReload!=='function'||window.__canReload());
   async function check(){ lastCheck=Date.now(); if(location.protocol==='file:') return;

@@ -233,6 +233,16 @@ textarea.inp{height:auto;min-height:84px;padding:10px 12px;resize:vertical}
 .ci-row .btn{min-width:132px;height:42px;justify-content:center;font-size:14px}
 .ci-done{background:#E3F0E8!important;border-color:#BCD9C7!important;color:#1F6B4A!important;font-weight:800}
 @media (max-width:640px){ .ci-row{padding:10px 14px} .ci-row .btn{min-width:110px} .ck-letter{padding:7px 14px 5px} }
+/* bidders: expandable rows */
+.bid-bar{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:10px 22px;border-top:1px solid var(--line)}
+.bid-item .chev{color:var(--muted);font-size:13px}
+.bid-item.open>.tr{background:#FBF7EC}
+.bid-detail{background:#FBFAF5;border-top:1px dashed var(--line);padding:6px 22px 10px 100px}
+.bl-row{display:grid;grid-template-columns:44px minmax(0,1fr) 80px 104px;gap:10px;align-items:center;padding:6px 0;border-top:1px solid #EFE9DA;font-size:14px}
+.bl-row:first-child{border-top:none} .bl-n{font-weight:800;color:var(--navy,#0F2A38)} .bl-t small{display:block;color:var(--muted);font-size:12px} .bl-f{color:var(--muted);font-size:13px} .bl-p{text-align:right}
+.bl-row.tot{border-top:2px solid var(--navy,#0F2A38);margin-top:4px;padding-top:8px} .bl-row.tot .bl-p{font-size:16px}
+@media (max-width:640px){ .bid-detail{padding:6px 14px 10px 14px} .bl-row{grid-template-columns:36px minmax(0,1fr) 84px} .bl-f{display:none} .bid-bar{padding:10px 14px}
+  .cc-bid[data-cbx]{grid-template-columns:16px 46px minmax(0,1fr) 84px 36px!important} .cc-bid[data-cbx]>.cc-n,.cc-bid[data-cbx]>span:nth-child(6){display:none} }
 /* Calcutta search */
 .cc-search{height:38px;width:240px;max-width:100%} @media (max-width:640px){ .cc-search{width:100%} }
 /* Calcutta sub-tabs */
@@ -3491,9 +3501,8 @@ function tCalcutta(el,t){
     </div></div></div>
   </div>
   <div class="cc-pane" data-pane="bidders"${view.ccTab!=='bidders'?' hidden':''}>
-    <div class="card cc-card" style="overflow:hidden"><div class="cardhead"><div><h2 class="h2">Bidders</h2><span class="muted">${c.bidders.filter(b=>b.paid).length} of ${c.bidders.filter(b=>bidderOwes(c,b).total>0).length} buyers paid</span></div>${searchBox('ccBQ',view.ccBQ,'Find a paddle #, name or lot')}<div class="actions">${c.bidders.length?`<button class="btn sm" id="ccClr">Remove all numbers</button>`:''}<button class="btn sm" id="ccBulk">Number the players</button><button class="btn sm" id="ccAddB">${I.plus}Add</button></div></div>
-      <div style="max-height:420px;overflow:auto">${c.bidders.length?(c.bidders.filter(b=>bidderMatches(c,b,view.ccBQ)).map(b=>{ const o=bidderOwes(c,b); return `<div class="tr num click cc-bid" data-cb="${b.id}" style="grid-template-columns:56px minmax(0,1fr) 50px 96px 64px"><b>#${esc(b.num)}</b><span class="trunc">${esc(b.name)}</span><span class="r muted cc-n">${o.lots.length||''}</span><span class="r">${o.total?fmt(o.total):'—'}</span><span class="r">${o.total?(b.paid?`<span class="chip ok">Paid</span>`:'<span class="chip warn">Owes</span>'):''}</span></div>`; }).join('')||`<div class="tr"><span class="muted">No bidders match “${esc(view.ccBQ)}”.</span></div>`)
-        :'<div class="empty" style="padding:22px"><span>Add bidders one at a time, or number every player in the field.</span></div>'}</div></div>
+    <div class="card cc-card" style="overflow:hidden"><div class="cardhead"><div><h2 class="h2">Bidders</h2><span class="muted">${c.bidders.filter(b=>b.paid&&bidderOwes(c,b).total>0).length} of ${c.bidders.filter(b=>bidderOwes(c,b).total>0).length} buyers paid · ${fmt(c.bidders.filter(b=>!b.paid).reduce((a,b)=>a+bidderOwes(c,b).total,0))} still owed</span></div>${searchBox('ccBQ',view.ccBQ,'Find a paddle #, name or lot')}<div class="actions">${c.bidders.length?`<button class="btn sm" id="ccClr">Remove all numbers</button>`:''}<button class="btn sm" id="ccBulk">Number the players</button><button class="btn sm" id="ccAddB">${I.plus}Add</button></div></div>
+      ${bidderListHTML(t)}</div>
   
   </div>
   <div class="cc-pane" data-pane="buyers"${view.ccTab!=='buyers'?' hidden':''}>
@@ -3533,7 +3542,10 @@ function tCalcutta(el,t){
   const st=$('ccStop'); if(st) st.onclick=()=>stopCashierLink(t); $('ccMin').onclick=()=>editMinBid(t); $('ccBi').onclick=()=>editBuyIn(t); const pbn=$('ccPool'); if(pbn) pbn.onclick=()=>editPool(t); $('ccAddE').onclick=()=>editCalcExpense(t,null); $('ccAddB').onclick=()=>editBidder(t,null); $('ccBulk').onclick=()=>bulkBidders(t);
   const cl=$('ccClr'); if(cl) cl.onclick=()=>clearBidders(t);
   el.querySelectorAll('[data-ce]').forEach(r=>r.onclick=()=>editCalcExpense(t,c.expenses.find(e=>e.id===r.dataset.ce)));
-  el.querySelectorAll('[data-cb]').forEach(r=>r.onclick=()=>editBidder(t,c.bidders.find(b=>b.id===r.dataset.cb)));
+  el.querySelectorAll('[data-cbx]').forEach(r=>r.onclick=e=>{ if(e.target.closest('[data-cbe]')) return; const id=r.dataset.cbx; view.ccOpen=view.ccOpen||{}; view.ccOpen[id]=!view.ccOpen[id]; render(); });
+  el.querySelectorAll('[data-cbe]').forEach(b=>b.onclick=e=>{ e.stopPropagation(); editBidder(t,c.bidders.find(x=>x.id===b.dataset.cbe)); });
+  el.querySelectorAll('[data-cbf]').forEach(b=>b.onclick=()=>{ view.ccBF=b.dataset.cbf; render(); });
+  const ea=$('ccExpAll'); if(ea) ea.onclick=()=>{ const ids=bidderRows(t).map(x=>x.b.id); view.ccOpen=view.ccOpen||{}; const open=!ids.every(id=>view.ccOpen[id]); ids.forEach(id=>view.ccOpen[id]=open); render(); };
   el.querySelectorAll('[data-cl]').forEach(r=>r.onclick=()=>r.dataset.cl==='__pool'?editPool(t):editLot(t,c.lots.find(l=>l.id===r.dataset.cl)));
   el.querySelectorAll('[data-ccf]').forEach(b=>b.onclick=()=>{ view.cclot=b.dataset.ccf; render(); });
   wireSearch('ccLQ','ccLQ'); wireSearch('ccBQ','ccBQ'); wireSearch('ccHq','ccH');
@@ -3809,6 +3821,30 @@ function addFieldTeams(t){
 }
 function missingTeamsBanner(t){ const n=fieldTeamsMissing(t).length; if(!n) return '';
   return `<div class="banner" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap"><span style="flex:1 1 260px"><b>${n} team${n===1?'':'s'} in the field ${n===1?'isn’t':'aren’t'} in the Calcutta yet.</b> ${esc(fieldTeamsMissing(t).map(m=>m.names.join(' & ')).join('; '))}</span><button class="btn sm pri" id="ccAddF">Add to the Calcutta</button></div>`; }
+
+/* ---------- bidders: what each owes, expandable to the lots they bought ---------- */
+function bidderRows(t){ const c=calc(t), f=view.ccBF||'all';
+  return c.bidders.filter(b=>bidderMatches(c,b,view.ccBQ)).map(b=>({b,o:bidderOwes(c,b)}))
+    .filter(({b,o})=>f==='all'||(f==='buyers'?o.total>0:o.total>0&&!b.paid)); }
+function bidderListHTML(t){
+  const c=calc(t), f=view.ccBF||'all', open=view.ccOpen||{}, rows=bidderRows(t);
+  if(!c.bidders.length) return '<div class="empty" style="padding:22px"><span>Add bidders one at a time, or number every player in the field.</span></div>';
+  const head=`<div class="bid-bar"><div class="seg">${[['all','All'],['buyers','Buyers'],['unpaid','Unpaid']].map(([k,l])=>`<button class="${f===k?'on':''}" data-cbf="${k}">${l}</button>`).join('')}</div>
+    ${rows.some(r=>r.o.lots.length)?`<button class="btn sm" id="ccExpAll">${rows.filter(r=>r.o.lots.length).every(r=>open[r.b.id])?'Collapse all':'Expand all'}</button>`:''}</div>`;
+  const body=rows.map(({b,o})=>{ const isOpen=!!open[b.id]&&o.lots.length;
+    const lines=o.lots.map(l=>l.isPool
+      ?`<div class="bl-row"><span class="bl-n">${l.lot}</span><span class="bl-t"><b>The Pool</b><small>${esc(l.teams.map(x=>'Lot '+x.lot+' '+teamName(x)).join(' · '))}</small></span><span class="bl-f">Pool</span><b class="bl-p">${fmt(l.price)}</b></div>`
+      :`<div class="bl-row"><span class="bl-n">${l.lot}</span><span class="bl-t">${esc(teamName(l))}${buyInOf(c).on?`<small>buyer owns ${ownership(c,l).buyer}%</small>`:''}</span><span class="bl-f">${esc(flightName(l.flight))}</span><b class="bl-p">${fmt(l.price)}</b></div>`).join('');
+    return `<div class="bid-item${isOpen?' open':''}">
+      <div class="tr num click cc-bid" data-cbx="${b.id}" style="grid-template-columns:22px 56px minmax(0,1fr) 70px 104px 74px 40px" aria-expanded="${isOpen}">
+        <span class="chev">${o.lots.length?(isOpen?'▾':'▸'):''}</span><b>#${esc(b.num)}</b><span class="trunc">${esc(b.name)}</span>
+        <span class="r muted cc-n">${o.lots.length?`${o.lots.length} lot${o.lots.length===1?'':'s'}`:''}</span>
+        <b class="r">${o.total?fmt(o.total):'<span class="muted" style="font-weight:500">—</span>'}</b>
+        <span class="r">${o.total?(b.paid?`<span class="chip ok">Paid</span>`:'<span class="chip warn">Owes</span>'):''}</span>
+        <span class="ib" data-cbe="${b.id}" title="Edit bidder" role="button">${I.edit}</span></div>
+      ${isOpen?`<div class="bid-detail">${lines}<div class="bl-row tot"><span class="bl-n"></span><span class="bl-t"><b>Total owed</b><small>${b.paid?`Paid${b.method?' by '+esc(b.method):''}`:'Not paid yet'}</small></span><span class="bl-f"></span><b class="bl-p">${fmt(o.total)}</b></div></div>`:''}</div>`; }).join('');
+  return head+(body||`<div class="tr"><span class="muted">No bidders match${view.ccBQ?` “${esc(view.ccBQ)}”`:''}.</span></div>`);
+}
 
 /* =====================================================================
    Checklist — per tournament. t.checklist = { sections:[{id,title,sub}], tasks:[{id,section,group,
@@ -4105,7 +4141,7 @@ function retireLegacy(){
 /* Keeps every open device on the latest version: checks version.json about once a minute and, when a
    newer build is live, reloads at a safe moment (nothing unsaved, no editor open, not mid-typing). */
 (function(){
-  const ME='20261002185546'; let ready=false, lastCheck=0;
+  const ME='20261003014017'; let ready=false, lastCheck=0;
   const typing=()=>{ const a=document.activeElement; return a&&/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)&&a.value&&a.type!=='search'; };
   const safe=()=>!typing()&&(typeof window.__canReload!=='function'||window.__canReload());
   async function check(){ lastCheck=Date.now(); if(location.protocol==='file:') return;

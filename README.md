@@ -117,6 +117,9 @@ each have a search box: names, paddle numbers (101 or #101), lot numbers, flight
 - **Teams added to the field later:** the Lots sub-tab shows a notice when the field has teams the Calcutta
   doesn't; **Add to the Calcutta** (also on Setup) adds them with a suggested flight (from the team index) and
   the next lot number — or a lot number of your choice, moving later lots down one. The pool renumbers itself.
+- **What each buyer owes:** every bidder row shows lots bought and the total owed; click (or tap, on the
+  cashier page) to expand the lots — lot, team, flight, price, the pool and its teams — with a total and paid
+  status. Filters: All / Buyers / Unpaid; Expand all in the hub.
 - **Bidders:** add one at a time (member or guest) or **Number the players** to give everyone in the
   field a bidder number (last-name order, choose the starting number). Each bidder shows what they
   bought, what they owe, and paid / paid-by.
