@@ -202,7 +202,10 @@ groups, printed scorecards — the printed cards include a live-scoring QR that 
 
 - **Brand:** navy `#0F2A38`, gold `#C7A13A` / light gold `#D8B75F` / dark gold `#7E5F1A`, ivory `#FBFAF5`,
   line `#E1D9C6`. Cormorant Garamond for display, Public Sans for UI. Crest: `crest.png` (Member-Member) /
-  `mga-crest.png`. **Always lining numerals** (`font-variant-numeric: lining-nums`) — Cormorant's default old-style
+  `mga-crest.png`. **Club logo** (derived from the club's artwork — tree gold `#D69929`, text teal `#254C5B`):
+  `club-logo.png` (color, for white surfaces: login card, picker), `club-logo-light.png` (light gold tree + white
+  script, for the navy sidebar — the club hub and the picker wear it instead of crest + name), `club-mark.png`
+  (tree only, square: the club's `crest` in cards, rows and the top bar), `favicon.png`. **Always lining numerals** (`font-variant-numeric: lining-nums`) — Cormorant's default old-style
   "1" reads as "I"; the PDF font in `pdffonts.js` has lining digits baked in.
 - **UI pattern:** screens are read-only; edits happen in the drawer (`openDrawer({title, body, wire, save, del})`),
   `save` returns `false` to keep it open. After mutating `db`: `persist(); render();`.

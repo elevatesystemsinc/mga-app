@@ -27,7 +27,7 @@ const NAV=[['dash','Dashboard',I.home],['tournaments','Tournaments',I.flag],['me
 const ORG_NAV={club:['dash','tournaments','golf','members','orgs','budget','treasury'],association:['dash','tournaments','golf','members','board','treasury','budget'],group:['dash','tournaments','golf','members']};
 function navItems(){ const allow=ORG_NAV[db.kind]; return NAV.filter(([k])=>!allow||allow.includes(k)).map(([k,l,ic])=>[k,k==='members'&&isClub()?'Directory':l,ic]); }
 /* the organization on screen: the club's record from CLUB.orgs wins over what the document says */
-const curOrg=()=>!db?null:isClub()?Object.assign({},CLUB_META,{name:CLUB.name||CLUB_META.name,crest:CLUB.crest||''}):(orgMeta()||{id:db.id,kind:db.kind,name:db.name,short:db.short});
+const curOrg=()=>!db?null:isClub()?Object.assign({},CLUB_META,{name:CLUB.name||CLUB_META.name,crest:CLUB.crest||CLUB_META.crest}):(orgMeta()||{id:db.id,kind:db.kind,name:db.name,short:db.short});
 const orgShort=()=>{ const o=curOrg(); return o?(o.short||o.name||'club'):'club'; };
 const orgName=()=>{ const o=curOrg(); return o?(o.name||o.short||''):''; };
 function crestHTML(o,cls=''){ const short=(o&&(o.short||o.name)||'?').replace(/[^A-Za-z0-9]/g,'').slice(0,4)||'?'; return o&&o.crest?`<img class="crest ${cls}" src="${esc(o.crest)}" alt="">`:`<span class="mono ${cls}"${short.length>3?' style="font-size:.8em;letter-spacing:0"':''}>${esc(short)}</span>`; }
@@ -87,7 +87,8 @@ function render(){
 function renderInner(){
   const o=curOrg(), clubName=CLUB&&CLUB.name||CLUB_META.name;
   const title=o?(isClub()?'Club Hub':orgShort()+' Hub'):'Club Hub';
-  $('brandCrest').innerHTML=crestHTML(o||CLUB_META); $('brandName').textContent=title; $('brandSub').textContent=o&&!isClub()?clubName:(o?'Club hub':clubName);
+  const lock=!o||isClub();   // the club hub (and the picker) wear the club's lockup; an organization shows its crest + name
+  $('brandCrest').innerHTML=lock?'<img class="lockup" src="club-logo-light.png" alt="'+esc(clubName)+'">':crestHTML(o); $('brandText').hidden=lock; $('brandName').textContent=title; $('brandSub').textContent=clubName;
   $('topCrest').innerHTML=crestHTML(o||CLUB_META,'sm'); $('topName').textContent=title; document.title=title+' · '+clubName;
   $('btnSwitch').hidden=!CLUB||(!db&&!setupNeeded);
   if(!db){ $('nav').innerHTML=''; $('seasonBox').hidden=true; (setupNeeded?vSetup:vPicker)($('main')); return; }
@@ -105,11 +106,11 @@ function renderInner(){
 
 /* ---------- Organization picker / first-run set-up (shown when no organization is open) ---------- */
 function vPicker(m){
-  const orgs=(CLUB&&CLUB.orgs||[]).filter(x=>!x.archived), club=Object.assign({},CLUB_META,{name:CLUB&&CLUB.name||CLUB_META.name,crest:CLUB&&CLUB.crest||''});
+  const orgs=(CLUB&&CLUB.orgs||[]).filter(x=>!x.archived), club=Object.assign({},CLUB_META,{name:CLUB&&CLUB.name||CLUB_META.name,crest:CLUB&&CLUB.crest||CLUB_META.crest});
   const card=(id,x,sub)=>`<button class="orgcard" data-org="${esc(id)}">${crestHTML(x)}<div class="cell2"><b>${esc(x.name)}</b><small>${esc(sub)} · ${esc(orgURL(id))}</small></div>${I.chev}</button>`;
   const unknown=ORG_ID&&ORG_ID!=='club'&&!orgMeta(ORG_ID)&&!db?`<div class="banner">There is no organization at ${esc(orgURL(ORG_ID))}. Pick one below.</div>`:'';
   const grp=(k,empty)=>{ const l=orgs.filter(x=>x.kind===k); return l.length?l.map(x=>card(x.id,x,ORG_KINDS[k]+(x.short?' · '+x.short:''))).join(''):`<p class="muted" style="margin:0;font-size:13.5px">${empty}</p>`; };
-  m.innerHTML=`<div class="phead"><div><h1 class="h1">${esc(club.name)}</h1><p class="sub">Choose what to work on. Each organization has its own hub; the club keeps the member directory.</p></div></div><div class="rule"></div>
+  m.innerHTML=`<div class="phead"><div><img class="pick-logo" src="club-logo.png" alt="${esc(club.name)}"><p class="sub">Choose what to work on. Each organization has its own hub; the club keeps the member directory.</p></div></div><div class="rule"></div>
   ${unknown}<div class="orgs">${card('club',club,'Club hub · member directory · club tournaments · organizations')}
     <h2 class="h2" style="margin-top:10px">Associations</h2>${grp('association','No associations yet — create one in the club hub under Organizations.')}
     <h2 class="h2" style="margin-top:10px">Small groups</h2>${grp('group','No small groups yet — create one in the club hub under Organizations.')}</div>`;

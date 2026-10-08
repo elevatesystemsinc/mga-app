@@ -39,7 +39,7 @@ function daysOut(t){ const d=parseD(t.startDate); if(!d) return null; const now=
    A person is one record club-wide; each organization's membership adds its own status / joined / notes. */
 const HUB_VERSION=2;
 const ORG_KINDS={club:'Club',association:'Association',group:'Small group'};
-const CLUB_META={id:'club',kind:'club',name:'Walnut Creek Country Club',short:'Club'};
+const CLUB_META={id:'club',kind:'club',name:'Walnut Creek Country Club',short:'Club',crest:'club-mark.png'};
 const DEFAULT_ORGS=[{id:'mga',kind:'association',name:'Men’s Golf Association',short:'MGA',crest:'mga-crest.png'},
                     {id:'lga',kind:'association',name:'Ladies’ Golf Association',short:'LGA'},
                     {id:'smga',kind:'association',name:'Senior Men’s Golf Association',short:'SMGA'}];
