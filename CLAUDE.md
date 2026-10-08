@@ -45,6 +45,8 @@ src/
                        leaderboards, match play, skins), scorecard renderer — see docs/formats.md       [shared]
   golf.js              Golf page: events, field, flights, groups, live scoring, printed cards
   games.js             small groups: Games (entry money, payouts by finish / skins, live scoring via golf events), Ledger
+  rounds.js            tournament Rounds & results: rounds with formats → scoring events from the field, combined results,
+                       finishes to the Calcutta                                                       [loads last]
   calccore.js          Calcutta pure logic                                                            [shared]
   pdffonts.js          PDF_FONTS: base64 TTFs for jsPDF (Public Sans 400/700/800, Cormorant 700 w/ lining digits)
   calcutta.js          Calcutta tab: lots, bidders, buyers & shares, money, setup, cashier link, bidder sheet PDF
@@ -163,7 +165,17 @@ idempotent (`calcStamp`/`ckStamp` only stamp an item once per change).
 ## 4. Features (where to look)
 
 **Member-Member is the main tournament.** Tournament tabs (TT): Overview · Meals & events · Field · Check-in ·
-Sponsors · Budget · Checklist · Calcutta · 50/50 Drawing.
+Rounds & results · Sponsors · Budget · Checklist · Calcutta · 50/50 Drawing. `t.features` switches the optional
+tabs (meals, sponsors, budget, checklist, calcutta, raffle) per tournament (`TOURNEY_FEATURES`, `tournamentTabs()`);
+Overview, Field, Check-in and Rounds & results are always on; tournaments from before the toggles keep every tab.
+
+### Rounds & results (`rounds.js`)
+`t.rounds` = one or more rounds per day, each with the full format fields (e.g. Saturday split scramble/shamble,
+Sunday best ball). **Create scoring events** builds one golf event per round from the field (teams → `T<n>`, later
+days copy the first day's flights; groups copy on request). `tournamentResults(t, basis)` totals the rounds per team
+(or player) in the rounds' unit — strokes to par (gross/net basis), points, holes, match points — ranked overall and
+per flight, marked Final when every event is closed. **Send finishes to Calcutta** writes each lot's `place` from the
+flight positions (lots matched by member id or name).
 
 ### Calcutta (`calccore.js`, `calcutta.js`, `payouts.js`)
 Sub-tabs: Lots · Bidders · Buyers & shares · Money · Results · Payouts · Setup.

@@ -4,7 +4,7 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 BUILD=${BUILD:-$(date -u +%Y%m%d%H%M%S)}; export BUILD
-MODULES="core ui treasury golfcore golf games calccore pdffonts calcutta checklist ckcore checkin raffle payouts"
+MODULES="core ui treasury golfcore golf games calccore pdffonts calcutta checklist ckcore checkin raffle payouts rounds"
 { cat src/head.html; printf '<script>\n'; for m in $MODULES; do cat "src/$m.js"; done
   sed "s/__BUILD__/$BUILD/" src/autoupdate.js; printf 'boot();\n</script>\n</body>\n</html>\n'; } > index.html
 python3 - <<'PY'

@@ -226,16 +226,17 @@ function editNewTournament(){
       `<div class="fld"><span class="lbl">Length</span>${seg('nDays',[[1,'1 day'],[2,'2 days'],[3,'3 days']],1)}</div>`+
       pair(field('Start date','nStart','',{type:'date'}),field('Venue','nVenue','Walnut Creek Country Club'))+
       pair(field('Entry fee per player','nFee','',{type:'number',ph:'$'}),field('Skins / day money per player','nSkins','',{type:'number',ph:'$ (optional)'}))+
-      pair(field('Expected players','nPlayers','',{type:'number',hint:'Used for the budget until the field is entered.'}),field('Players per team','nTeam',2,{type:'select',options:[[1,'Individual'],[2,'2-person teams'],[4,'4-person teams']]}))+
+      pair(field('Expected players','nPlayers','',{type:'number',hint:'Used for the budget until the field is entered.'}),field('Players per team','nTeam',2,{type:'select',options:[[1,'Individual'],[2,'2-person teams'],[3,'3-person teams'],[4,'4-person teams']]}))+
+      featuresHTML('nf',{budget:true})+
       field('Golf Genius event (optional)','nGG','',{ph:'Event name or link, for syncing signups later'})+
       field('Start from','nCopy','',{type:'select',options:[['','Blank tournament']].concat(prev.map(t=>[t.id,`Copy ${t.name} (${t.season})`])),hint:'Copying brings over meals, events, sponsor tiers, income and expense lines — actuals, payments and the field are cleared.'}),
     wire:r=>wireSeg(r,'nDays'),
     save:()=>{
       const name=fv('nName'); if(!name){ toast('Give the tournament a name'); return false; }
       const days=+$('nDays').dataset.val||1; const src=db.tournaments.find(t=>t.id===fv('nCopy'));
-      let t=newTournament({season:Y(),name,days,startDate:fv('nStart'),venue:fv('nVenue'),entryFee:fnum('nFee'),skinsFee:fnum('nSkins'),plannedPlayers:fnum('nPlayers'),teamSize:+fv('nTeam'),ggEvent:fv('nGG')});
+      let t=newTournament({season:Y(),name,days,startDate:fv('nStart'),venue:fv('nVenue'),entryFee:fnum('nFee'),skinsFee:fnum('nSkins'),plannedPlayers:fnum('nPlayers'),teamSize:+fv('nTeam'),ggEvent:fv('nGG'),features:readFeatures('nf')});
       if(src) copyStructure(src,t);
-      db.tournaments.push(t); view.tid=t.id; view.page='tournament'; view.ttab='meals'; toast('Tournament created');
+      db.tournaments.push(t); view.tid=t.id; view.page='tournament'; view.ttab=t.features.meals?'meals':'field'; toast('Tournament created');
     }});
 }
 function copyStructure(src,t){
@@ -250,10 +251,16 @@ function copyStructure(src,t){
 
 /* ---------- Tournament detail ---------- */
 const TT=[['overview','Overview'],['meals','Meals & events'],['field','Field'],['sponsors','Sponsors'],['budget','Budget']];
+/* optional tabs per tournament (Overview, Field, Check-in and Rounds & results are always on) */
+const TOURNEY_FEATURES=[['meals','Meals & events'],['sponsors','Sponsors'],['budget','Budget'],['checklist','Checklist'],['calcutta','Calcutta'],['raffle','50/50 Drawing']];
+const tFeatures=t=>t.features||{};
+const tournamentTabs=t=>TT.filter(([k])=>!(k in tFeatures(t))||tFeatures(t)[k]);
+const featuresHTML=(pre,cur)=>`<div class="fld"><span class="lbl">What this tournament uses</span><div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px 14px">${TOURNEY_FEATURES.map(([k,l])=>`<label class="check" style="font-weight:400"><input type="checkbox" id="${pre}${k}"${cur[k]?' checked':''}>${l}</label>`).join('')}</div><p class="hint">Registration (Field), Check-in and Rounds & results are always there. Turn on the Calcutta, sponsors, meals or the drawing only for the tournaments that have them.</p></div>`;
+const readFeatures=pre=>Object.fromEntries(TOURNEY_FEATURES.map(([k])=>[k,!!($(pre+k)&&$(pre+k).checked)]));
 function vTournament(m){
   const t=T(); if(!t){ go('tournaments'); return; }
-  const tabs=TT;
-  if(!tabs.some(x=>x[0]===view.ttab)) view.ttab='budget';
+  const tabs=tournamentTabs(t);
+  if(!tabs.some(x=>x[0]===view.ttab)) view.ttab='overview';
   m.innerHTML=`<div class="crumb"><button data-go="tournaments">Tournaments</button><span class="muted">/</span><span class="muted">${esc(t.name)}</span></div>
   <div class="phead"><div><h1 class="h1">${esc(t.name)}</h1>
     <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap"><span class="chip navy">${t.days} day${t.days>1?'s':''}</span><span class="chip">${dateRange(t)}</span><span class="chip">${tcalc(t).players} players ${t.budgetBasis==='field'?'in field':'planned'}</span>${statusChip(t)}</div></div>
@@ -263,7 +270,7 @@ function vTournament(m){
   wireCommon(m);
   m.querySelectorAll('[data-tab]').forEach(b=>b.onclick=()=>{view.ttab=b.dataset.tab;render();});
   $('tEdit').onclick=()=>editTournament(t);
-  ({overview:tOverview,meals:tMeals,field:tField,sponsors:tSponsors,budget:tBudget,calcutta:tCalcutta,checklist:tChecklist,checkin:tCheckin,raffle:tRaffle}[view.ttab])($('tbody'),t);
+  ({overview:tOverview,meals:tMeals,field:tField,sponsors:tSponsors,budget:tBudget,calcutta:tCalcutta,checklist:tChecklist,checkin:tCheckin,raffle:tRaffle,rounds:tRounds}[view.ttab]||tOverview)($('tbody'),t);
 }
 function editTournament(t){
   openDrawer({kicker:'Tournament',title:'Tournament details',
@@ -271,12 +278,12 @@ function editTournament(t){
       `<div class="fld"><span class="lbl">Length</span>${seg('eDays',[[1,'1 day'],[2,'2 days'],[3,'3 days']],t.days)}<p class="hint">Shortening keeps the later days’ items but stops counting them.</p></div>`+
       pair(field('Start date','eStart',t.startDate,{type:'date'}),field('Venue','eVenue',t.venue))+
       pair(field('Entry fee per player','eFee',t.entryFee,{type:'number'}),field('Skins / day money per player','eSkins',t.skinsFee,{type:'number'}))+
-      field('Budget player count from','eBasis',t.budgetBasis,{type:'select',options:[['planned','Planned count'],['field',`The field (${t.field.length} players now)`]],hint:'Switch to the field once signups close.'})+pair(field('Planned players','ePlayers',t.plannedPlayers,{type:'number'}),field('Players per team','eTeam',t.teamSize,{type:'select',options:[[1,'Individual'],[2,'2-person teams'],[4,'4-person teams']]}))+
+      field('Budget player count from','eBasis',t.budgetBasis,{type:'select',options:[['planned','Planned count'],['field',`The field (${t.field.length} players now)`]],hint:'Switch to the field once signups close.'})+pair(field('Planned players','ePlayers',t.plannedPlayers,{type:'number'}),field('Players per team','eTeam',t.teamSize,{type:'select',options:[[1,'Individual'],[2,'2-person teams'],[3,'3-person teams'],[4,'4-person teams']]}))+
       pair(field('Status','eStatus',t.status,{type:'select',options:['Planning','Open for signups','Complete']}),field('Sponsorship goal','eGoal',t.goal,{type:'number'}))+
-      field('Golf Genius event','eGG',t.ggEvent)+field('Notes','eNotes',t.notes,{type:'textarea'}),
+      featuresHTML('ef',tFeatures(t))+field('Golf Genius event','eGG',t.ggEvent)+field('Notes','eNotes',t.notes,{type:'textarea'}),
     wire:r=>wireSeg(r,'eDays'),
     save:()=>{ Object.assign(t,{name:fv('eName')||t.name,days:+$('eDays').dataset.val||t.days,startDate:fv('eStart'),venue:fv('eVenue'),entryFee:fnum('eFee'),skinsFee:fnum('eSkins'),
-      plannedPlayers:fnum('ePlayers'),budgetBasis:fv('eBasis'),teamSize:+fv('eTeam'),status:fv('eStatus'),goal:fnum('eGoal'),ggEvent:fv('eGG'),notes:fv('eNotes')}); toast('Saved'); },
+      plannedPlayers:fnum('ePlayers'),budgetBasis:fv('eBasis'),teamSize:+fv('eTeam'),status:fv('eStatus'),goal:fnum('eGoal'),ggEvent:fv('eGG'),notes:fv('eNotes'),features:readFeatures('ef')}); toast('Saved'); },
     del:()=>{ if(!confirm(`Delete ${t.name} and everything in it?`)) return false; const i=db.tournaments.indexOf(t), copy=clone(t);
       db.tournaments.splice(i,1); view.page='tournaments'; toast('Tournament deleted',()=>{db.tournaments.splice(i,0,copy);persist();render();}); },delLabel:'Delete tournament'});
 }

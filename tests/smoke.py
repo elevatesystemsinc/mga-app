@@ -22,14 +22,29 @@ async def main():
       brand=await pg.evaluate("()=>[document.getElementById('brandName').textContent, isClub(), db.id]")
       print(f'{org:5} pages {pages} tabs {len(tabs)} brand {brand} errors {errs}'); bad+=bool(errs)
       if org=='mga':
+        # rounds → scoring events from the field → combined results; tab toggles
+        r=await pg.evaluate("""async()=>{ const t=db.tournaments.find(x=>x.id==='T1'); t.teamSize=2; t.days=2; t.startDate='2026-10-03';
+          ['Ann Able 4.1','Bo Baker 12.0','Cy Cole 20.3','Di Dunn 8.8'].forEach((x,i)=>{ const [f,l,h]=x.split(' '); CLUB.members.push({id:'q'+i,first:f,last:l,hcp:h,status:'Active'}); db.memberships.push({id:'q'+i,status:'Active',joined:'',notes:''}); t.field.push({id:uid(),memberId:'q'+i,team:i<2?1:2,paid:true,skins:false,answers:{}}); });
+          t.rounds=defaultRounds(t); t.rounds[0]=Object.assign(t.rounds[0],{format:'split',front:'scramble',back:'shamble',count:1}); createRoundEvents(t);
+          const evs=t.rounds.map(roundEvent); for(const ev of evs){ ev.groups=[{id:uid(),code:newCode(ev),label:'Oak 1',course:'oak',startHole:1,teeTime:'',players:ev.pool}]; ev.pool=[]; }
+          for(const ev of evs) for(const p of ev.groups[0].players) for(let h=1;h<=18;h++) await setScore(ev,p.id,h,4+(p.team==='T2'&&h%3===0?1:0)+(ev===evs[1]&&p.memberId==='q0'&&h%2===0?-1:0));
+          const R=tournamentResults(t,'gross'); view.ttab='rounds'; render(); const tabsAll=tournamentTabs(t).map(x=>x[0]);
+          t.features={meals:false,sponsors:false,budget:true,checklist:false,calcutta:false,raffle:false}; render(); const tabsFew=tournamentTabs(t).map(x=>x[0]);
+          return {events:evs.map(e=>[e.format,e.front,e.back,e.teamSize,e.pool.length+e.groups[0].players.length,e.groups[0].players.map(p=>p.team).join('')]), rows:R.list.map(u=>[u.name,u.posTxt,u.totalTxt,u.rounds[t.rounds[0].id].txt,u.rounds[t.rounds[1].id].txt]), unit:R.unit, tabsAll, tabsFew, rowsShown:document.querySelectorAll('#tbody .tr.num').length}; }""")
+        # Oak par 36/35. R1 split: scramble front (captain's 4s → E; T2 +3) + shamble back (T1 4s → +1; T2 +4) → T1 +1, T2 +7. R2 best ball: Ann's even-hole birdies → 63 (−8); T2 78 (+7). Totals −7 / +14
+        ok=(r['events']==[['split','scramble','shamble',2,4,'T1T1T2T2'],['bestball','scramble','shamble',2,4,'T1T1T2T2']] and r['unit']=='strokes'
+            and r['rows'][0][0].startswith('Ann Able') and r['rows'][0][1]=='1' and r['rows'][0][2]=='−7' and r['rows'][0][3]=='+1' and r['rows'][0][4]=='−8'
+            and r['rows'][1][1]=='2' and r['rows'][1][2]=='+14' and r['rows'][1][3]=='+7' and r['rows'][1][4]=='+7'
+            and r['tabsAll']==['overview','meals','field','checkin','rounds','sponsors','budget','checklist','calcutta','raffle'] and r['tabsFew']==['overview','field','checkin','rounds','budget'] and r['rowsShown']==2)
+        print('rounds → events → results; tab toggles', r, 'OK' if ok else 'FAIL'); bad+=not ok
         # a member added in the association lands in the club directory + this organization's memberships; the drawer opens on the view
         r=await pg.evaluate("""()=>{ const p=upsertMember(null,{first:'Ada',last:'Lovelace',email:'ada@x.org',status:'Active',joined:'2026-01-01',notes:'hi'}); persist();
           const v=memberById(p.id); go('members'); editMember(v); const open=drawerOpen(); closeDrawer();
           return {inDir:!!CLUB.members.find(x=>x.id===p.id), personHasNotes:'notes' in CLUB.members.find(x=>x.id===p.id), ms:db.memberships.find(m=>m.id===p.id), view:[v.first,v.status,v.notes], count:members().length, open}; }""")
-        ok=r['inDir'] and not r['personHasNotes'] and r['ms']['status']=='Active' and r['view']==['Ada','Active','hi'] and r['count']==1 and r['open']
+        ok=r['inDir'] and not r['personHasNotes'] and r['ms']['status']=='Active' and r['view']==['Ada','Active','hi'] and r['count']==5 and r['open']
         print('member add via association', r, 'OK' if ok else 'FAIL'); bad+=not ok
         r=await pg.evaluate("()=>{ removeMember(members()[0].id); return {dir:CLUB.members.length, ms:db.memberships.length}; }")
-        ok=r=={'dir':1,'ms':0}; print('remove from association keeps the person', r, 'OK' if ok else 'FAIL'); bad+=not ok
+        ok=r=={'dir':5,'ms':4}; print('remove from association keeps the person', r, 'OK' if ok else 'FAIL'); bad+=not ok
       if org=='club':
         r=await pg.evaluate("""()=>{ go('orgs'); editOrg(null,'group'); document.getElementById('ogN').value='The Misfits'; document.getElementById('ogS').value='Misfits'; document.getElementById('dSave').click();
           const o=CLUB.orgs.find(x=>x.id==='misfits'); db=null; render(); const cards=[...document.querySelectorAll('[data-org]')].map(b=>b.dataset.org); return {o, cards}; }""")

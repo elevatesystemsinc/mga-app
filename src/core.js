@@ -60,7 +60,8 @@ function newTournament(o){
     status:'Planning',budgetBasis:'planned',entryFee:n0(o.entryFee),skinsFee:n0(o.skinsFee),plannedPlayers:n0(o.plannedPlayers),teamSize:+o.teamSize||2,ggEvent:o.ggEvent||'',
     field:[],sponsors:[],tiers:[],goal:0,
     dayItems:[[],[],[]].slice(0,3),income:[],perPlayer:[],lines:[],
-    actuals:{entryFees:0,skins:0,skinsPaid:0},schedule:[],decisions:[],notes:'',source:null};
+    actuals:{entryFees:0,skins:0,skinsPaid:0},schedule:[],decisions:[],notes:'',source:null,
+    features:Object.assign({meals:false,sponsors:false,budget:true,checklist:false,calcutta:false,raffle:false},o.features||{})};   // which optional tabs this tournament uses
 }
 function normalize(d,meta){
   if(!d||typeof d!=='object') return emptyOrg(meta);
@@ -74,6 +75,7 @@ function normalize(d,meta){
     t.dayItems=t.dayItems||[[],[],[]]; while(t.dayItems.length<3) t.dayItems.push([]);
     for(const k of ['field','sponsors','tiers','income','perPlayer','lines','schedule','decisions','fieldQuestions']) t[k]=t[k]||[];
     t.actuals=Object.assign({entryFees:0,skins:0,skinsPaid:0},t.actuals||{}); if(!t.budgetBasis) t.budgetBasis='planned';
+    if(!t.features) t.features={meals:true,sponsors:true,budget:true,checklist:true,calcutta:true,raffle:true};   // tournaments from before the toggles keep every tab
     (t.dayItems||[]).forEach(d=>(d||[]).forEach(it=>{ if(it.menu) it.menu.svcPct=0; }));
     if(!d.seasons[t.season]) d.seasons[t.season]=newSeason();
   }

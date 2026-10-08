@@ -23,6 +23,15 @@ own hub. An organization's **Members** page is the club members who belong to it
 the organization's own list (club members are matched and joined; new people are added to the directory too), and keep
 status, join date, notes and dues per organization. Editing a person's details anywhere updates the directory.
 
+## Rounds & results
+
+Each tournament declares its rounds — one or more per day, each with a format (a day can be scramble on the front
+and shamble on the back, the next day best ball). **Create scoring events** builds the live-scoring events from the
+field in one click, teams and all; later days copy the first day's flights, and groups can be copied too. **Results**
+total every round per team or player, overall and by flight, and can be sent to the Calcutta as finishes. Tournament
+details has checkboxes for which tabs a tournament uses: the Calcutta, sponsors, meals, checklist and the 50/50 drawing
+are optional; registration, check-in and rounds are always there.
+
 ## Formats
 
 Scoring events (and small-group games) support stroke play, Stableford, modified Stableford, quota, par/bogey, singles
