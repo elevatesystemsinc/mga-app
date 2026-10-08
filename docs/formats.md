@@ -5,6 +5,34 @@ exactly how team scores and handicaps are worked out for solo play and for 2-, 3
 The engine that implements it is `src/golfcore.js` (shared by the hub and the public scoring page); the unit checks
 are `tests/test_formats.js`.
 
+## The game library
+
+`GAME_CATALOG` in `golfcore.js` is the list the pickers draw from: every game below, grouped as Individual, Match play,
+Team · own ball, Team · one ball, Side games and Partner draws. The **club hub → Game library** switches entries on or
+off for every association and small group. Beyond the formats in the tables below it adds:
+
+| Game | How it is scored |
+|---|---|
+| **Maximum score** | Stroke play with each hole capped at net double bogey (par + 2 + strokes received). |
+| **Chicago** | Quota from 39 instead of 36 (same point table). |
+| **Nassau** | A singles match scored as three bets: front nine, back nine and the eighteen, one point each. |
+| **Hi-Lo** | Two against two, two points a hole: the better low ball and the better high ball. |
+| **Foursomes match play** | Alternate shot, one ball per side off the team handicap (50% of combined), hole by hole. |
+| **Cha-cha-cha** | Best ball with 1, 2, 3 balls counting on successive holes, repeating. |
+| **1-2-3 by par** | One best ball on par 3s, two on par 4s, three on par 5s. |
+| **Yellow ball** | A designated ball rotates through the team (player 1 on hole 1, player 2 on hole 2…) and must count on its hole, plus the best of the rest. |
+| **Florida scramble** | A scramble by another name; scored like one. |
+| **Chapman / Pinehurst** | Scored as a greensome (60% low + 40% high). |
+| **Dots / Doodah / Garbage** (side game) | Birdies and eagles are counted from the scores; sandies, greenies, chip-ins and the like are tallied by the group. Pot ÷ dots. |
+| **Blind-draw partners** (side game) | Everyone plays their own ball; partners are drawn afterwards and scored as best ball. |
+| **Low gross / low net pot** (side game) | An individual stroke-play pot alongside a team game. |
+| **Closest to the pin · Long drive · Hole-in-one** (side games) | Winners entered by the committee. |
+
+**Partner draws** (Golf → event → Field → Draw partners, or a game's Live scoring card): random; ABCD (the field split
+into handicap tiers, one player drawn from each tier per team); balanced snake by handicap. Before the round the groups
+are then built around the teams; after the round the draw is scored from the individual rounds, so partners can sit
+in different groups.
+
 ## Handicaps: the three numbers
 
 | Number | How it is worked out |

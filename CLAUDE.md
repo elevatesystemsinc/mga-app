@@ -255,6 +255,11 @@ groups, printed scorecards — the printed cards include a live-scoring QR that 
   hub's import / Verify / two-way sync / "Retire current app" code was removed in Oct 2026. Stored documents may still carry `db.legacy`, `t.source` (`kind:'mm-app'`) and
   `t.sync` from that era; nothing reads them and `normalize()` leaves them alone.
 - 2026 Member-Member: Oct 2–4. 150 players / 75 teams (Team 84, Regina & Cagle, added late as Lot 75).
+- **Built Oct 2026 (game library):** `GAME_CATALOG` / `gameCatalog()` / `enabledGames()` / `catalogOf(pub)` in golfcore;
+  the club hub's **Game library** page stores switches in `CLUB.games.disabled`; `gameOptions()` + `engineFrom(C,…)`
+  (golf.js) drive the pickers in editEvent, editRound and editGame; events carry `game` (catalog id) plus the engine
+  fields (`quotaBase`, `cap`, `matchScoring` nassau/hilo, `matchForm` foursomes, `countPattern` 123/123rot/par345/yellow).
+  Teams may span groups (`eventTeams`) so post-round partner draws score. `drawPartners(ev)`: random / ABCD / snake.
 - **Built Oct 2026 (formats):** `docs/formats.md` is the reference. Event fields: `format` (stroke, stableford, modstable,
   quota, parbogey, match, bestball, aggregate, scramble, shamble, foursomes, greensome, teamstable, split), `teamSize`
   1–6, `count` (balls that count), `countPattern` ('123'), `scoring`, `allow` (overrides by `allowKey`; defaults in

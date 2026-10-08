@@ -22,9 +22,10 @@ const I={
   trash:svg('<path d="M4 7h16M10 7V4h4v3M6 7l1 13h10l1-13"/>'), check:svg('<path d="M5 12l5 5 9-10"/>'), refresh:svg('<path d="M20 11a8 8 0 10-2.3 5.7"/><path d="M20 4v7h-7"/>'),
 };
 I.org=svg('<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18M9 20v-6h6v6"/>');
-const NAV=[['dash','Dashboard',I.home],['tournaments','Tournaments',I.flag],['members','Members',I.users],['board','Board',I.shield],['budget','Season budget',I.ledger],['orgs','Organizations',I.org]];
+I.lib=svg('<path d="M4 5h5a3 3 0 013 3v12a2 2 0 00-2-2H4z"/><path d="M20 5h-5a3 3 0 00-3 3v12a2 2 0 012-2h6z"/>');
+const NAV=[['dash','Dashboard',I.home],['tournaments','Tournaments',I.flag],['members','Members',I.users],['board','Board',I.shield],['budget','Season budget',I.ledger],['orgs','Organizations',I.org],['library','Game library',I.lib]];
 /* which pages each kind of organization gets (associations get everything) */
-const ORG_NAV={club:['dash','tournaments','golf','members','orgs','budget','treasury'],association:['dash','tournaments','golf','members','board','treasury','budget'],group:['dash','tournaments','golf','members']};
+const ORG_NAV={club:['dash','tournaments','golf','members','orgs','library','budget','treasury'],association:['dash','tournaments','golf','members','board','treasury','budget'],group:['dash','tournaments','golf','members']};
 function navItems(){ const allow=ORG_NAV[db.kind]; return NAV.filter(([k])=>!allow||allow.includes(k)).map(([k,l,ic])=>[k,k==='members'&&isClub()?'Directory':l,ic]); }
 /* the organization on screen: the club's record from CLUB.orgs wins over what the document says */
 const curOrg=()=>!db?null:isClub()?Object.assign({},CLUB_META,{name:CLUB.name||CLUB_META.name,crest:CLUB.crest||CLUB_META.crest}):(orgMeta()||{id:db.id,kind:db.kind,name:db.name,short:db.short});
@@ -101,7 +102,7 @@ function renderInner(){
     live.map(e=>`<button class="nav livelink" data-golfev="${e.id}"><span class="livedot"></span><span class="trunc">Leaderboard · ${esc(e.name)}</span></button>`).join('');
   $('nav').querySelectorAll('[data-go]').forEach(b=>b.onclick=()=>{ if(b.dataset.go==='golf') view.geid=null; go(b.dataset.go); });
   const m=$('main');
-  ({dash:vDash,tournaments:vTournaments,tournament:vTournament,members:vMembers,board:vBoard,budget:vBudget,treasury:vTreasury,golf:vGolf,orgs:vOrgs,pick:vPicker,games:vGames,ledger:vLedger}[view.page]||vDash)(m);
+  ({dash:vDash,tournaments:vTournaments,tournament:vTournament,members:vMembers,board:vBoard,budget:vBudget,treasury:vTreasury,golf:vGolf,orgs:vOrgs,pick:vPicker,games:vGames,ledger:vLedger,library:vLibrary}[view.page]||vDash)(m);
 }
 
 /* ---------- Organization picker / first-run set-up (shown when no organization is open) ---------- */
@@ -145,6 +146,17 @@ function vOrgs(m){
   $('oGrp').onclick=()=>editOrg(null,'group'); $('oAssoc').onclick=()=>editOrg(null,'association');
   const mg=$('oMig'); if(mg) mg.onclick=async()=>{ if(!confirm('Replace the MGA’s hub here with the MGA Hub’s current data, and update the directory from its member list?')) return; mg.disabled=true;
     try{ const r=await migrateFromHub(); toast(`Imported · ${r.people} people · ${r.tournaments} tournaments`); render(); }catch(e){ mg.disabled=false; toast(e.message||'Import failed'); } };
+}
+/* ---------- Game library (club hub): which games the club makes available to its organizations ---------- */
+function vLibrary(m){
+  if(!isClub()){ go('dash'); return; }
+  CLUB.games=CLUB.games||{disabled:{}}; const dis=CLUB.games.disabled=CLUB.games.disabled||{};
+  const cat=gameCatalog(), groups=[...new Set(cat.map(g=>g.group))], on=cat.filter(g=>!dis[g.id]).length;
+  m.innerHTML=head('Game library',`Every game the hub can score. Switch a game off here and it disappears from the pickers in every association and small group. ${on} of ${cat.length} on. The math behind each game is in docs/formats.md.`,btn('Turn everything on','libAll',''))+
+    groups.map(gr=>`<div class="card" style="overflow:hidden"><div class="cardhead"><h2 class="h2">${esc(gr)}</h2><span class="muted">${cat.filter(g=>g.group===gr&&!dis[g.id]).length} of ${cat.filter(g=>g.group===gr).length} on</span></div><div class="t">
+      ${cat.filter(g=>g.group===gr).map(g=>`<div class="tr" style="grid-template-columns:52px minmax(0,1.3fr) minmax(0,2fr) 170px"><label class="check" style="margin:0"><input type="checkbox" data-lib="${g.id}"${dis[g.id]?'':' checked'} aria-label="${esc(g.name)} on"></label><div class="cell2"><b>${esc(g.name)}</b><small>${g.sizes?'Teams of '+g.sizes.join(', '):g.side?'Side game':g.tool?'Tool':'Individual'}${g.manual?' · entered by hand':''}</small></div><span style="font-size:13px">${esc(g.desc||'')}</span><span class="muted" style="font-size:12.5px">${g.hcp?'Allowance: '+esc(g.hcp):''}</span></div>`).join('')}</div></div>`).join('');
+  m.querySelectorAll('[data-lib]').forEach(c=>c.onchange=()=>{ if(c.checked) delete dis[c.dataset.lib]; else dis[c.dataset.lib]=true; persist(); render(); });
+  $('libAll').onclick=()=>{ CLUB.games.disabled={}; persist(); render(); toast('Every game is on'); };
 }
 function editOrg(o,kind){
   kind=o?o.kind:kind;

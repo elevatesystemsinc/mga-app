@@ -15,9 +15,9 @@ const roundEvent=r=>r&&r.eventId?golfData().events.find(e=>e.id===r.eventId):nul
 const roundDate=(t,day)=>{ const d=parseD(t.startDate); if(!d) return ''; const x=addDays(d,day); return `${x.getFullYear()}-${String(x.getMonth()+1).padStart(2,'0')}-${String(x.getDate()).padStart(2,'0')}`; };
 const roundLabel=(t,r)=>r.name||`${dayLabel(t,r.day).split(' · ')[0]} · ${formatSummary(r)}`;
 function defaultRounds(t){ const n=Math.max(1,t.days||1), ts=t.teamSize||1;
-  return Array.from({length:n},(_,day)=>({id:uid(),day,name:'',format:ts>=2?'bestball':'stroke',front:'scramble',back:'shamble',teamSize:ts,count:1,countPattern:'',scoring:'net',eventId:''})); }
+  return Array.from({length:n},(_,day)=>Object.assign({id:uid(),day,name:'',front:'scramble',back:'shamble',scoring:'net',eventId:''},engineFrom(catalogById(ts>=2?'bestball':'stroke'),ts,1))); }
 /* the round's format fields, pushed onto its event */
-const ROUND_KEYS=['format','front','back','teamSize','count','countPattern','scoring'];
+const ROUND_KEYS=['game','format','front','back','teamSize','count','countPattern','quotaBase','cap','matchScoring','matchForm','scoring'];
 function roundToEvent(r,ev){ ROUND_KEYS.forEach(k=>{ ev[k]=r[k]; }); if(!ev.allow) ev.allow={}; }
 
 function tRounds(el,t){
@@ -68,19 +68,19 @@ function editRound(t,r){
   const cur=r||{day:tournamentRounds(t).length%(t.days||1),name:'',format:ts>=2?'bestball':'stroke',front:'scramble',back:'shamble',teamSize:ts,count:1,countPattern:'',scoring:'net'};
   openDrawer({kicker:t.name,title:r?'Round':'Add round',
     body:pair(field('Day','rdD',cur.day,{type:'select',options:days}),field('Name (optional)','rdN',cur.name,{ph:'e.g. Saturday · Scramble / Shamble'}))+
-      `<div class="fld"><span class="lbl">Format</span><select class="inp" id="rdF">${FORMAT_GROUPS.map(([g,fs])=>`<optgroup label="${g}">${fs.map(f=>`<option value="${f}"${cur.format===f?' selected':''}>${FORMAT_LABEL[f]}</option>`).join('')}</optgroup>`).join('')}</select></div>
+      `<div class="fld"><span class="lbl">Game</span><select class="inp" id="rdF">${gameOptions(cur.game||catalogOf(cur).id)}</select></div>
        <div id="rdSplit" style="display:${cur.format==='split'?'grid':'none'};grid-template-columns:repeat(2,minmax(0,1fr));gap:12px">${field('Front nine (1–9)','rdFr',cur.front,{type:'select',options:TEAM_FORMATS.map(f=>[f,FORMAT_LABEL[f]])})}${field('Back nine (10–18)','rdBk',cur.back,{type:'select',options:TEAM_FORMATS.map(f=>[f,FORMAT_LABEL[f]])})}</div>
-       <div id="rdTeam" style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px">${field('Team size','rdTS',cur.teamSize||ts,{type:'select',options:[2,3,4,5,6].map(n=>[n,n+' players'])})}${field('Balls that count','rdCnt',cur.count||1,{type:'select',options:[1,2,3,4,5].map(n=>[n,'Best '+n])})}${field('Pattern','rdCP',cur.countPattern||'',{type:'select',options:[['','Same all holes'],['123','1-2-3 by six holes']]})}</div>
+       <div id="rdTeam" style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px">${field('Team size','rdTS',cur.teamSize||ts,{type:'select',options:[2,3,4,5,6].map(n=>[n,n+' players'])})}${field('Balls that count','rdCnt',cur.count||1,{type:'select',options:[1,2,3,4,5].map(n=>[n,'Best '+n])})}</div>
        <p class="hint" id="rdHint"></p>`+field('Scored','rdSc',cur.scoring||'net',{type:'select',options:[['net','Net (handicaps)'],['gross','Gross']]})+
       (ev?`<p class="hint">Changes apply to its scoring event too (${esc(ev.name)}). Allowances are edited on the event.</p>`:`<p class="hint">${ts>=2?`Teams come from the field (${ts} players).`:'An individual tournament: team formats form teams in the groups.'}</p>`),
-    wire:x=>{ const upd=()=>{ const f=x.querySelector('#rdF').value, F=FORMATS[f]||FORMATS.stroke, team=F.team===true||f==='split'||f==='match'; x.querySelector('#rdSplit').style.display=f==='split'?'grid':'none'; x.querySelector('#rdTeam').style.display=team?'grid':'none';
-        const tsSel=x.querySelector('#rdTS'); if(ts>=2&&!F.size){ tsSel.value=ts; tsSel.disabled=true; } else if(F.size){ tsSel.value=F.size; tsSel.disabled=true; } else tsSel.disabled=false;
-        const n=+tsSel.value; x.querySelector('#rdCnt').parentElement.style.display=F.count||f==='split'?'':'none'; x.querySelector('#rdCP').parentElement.style.display=F.count&&n===4?'':'none'; [...x.querySelector('#rdCnt').options].forEach(o=>{ o.disabled=+o.value>=n; }); if(+x.querySelector('#rdCnt').value>=n) x.querySelector('#rdCnt').value=1;
-        x.querySelector('#rdHint').textContent=f==='split'?'Front nine and back nine are scored with different team formats; both count toward the round.':F.team===true?`${F.label}: ${f==='scramble'||f==='foursomes'||f==='greensome'?'one team score per hole':'everyone plays their own ball'}.`:''; };
+    wire:x=>{ const upd=()=>{ const C=catalogById(x.querySelector('#rdF').value)||catalogById('stroke'), f=C.engine.format, sizes=C.sizes||null, team=!!sizes||f==='split'; x.querySelector('#rdSplit').style.display=f==='split'?'grid':'none'; x.querySelector('#rdTeam').style.display=team?'grid':'none';
+        const tsSel=x.querySelector('#rdTS'); [...tsSel.options].forEach(o=>{ o.hidden=sizes?!sizes.includes(+o.value):false; });
+        if(C.engine.teamSize){ tsSel.value=C.engine.teamSize; tsSel.disabled=true; } else if(ts>=2&&sizes&&sizes.includes(ts)){ tsSel.value=ts; tsSel.disabled=true; } else { tsSel.disabled=false; if(sizes&&!sizes.includes(+tsSel.value)) tsSel.value=sizes[0]; }
+        const n=+tsSel.value; x.querySelector('#rdCnt').parentElement.style.display=C.count?'':'none'; [...x.querySelector('#rdCnt').options].forEach(o=>{ o.disabled=+o.value>=n; }); if(+x.querySelector('#rdCnt').value>=n) x.querySelector('#rdCnt').value=1;
+        x.querySelector('#rdHint').textContent=f==='split'?'Front nine and back nine are scored with different team formats; both count toward the round.':(C.desc||''); };
       ['#rdF','#rdTS','#rdFr','#rdBk'].forEach(id=>x.querySelector(id).onchange=upd); upd(); },
-    save:()=>{ const f=fv('rdF'), F=FORMATS[f]||FORMATS.stroke; if(f==='split'&&fv('rdFr')===fv('rdBk')){ toast('Front and back use the same format — pick it as the format instead'); return false; }
-      const tsz=F.size||(F.team===true||f==='split'||f==='match'?+fv('rdTS')||2:1);
-      const d={day:+fv('rdD')||0,name:fv('rdN'),format:f,front:fv('rdFr'),back:fv('rdBk'),teamSize:tsz,count:Math.min(tsz-1,+fv('rdCnt')||1)||1,countPattern:tsz===4?fv('rdCP'):'',scoring:fv('rdSc')};
+    save:()=>{ const C=catalogById(fv('rdF'))||catalogById('stroke'), E=engineFrom(C,+fv('rdTS'),+fv('rdCnt')); if(E.format==='split'){ if(fv('rdFr')===fv('rdBk')){ toast('Front and back use the same format — pick it as the game instead'); return false; } E.teamSize=+fv('rdTS')||2; }
+      const d=Object.assign({day:+fv('rdD')||0,name:fv('rdN'),front:fv('rdFr'),back:fv('rdBk'),scoring:fv('rdSc')},E);
       if(r){ Object.assign(r,d); const e=roundEvent(r); if(e){ roundToEvent(r,e); e.date=roundDate(t,r.day)||e.date; golfSave(e); } } else tournamentRounds(t).push(Object.assign({id:uid(),eventId:''},d)); },
     del:r?()=>{ const e=roundEvent(r); if(e&&!confirm(`Remove this round? Its scoring event (${e.name}) stays in Golf.`)) return false; t.rounds=t.rounds.filter(x=>x!==r); }:null,delLabel:'Remove round'});
 }
@@ -220,12 +220,14 @@ async function resultsPDF(t,opt){
   const rounds=R.rounds, rl=r=>dayLabel(t,r.day).split(' · ')[0].slice(0,3)+(rounds.filter(x=>x.day===r.day).length>1?' '+(rounds.filter(x=>x.day===r.day).indexOf(r)+1):'');
   const cw=Math.min(62,Math.floor(170/Math.max(1,rounds.length))), nameW=R2-L-44-40-rounds.length*cw-66;
   page();
-  doc.setFillColor(...GOLD); doc.roundedRect(L,32,R2-L,78,8,8,'F'); doc.setFillColor(...NAVY); doc.roundedRect(L,32,R2-L,74,8,8,'F'); doc.rect(L,94,R2-L,8,'F');
+  font('PublicSans','normal',8.4,[214,218,220]); const sub=doc.splitTextToSize(`${dateRange(t)} · ${rounds.map(r=>`${dayLabel(t,r.day).split(' · ')[0]}: ${formatSummary(r)}`).join(' · ')} · ${R.unit==='strokes'?(t.resultsBasis||'net')+' to par':R.unit}${R.final?'':' · as of '+new Date().toLocaleString()}`,R2-L-90);
+  const bandH=74+Math.max(0,sub.length-1)*11;
+  doc.setFillColor(...GOLD); doc.roundedRect(L,32,R2-L,bandH+4,8,8,'F'); doc.setFillColor(...NAVY); doc.roundedRect(L,32,R2-L,bandH,8,8,'F'); doc.rect(L,32+bandH-12,R2-L,8,'F');
   if(crest) doc.addImage(crest,'PNG',L+16,42,54*914/1180,54);
   font('PublicSansXB','normal',6.8,GOLDL); doc.text(`${(orgName()||'').toUpperCase()} · ${t.season||''}`,L+76,56,{charSpace:1.2});
   font('Cormorant','bold',24,[255,255,255]); doc.text(`${t.name} — ${R.final?'Final Results':'Results'}`,L+76,80);
-  font('PublicSans','normal',8.4,[214,218,220]); doc.text(`${dateRange(t)} · ${rounds.map(r=>`${dayLabel(t,r.day).split(' · ')[0]}: ${formatSummary(r)}`).join(' · ')} · ${R.unit==='strokes'?(t.resultsBasis||'net')+' to par':R.unit}${R.final?'':' · as of '+new Date().toLocaleString()}`,L+76,96,{maxWidth:R2-L-90});
-  let y=128;
+  font('PublicSans','normal',8.4,[214,218,220]); doc.text(sub,L+76,96);
+  let y=32+bandH+26;
   const flights=[...new Set(R.list.map(u=>u.flight))].sort((a,b)=>(a||'~').localeCompare(b||'~'));
   const head=label=>{ if(y>H-80){ doc.addPage(); page(); y=48; } font('PublicSansXB','normal',7.4,GOLDDK); doc.text(label.toUpperCase(),L,y,{charSpace:1.1}); y+=6; doc.setDrawColor(...GOLD); doc.setLineWidth(1); doc.line(L,y,R2,y); y+=12;
     font('PublicSans','bold',7.6,MUTED); doc.text('POS',L,y); doc.text(R.list[0].isTeam?'TEAM':'PLAYER',L+30,y); let x=L+30+nameW; rounds.forEach(r=>{ doc.text(rl(r).toUpperCase(),x+cw-2,y,{align:'right'}); x+=cw; }); doc.text('TOTAL',R2-2,y,{align:'right'}); y+=10; };

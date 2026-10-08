@@ -36,6 +36,16 @@ shotgun), and every group stays editable. Tournament
 details has checkboxes for which tabs a tournament uses: the Calcutta, sponsors, meals, checklist and the 50/50 drawing
 are optional; registration, check-in and rounds are always there.
 
+## Game library
+
+The club hub's **Game library** lists every game the hub can score — stroke play, maximum score, Stableford and modified,
+quota and Chicago, par/bogey, singles, Nassau, four-ball, Hi-Lo and foursomes match play, best ball of any size,
+aggregate, 1-2-3, cha-cha-cha, 1-2-3 by par, yellow ball, shamble, team Stableford, scramble and Florida scramble,
+foursomes, greensome, Chapman, a front/back split, and the side games (skins, dots, closest to the pin, long drive,
+low gross/net pots, blind-draw partners, hole-in-one) plus random, ABCD and balanced partner draws — and lets the club
+switch any of them off for its associations and small groups. **Draw partners** on an event (or a game) draws teams
+before or after the round.
+
 ## Formats
 
 Scoring events (and small-group games) support stroke play, Stableford, modified Stableford, quota, par/bogey, singles

@@ -116,4 +116,37 @@ mb=matchBoard(ev({format:'match',teamSize:2,scoring:'net'},fb),scm,{});
 check('four-ball: 90% then off the low man (A 4, B 9, C 5, D 18 → C gets 1, D 14): C’s stroke wins hole 1 for Y, A’s birdie on 18 squares it → AS',mb.every(r=>r.status==='AS'&&r.pts===0.5),mb.map(r=>[r.id,r.status]));
 check('format summary text',[formatSummary({format:'bestball',teamSize:4,count:2}),formatSummary({format:'scramble',teamSize:5}),formatSummary({format:'match',teamSize:2}),formatSummary({format:'split',front:'scramble',back:'shamble',teamSize:2,count:1})].join(' | '),null);
 check('unitOf / isTeamEvent / isMatchEvent',[unitOf({format:'quota'}),unitOf({format:'parbogey'}),unitOf({format:'match'}),unitOf({format:'teamstable',teamSize:2}),isTeamEvent({format:'split',front:'scramble',back:'shamble'}),isMatchEvent({format:'match'})].join()==='points,holes,match,points,true,true');
+
+
+// ---------- catalog & new variants ----------
+const c4=[PC('a',0,'T'),PC('b',0,'T'),PC('c',0,'T'),PC('d',0,'T')].map(net1), sc4b={a:fill(4),b:fill(5),c:fill(3),d:fill(6)};
+tb=teamBoard(ev({format:'bestball',teamSize:4,countPattern:'123rot',scoring:'gross'},c4),sc4b,{sort:'gross'});
+check('cha-cha-cha: 6×(3) + 6×(3+4) + 6×(3+4+5) = 18+42+72 = 132',tb[0].gross===132,tb[0].gross);
+tb=teamBoard(ev({format:'bestball',teamSize:4,countPattern:'yellow',scoring:'gross'},c4),sc4b,{sort:'gross'});
+// yellow rotates a,b,c,d: hole1 a(4)+best other c(3)=7; hole2 b(5)+3=8; hole3 c(3)+a(4)=7; hole4 d(6)+3=9 → 31 per 4 holes; 18 holes = 4 cycles (124) + holes 17,18 = a,b → 7+8
+check('yellow ball: designated ball + best of the rest = 139',tb[0].gross===139,tb[0].gross);
+const course345={name:'Mixed',par:{M:[3,4,5,4,4,3,5,4,4,4,4,3,5,4,4,3,4,5]},hcp:{M:hcp}};
+let pub345={courses:{t:course345},groups:[{id:'g',course:'t',startHole:1,players:c4}],scoring:'gross',format:'bestball',teamSize:4,countPattern:'par345'};
+tb=teamBoard(pub345,sc4b,{sort:'gross'});
+check('1-2-3 by par: par3s 1 ball (3), par4s 2 balls (7), par5s 3 balls (12)',tb[0].gross===4*3+10*7+4*12,tb[0].gross);
+lb=leaderboard(ev({format:'quota',quotaBase:39},[net1(PC('A',10))]),scA,{});
+check('Chicago: same points (41) vs quota 29 → +12',lb[0].pts===12,lb[0].pts);
+lb=leaderboard(ev({format:'stroke',cap:'nddb',scoring:'gross'},[net1(PC('A',0))]),{A:Object.assign(fill(4),{4:9,5:8})},{});
+check('maximum score: 9 and 8 capped at net double bogey (6) → 76',lb[0].gross===76,lb[0].gross);
+// post-round draw: partners in different groups still score as a team
+let pubX={courses:{t:course},groups:[{id:'g1',course:'t',startHole:1,players:[PC('a',0,'D1'),PC('b',0,'D2')].map(net1)},{id:'g2',course:'t',startHole:1,players:[PC('c',0,'D1'),PC('d',0,'D2')].map(net1)}],scoring:'gross',format:'bestball',teamSize:2,count:1};
+tb=teamBoard(pubX,{a:fill(4),b:fill(5),c:fill(3),d:fill(6)},{sort:'gross'});
+check('teams across groups: D1 = a+c best 3 → 54; D2 = b+d best 5 → 90',tb.map(r=>r.id+':'+r.gross).join()==='D1:54,D2:90',tb.map(r=>[r.id,r.gross,r.group]));
+// nassau: A wins front by 2 (holes 1,2), B wins back by 1 (hole 10), A 18 by 1 → A 2 points, B 1
+scm={A:Object.assign(fill(4),{1:3,2:3}),B:Object.assign(fill(4),{10:3})};
+mb=matchBoard(ev({format:'match',teamSize:1,matchScoring:'nassau',scoring:'net'},[Object.assign(PC('A',5,'S1'),{ch:5}),Object.assign(PC('B',5,'S2'),{ch:5})]),scm,{});
+check('nassau: A takes front and 18 (2 pts), B the back (1 pt)',mb.find(r=>r.id==='S1').pts===2&&mb.find(r=>r.id==='S2').pts===1,mb.map(r=>[r.id,r.status,r.pts]));
+// hi-lo: X = A 3s & B 5s; Y = C 4s & D 4s → low: X wins each hole, high: Y wins each hole → AS
+mb=matchBoard(ev({format:'match',teamSize:2,matchScoring:'hilo',scoring:'net'},[Object.assign(PC('A',0,'X'),{ch:0}),Object.assign(PC('B',0,'X'),{ch:0}),Object.assign(PC('C',0,'Y'),{ch:0}),Object.assign(PC('D',0,'Y'),{ch:0})]),{A:fill(3),B:fill(5),C:fill(4),D:fill(4)},{});
+check('hi-lo: low ball to X, high ball to Y every hole → AS',mb.every(r=>r.status==='AS'&&r.pts===0.5),mb.map(r=>[r.id,r.status]));
+// foursomes match: one ball per side, team handicaps 50% combined; sides X (CH 8+14 → 11) and Y (CH 4+6 → 5): X gets 6 strokes
+mb=matchBoard(ev({format:'match',teamSize:2,matchForm:'foursomes',scoring:'net'},[Object.assign(PC('A',8,'X'),{ch:8}),Object.assign(PC('B',14,'X'),{ch:14}),Object.assign(PC('C',4,'Y'),{ch:4}),Object.assign(PC('D',6,'Y'),{ch:6})]),{A:fill(4),C:fill(4)},{});
+check('foursomes match: X wins holes 1–6 with its 6 strokes → 6&5? no: 6 up after 6, 12 left … after 12 halves, 6 up with 6 left → dormie; ends 6 up at 18? 6 up with 0 left = "6 up"',mb.find(r=>r.id==='X').pts===1&&/6/.test(mb.find(r=>r.id==='X').status),mb.map(r=>[r.id,r.status]));
+check('catalog: lookups and summaries',[catalogOf({format:'quota',quotaBase:39}).id,catalogOf({format:'bestball',countPattern:'yellow'}).id,catalogOf({format:'match',teamSize:2,matchScoring:'hilo'}).id,formatSummary({format:'match',matchScoring:'nassau'}),formatSummary({format:'bestball',teamSize:4,countPattern:'123rot'}),gameCatalog().length].join(' | '),null);
+check('catalog ids are unique',new Set(gameCatalog().map(g=>g.id)).size===gameCatalog().length);
 process.exit(bad?1:0);
