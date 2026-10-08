@@ -1,0 +1,796 @@
+/* =====================================================================
+   MGA Hub — UI. Screens are read-only; every edit happens in ONE drawer.
+   ===================================================================== */
+const tA=(t,k,id,m)=>actualOf(ledgerIndex(t.season),t.id,k,id,m);
+/* Actual $ input, or — when Treasury entries are linked — a read-only total that points to the ledger. */
+function actField(label,id,season,tid,k,lid,manual,ph){
+  const L=linkInfo(season,tid,k,lid);
+  if(L) return `<div class="fld"><span class="lbl">${label}</span><div class="banner" style="justify-content:space-between"><span><b class="num">${fmt(L.sum)}</b> from ${L.n} Treasury entr${L.n===1?'y':'ies'}</span><button class="btn sm" type="button" data-goledger="1">Open ledger</button></div><input type="hidden" id="${id}" value="${esc(manual||'')}"></div>`;
+  return field(label,id,manual||'',{type:'number',ph:ph||'Enter when invoiced, or record it in Treasury'});
+}
+document.addEventListener('click',e=>{ const b=e.target.closest('[data-goledger]'); if(b){ closeDrawer(); go('treasury',{xtab:'ledger'}); } });
+const svg=d=>`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${d}</svg>`;
+const I={
+  home:svg('<path d="M3 11l9-7 9 7"/><path d="M5 10v10h14V10"/>'),
+  flag:svg('<path d="M6 21V4"/><path d="M6 4h11l-2 4 2 4H6"/>'),
+  users:svg('<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.6 3.4-5.5 6.5-5.5s5.7 1.9 6.5 5.5"/><path d="M16 4.6a3.5 3.5 0 010 6.8"/><path d="M18 14.8c1.9.7 3.1 2.4 3.5 5.2"/>'),
+  shield:svg('<path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"/>'),
+  ledger:svg('<rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/>'),
+  plus:svg('<path d="M12 5v14M5 12h14"/>'), edit:svg('<path d="M4 20h4L19 9l-4-4L4 16z"/>'), x:svg('<path d="M6 6l12 12M18 6L6 18"/>'),
+  search:svg('<circle cx="11" cy="11" r="6.5"/><path d="M20 20l-4-4"/>'), chev:svg('<path d="M9 6l6 6-6 6"/>'),
+  down:svg('<path d="M12 4v12M6 11l6 6 6-6M5 20h14"/>'), menu:svg('<path d="M4 7h16M4 12h16M4 17h16"/>'),
+  trash:svg('<path d="M4 7h16M10 7V4h4v3M6 7l1 13h10l1-13"/>'), check:svg('<path d="M5 12l5 5 9-10"/>'), refresh:svg('<path d="M20 11a8 8 0 10-2.3 5.7"/><path d="M20 4v7h-7"/>'),
+};
+const NAV=[['dash','Dashboard',I.home],['tournaments','Tournaments',I.flag],['members','Members',I.users],['board','Board',I.shield],['budget','Season budget',I.ledger]];
+let view={page:'dash',tid:null,ttab:'budget',mfilter:'All',mq:'',tfilter:'All'};
+const Y=()=>db.activeSeason;
+const T=()=>db.tournaments.find(t=>t.id===view.tid);
+function go(page,extra){ view=Object.assign(view,{page},extra||{}); $('side').classList.remove('open'); render(); window.scrollTo(0,0); }
+
+/* ---------- toast ---------- */
+let toastT;
+function toast(msg,undo){ const t=$('toast'); t.innerHTML=esc(msg); if(undo){ const b=document.createElement('button'); b.textContent='Undo'; b.onclick=()=>{undo();t.classList.remove('show');}; t.appendChild(b); }
+  t.classList.add('show'); clearTimeout(toastT); toastT=setTimeout(()=>t.classList.remove('show'),undo?6000:2600); }
+
+/* ---------- drawer ---------- */
+const drawerOpen=()=>$('drawer').classList.contains('show');
+let drawerCtx=null;
+function openDrawer({kicker='',title,body,save,saveLabel='Save',del,delLabel='Delete',wire,wide,delPlain}){
+  drawerCtx={save,del}; $('drawer').classList.toggle('wide',wide===true); $('drawer').classList.toggle('xwide',wide==='x');
+  $('dKicker').textContent=kicker; $('dTitle').textContent=title; $('dBody').innerHTML=body;
+  $('dFoot').innerHTML=`<div>${del?`<button class="btn${delPlain?'':' danger'}" id="dDel">${delPlain?'':I.trash}${esc(delLabel)}</button>`:''}</div><div class="actions"><button class="btn" id="dCancel">Cancel</button>${save?`<button class="btn pri" id="dSave">${esc(saveLabel)}</button>`:''}</div>`;
+  $('drawer').classList.add('show'); $('scrim').classList.add('show');
+  $('dCancel').onclick=closeDrawer;
+  if(save) $('dSave').onclick=()=>{ if(save()!==false){ closeDrawer(); persist(); render(); } };
+  if(del) $('dDel').onclick=()=>{ if(del()!==false){ closeDrawer(); persist(); render(); } };
+  if(wire) wire($('dBody'));
+  const f=$('dBody').querySelector('input:not([type=checkbox]),select,textarea'); if(f) setTimeout(()=>f.focus(),60);
+}
+function closeDrawer(){ $('drawer').classList.remove('show'); $('scrim').classList.remove('show'); drawerCtx=null;
+  if(pendingRemote){ const r=pendingRemote; pendingRemote=null; setTimeout(()=>applyRemote(r),0); } }
+const fv=id=>{ const e=$(id); return e?e.value.trim():''; };
+const fnum=id=>n0(fv(id));
+function field(label,id,val,o={}){
+  const t=o.type||'text';
+  if(t==='select') return `<div class="fld"><label class="lbl" for="${id}">${label}</label><select class="inp" id="${id}">${o.options.map(x=>{const [v,l]=Array.isArray(x)?x:[x,x];return `<option value="${esc(v)}"${String(v)===String(val??'')?' selected':''}>${esc(l)}</option>`;}).join('')}</select>${o.hint?`<p class="hint">${o.hint}</p>`:''}</div>`;
+  if(t==='textarea') return `<div class="fld"><label class="lbl" for="${id}">${label}</label><textarea class="inp" id="${id}">${esc(val)}</textarea></div>`;
+  return `<div class="fld"><label class="lbl" for="${id}">${label}</label><input class="inp${t==='number'?' num':''}" id="${id}" type="${t==='number'?'text':t}" ${t==='number'?'inputmode="decimal"':''} value="${esc(val??'')}" ${o.ph?`placeholder="${esc(o.ph)}"`:''}>${o.hint?`<p class="hint">${o.hint}</p>`:''}</div>`;
+}
+const pair=(a,b)=>`<div class="frow2">${a}${b}</div>`;
+function seg(id,opts,val){ return `<div class="seg" id="${id}" data-val="${esc(val)}">${opts.map(([v,l])=>`<button type="button" data-v="${esc(v)}" class="${String(v)===String(val)?'on':''}">${esc(l)}</button>`).join('')}</div>`; }
+function wireSeg(root,id,onChange){ const s=root.querySelector('#'+id); if(!s) return; s.querySelectorAll('button').forEach(b=>b.onclick=()=>{ s.dataset.val=b.dataset.v; s.querySelectorAll('button').forEach(x=>x.classList.toggle('on',x===b)); onChange&&onChange(b.dataset.v); }); }
+
+/* ---------- shared pieces ---------- */
+const btn=(label,id,cls='',ic='')=>`<button class="btn ${cls}" id="${id}">${ic}${esc(label)}</button>`;
+function head(title,sub,actions=''){ return `<div class="phead"><div><h1 class="h1">${esc(title)}</h1>${sub?`<p class="sub">${sub}</p>`:''}</div><div class="actions">${actions}</div></div><div class="rule"></div>`; }
+const kpi=(l,v,note,cls='')=>`<div class="card pad kpi"><span class="lbl">${l}</span><span class="v num ${cls}">${v}</span><span class="muted" style="font-size:12.5px">${note}</span></div>`;
+const netCls=v=>n0(v)>0.004?'pos':n0(v)<-0.004?'neg':'';
+function statusChip(t){ const d=daysOut(t); const st=t.status||'Planning';
+  return `<span class="chip ${st==='Complete'?'ok':st==='Planning'?'gold':''}">${esc(st)}</span>`; }
+
+/* ---------- render root ---------- */
+function render(){
+  const ae=document.activeElement, keep=ae&&ae.id&&/^(INPUT|TEXTAREA|SELECT)$/.test(ae.tagName)&&!ae.closest('#drawer')?{id:ae.id,s:ae.selectionStart,e:ae.selectionEnd,v:ae.value}:null, sy=window.scrollY;
+  renderInner();
+  if(keep){ const n=document.getElementById(keep.id); if(n){ if(n.value!==keep.v&&n.tagName!=='SELECT') n.value=keep.v; n.focus({preventScroll:true}); try{ n.setSelectionRange(keep.s,keep.e); }catch(_){} } }
+  if(Math.abs(window.scrollY-sy)>2) window.scrollTo(0,sy);
+}
+function renderInner(){
+  const ys=Object.keys(db.seasons).sort((a,b)=>b-a);
+  $('seasonSel').innerHTML=ys.map(y=>`<option value="${y}"${y===Y()?' selected':''}>${y} season</option>`).join('')+'<option value="__new">+ New season…</option>';
+  const live=typeof liveEvents==='function'?liveEvents():[];
+  $('nav').innerHTML=NAV.map(([k,l,ic])=>`<button class="nav${(view.page===k||(k==='tournaments'&&view.page==='tournament'))?' on':''}" data-go="${k}">${ic}<span>${l}</span>${k==='golf'&&live.length?'<span class="livedot" aria-label="Live scoring"></span>':''}</button>`).join('')+
+    live.map(e=>`<button class="nav livelink" data-golfev="${e.id}"><span class="livedot"></span><span class="trunc">Leaderboard · ${esc(e.name)}</span></button>`).join('');
+  $('nav').querySelectorAll('[data-go]').forEach(b=>b.onclick=()=>{ if(b.dataset.go==='golf') view.geid=null; go(b.dataset.go); });
+  const m=$('main');
+  ({dash:vDash,tournaments:vTournaments,tournament:vTournament,members:vMembers,board:vBoard,budget:vBudget,treasury:vTreasury,golf:vGolf}[view.page]||vDash)(m);
+}
+
+/* ---------- Dashboard ---------- */
+function vDash(m){
+  const sc=scalc(Y()), next=sc.ts.map(x=>x.t).filter(t=>{const d=daysOut(t);return d!==null&&d>=0;})[0];
+  const withBudget=sc.ts.filter(x=>x.c.revenue||x.c.expenses).length;
+  const cols='grid-template-columns:minmax(150px,2fr) 90px 100px 100px 96px';
+  const attention=[];
+  for(const {t,c} of sc.ts){
+    const owed=t.sponsors.filter(s=>n0(s.pledged)>spPaid(s)+0.004);
+    if(owed.length) attention.push([fmt(sum(owed,s=>n0(s.pledged)-spPaid(s))),`${esc(t.name)}: ${owed.length} sponsor${owed.length>1?'s':''} still owe money`,'warn',t.id]);
+  }
+  const unpaid=db.members.filter(x=>x.status!=='Inactive'&&memberDues(Y(),x.id)<n0(sc.s.dues.amount)).length;
+  if(db.members.length&&unpaid&&sc.s.duesPayments.length) attention.push([String(unpaid),`member${unpaid>1?'s have':' has'} not paid full ${Y()} dues`,'warn',null]);
+  m.innerHTML=head(`${Y()} Season`,'Walnut Creek Country Club Men’s Golf Association',btn('New tournament','dNew','pri',I.plus))+`
+  <div class="grid g4">
+    ${kpi('Season net (projected)',fmtS(sc.projected),`Actuals for ${sc.past.length} completed · budget for ${sc.upcoming.length} upcoming`,netCls(sc.projected))}
+    ${kpi('Next up',next?dayShort(next,0)||'TBD':'—',next?`${esc(next.name)} · ${daysOut(next)===0?'today':daysOut(next)+' days out'}`:'No upcoming tournaments')}
+    ${kpi('Sponsor money received',fmt(sc.received),`of ${fmt(sc.pledged)} pledged this season`)}
+    ${kpi('Members',String(sc.active),`active · ${db.board.filter(b=>b.memberId).length} on the board`)}
+  </div>
+  <div class="split">
+    <div class="card" style="overflow:hidden">
+      <div class="cardhead"><h2 class="h2">Tournaments</h2><button class="btn sm" data-go="tournaments">View all</button></div>
+      ${sc.ts.length?`<div class="tw"><div class="t" style="min-width:520px">
+      <div class="tr th" style="${cols}"><span>Tournament</span><span>Dates</span><span class="r">Revenue</span><span class="r">Expenses</span><span class="r">Net</span></div>
+      ${sc.ts.map(({t,c})=>`<div class="tr num click" data-open="${t.id}" style="${cols}"><div class="cell2"><b class="trunc" style="color:var(--navy)">${esc(t.name)}</b><small>${t.days} day${t.days>1?'s':''} · ${esc(t.status||'Planning')}</small></div><span>${dateRange(t).replace(/, \d{4}$/,'')}</span><span class="r">${fmt(c.revenue)}</span><span class="r">${fmt(c.expenses)}</span><b class="r ${netCls(c.net)}">${fmtS(c.net)}</b></div>`).join('')}
+      <div class="tr tot num" style="${cols}"><span>Tournaments total</span><span></span><span class="r">${fmt(sc.tRev)}</span><span class="r">${fmt(sc.tExp)}</span><span class="r ${netCls(sc.tRev-sc.tExp)}">${fmtS(sc.tRev-sc.tExp)}</span></div>
+      </div></div>`:`<div class="empty"><b>No tournaments yet</b><span>Add the season’s first event.</span><div class="actions"><button class="btn pri" id="dNew2">${I.plus}New tournament</button></div></div>`}
+    </div>
+    <div style="display:flex;flex-direction:column;gap:20px">
+      ${typeof liveBoardCard==='function'?liveBoardCard():''}
+      <div class="card pad" style="display:flex;flex-direction:column;gap:12px"><h2 class="h2">Needs attention</h2>
+        ${attention.length?attention.map(([c,txt,k,id])=>`<div style="display:flex;gap:10px;align-items:flex-start;font-size:13.5px"><span class="chip ${k}">${c}</span><span>${id?`<a href="#" data-open="${id}">${txt}</a>`:txt}</span></div>`).join(''):'<span class="muted">Nothing outstanding.</span>'}
+      </div>
+      <div class="card pad" style="display:flex;flex-direction:column;gap:12px"><div style="display:flex;justify-content:space-between;align-items:center"><h2 class="h2">Board</h2><button class="btn sm" data-go="board">Manage</button></div>
+        ${db.board.filter(b=>b.memberId).map(b=>{const mm=memberById(b.memberId);return `<div style="display:flex;align-items:center;gap:10px"><span class="av">${initials(mm)}</span><div class="cell2"><b>${esc(memberName(mm))}</b><small>${esc(b.role)}</small></div></div>`;}).join('')||'<span class="muted">No seats filled yet. Add members, then fill seats on the Board page.</span>'}
+      </div>
+    </div>
+  </div>`;
+  wireCommon(m);
+  const n1=$('dNew'),n2=$('dNew2'); if(n1) n1.onclick=editNewTournament; if(n2) n2.onclick=editNewTournament;
+}
+function wireCommon(root){
+  root.querySelectorAll('[data-open]').forEach(e=>e.onclick=ev=>{ev.preventDefault(); go('tournament',{tid:e.dataset.open,ttab:'budget'});});
+  root.querySelectorAll('[data-go]').forEach(e=>e.onclick=()=>go(e.dataset.go));
+}
+
+/* ---------- Tournaments list ---------- */
+function vTournaments(m){
+  const all=seasonTournaments(Y()), now=all.filter(t=>{const d=daysOut(t);return view.tfilter==='All'||(view.tfilter==='Upcoming'?(d===null||d>=0)&&t.status!=='Complete':t.status==='Complete'||(d!==null&&d<0));});
+  const cols='grid-template-columns:minmax(160px,2fr) 150px 80px 110px 150px 110px 40px';
+  m.innerHTML=head('Tournaments',`Every event on the ${Y()} calendar. Each budget rolls up into the season.`,btn('New tournament','tNew','pri',I.plus))+`
+  <div class="tabs">${['All','Upcoming','Completed'].map(f=>`<button class="tab${view.tfilter===f?' on':''}" data-f="${f}">${f}${f==='All'?' · '+all.length:''}</button>`).join('')}</div>
+  <div class="card" style="overflow:hidden">${now.length?`<div class="tw"><div class="t">
+    <div class="tr th" style="${cols}"><span>Tournament</span><span>Dates</span><span>Length</span><span>Field</span><span>Sponsors</span><span class="r">Net</span><span></span></div>
+    ${now.map(t=>{const c=tcalc(t);return `<div class="tr num click" data-open="${t.id}" style="${cols}"><div class="cell2"><b class="trunc" style="color:var(--navy)">${esc(t.name)}</b><small>${esc(t.venue||'')}</small></div><span>${dateRange(t)}</span><span class="muted">${t.days} day${t.days>1?'s':''}</span><span>${t.field.length?t.field.length+' signed up':c.players?c.players+' planned':'—'}</span><span>${t.sponsors.length?fmt(c.received)+' of '+fmt(c.pledged):'—'}</span><b class="r ${netCls(c.net)}">${fmtS(c.net)}</b><span class="ib">${I.chev}</span></div>`;}).join('')}
+  </div></div>`:`<div class="empty"><b>Nothing here yet</b><span>Create a tournament to start its schedule, field and budget.</span></div>`}</div>`;
+  m.querySelectorAll('[data-f]').forEach(b=>b.onclick=()=>{view.tfilter=b.dataset.f;render();});
+  $('tNew').onclick=editNewTournament; wireCommon(m);
+}
+function editNewTournament(){
+  const prev=db.tournaments.filter(t=>t.season!==Y()||true).sort((a,b)=>(b.startDate||'').localeCompare(a.startDate||''));
+  openDrawer({kicker:`${Y()} season`,title:'New tournament',saveLabel:'Create tournament',
+    body:field('Name','nName','',{ph:'e.g. Member-Guest'})+
+      `<div class="fld"><span class="lbl">Length</span>${seg('nDays',[[1,'1 day'],[2,'2 days'],[3,'3 days']],1)}</div>`+
+      pair(field('Start date','nStart','',{type:'date'}),field('Venue','nVenue','Walnut Creek Country Club'))+
+      pair(field('Entry fee per player','nFee','',{type:'number',ph:'$'}),field('Skins / day money per player','nSkins','',{type:'number',ph:'$ (optional)'}))+
+      pair(field('Expected players','nPlayers','',{type:'number',hint:'Used for the budget until the field is entered.'}),field('Players per team','nTeam',2,{type:'select',options:[[1,'Individual'],[2,'2-person teams'],[4,'4-person teams']]}))+
+      field('Golf Genius event (optional)','nGG','',{ph:'Event name or link, for syncing signups later'})+
+      field('Start from','nCopy','',{type:'select',options:[['','Blank tournament']].concat(prev.map(t=>[t.id,`Copy ${t.name} (${t.season})`])),hint:'Copying brings over meals, events, sponsor tiers, income and expense lines — actuals, payments and the field are cleared.'}),
+    wire:r=>wireSeg(r,'nDays'),
+    save:()=>{
+      const name=fv('nName'); if(!name){ toast('Give the tournament a name'); return false; }
+      const days=+$('nDays').dataset.val||1; const src=db.tournaments.find(t=>t.id===fv('nCopy'));
+      let t=newTournament({season:Y(),name,days,startDate:fv('nStart'),venue:fv('nVenue'),entryFee:fnum('nFee'),skinsFee:fnum('nSkins'),plannedPlayers:fnum('nPlayers'),teamSize:+fv('nTeam'),ggEvent:fv('nGG')});
+      if(src) copyStructure(src,t);
+      db.tournaments.push(t); view.tid=t.id; view.page='tournament'; view.ttab='meals'; toast('Tournament created');
+    }});
+}
+function copyStructure(src,t){
+  const re=a=>(a||[]).map(x=>Object.assign(clone(x),{id:uid()}));
+  t.tiers=re(src.tiers); t.goal=src.goal;
+  t.dayItems=[0,1,2].map(i=>i<t.days?re(src.dayItems[i]).map(x=>{x.actual=0; if(x.menu) x.menu.items=re(x.menu.items); return x;}):[]);
+  t.income=re(src.income).map(x=>(x.actual=0,x)); t.perPlayer=re(src.perPlayer).map(x=>(x.actual=0,x)); t.lines=re(src.lines).map(x=>(x.actual=0,x));
+  t.sponsors=src.sponsors.map(s=>({id:uid(),company:s.company,contact:s.contact,phone:s.phone,email:s.email,tier:s.tier,pledged:0,committee:s.committee,notes:'',payments:[]}));
+  t.schedule=clone(src.schedule||[]).filter(d=>d.day<t.days);
+  if(!t.entryFee) t.entryFee=src.entryFee; if(!t.skinsFee) t.skinsFee=src.skinsFee;
+}
+
+/* ---------- Tournament detail ---------- */
+const TT=[['overview','Overview'],['meals','Meals & events'],['field','Field'],['sponsors','Sponsors'],['budget','Budget']];
+function vTournament(m){
+  const t=T(); if(!t){ go('tournaments'); return; }
+  const tabs=TT;
+  if(!tabs.some(x=>x[0]===view.ttab)) view.ttab='budget';
+  m.innerHTML=`<div class="crumb"><button data-go="tournaments">Tournaments</button><span class="muted">/</span><span class="muted">${esc(t.name)}</span></div>
+  <div class="phead"><div><h1 class="h1">${esc(t.name)}</h1>
+    <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap"><span class="chip navy">${t.days} day${t.days>1?'s':''}</span><span class="chip">${dateRange(t)}</span><span class="chip">${tcalc(t).players} players ${t.budgetBasis==='field'?'in field':'planned'}</span>${statusChip(t)}</div></div>
+    <div class="actions"><button class="btn" id="tEdit">${I.edit}Tournament details</button></div></div>
+  <div class="tabs">${tabs.map(([k,l])=>`<button class="tab${view.ttab===k?' on':''}" data-tab="${k}">${l}</button>`).join('')}</div>
+  <div id="tbody" style="display:flex;flex-direction:column;gap:20px"></div>`;
+  wireCommon(m);
+  m.querySelectorAll('[data-tab]').forEach(b=>b.onclick=()=>{view.ttab=b.dataset.tab;render();});
+  $('tEdit').onclick=()=>editTournament(t);
+  ({overview:tOverview,meals:tMeals,field:tField,sponsors:tSponsors,budget:tBudget,calcutta:tCalcutta,checklist:tChecklist,checkin:tCheckin,raffle:tRaffle}[view.ttab])($('tbody'),t);
+}
+function editTournament(t){
+  openDrawer({kicker:'Tournament',title:'Tournament details',
+    body:field('Name','eName',t.name)+
+      `<div class="fld"><span class="lbl">Length</span>${seg('eDays',[[1,'1 day'],[2,'2 days'],[3,'3 days']],t.days)}<p class="hint">Shortening keeps the later days’ items but stops counting them.</p></div>`+
+      pair(field('Start date','eStart',t.startDate,{type:'date'}),field('Venue','eVenue',t.venue))+
+      pair(field('Entry fee per player','eFee',t.entryFee,{type:'number'}),field('Skins / day money per player','eSkins',t.skinsFee,{type:'number'}))+
+      field('Budget player count from','eBasis',t.budgetBasis,{type:'select',options:[['planned','Planned count'],['field',`The field (${t.field.length} players now)`]],hint:'Switch to the field once signups close.'})+pair(field('Planned players','ePlayers',t.plannedPlayers,{type:'number'}),field('Players per team','eTeam',t.teamSize,{type:'select',options:[[1,'Individual'],[2,'2-person teams'],[4,'4-person teams']]}))+
+      pair(field('Status','eStatus',t.status,{type:'select',options:['Planning','Open for signups','Complete']}),field('Sponsorship goal','eGoal',t.goal,{type:'number'}))+
+      field('Golf Genius event','eGG',t.ggEvent)+field('Notes','eNotes',t.notes,{type:'textarea'}),
+    wire:r=>wireSeg(r,'eDays'),
+    save:()=>{ Object.assign(t,{name:fv('eName')||t.name,days:+$('eDays').dataset.val||t.days,startDate:fv('eStart'),venue:fv('eVenue'),entryFee:fnum('eFee'),skinsFee:fnum('eSkins'),
+      plannedPlayers:fnum('ePlayers'),budgetBasis:fv('eBasis'),teamSize:+fv('eTeam'),status:fv('eStatus'),goal:fnum('eGoal'),ggEvent:fv('eGG'),notes:fv('eNotes')}); toast('Saved'); },
+    del:()=>{ if(!confirm(`Delete ${t.name} and everything in it?`)) return false; const i=db.tournaments.indexOf(t), copy=clone(t);
+      db.tournaments.splice(i,1); view.page='tournaments'; toast('Tournament deleted',()=>{db.tournaments.splice(i,0,copy);persist();render();}); },delLabel:'Delete tournament'});
+}
+
+/* Overview */
+function tOverview(el,t){
+  const c=tcalc(t);
+  el.innerHTML=`<div class="grid g4">${kpi('Budgeted net',fmtS(c.net),`${fmt(c.revenue)} in · ${fmt(c.expenses)} out`,netCls(c.net))}${kpi('Players',String(c.players),t.budgetBasis==='field'?'from the field':`planned · ${t.field.length} in the field so far`)}${kpi('Sponsors',fmt(c.pledged),`${fmt(c.received)} received`)}${kpi('Actual net so far',fmtS(c.netA),'from actuals entered')}</div>
+  <div class="split"><div class="card" style="overflow:hidden"><div class="cardhead"><h2 class="h2">Schedule</h2><button class="btn sm" id="schAdd">${I.plus}Add</button></div>
+    ${[0,1,2].slice(0,t.days).map(di=>{const d=t.schedule.find(s=>s.day===di)||{items:[]};return `<div class="gh"><b>${dayLabel(t,di)}</b><span class="muted">${dayShort(t,di)}</span></div>${d.items.length?d.items.map(i=>`<div class="tr click" data-sch="${di}|${i.id}" style="grid-template-columns:150px minmax(0,1fr)"><span class="muted num">${esc(i.time||'—')}</span><div class="cell2"><b>${esc(i.event)}</b>${i.notes?`<small>${esc(i.notes)}</small>`:''}</div></div>`).join(''):'<div class="tr"><span class="muted">Nothing scheduled.</span></div>'}`;}).join('')}
+  </div>
+  <div class="card pad" style="display:flex;flex-direction:column;gap:12px"><div style="display:flex;justify-content:space-between;align-items:center"><h2 class="h2">Open decisions</h2><button class="ib" id="decAdd" aria-label="Add decision">${I.plus}</button></div>
+    ${t.decisions.length?t.decisions.map(d=>`<label class="check" style="align-items:flex-start;font-weight:400"><input type="checkbox" data-dec="${d.id}"${d.done?' checked':''}><span style="${d.done?'text-decoration:line-through;color:var(--muted)':''}">${esc(d.text)}</span></label>`).join(''):'<span class="muted">None.</span>'}
+    ${t.notes?`<div class="lbl" style="margin-top:8px">Notes</div><p style="margin:0;white-space:pre-wrap">${esc(t.notes)}</p>`:''}</div></div>`;
+  el.querySelectorAll('[data-sch]').forEach(r=>r.onclick=()=>{const [di,id]=r.dataset.sch.split('|');editSched(t,+di,id);});
+  $('schAdd').onclick=()=>editSched(t,0,null);
+  el.querySelectorAll('[data-dec]').forEach(cb=>cb.onchange=()=>{t.decisions.find(d=>d.id===cb.dataset.dec).done=cb.checked;persist();render();});
+  $('decAdd').onclick=()=>openDrawer({kicker:t.name,title:'Add decision',body:field('Decision to make','decT',''),save:()=>{const v=fv('decT'); if(!v) return false; t.decisions.push({id:uid(),text:v,done:false});}});
+}
+function editSched(t,di,id){
+  const d=t.schedule.find(s=>s.day===di), it=id&&d?d.items.find(x=>x.id===id):null;
+  openDrawer({kicker:t.name,title:it?'Edit schedule item':'Add schedule item',
+    body:field('Day','sDay',di,{type:'select',options:[0,1,2].slice(0,t.days).map(i=>[i,dayLabel(t,i)])})+pair(field('Time','sTime',it?.time||'',{ph:'e.g. 5:30pm'}),field('Event','sEvent',it?.event||''))+field('Notes','sNotes',it?.notes||'',{type:'textarea'}),
+    save:()=>{ const nd=+fv('sDay'); const data={time:fv('sTime'),event:fv('sEvent'),notes:fv('sNotes')}; if(!data.event){toast('Name the event');return false;}
+      if(it&&d) d.items=d.items.filter(x=>x!==it);
+      let day=t.schedule.find(s=>s.day===nd); if(!day){ day={day:nd,label:'',items:[]}; t.schedule.push(day); }
+      day.items.push(Object.assign(it||{id:uid()},data)); },
+    del:it?()=>{ d.items=d.items.filter(x=>x!==it); }:null});
+}
+
+/* Meals & events (per day) */
+function itemRow(t,it,di){
+  const q=it.menu?`Menu · ${it.menu.items.length} items`:`${itemQty(t,it)}${it.qtyLink==='players'?' (players)':''} × ${fmt2(it.unitCost).replace('.00','')}`;
+  return `<div class="tr num click bl" data-item="${di}|${it.id}"><div class="cell2"><span style="font-weight:500">${esc(it.item)} <span class="chip" style="height:20px;font-size:11px;margin-left:4px">${esc(it.kind||'Other')}</span></span>${it.menu?`<small>${it.menu.items.length} menu items · ${n0(it.menu.guests)} guests</small>`:it.notes?`<small class="trunc">${esc(it.notes)}</small>`:''}</div><span class="muted" style="font-size:13px">${q}</span><b class="r">${fmt(itemTotal(t,it))}</b><span class="r muted" style="font-size:12.5px">${tA(t,'item',it.id,it.actual)?fmt(tA(t,'item',it.id,it.actual))+' act.':''}</span><span class="ib" aria-hidden="true">${I.edit}</span></div>`;
+}
+function tMeals(el,t){
+  const c=tcalc(t);
+  el.innerHTML=[0,1,2].slice(0,t.days).map(di=>`<div class="card" style="overflow:hidden">
+    <div class="cardhead"><div><h2 class="h2">${dayLabel(t,di)}</h2><span class="muted">${dayShort(t,di)} · ${t.dayItems[di].length} item${t.dayItems[di].length===1?'':'s'}</span></div><div class="actions"><b class="num" style="font-size:18px;color:var(--navy)">${fmt(c.dayTot[di])}</b><button class="btn sm" data-add="${di}">${I.plus}Add meal or event</button><button class="btn sm" data-addm="${di}">${I.plus}Add catered menu</button></div></div>
+    <div class="tw"><div class="t bt">${t.dayItems[di].length?`<div class="tr th bl"><span>Item</span><span>How it’s priced</span><span class="r">Budget</span><span class="r">Actual</span><span></span></div>`+t.dayItems[di].map(it=>itemRow(t,it,di)).join(''):'<div class="empty" style="padding:22px">Nothing planned for this day yet.</div>'}</div></div></div>`).join('');
+  wireItems(el,t);
+}
+function wireItems(el,t){
+  el.querySelectorAll('[data-item]').forEach(r=>r.onclick=()=>{const [di,id]=r.dataset.item.split('|'); const it=t.dayItems[+di].find(x=>x.id===id); it.menu?editMenu(t,+di,it):editItem(t,+di,it);});
+  el.querySelectorAll('[data-add]').forEach(b=>b.onclick=()=>editItem(t,+b.dataset.add,null));
+  el.querySelectorAll('[data-addm]').forEach(b=>b.onclick=()=>editMenu(t,+b.dataset.addm,null));
+}
+function editItem(t,di,it){
+  openDrawer({kicker:dayLabel(t,di),title:it?'Edit '+(it.kind||'item').toLowerCase():'Add meal or event',
+    body:field('Item','iName',it?.item||'',{ph:'e.g. Lunch — club sandwiches'})+
+      pair(field('Type','iKind',it?.kind||'Meal',{type:'select',options:ITEM_KINDS}),field('Day','iDay',di,{type:'select',options:[0,1,2].slice(0,t.days).map(i=>[i,dayLabel(t,i)])}))+
+      `<div class="fld"><span class="lbl">Quantity</span>${seg('iLink',[['','Fixed number'],['players','Every player']],it?.qtyLink||'')}</div>`+
+      pair(field('Quantity','iQty',it?(it.qtyLink?playersUsed(t):it.qty):'',{type:'number'}),field('Unit cost $','iCost',it?.unitCost??'',{type:'number'}))+
+      `<div class="sumrows num"><div class="big"><span>Budget</span><span id="iTot">${fmt(it?itemTotal(t,it):0)}</span></div></div>`+
+      actField('Actual $ (after the bill)','iAct',t.season,t.id,'item',it?.id,it?.actual)+field('Notes','iNotes',it?.notes||'',{type:'textarea'}),
+    wire:r=>{ const upd=()=>{ const link=$('iLink').dataset.val; const q=link?playersUsed(t):fnum('iQty'); $('iQty').disabled=!!link; if(link) $('iQty').value=q; $('iTot').textContent=fmt(q*fnum('iCost')); };
+      wireSeg(r,'iLink',upd); r.querySelector('#iQty').oninput=upd; r.querySelector('#iCost').oninput=upd; upd(); },
+    save:()=>{ const name=fv('iName'); if(!name){toast('Name the item');return false;}
+      const data={item:name,kind:fv('iKind'),qtyLink:$('iLink').dataset.val,qty:fnum('iQty'),unitCost:fnum('iCost'),actual:fnum('iAct'),notes:fv('iNotes')};
+      const nd=+fv('iDay'); if(it){ t.dayItems[di]=t.dayItems[di].filter(x=>x!==it); t.dayItems[nd].push(Object.assign(it,data)); } else t.dayItems[nd].push(Object.assign({id:uid()},data)); },
+    del:it?()=>{ const i=t.dayItems[di].indexOf(it); t.dayItems[di].splice(i,1); toast('Removed',()=>{t.dayItems[di].splice(i,0,it);persist();render();}); }:null});
+}
+/* Catered menu: line items × qty × all-in price */
+function editMenu(t,di,it){
+  const menu=it?clone(it.menu):{items:[],svcPct:0,guests:playersUsed(t)}; menu.svcPct=0;
+  const rowsHTML=()=>menu.items.map((x,i)=>`<div class="mr num" style="grid-template-columns:minmax(0,1fr) 64px 84px 76px 28px"><input class="inp" data-mi="${i}" data-k="item" value="${esc(x.item)}" aria-label="Menu item"><input class="inp r" data-mi="${i}" data-k="qty" inputmode="decimal" value="${esc(x.qty)}" aria-label="${esc(x.item)} quantity"><input class="inp r" data-mi="${i}" data-k="unitCost" inputmode="decimal" value="${esc(x.unitCost)}" aria-label="${esc(x.item)} unit price"><b class="r" data-mt="${i}">${fmt(n0(x.qty)*n0(x.unitCost))}</b><button class="ib" data-mdel="${i}" aria-label="Remove ${esc(x.item)}">${I.x}</button></div>`).join('')||'<div class="mr"><span class="muted">No menu items yet.</span></div>';
+  const totals=()=>{ const g=n0(menu.guests), tot=menuTotal(menu);
+    return `<div class="big"><span>Total <small class="muted" style="font-weight:500">all-in prices</small></span><span>${fmt(tot)}</span></div><div><span class="muted">Per guest</span><span>${g?fmt2(tot/g):'—'}</span></div>`; };
+  openDrawer({kicker:dayLabel(t,di)+' · Catered menu',title:it?it.item:'New catered menu',
+    body:field('Name','mName',it?.item||'Dinner',{ph:'e.g. Dinner (WCCC)'})+field('Guests','mGuests',menu.guests,{type:'number',hint:'Prices are all-in from the club — nothing is added on top.'})+
+      (fieldRSVP(t).headcount!=null&&fieldRSVP(t).headcount!==n0(menu.guests)?`<div class="banner" style="justify-content:space-between"><span>Field RSVPs: <b>${fieldRSVP(t).headcount}</b> (${fieldRSVP(t).dinner} players + ${fieldRSVP(t).guests||0} plus-ones)</span><button class="btn sm" type="button" id="mUseRsvp">Use ${fieldRSVP(t).headcount}</button></div>`:'')+
+      `<div class="fld"><div style="display:flex;justify-content:space-between;align-items:center"><span class="lbl">Menu</span><button class="btn sm" id="mAdd" type="button">${I.plus}Add item</button></div>
+       <div class="mini"><div class="mr h" style="grid-template-columns:minmax(0,1fr) 64px 84px 76px 28px"><span>Item</span><span class="r">Qty</span><span class="r">Unit $</span><span class="r">Total</span><span></span></div><div id="mRows">${rowsHTML()}</div></div></div>
+       <div class="sumrows num" id="mTot">${totals()}</div>`+actField('Actual $ (final bill)','mAct',t.season,t.id,'item',it?.id,it?.actual)+field('Notes','mNotes',it?.notes||'',{type:'textarea'}),
+    wire:r=>{
+      const rewire=()=>{ r.querySelector('#mRows').innerHTML=rowsHTML(); bind(); r.querySelector('#mTot').innerHTML=totals(); };
+      const bind=()=>{ r.querySelectorAll('[data-mi]').forEach(inp=>inp.oninput=()=>{ const x=menu.items[+inp.dataset.mi]; x[inp.dataset.k]=inp.dataset.k==='item'?inp.value:inp.value; const i=+inp.dataset.mi;
+          r.querySelector(`[data-mt="${i}"]`).textContent=fmt(n0(x.qty)*n0(x.unitCost)); r.querySelector('#mTot').innerHTML=totals(); });
+        r.querySelectorAll('[data-mdel]').forEach(b=>b.onclick=()=>{ menu.items.splice(+b.dataset.mdel,1); rewire(); }); };
+      bind();
+      r.querySelector('#mAdd').onclick=()=>{ menu.items.push({id:uid(),item:'',qty:0,unitCost:0,notes:''}); rewire(); const ins=r.querySelectorAll('[data-k=item]'); ins[ins.length-1].focus(); };
+      const ur=r.querySelector('#mUseRsvp'); if(ur) ur.onclick=()=>{ menu.guests=fieldRSVP(t).headcount; r.querySelector('#mGuests').value=menu.guests; r.querySelector('#mTot').innerHTML=totals(); ur.closest('.banner').remove(); };
+      r.querySelector('#mGuests').oninput=e=>{ menu.guests=n0(e.target.value); r.querySelector('#mTot').innerHTML=totals(); };
+    },
+    save:()=>{ menu.items=menu.items.filter(x=>x.item.trim()||n0(x.qty)||n0(x.unitCost)).map(x=>({...x,qty:n0(x.qty),unitCost:n0(x.unitCost)}));
+      menu.guests=fnum('mGuests'); menu.svcPct=0;
+      const data={item:fv('mName')||'Catered menu',kind:'Meal',menu,qty:menu.guests,unitCost:0,qtyLink:'',actual:fnum('mAct'),notes:fv('mNotes')};
+      if(it) Object.assign(it,data); else t.dayItems[di].push(Object.assign({id:uid()},data)); },
+    del:it?()=>{ const i=t.dayItems[di].indexOf(it); t.dayItems[di].splice(i,1); toast('Menu removed',()=>{t.dayItems[di].splice(i,0,it);persist();render();}); }:null});
+}
+
+/* Field */
+const inactiveBadge=m=>m&&m.status==='Inactive'?' <span class="chip inact" title="Not on the active MGA member list">Not Active</span>':'';
+function tField(el,t){
+  const size=t.teamSize||2, teams={};
+  t.field.forEach(p=>{ (teams[p.team||0]=teams[p.team||0]||[]).push(p); });
+  const nums=Object.keys(teams).map(Number).sort((a,b)=>a-b);
+  const paid=t.field.filter(p=>p.paid).length, skins=t.field.filter(p=>p.skins).length;
+  const cols=`grid-template-columns:80px repeat(${size},minmax(0,1fr)) 120px 40px`;
+  const rs=fieldRSVP(t), qs=t.fieldQuestions||[];
+  const ansLine=p=>qs.filter(q=>yes((p.answers||{})[q.key])).map(q=>q.short||qShort(q.label)).join(' · ');
+  const nInact=t.field.filter(p=>{const m=memberById(p.memberId);return m&&m.status==='Inactive';}).length;
+  el.innerHTML=`<div class="grid g4">${kpi('Players in field',String(t.field.length),(size>1?`${nums.length} team${nums.length===1?'':'s'} of ${size}`:'individual')+(nInact?` · ${nInact} not active`:''))}${kpi('Entry fee',fmt(t.entryFee),'per player')}${kpi('Entry fees paid',String(paid),`of ${t.field.length} · ${fmt(paid*n0(t.entryFee))} collected`)}${rs.headcount!=null?kpi('Dinner headcount',String(rs.headcount),`${rs.dinner} players${rs.guests!=null?' + '+rs.guests+' plus-ones':''}`):kpi('Skins entered',String(skins),n0(t.skinsFee)?'× '+fmt(t.skinsFee):'no skins fee set')}</div>
+  ${qs.length?`<div class="card pad" style="display:flex;gap:10px 24px;flex-wrap:wrap;align-items:center;font-size:13.5px"><span class="lbl">RSVPs</span>${qs.map(q=>`<span><b class="num">${t.field.filter(p=>yes((p.answers||{})[q.key])).length}</b> <span class="muted">${esc(q.label)}</span></span>`).join('')}${t.rosterFile?`<span class="muted" style="margin-left:auto;font-size:12.5px">From ${esc(t.rosterFile)} · ${new Date(t.rosterImportedAt).toLocaleDateString()}</span>`:''}</div>`:''}
+  ${t.budgetBasis!=='field'?`<div class="banner">The budget uses ${n0(t.plannedPlayers)} planned players. Switch it to the field in Tournament details once signups close.</div>`:''}
+  <div class="toolbar"><div class="actions"><button class="btn pri" id="fImp">${I.down}Import roster</button><button class="btn" id="fAdd">${I.plus}Add ${size>1?'team':'player'}</button></div><span class="muted" style="margin-left:auto;font-size:13px">Players are picked from Members${db.members.length?'':' — add members first'}.</span></div>
+  <div class="card" style="overflow:hidden">${t.field.length?`<div class="tw"><div class="t"><div class="tr th" style="${cols}"><span>${size>1?'Team':'#'}</span>${Array.from({length:size},(_,i)=>`<span>Player ${i+1}</span>`).join('')}<span>Entry</span><span></span></div>
+    ${nums.map(n=>`<div class="tr click" data-team="${n}" style="${cols}"><span class="muted">${size>1?'Team '+n:n}</span>${Array.from({length:size},(_,i)=>{const p=teams[n][i];const mm=p&&memberById(p.memberId);return p?`<div class="cell2"><b class="trunc">${esc(mm?memberName(mm):p.name||'Unknown')}${inactiveBadge(mm)}${p.skins?' <span class="chip" style="height:20px;font-size:11px">Skins</span>':''}</b>${ansLine(p)?`<small class="trunc">${esc(ansLine(p))}</small>`:''}</div>`:'<span class="muted">—</span>';}).join('')}<span>${teams[n].every(p=>p.paid)?'<span class="chip ok">Paid</span>':`<span class="chip warn">${fmt(teams[n].filter(p=>!p.paid).length*n0(t.entryFee))} due</span>`}</span><span class="ib">${I.edit}</span></div>`).join('')}</div></div>`:`<div class="empty"><b>No field yet</b><span>Import the Golf Genius roster, or add ${size>1?'teams':'players'} from the member list as they sign up.</span></div>`}</div>`;
+  $('fAdd').onclick=()=>editTeam(t,null); $('fImp').onclick=()=>importField(t);
+  el.querySelectorAll('[data-team]').forEach(r=>r.onclick=()=>editTeam(t,+r.dataset.team));
+}
+function editTeam(t,num){
+  const size=t.teamSize||2, existing=num!=null?t.field.filter(p=>(p.team||0)===num):[];
+  const next=num!=null?num:(Math.max(0,...t.field.map(p=>p.team||0))+1);
+  const taken=new Set(t.field.filter(p=>(p.team||0)!==num).map(p=>p.memberId));
+  const opts=[['','— Choose member —'],['__new','+ New player (not an MGA member — added as Not Active)']].concat(db.members.slice().sort((a,b)=>memberName(a).localeCompare(memberName(b))).map(m=>[m.id,memberName(m)+(m.status==='Inactive'?' — Not Active':'')+(taken.has(m.id)?' (already in field)':'')]));
+  openDrawer({kicker:t.name+' · Field',title:size>1?(num!=null?'Team '+num:'Add team'):(num!=null?'Edit player':'Add player'),
+    body:(size>1?field('Team number','tmNum',next,{type:'number'}):'')+Array.from({length:size},(_,i)=>{const p=existing[i]||{};return `<div class="card pad" style="display:flex;flex-direction:column;gap:10px">${field('Player '+(i+1),'tmM'+i,p.memberId||'',{type:'select',options:opts})}<div id="tmB${i}">${inactiveBadge(memberById(p.memberId))?`<span class="chip inact">Not Active</span>`:''}</div>
+      <div id="tmN${i}" hidden style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px"><input class="inp" id="tmNF${i}" placeholder="First name" aria-label="New player first name"><input class="inp" id="tmNL${i}" placeholder="Last name" aria-label="New player last name"><input class="inp" id="tmNE${i}" placeholder="Email (optional)" aria-label="New player email"></div><div style="display:flex;gap:10px 18px;flex-wrap:wrap"><label class="check"><input type="checkbox" id="tmP${i}"${p.paid?' checked':''}>Entry paid</label><label class="check"><input type="checkbox" id="tmS${i}"${p.skins?' checked':''}>In skins</label>${(t.fieldQuestions||[]).map((q,qi)=>`<label class="check"><input type="checkbox" id="tmQ${i}_${qi}"${yes((p.answers||{})[q.key])?' checked':''}>${esc(q.short||qShort(q.label))}</label>`).join('')}</div></div>`;}).join('')+
+      '<p class="hint">Players who aren’t active MGA members can still play. Pick “New player” to add them to Members as Inactive; they show as Not Active in the field.</p>',
+    wire:r=>{ for(let i=0;i<size;i++){ const s=r.querySelector('#tmM'+i); const upd=()=>{ const n=r.querySelector('#tmN'+i); n.hidden=s.value!=='__new'; n.style.display=s.value==='__new'?'grid':'none';
+        r.querySelector('#tmB'+i).innerHTML=(s.value==='__new'||inactiveBadge(memberById(s.value)))?'<span class="chip inact">Not Active</span>':''; if(s.value==='__new') r.querySelector('#tmNF'+i).focus(); }; s.onchange=upd; upd(); } },
+    save:()=>{ const team=size>1?(+fv('tmNum')||next):next; const picks=[], created=[];
+      for(let i=0;i<size;i++){ let mid=fv('tmM'+i); if(!mid) continue;
+        if(mid==='__new'){ const f=fv('tmNF'+i), l=fv('tmNL'+i); if(!f&&!l){ toast('Enter the new player’s name'); return false; }
+          const dup=db.members.find(m=>(m.first||'').toLowerCase()===f.toLowerCase()&&(m.last||'').toLowerCase()===l.toLowerCase());
+          if(dup){ mid=dup.id; } else { const m={id:uid(),first:f,last:l,email:fv('tmNE'+i).toLowerCase(),status:'Inactive',joined:'',notes:'Added from the '+t.name+' field',source:'field'}; created.push(m); mid=m.id; } } if(taken.has(mid)){ toast(memberName(memberById(mid))+' is already in the field'); return false; }
+        if(picks.some(p=>p.memberId===mid)){ toast('Same member picked twice'); return false; }
+        const prev=existing.find(p=>p.memberId===mid)||existing[i]||{}; const answers=Object.assign({},prev.memberId===mid?prev.answers:{});
+        (t.fieldQuestions||[]).forEach((q,qi)=>{ answers[q.key]=$(`tmQ${i}_${qi}`).checked?'Yes':'No'; });
+        picks.push({...(prev.memberId===mid?prev:{}),id:(prev.memberId===mid&&prev.id)||uid(),memberId:mid,team,paid:$('tmP'+i).checked,skins:$('tmS'+i).checked,answers}); }
+      if(!picks.length){ toast('Pick at least one player'); return false; }
+      created.forEach(m=>db.members.push(m));
+      t.field=t.field.filter(p=>(p.team||0)!==num).concat(picks);
+      if(created.length) toast(created.map(memberName).join(' and ')+' added to Members as Inactive'); },
+    del:num!=null?()=>{ t.field=t.field.filter(p=>(p.team||0)!==num); }:null,delLabel:size>1?'Remove team':'Remove player'});
+}
+
+/* Sponsors */
+function tSponsors(el,t){
+  const c=tcalc(t), order=s=>{const i=t.tiers.findIndex(x=>x.name===s.tier);return i<0?99:i;};
+  const list=[...t.sponsors].sort((a,b)=>order(a)-order(b)||(a.company||'').localeCompare(b.company||''));
+  const cols='grid-template-columns:minmax(0,1.6fr) minmax(0,1fr) 110px 110px 120px 40px';
+  el.innerHTML=`<div class="grid g3">${kpi('Pledged',fmt(c.pledged),t.goal?`${Math.round(c.pledged/t.goal*100)}% of ${fmt(t.goal)} goal`:`${t.sponsors.length} sponsors`)}${kpi('Received',fmt(c.received),`${t.sponsors.filter(s=>spPaid(s)>=n0(s.pledged)&&n0(s.pledged)>0).length} paid in full`)}${kpi('Outstanding',fmt(sum(t.sponsors,s=>Math.max(0,n0(s.pledged)-spPaid(s)))),`${t.sponsors.filter(s=>n0(s.pledged)>spPaid(s)+0.004).length} still owe`,'')}</div>
+  <div class="toolbar"><div class="actions"><button class="btn pri" id="spAdd">${I.plus}Add sponsor</button><button class="btn" id="spTiers">Sponsor tiers</button></div></div>
+  <div class="card" style="overflow:hidden">${list.length?`<div class="tw"><div class="t"><div class="tr th" style="${cols}"><span>Sponsor</span><span>Tier</span><span class="r">Pledged</span><span class="r">Received</span><span>Status</span><span></span></div>
+  ${list.map(s=>{const p=spPaid(s),pl=n0(s.pledged);const st=p<=0?['Pledged','']:p>=pl?['Paid','ok']:['Partial','gold'];return `<div class="tr num click" data-sp="${s.id}" style="${cols}"><div class="cell2"><b class="trunc">${esc(s.company)}</b><small class="trunc">${esc([s.contact,s.committee&&'Committee '+s.committee].filter(Boolean).join(' · '))}</small></div><span class="trunc muted">${esc(s.tier)}</span><span class="r">${fmt(pl)}</span><span class="r">${fmt(p)}</span><span><span class="chip ${st[1]}">${st[0]}</span></span><span class="ib">${I.edit}</span></div>`;}).join('')}
+  <div class="tr tot num" style="${cols}"><span>Total</span><span></span><span class="r">${fmt(c.pledged)}</span><span class="r">${fmt(c.received)}</span><span></span><span></span></div></div></div>`:`<div class="empty"><b>No sponsors yet</b><span>Add sponsors and log their payments as they come in.</span></div>`}</div>`;
+  $('spAdd').onclick=()=>editSponsor(t,null); $('spTiers').onclick=()=>editTiers(t);
+  el.querySelectorAll('[data-sp]').forEach(r=>r.onclick=()=>editSponsor(t,t.sponsors.find(s=>s.id===r.dataset.sp)));
+}
+function editSponsor(t,s){
+  const pays=s?clone(s.payments||[]):[];
+  const payHTML=()=>pays.map((p,i)=>`<div class="mr num" style="grid-template-columns:86px minmax(0,1fr) 72px 76px 28px"><input class="inp r" data-pi="${i}" data-k="amount" inputmode="decimal" value="${esc(p.amount)}" aria-label="Payment amount"><select class="inp" data-pi="${i}" data-k="method" aria-label="Payment method">${['Check','Zelle','CC','Cash','Other'].map(o=>`<option${o===p.method?' selected':''}>${o}</option>`).join('')}</select><input class="inp" data-pi="${i}" data-k="checkNo" value="${esc(p.checkNo||'')}" placeholder="Chk #" aria-label="Check number"><input class="inp" data-pi="${i}" data-k="date" value="${esc(p.date)}" placeholder="Date" aria-label="Payment date"><button class="ib" data-pdel="${i}" aria-label="Remove payment">${I.x}</button></div>`).join('')||'<div class="mr"><span class="muted">No payments logged.</span></div>';
+  const tierOpts=[['','— None —']].concat(t.tiers.map(x=>[x.name,x.name]));
+  openDrawer({kicker:t.name+' · Sponsor',title:s?s.company:'Add sponsor',
+    body:field('Company','sCo',s?.company||'')+pair(field('Tier','sTier',s?.tier||'',{type:'select',options:tierOpts}),field('Pledged $','sPl',s?.pledged??'',{type:'number'}))+
+      pair(field('Contact','sCt',s?.contact||''),field('Committee','sCm',s?.committee||'',{ph:'Initials'}))+pair(field('Phone','sPh',s?.phone||''),field('Email','sEm',s?.email||''))+
+      `<div class="fld"><div style="display:flex;justify-content:space-between;align-items:center"><span class="lbl">Payments received</span><button class="btn sm" id="pAdd" type="button">${I.plus}Log payment</button></div><div class="mini"><div id="pRows">${payHTML()}</div></div><p class="hint" id="pSum"></p></div>`+
+      field('Notes','sNt',s?.notes||'',{type:'textarea'}),
+    wire:r=>{ const sumTxt=()=>{ r.querySelector('#pSum').textContent=`${fmt(sum(pays,p=>p.amount))} received of ${fmt(fnum('sPl'))} pledged`; };
+      const bind=()=>{ r.querySelectorAll('[data-pi]').forEach(e=>e.oninput=e.onchange=()=>{ pays[+e.dataset.pi][e.dataset.k]=e.value; sumTxt(); });
+        r.querySelectorAll('[data-pdel]').forEach(b=>b.onclick=()=>{ pays.splice(+b.dataset.pdel,1); r.querySelector('#pRows').innerHTML=payHTML(); bind(); sumTxt(); }); };
+      bind(); sumTxt(); r.querySelector('#sPl').oninput=sumTxt;
+      r.querySelector('#sTier').onchange=e=>{ const tr=t.tiers.find(x=>x.name===e.target.value); if(tr&&n0(tr.amt)&&!fnum('sPl')){ r.querySelector('#sPl').value=tr.amt; sumTxt(); } };
+      r.querySelector('#pAdd').onclick=()=>{ const left=Math.max(0,fnum('sPl')-sum(pays,p=>p.amount)); const d=new Date(); pays.push({id:uid(),amount:left||'',method:'Check',date:(d.getMonth()+1)+'/'+d.getDate()}); r.querySelector('#pRows').innerHTML=payHTML(); bind(); sumTxt(); }; },
+    save:()=>{ const co=fv('sCo'); if(!co){ toast('Company name is required'); return false; }
+      const data={company:co,tier:fv('sTier'),pledged:fnum('sPl'),contact:fv('sCt'),committee:fv('sCm'),phone:fv('sPh'),email:fv('sEm'),notes:fv('sNt'),
+        payments:pays.filter(p=>n0(p.amount)).map(p=>({id:p.id||uid(),amount:n0(p.amount),method:p.method||'Check',date:p.date||'',checkNo:p.checkNo||''}))};
+      if(s) Object.assign(s,data); else t.sponsors.push(Object.assign({id:uid()},data)); },
+    del:s?()=>{ const i=t.sponsors.indexOf(s); t.sponsors.splice(i,1); toast('Sponsor removed',()=>{t.sponsors.splice(i,0,s);persist();render();}); }:null});
+}
+function editTiers(t){
+  const tiers=clone(t.tiers);
+  const rows=()=>tiers.map((x,i)=>`<div class="mr num" style="grid-template-columns:minmax(0,1fr) 100px 28px"><input class="inp" data-ti="${i}" data-k="name" value="${esc(x.name)}" aria-label="Tier name"><input class="inp r" data-ti="${i}" data-k="amt" inputmode="decimal" value="${esc(x.amt)}" aria-label="Tier amount"><button class="ib" data-tdel="${i}" aria-label="Remove tier">${I.x}</button></div>`).join('');
+  openDrawer({kicker:t.name,title:'Sponsor tiers',body:`<div class="mini"><div class="mr h" style="grid-template-columns:minmax(0,1fr) 100px 28px"><span>Tier</span><span class="r">Default $</span><span></span></div><div id="tRows">${rows()}</div></div><button class="btn sm" id="tAdd" type="button" style="align-self:flex-start">${I.plus}Add tier</button><p class="hint">Renaming a tier updates sponsors already on it.</p>`,
+    wire:r=>{ const bind=()=>{ r.querySelectorAll('[data-ti]').forEach(e=>e.oninput=()=>tiers[+e.dataset.ti][e.dataset.k]=e.value); r.querySelectorAll('[data-tdel]').forEach(b=>b.onclick=()=>{tiers.splice(+b.dataset.tdel,1);r.querySelector('#tRows').innerHTML=rows();bind();}); };
+      bind(); r.querySelector('#tAdd').onclick=()=>{ tiers.push({id:uid(),name:'',amt:0}); r.querySelector('#tRows').innerHTML=rows(); bind(); }; },
+    save:()=>{ const old=new Map(t.tiers.map(x=>[x.id,x.name]));
+      const next=tiers.filter(x=>x.name.trim()).map(x=>({id:x.id||uid(),name:x.name.trim(),amt:n0(x.amt)}));
+      next.forEach(x=>{ const was=old.get(x.id); if(was&&was!==x.name) t.sponsors.forEach(s=>{ if(s.tier===was) s.tier=x.name; }); });
+      t.tiers=next; }});
+}
+
+/* Budget: every number, grouped, read-only rows → drawer */
+function tBudget(el,t){
+  const c=tcalc(t);
+  const row=(name,how,amt,act,key,sub)=>`<div class="tr num bl${key?' click':''}" ${key?`data-b="${key}"`:''}><div class="cell2"><span style="font-weight:500">${name}</span>${sub?`<small>${sub}</small>`:''}</div><span class="muted" style="font-size:13px">${how}</span><b class="r">${fmt(amt)}</b><span class="r muted" style="font-size:12.5px">${act==null||!n0(act)?'—':fmt(act)}</span><span class="ib" aria-hidden="true">${key?I.edit:''}</span></div>`;
+  const grp=(title,total,chip,body,addKey)=>`<div class="gh"><div style="display:flex;align-items:center;gap:10px"><b>${title}</b>${chip?`<span class="chip">${chip}</span>`:''}${addKey?`<button class="btn sm" data-badd="${addKey}">${I.plus}Add</button>`:''}</div><b class="num">${fmt(total)}</b></div>${body}`;
+  const pl=`${c.players} ${t.budgetBasis==='field'?'in the field':'planned'}`;
+  const rev=grp('Revenue',c.revenue,'',
+    row('Entry fees',`${pl} × ${fmt(t.entryFee)}`,c.entryFees,tA(t,'entry','',t.actuals.entryFees),'a:entryFees',t.budgetBasis==='field'?'Players from the Field tab':'')+
+    (n0(t.skinsFee)||c.skins?row('Skins / day money',`${c.players} × ${fmt(t.skinsFee)} · paid back out`,c.skins,tA(t,'skins','',t.actuals.skins),'a:skins'):'')+
+    row('Sponsors',`${t.sponsors.length} sponsors · Sponsors tab`,c.pledged,c.received,'go:sponsors')+
+    t.income.map(i=>row(esc(i.desc),i.source==='raffle'?'Season raffle':'',i.budget,tA(t,'inc',i.id,i.actual),'inc:'+i.id,i.notes?esc(i.notes):'')).join(''),'inc');
+  const days=[0,1,2].slice(0,t.days).map(di=>grp(dayLabel(t,di),c.dayTot[di],dayShort(t,di),t.dayItems[di].map(it=>row(esc(it.item),it.menu?`Menu · ${it.menu.items.length} items · all-in`:`${itemQty(t,it)} × ${fmt2(it.unitCost).replace('.00','')}`,itemTotal(t,it),tA(t,'item',it.id,it.actual),`it:${di}:${it.id}`,it.menu?`${it.menu.items.length} menu items · ${n0(it.menu.guests)} guests`:'')).join('')||'<div class="tr"><span class="muted">No meals or events.</span></div>','day'+di)).join('');
+  const groups=[...new Set(t.lines.map(l=>l.group||'Other'))];
+  const wide=grp('Tournament-wide',c.perPlayer+c.skinsPayout+c.lineTot,'',
+    t.perPlayer.map(p=>row(esc(p.desc),`${c.players} × ${fmt(p.perPlayer)} per player`,c.players*n0(p.perPlayer),tA(t,'pp',p.id,p.actual),'pp:'+p.id)).join('')+
+    (c.skinsPayout?row('Skins / day money payout','Matches what’s collected',c.skinsPayout,tA(t,'skinsPaid','',t.actuals.skinsPaid),'a:skinsPaid'):'')+
+    groups.map(g=>t.lines.filter(l=>(l.group||'Other')===g).map(l=>row(esc(l.desc),esc(g),l.budget,tA(t,'line',l.id,l.actual),'ln:'+l.id,l.notes?esc(l.notes):'')).join('')).join(''),'wide');
+  el.innerHTML=`<div style="display:flex;gap:20px;align-items:flex-start;flex-wrap:wrap">
+    <div class="card" style="flex:1 1 640px;overflow:hidden;min-width:0"><div class="tw"><div class="t bt">
+      <div class="tr th bl"><span>Line</span><span>How it’s calculated</span><span class="r">Budget</span><span class="r">Actual</span><span></span></div>
+      ${rev}${days}${wide}
+      <div class="tr num bl" style="border-top:2px solid var(--navy);font-weight:700;font-size:15px"><span>Total expenses</span><span></span><span class="r">${fmt(c.expenses)}</span><span class="r muted">${fmt(c.expensesA)}</span><span></span></div>
+    </div></div></div>
+    <div class="card pad" style="flex:0 0 300px;display:flex;flex-direction:column;gap:14px;position:sticky;top:20px">
+      <span class="lbl">Budget summary</span>
+      <div class="num" style="display:flex;flex-direction:column;gap:10px">
+        <div style="display:flex;justify-content:space-between"><span>Revenue</span><b>${fmt(c.revenue)}</b></div>
+        <div style="display:flex;justify-content:space-between"><span>Expenses</span><b>${fmt(c.expenses)}</b></div>
+        <div style="height:1px;background:var(--line)"></div>
+        <div style="display:flex;justify-content:space-between;align-items:baseline"><b>Net</b><span class="serif ${netCls(c.net)}" style="font-size:34px;font-weight:700">${fmtS(c.net)}</span></div>
+      </div>
+      ${c.revenue?`<div style="height:8px;border-radius:4px;background:var(--paper);overflow:hidden"><div style="width:${Math.min(100,c.expenses/c.revenue*100).toFixed(1)}%;height:100%;background:${c.expenses>c.revenue?'var(--neg)':'var(--gold)'}"></div></div><span class="muted" style="font-size:12.5px">Expenses use ${(c.expenses/c.revenue*100).toFixed(1)}% of revenue. Feeds the ${esc(t.season)} season budget.</span>`:''}
+      <div style="height:1px;background:var(--line)"></div>
+      <div class="num" style="display:flex;flex-direction:column;gap:8px;font-size:13.5px"><span class="lbl">Actuals so far</span>
+        <div style="display:flex;justify-content:space-between"><span class="muted">Money in</span><span>${fmt(c.revenueA)}</span></div>
+        <div style="display:flex;justify-content:space-between"><span class="muted">Money out</span><span>${fmt(c.expensesA)}</span></div>
+        <div style="display:flex;justify-content:space-between;font-weight:700"><span>Actual net</span><span class="${netCls(c.netA)}">${fmtS(c.netA)}</span></div></div>
+    </div></div>`;
+  el.querySelectorAll('[data-b]').forEach(r=>r.onclick=()=>budgetEdit(t,r.dataset.b));
+  el.querySelectorAll('[data-badd]').forEach(b=>b.onclick=()=>{ const k=b.dataset.badd;
+    if(k==='inc') editLine(t,'income',null); else if(k==='wide') chooseWide(t); else { const di=+k.slice(3); editItem(t,di,null); } });
+}
+function budgetEdit(t,key){
+  const [k,a,b]=key.split(':');
+  if(k==='go'){ view.ttab=a; render(); return; }
+  if(k==='it'){ const it=t.dayItems[+a].find(x=>x.id===b); return it.menu?editMenu(t,+a,it):editItem(t,+a,it); }
+  if(k==='inc') return editLine(t,'income',t.income.find(x=>x.id===a));
+  if(k==='ln') return editLine(t,'lines',t.lines.find(x=>x.id===a));
+  if(k==='pp') return editPerPlayer(t,t.perPlayer.find(x=>x.id===a));
+  if(k==='a'){
+    const lab={entryFees:'Entry fees collected',skins:'Skins / day money collected',skinsPaid:'Skins / day money paid out'}[a];
+    openDrawer({kicker:t.name+' · Actual',title:lab,body:actField('Actual $','aVal',t.season,t.id,{entryFees:'entry',skins:'skins',skinsPaid:'skinsPaid'}[a],'',t.actuals[a])+(a==='entryFees'&&t.field.length?`<p class="hint">The field shows ${t.field.filter(p=>p.paid).length} paid × ${fmt(t.entryFee)} = ${fmt(t.field.filter(p=>p.paid).length*n0(t.entryFee))}.</p>`:'')+`<p class="hint">Change the per-player amount in Tournament details.</p>`,
+      save:()=>{ t.actuals[a]=fnum('aVal'); }});
+  }
+}
+function chooseWide(t){
+  openDrawer({kicker:t.name,title:'Add a tournament-wide expense',body:`<button class="btn" id="cw1" style="justify-content:flex-start;height:auto;padding:14px 16px"><div class="cell2" style="text-align:left"><b>Fixed amount</b><small>Prizes, gifts, signage, entertainment, contests…</small></div></button><button class="btn" id="cw2" style="justify-content:flex-start;height:auto;padding:14px 16px"><div class="cell2" style="text-align:left"><b>Per player</b><small>Scales with the field — pro shop credit, tee gifts…</small></div></button>`,
+    wire:r=>{ r.querySelector('#cw1').onclick=()=>{closeDrawer();editLine(t,'lines',null);}; r.querySelector('#cw2').onclick=()=>{closeDrawer();editPerPlayer(t,null);}; }});
+}
+function editLine(t,kind,l){
+  const inc=kind==='income', groups=[...new Set(['Prizes','Gifts','Entertainment','Misc'].concat(t.lines.map(x=>x.group).filter(Boolean)))];
+  openDrawer({kicker:t.name+(inc?' · Income':' · Expense'),title:l?l.desc:(inc?'Add income':'Add expense'),
+    body:field('Description','lDesc',l?.desc||'')+(inc?'':field('Group','lGrp',l?.group||'Misc',{type:'select',options:groups}))+pair(field('Budget $','lBud',l?.budget??'',{type:'number'}),actField('Actual $','lAct',t.season,t.id,inc?'inc':'line',l?.id,l?.actual))+
+      (inc?`<label class="check"><input type="checkbox" id="lRaf"${l?.source==='raffle'?' checked':''}>This is season 50/50 raffle money</label>`:'')+field('Notes','lNt',l?.notes||'',{type:'textarea'}),
+    save:()=>{ const d=fv('lDesc'); if(!d){ toast('Add a description'); return false; }
+      const data={desc:d,budget:fnum('lBud'),actual:fnum('lAct'),notes:fv('lNt')}; if(!inc) data.group=fv('lGrp'); else data.source=$('lRaf').checked?'raffle':'';
+      if(l) Object.assign(l,data); else t[kind].push(Object.assign({id:uid()},data)); },
+    del:l?()=>{ const i=t[kind].indexOf(l); t[kind].splice(i,1); toast('Removed',()=>{t[kind].splice(i,0,l);persist();render();}); }:null});
+}
+function editPerPlayer(t,p){
+  openDrawer({kicker:t.name+' · Per-player expense',title:p?p.desc:'Add per-player expense',
+    body:field('Description','ppD',p?.desc||'',{ph:'e.g. Pro shop spree'})+pair(field('Amount per player $','ppA',p?.perPlayer??'',{type:'number'}),actField('Actual $','ppAct',t.season,t.id,'pp',p?.id,p?.actual))+`<p class="hint">Budget = ${playersUsed(t)} players × amount.</p>`,
+    save:()=>{ const d=fv('ppD'); if(!d){ toast('Add a description'); return false; } const data={desc:d,perPlayer:fnum('ppA'),actual:fnum('ppAct')};
+      if(p) Object.assign(p,data); else t.perPlayer.push(Object.assign({id:uid(),notes:''},data)); },
+    del:p?()=>{ t.perPlayer=t.perPlayer.filter(x=>x!==p); }:null});
+}
+
+
+/* ---------- Members ---------- */
+function vMembers(m){
+  const y=Y(), s=db.seasons[y], amt=n0(s.dues.amount);
+  const boardOf=id=>db.board.filter(b=>b.memberId===id).map(b=>b.role);
+  let list=db.members.slice().sort((a,b)=>(a.last||'').localeCompare(b.last||'')||(a.first||'').localeCompare(b.first||''));
+  const q=view.mq.toLowerCase();
+  if(q) list=list.filter(x=>[memberName(x),x.email,x.phone,x.memberNo,x.ghin,x.city].join(' ').toLowerCase().includes(q));
+  const f=view.mfilter;
+  if(f==='Active') list=list.filter(x=>x.status!=='Inactive'); if(f==='Inactive') list=list.filter(x=>x.status==='Inactive');
+  if(f==='Board') list=list.filter(x=>boardOf(x.id).length); if(f==='Dues unpaid') list=list.filter(x=>x.status!=='Inactive'&&memberDues(y,x.id)<amt);
+  const cols='grid-template-columns:40px minmax(0,1.5fr) minmax(0,1.5fr) 130px 70px 150px 120px 90px 40px';
+  m.innerHTML=head('Members','Everyone in the MGA. Board seats and tournament fields are picked from this list.',btn('Dues settings','mDues','')+btn('Import member list','mCsv','',I.down)+btn('Add member','mAdd','pri',I.plus))+`
+  <div class="toolbar"><div class="search">${I.search}<input class="inp" id="mq" placeholder="Search name, email, phone or GHIN" value="${esc(view.mq)}" aria-label="Search members"></div>
+    <div class="seg">${['All','Active','Board','Dues unpaid','Inactive'].map(x=>`<button class="${f===x?'on':''}" data-mf="${x}">${x}</button>`).join('')}</div>
+    <span class="muted" style="margin-left:auto;font-size:13px">${db.members.filter(x=>x.status!=='Inactive').length} active · ${y} dues ${fmt(amt)}${n0(s.dues.installments)>1?` (${s.dues.installments} × ${fmt(amt/s.dues.installments)})`:''}</span></div>
+  <div class="card" style="overflow:hidden">${list.length?`<div class="tw"><div class="t" style="min-width:980px"><div class="tr th" style="${cols}"><span></span><span>Name</span><span>Email</span><span>Phone</span><span>Hcp</span><span>Board</span><span>${y} dues</span><span>Status</span><span></span></div>
+  ${list.map(x=>{const paid=memberDues(y,x.id), br=boardOf(x.id); const du=x.status==='Inactive'?['—','']:paid>=amt?['Paid '+fmt(paid),'ok']:paid>0?[fmt(paid)+' of '+fmt(amt),'gold']:s.duesPayments.length?['Unpaid','warn']:['Not recorded',''];
+    return `<div class="tr num click" data-m="${x.id}" style="${cols}"><span class="av">${initials(x)}</span><div class="cell2"><b class="trunc">${esc(memberName(x))}</b>${(x.ghin||x.memberNo)?`<small>${x.ghin?'GHIN '+esc(x.ghin):'#'+esc(x.memberNo)}</small>`:''}</div><span class="trunc muted">${esc(x.email||'')}</span><span class="muted">${esc(x.phone||'')}</span><span>${esc(x.hcp??'')}</span><span>${br.map(r=>`<span class="chip navy">${esc(r)}</span>`).join(' ')}</span><span><span class="chip ${du[1]}">${du[0]}</span></span><span><span class="chip ${x.status==='Inactive'?'':'ok'}">${esc(x.status||'Active')}</span></span><span class="ib">${I.edit}</span></div>`;}).join('')}</div></div>`
+  :`<div class="empty"><b>${db.members.length?'No members match':'No members yet'}</b><span>${db.members.length?'Try a different search or filter.':'Import the Golf Genius contact list export, or add members one at a time.'}</span></div>`}</div>`;
+  const qi=$('mq'); qi.oninput=()=>{ view.mq=qi.value; const pos=qi.selectionStart; render(); const n=$('mq'); n.focus(); n.setSelectionRange(pos,pos); };
+  m.querySelectorAll('[data-mf]').forEach(b=>b.onclick=()=>{view.mfilter=b.dataset.mf;render();});
+  m.querySelectorAll('[data-m]').forEach(r=>r.onclick=()=>editMember(db.members.find(x=>x.id===r.dataset.m)));
+  $('mAdd').onclick=()=>editMember(null); $('mDues').onclick=editDues; $('mCsv').onclick=importRoster;
+}
+function editMember(mm){
+  const y=Y(), s=db.seasons[y]; const pays=mm?clone(s.duesPayments.filter(p=>p.memberId===mm.id)):[];
+  const payHTML=()=>pays.map((p,i)=>`<div class="mr num" style="grid-template-columns:90px minmax(0,1fr) 28px"><input class="inp r" data-di="${i}" data-k="amount" inputmode="decimal" value="${esc(p.amount)}" aria-label="Dues amount"><input class="inp" data-di="${i}" data-k="date" value="${esc(p.date)}" placeholder="Date" aria-label="Dues date"><button class="ib" data-ddel="${i}" aria-label="Remove">${I.x}</button></div>`).join('')||'<div class="mr"><span class="muted">No dues recorded for '+y+'.</span></div>';
+  const inT=mm?db.tournaments.filter(t=>t.field.some(p=>p.memberId===mm.id)):[];
+  openDrawer({kicker:'Member',title:mm?memberName(mm):'Add member',
+    body:pair(field('First name','mfF',mm?.first||''),field('Last name','mfL',mm?.last||''))+pair(field('Email','mfE',mm?.email||''),field('Phone','mfP',mm?.phone||''))+
+      pair(field('Handicap index','mfH',mm?.hcp??''),field('GHIN','mfG',mm?.ghin||''))+field('Address','mfA',mm?.address1||'')+`<div style="display:grid;grid-template-columns:minmax(0,2fr) 70px minmax(0,1fr);gap:12px">${field('City','mfC',mm?.city||'')}${field('State','mfSt',mm?.state||'')}${field('Zip','mfZ',mm?.zip||'')}</div>`+pair(field('Status','mfS',mm?.status||'Active',{type:'select',options:['Active','Inactive']}),field('Joined','mfJ',mm?.joined||'',{type:'date'}))+
+      `<div class="fld"><div style="display:flex;justify-content:space-between;align-items:center"><span class="lbl">${y} dues · ${fmt(s.dues.amount)}, not prorated</span><button class="btn sm" id="dAdd" type="button">${I.plus}Record payment</button></div><div class="mini"><div id="dRows">${payHTML()}</div></div></div>`+
+      (mm&&mm.ggId?`<p class="hint">Golf Genius ID ${esc(mm.ggId)}${mm.memberType?' · member type '+esc(mm.memberType):''}</p>`:'')+(inT.length?`<div class="fld"><span class="lbl">Tournaments</span><span>${inT.map(t=>esc(t.name)+' ('+t.season+')').join(', ')}</span></div>`:'')+field('Notes','mfNt',mm?.notes||'',{type:'textarea'}),
+    wire:r=>{ const bind=()=>{ r.querySelectorAll('[data-di]').forEach(e=>e.oninput=()=>pays[+e.dataset.di][e.dataset.k]=e.value); r.querySelectorAll('[data-ddel]').forEach(b=>b.onclick=()=>{pays.splice(+b.dataset.ddel,1);r.querySelector('#dRows').innerHTML=payHTML();bind();}); };
+      bind(); r.querySelector('#dAdd').onclick=()=>{ const inst=n0(s.dues.amount)/Math.max(1,n0(s.dues.installments)); const d=new Date(); pays.push({id:uid(),amount:inst,date:(d.getMonth()+1)+'/'+d.getDate()}); r.querySelector('#dRows').innerHTML=payHTML(); bind(); }; },
+    save:()=>{ const first=fv('mfF'), last=fv('mfL'); if(!first&&!last){ toast('Enter a name'); return false; }
+      const data={first,last,email:fv('mfE'),phone:fv('mfP'),hcp:fv('mfH'),ghin:fv('mfG'),address1:fv('mfA'),city:fv('mfC'),state:fv('mfSt'),zip:fv('mfZ'),status:fv('mfS'),joined:fv('mfJ'),notes:fv('mfNt')};
+      let target=mm; if(mm) Object.assign(mm,data); else { target=Object.assign({id:uid()},data); db.members.push(target); }
+      s.duesPayments=s.duesPayments.filter(p=>p.memberId!==target.id).concat(pays.filter(p=>n0(p.amount)).map(p=>({id:p.id||uid(),memberId:target.id,amount:n0(p.amount),date:p.date||''}))); },
+    del:mm?()=>{ if(inT.length&&!confirm(`${memberName(mm)} is in ${inT.length} tournament field(s). Remove anyway?`)) return false;
+      db.members=db.members.filter(x=>x!==mm); db.board.forEach(b=>{ if(b.memberId===mm.id) b.memberId=''; }); db.tournaments.forEach(t=>t.field=t.field.filter(p=>p.memberId!==mm.id));
+      for(const ss of Object.values(db.seasons)) ss.duesPayments=ss.duesPayments.filter(p=>p.memberId!==mm.id); toast('Member removed'); }:null,delLabel:'Remove member'});
+}
+function editDues(){
+  const s=db.seasons[Y()];
+  openDrawer({kicker:Y()+' season',title:'Dues settings',body:pair(field('Annual dues $','duA',s.dues.amount,{type:'number'}),field('Charged in','duI',s.dues.installments,{type:'select',options:[[1,'1 payment'],[2,'2 payments'],[4,'4 payments']]}))+'<p class="hint">Not prorated: members who join late still owe the full year. The season budget counts active members × annual dues.</p>',
+    save:()=>{ s.dues={amount:fnum('duA'),installments:+fv('duI')||1}; }});
+}
+/* ---------- Field roster import (Golf Genius event registration export) ---------- */
+function qKind(label){ const l=label.toLowerCase(); return /plus ?1|plus one|\+ ?1|guest/.test(l)?'plus1':/dinner|banquet/.test(l)?'dinner':/par ?3/.test(l)?'par3':'other'; }
+function qShort(label){ const k=qKind(label); if(k==='plus1') return '+1'; if(k==='dinner') return 'Dinner'; if(k==='par3') return 'Par 3';
+  const s=label.replace(/^(are|will|do|did|would) you\s+/i,'').replace(/\?\s*$/,'').trim(); return s.length>18?s.slice(0,17)+'…':s; }
+const yes=v=>/^(y|yes|true|1|x)$/i.test(String(v||'').trim());
+function fieldRSVP(t){
+  const qs=t.fieldQuestions||[], d=qs.find(q=>q.kind==='dinner'), p1=qs.find(q=>q.kind==='plus1'), p3=qs.find(q=>q.kind==='par3');
+  const cnt=q=>q?t.field.filter(p=>yes((p.answers||{})[q.key])).length:null;
+  const dinner=cnt(d), guests=p1?t.field.filter(p=>yes((p.answers||{})[p1.key])&&(!d||yes((p.answers||{})[d.key]))).length:null;
+  return {dinner,guests,headcount:dinner==null?null:dinner+(guests||0),par3:cnt(p3),others:qs.filter(q=>q.kind==='other').map(q=>({q,n:cnt(q)}))};
+}
+function importField(t){
+  openDrawer({kicker:t.name+' · Field',title:'Import tournament roster',
+    body:`<p style="margin:0">Upload the Golf Genius registration export for this event (<b>.xlsx</b>), or any spreadsheet with first and last name columns.</p>
+      <p class="hint">Team Id sets the teams. RSVP questions (dinner, plus one, Par 3 and any others) are kept with each player. Players are matched to Members by GHIN, then email, then name. You’ll see a preview first, and uploading a newer version updates the field.</p>
+      <input type="file" id="fieldF" accept=".xlsx,.xls,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv" class="inp" style="padding-top:8px"><p class="hint" id="fieldMsg" aria-live="polite"></p>`,
+    wire:r=>{ r.querySelector('#fieldF').onchange=async e=>{ const f=e.target.files[0]; if(!f) return; const msg=r.querySelector('#fieldMsg'); msg.style.color=''; msg.textContent='Reading '+f.name+'…';
+      try{ const res=mapRoster(await readRosterFile(f)); if(!res.people.length) throw new Error('No players found under the header row'); closeDrawer(); previewField(t,res,f.name); }
+      catch(err){ msg.style.color='var(--neg)'; msg.textContent=err.message||'Couldn’t read that file'; } }; }});
+}
+function previewField(t,res,fname){
+  const size=t.teamSize||2, used=new Set();
+  const rows=res.people.map((p,i)=>{ const m=matchMember(p,used,true); if(m) used.add(m.id); return {p,m,team:parseInt(p.team,10)||0,i}; });
+  // players without a team number: keep file order, pair them up
+  let nextT=Math.max(0,...rows.map(r=>r.team))+1, open=0;
+  rows.forEach(r=>{ if(!r.team){ if(open===0) nextT++; r.team=nextT-1; open=(open+1)%size; } });
+  const newMembers=rows.filter(r=>!r.m);
+  const inField=new Map(t.field.map(x=>[x.memberId,x]));
+  const matchedIds=new Set(rows.filter(r=>r.m).map(r=>r.m.id));
+  const added=rows.filter(r=>!r.m||!inField.has(r.m.id)), moved=rows.filter(r=>r.m&&inField.has(r.m.id)&&(inField.get(r.m.id).team||0)!==r.team);
+  const removed=t.field.filter(x=>!matchedIds.has(x.memberId));
+  const teamSizes={}; rows.forEach(r=>teamSizes[r.team]=(teamSizes[r.team]||0)+1);
+  const odd=Object.entries(teamSizes).filter(([,n])=>n!==size);
+  const newerHcp=r=>r.m&&r.p.hcp&&String(r.m.hcp??'')!==r.p.hcp&&!(r.m.hcpAt&&res.fileDate<r.m.hcpAt);
+  const hcpChanges=rows.filter(newerHcp).length;
+  const fills=rows.filter(r=>r.m&&['phone','email','ghin'].some(k=>r.p[k]&&!r.m[k])).length;
+  const qs=res.questions;
+  const tally=qs.map(q=>`${esc(qShort(q))}: ${rows.filter(r=>yes(r.p.answers[q])).length} yes`).join(' · ');
+  const pn=r=>esc(r.m?memberName(r.m):r.p.first+' '+r.p.last);
+  openDrawer({kicker:'Import · '+fname,title:'Review roster',saveLabel:`Import ${rows.length} players`,
+    body:`<div class="grid g3" style="gap:10px">${[['Players',rows.length],['Teams',Object.keys(teamSizes).length],['New to field',added.length]].map(([l,v])=>`<div class="card pad kpi" style="padding:14px"><span class="lbl">${l}</span><span class="v num" style="font-size:30px">${v}</span></div>`).join('')}</div>
+      <p class="hint">${rows.length-newMembers.length} matched to existing members${rows.filter(r=>r.m&&r.m.status==='Inactive').length?` (${rows.filter(r=>r.m&&r.m.status==='Inactive').length} Inactive)`:''}${newMembers.length?` · <b>${newMembers.length} not in Members</b>`:''}${moved.length?` · ${moved.length} changing teams`:''}${res.skippedGuests?` · ${res.skippedGuests} guests skipped`:''}.</p>
+      ${qs.length?`<div class="fld"><span class="lbl">RSVP questions found</span><span style="font-size:13.5px">${tally}</span></div>`:''}
+      ${odd.length?`<div class="banner">${odd.length} team${odd.length>1?'s don’t':' doesn’t'} have ${size} players: ${odd.slice(0,6).map(([n,c])=>'Team '+n+' ('+c+')').join(', ')}${odd.length>6?'…':''}. They’ll import as-is so you can fix them on the Field tab.</div>`:''}
+      ${newMembers.length?`<div class="fld"><span class="lbl">Not on the MGA member list — will play as Not Active</span><div class="mini">${newMembers.slice(0,6).map(r=>`<div class="mr"><div class="cell2"><b>${pn(r)}</b><small>${esc([r.p.email,r.p.ghin&&'GHIN '+r.p.ghin].filter(Boolean).join(' · '))}</small></div></div>`).join('')}${newMembers.length>6?`<div class="mr"><span class="muted">+ ${newMembers.length-6} more</span></div>`:''}</div></div>`:''}
+      ${removed.length?`<div class="fld"><span class="lbl">In the field now but not in this roster</span><div class="mini">${removed.slice(0,6).map(x=>`<div class="mr"><b>${esc(memberName(memberById(x.memberId))||'Unknown')}</b></div>`).join('')}${removed.length>6?`<div class="mr"><span class="muted">+ ${removed.length-6} more</span></div>`:''}</div></div>`:''}
+      <div class="fld" style="gap:10px">
+        ${newMembers.length?`<label class="check"><input type="checkbox" id="fiAdd" checked>Add the ${newMembers.length} player${newMembers.length>1?'s':''} who aren’t on the MGA member list to Members as <b>Inactive</b> (they still play, marked Not Active)</label>`:''}
+        ${hcpChanges||fills?`<label class="check" style="align-items:flex-start"><input type="checkbox" id="fiUpd" checked><span>Update members from this roster <span class="muted">(${hcpChanges} handicap index${hcpChanges===1?'':'es'}${fills?`, fill in ${fills} missing phone/email/GHIN`:''})</span></span></label>`:''}
+        ${removed.length?`<label class="check"><input type="checkbox" id="fiRem" checked>Remove the ${removed.length} player${removed.length>1?'s':''} not in this roster from the field</label>`:''}
+        <label class="check"><input type="checkbox" id="fiPaid">Mark every imported player’s entry fee as paid</label>
+        ${t.budgetBasis!=='field'?`<label class="check" style="align-items:flex-start"><input type="checkbox" id="fiBasis"><span>Use the field for the budget player count <span class="muted">(now ${n0(t.plannedPlayers)} planned → ${rows.length} in the field)</span></span></label>`:''}
+      </div>`,
+    save:()=>{
+      const chk=id=>$(id)&&$(id).checked, before={field:clone(t.field),members:clone(db.members),q:clone(t.fieldQuestions||[]),basis:t.budgetBasis};
+      if(newMembers.length&&!chk('fiAdd')&&!confirm(`${newMembers.length} player(s) aren’t in Members and will be left out of the field. Continue?`)) return false;
+      // questions
+      const qmap=new Map((t.fieldQuestions||[]).map(q=>[q.label,q]));
+      qs.forEach(l=>{ if(!qmap.has(l)) qmap.set(l,{key:uid(),label:l,short:qShort(l),kind:qKind(l)}); });
+      t.fieldQuestions=[...qmap.values()];
+      const keyOf=l=>qmap.get(l).key;
+      const upd=chk('fiUpd'), paid=chk('fiPaid');
+      const next=[];
+      for(const r of rows){
+        let m=r.m;
+        if(!m){ if(!chk('fiAdd')) continue; m={id:uid(),status:'Inactive',joined:'',notes:'Added from the '+t.name+' roster',source:'field-roster'}; ROSTER_FIELDS.forEach(([k])=>{ if(k!=='ggId') m[k]=r.p[k]||''; }); if(r.p.hcp) m.hcpAt=res.fileDate; db.members.push(m); }
+        else if(upd){ if(newerHcp(r)){ m.hcp=r.p.hcp; m.hcpAt=res.fileDate; } ['phone','email','ghin','address1','city','state','zip'].forEach(k=>{ if(r.p[k]&&!m[k]) m[k]=r.p[k]; }); }
+        const prev=inField.get(m.id)||{};
+        const answers=Object.assign({},prev.answers||{}); qs.forEach(l=>{ answers[keyOf(l)]=r.p.answers[l]||''; });
+        next.push({id:prev.id||uid(),memberId:m.id,team:r.team,paid:paid||!!prev.paid,skins:!!prev.skins,entryNo:r.p.entryNo||prev.entryNo||'',regId:r.p.ggId||prev.regId||'',answers});
+      }
+      const keep=chk('fiRem')?[]:removed;
+      t.field=next.concat(keep);
+      if(chk('fiBasis')) t.budgetBasis='field';
+      t.rosterFile=fname; t.rosterImportedAt=new Date().toISOString();
+      toast(`${next.length} players imported into ${new Set(next.map(x=>x.team)).size} teams`,()=>{ t.field=before.field; db.members=before.members; t.fieldQuestions=before.q; t.budgetBasis=before.basis; persist(); render(); });
+    }});
+}
+
+/* ---------- Member roster import (Golf Genius export, any .xlsx/.xls/.csv) ----------
+   Finds the header row itself, maps columns by name, previews new vs. updated,
+   and matches existing members by Golf Genius ID → GHIN → email → name so a newer
+   export updates people instead of duplicating them. */
+function loadXLSX(){ if(window.XLSX) return Promise.resolve();
+  return new Promise((ok,bad)=>{ const s=document.createElement('script'); s.src='https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js'; s.onload=ok; s.onerror=()=>bad(new Error('Couldn’t load the spreadsheet reader — check your connection')); document.head.appendChild(s); }); }
+const ROSTER_COLS={
+  ggId:/^(id\b|id \(|golf ?genius( player)? id)/, email:/^e-?mail( address)?$/, first:/^first( name)?$/, last:/^last( name)?$/,
+  full:/^(full ?name|name|player|golfer)$/, handle:/^handle$/, phone:/(cell|mobile)( phone)?$|^phone( number)?$/, hcp:/^(index|handicap( index)?|hcp|hi)$/,
+  ghin:/^ghin( ?(id|#|no\.?|number))?$/, memberNo:/^member ?(#|no\.?|number|id)$/, addr1:/^address ?1?$/, addr2:/^address ?2$/, city:/^city$/, state:/^state$/,
+  zip:/^(zip|zip ?code|postal( code)?)$/, team:/^team( ?(id|#|no\.?|number))?$/, entryNo:/^entry( ?(#|no\.?|number))?$/, dob:/(date of )?birth|^dob$/, memberType:/^member ?type$/, mg:/member or guest|^guest$/, gender:/^gender$/
+};
+async function readRosterFile(f){
+  const ext=(f.name.split('.').pop()||'').toLowerCase(); let rows;
+  if(ext==='csv'&&!window.XLSX){ try{ await loadXLSX(); }catch(_){ rows=parseCSV(await f.text()); } }
+  if(!rows){ await loadXLSX(); const wb=XLSX.read(await f.arrayBuffer(),{type:'array'});
+    let best=null; for(const n of wb.SheetNames){ const r=XLSX.utils.sheet_to_json(wb.Sheets[n],{header:1,raw:false,defval:''}); if(!best||r.length>best.length) best=r; } rows=best||[]; }
+  return rows.map(r=>r.map(c=>String(c??'').trim()));
+}
+function mapRoster(rows){
+  let hi=-1, map={};
+  for(let i=0;i<Math.min(rows.length,30)&&hi<0;i++){
+    const m={}; rows[i].forEach((h,ci)=>{ const k=h.toLowerCase().replace(/\s+/g,' ').trim(); for(const [key,re] of Object.entries(ROSTER_COLS)) if(m[key]===undefined&&re.test(k)){ m[key]=ci; break; } });
+    if((m.first!==undefined&&m.last!==undefined)||m.full!==undefined||m.handle!==undefined){ hi=i; map=m; }
+  }
+  let fileDate=Date.now();
+  for(const r of rows.slice(0,Math.max(hi,0))){ const mt=/created on\s+(\d{1,2})\/(\d{1,2})\/(\d{4})\s+(\d{1,2}):(\d{2})\s*([AP]M)?/i.exec(r.join(' ')); if(mt){ let hh=+mt[4]%12; if(/pm/i.test(mt[6]||'')) hh+=12; fileDate=new Date(+mt[3],+mt[1]-1,+mt[2],hh,+mt[5]).getTime(); break; } }
+  const questions=[];
+  if(hi>=0) rows[hi].forEach((h,ci)=>{ if(/\?\s*$|^(are|will|do|did|would) you\b/i.test(h.trim())&&!Object.values(map).includes(ci)) questions.push({ci,label:h.trim()}); });
+  if(hi<0) throw new Error('Couldn’t find a header row with First Name and Last Name (or Name)');
+  const people=[]; let skippedGuests=0, skippedBlank=0;
+  for(const r of rows.slice(hi+1)){
+    const g=k=>map[k]!==undefined?(r[map[k]]||'').trim():'';
+    let first=g('first'), last=g('last');
+    if(!first&&!last){ const h=g('handle'); if(h.includes(',')){ [last,first]=h.split(',').map(s=>s.trim()); } else { const p=(g('full')||h).split(/\s+/).filter(Boolean); first=p.shift()||''; last=p.join(' '); } }
+    if(!first&&!last){ if(r.some(c=>c)) skippedBlank++; continue; }
+    if(/guest/i.test(g('mg'))){ skippedGuests++; continue; }
+    people.push({ggId:g('ggId').replace(/\D/g,'')?g('ggId'):'',first,last,email:g('email').toLowerCase(),phone:g('phone'),hcp:g('hcp'),ghin:g('ghin'),memberNo:g('memberNo'),
+      address1:g('addr1'),address2:g('addr2'),city:g('city'),state:g('state'),zip:g('zip'),dob:g('dob'),memberType:g('memberType'),
+      team:g('team'),entryNo:g('entryNo'),answers:Object.fromEntries(questions.map(q=>[q.label,(r[q.ci]||'').trim()]))});
+  }
+  return {people,skippedGuests,skippedBlank,columns:Object.keys(map),questions:questions.map(q=>q.label),fileDate};
+}
+const ROSTER_FIELDS=[['first','First name'],['last','Last name'],['email','Email'],['phone','Phone'],['hcp','Handicap'],['ghin','GHIN'],['memberNo','Member #'],['ggId','Golf Genius ID'],
+  ['address1','Address'],['address2','Address 2'],['city','City'],['state','State'],['zip','Zip'],['dob','Date of birth'],['memberType','Member type']];
+function matchMember(p,used,noGG){
+  const key=s=>(s||'').toLowerCase().replace(/[^a-z]/g,'');
+  const tries=[x=>!noGG&&p.ggId&&x.ggId===p.ggId, x=>p.ghin&&x.ghin===p.ghin, x=>p.email&&(x.email||'').toLowerCase()===p.email, x=>key(x.first)===key(p.first)&&key(x.last)===key(p.last)];
+  for(const t of tries){ const m=db.members.find(x=>!used.has(x.id)&&t(x)); if(m) return m; }
+  return null;
+}
+function planRoster(people,fileDate){
+  const used=new Set(), plan={add:[],update:[],same:[]};
+  for(const p of people){
+    const m=matchMember(p,used);
+    if(!m){ plan.add.push(p); continue; }
+    used.add(m.id);
+    const changes=ROSTER_FIELDS.filter(([k])=>p[k]&&String(m[k]??'')!==p[k]&&!(k==='hcp'&&m.hcpAt&&fileDate<m.hcpAt)).map(([k,l])=>({k,l,from:m[k]??'',to:p[k]}));
+    if(m.status==='Inactive') changes.push({k:'status',l:'Status',from:'Inactive',to:'Active'});
+    (changes.length?plan.update:plan.same).push({m,p,changes});
+  }
+  plan.missing=db.members.filter(x=>!used.has(x.id)&&x.status!=='Inactive');
+  return plan;
+}
+function importRoster(){
+  openDrawer({kicker:'Members',title:'Import member list',
+    body:`<p style="margin:0">Upload the Golf Genius contact list export (<b>.xlsx</b>) or any spreadsheet or CSV with first and last name columns.</p>
+      <p class="hint">Picks up email, handicap index, GHIN, Golf Genius ID, phone and address. People already in the hub are matched by Golf Genius ID, GHIN, email, then name, so uploading a newer export updates them instead of adding duplicates. You’ll see a preview before anything is saved.</p>
+      <input type="file" id="rosterF" accept=".xlsx,.xls,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv" class="inp" style="padding-top:8px"><p class="hint" id="rosterMsg" aria-live="polite"></p>`,
+    wire:r=>{ r.querySelector('#rosterF').onchange=async e=>{ const f=e.target.files[0]; if(!f) return; const msg=r.querySelector('#rosterMsg'); msg.style.color=''; msg.textContent='Reading '+f.name+'…';
+      try{ const res=mapRoster(await readRosterFile(f)); if(!res.people.length) throw new Error('No people found under the header row');
+        closeDrawer(); previewRoster(res,f.name); }
+      catch(err){ msg.style.color='var(--neg)'; msg.textContent=err.message||'Couldn’t read that file'; } }; }});
+}
+function previewRoster(res,fname,eventFile){
+  const plan=planRoster(res.people,res.fileDate);
+  const li=(t,sub)=>`<div class="mr" style="grid-template-columns:minmax(0,1fr)"><div class="cell2"><b>${t}</b>${sub?`<small>${sub}</small>`:''}</div></div>`;
+  const more=(n,shown)=>n>shown?`<div class="mr"><span class="muted">+ ${n-shown} more</span></div>`:'';
+  const SHOW=8;
+  openDrawer({kicker:'Import · '+fname,title:'Review import',saveLabel:`Import ${plan.add.length+plan.update.length} change${plan.add.length+plan.update.length===1?'':'s'}`,
+    body:`<div class="grid g3" style="gap:10px">${[['New',plan.add.length],['Updated',plan.update.length],['No change',plan.same.length]].map(([l,v])=>`<div class="card pad kpi" style="padding:14px"><span class="lbl">${l}</span><span class="v num" style="font-size:30px">${v}</span></div>`).join('')}</div>
+      <p class="hint">Everyone in this file is imported as an <b>Active</b> MGA member. ${res.people.length} people read from the file${res.skippedGuests?` · ${res.skippedGuests} guests skipped`:''}${res.skippedBlank?` · ${res.skippedBlank} rows without a name skipped`:''}.</p>
+      ${plan.add.length?`<div class="fld"><span class="lbl">New members</span><div class="mini">${plan.add.slice(0,SHOW).map(p=>li(esc(p.first+' '+p.last),esc([p.email,p.hcp&&'Index '+p.hcp,p.ghin&&'GHIN '+p.ghin].filter(Boolean).join(' · ')))).join('')}${more(plan.add.length,SHOW)}</div></div>`:''}
+      ${plan.update.length?`<div class="fld"><span class="lbl">Updates to existing members</span><div class="mini">${plan.update.slice(0,SHOW).map(u=>li(esc(memberName(u.m)),u.changes.map(c=>esc(c.l)+': '+(c.from?esc(c.from)+' → ':'')+esc(c.to)).join(' · '))).join('')}${more(plan.update.length,SHOW)}</div><p class="hint">Blank cells in the file never erase what’s already in the hub.</p></div>`:''}
+      ${plan.missing.length?`<label class="check" style="align-items:flex-start;font-weight:400"><input type="checkbox" id="rosterInact"${(plan.update.length+plan.same.length)>=0.6*(plan.update.length+plan.same.length+plan.missing.length)?' checked':''}><span>Mark the ${plan.missing.length} active member${plan.missing.length===1?'':'s'} not on this MGA roster as Inactive <span class="muted">(${esc(plan.missing.slice(0,4).map(memberName).join(', '))}${plan.missing.length>4?'…':''})</span></span></label>`:''}`,
+    save:()=>{
+      const inact=$('rosterInact')&&$('rosterInact').checked;
+      if(!plan.add.length&&!plan.update.length&&!inact){ toast('Nothing to change — the hub already matches this file'); return; }
+      const before=clone(db.members);
+      for(const p of plan.add){ const m={id:uid(),status:'Active',joined:'',notes:''}; ROSTER_FIELDS.forEach(([k])=>{ m[k]=p[k]||''; }); m.source='roster'; if(p.hcp) m.hcpAt=res.fileDate; db.members.push(m); }
+      for(const u of plan.update){ u.changes.forEach(c=>{ u.m[c.k]=c.to; if(c.k==='hcp') u.m.hcpAt=res.fileDate; }); if(u.m.status==='Inactive') u.m.status='Active'; }
+      if(inact) plan.missing.forEach(m=>m.status='Inactive');
+      db.rosterImportedAt=new Date().toISOString(); db.rosterFile=fname;
+      toast(`${plan.add.length} added · ${plan.update.length} updated${inact?` · ${plan.missing.length} marked inactive`:''}`,()=>{ db.members=before; persist(); render(); });
+    }});
+}
+function parseCSV(txt){ const rows=[]; let row=[],cur='',q=false;
+  for(let i=0;i<txt.length;i++){ const ch=txt[i];
+    if(q){ if(ch==='"'&&txt[i+1]==='"'){cur+='"';i++;} else if(ch==='"') q=false; else cur+=ch; }
+    else if(ch==='"') q=true; else if(ch===','){row.push(cur);cur='';} else if(ch==='\n'||ch==='\r'){ if(ch==='\r'&&txt[i+1]==='\n') i++; row.push(cur); rows.push(row); row=[]; cur=''; } else cur+=ch; }
+  if(cur||row.length){ row.push(cur); rows.push(row); } return rows.filter(r=>r.some(c=>c.trim())); }
+/* ---------- Board ---------- */
+function vBoard(m){
+  m.innerHTML=head('Board',`${Y()} MGA board. Each seat is filled from the member list.`,btn('Add seat','bAdd','',I.plus))+`
+  <div class="grid g4 board">${db.board.map(b=>{const mm=memberById(b.memberId);const sub=b.term?'Term through '+b.term:(mm&&mm.email)||'';return `<div class="card seat">
+    <div class="seat-top"><span class="lbl trunc">${esc(b.role)}</span><button class="ib" data-bs="${b.id}" aria-label="Edit ${esc(b.role)} seat">${I.edit}</button></div>
+    ${mm?`<div class="seat-who"><span class="av">${initials(mm)}</span><div class="cell2"><b class="trunc" title="${esc(memberName(mm))}">${esc(memberName(mm))}</b><small class="trunc" title="${esc(sub)}">${esc(sub)}</small></div></div>
+    <div class="seat-act"><button class="btn sm" data-bp="${b.id}">Change</button><button class="btn sm" data-bc="${b.id}">Vacate</button></div>`
+    :`<button class="btn seat-empty" data-bp="${b.id}">${I.plus}Fill seat from members</button>`}</div>`;}).join('')}</div>`;
+  m.querySelectorAll('[data-bp]').forEach(x=>x.onclick=()=>pickMember(db.board.find(b=>b.id===x.dataset.bp)));
+  m.querySelectorAll('[data-bc]').forEach(x=>x.onclick=()=>{ const b=db.board.find(s=>s.id===x.dataset.bc), was=b.memberId; b.memberId=''; persist(); render(); toast('Seat vacated',()=>{b.memberId=was;persist();render();}); });
+  m.querySelectorAll('[data-bs]').forEach(x=>x.onclick=()=>editSeat(db.board.find(b=>b.id===x.dataset.bs)));
+  $('bAdd').onclick=()=>editSeat(null);
+}
+function pickMember(seat){
+  if(!db.members.length){ toast('Add members first'); go('members'); return; }
+  let chosen=seat.memberId;
+  const list=db.members.filter(x=>x.status!=='Inactive').sort((a,b)=>memberName(a).localeCompare(memberName(b)));
+  const html=q=>list.filter(x=>memberName(x).toLowerCase().includes(q.toLowerCase())).map(x=>{const on=db.board.filter(b=>b.memberId===x.id&&b.id!==seat.id).map(b=>b.role);
+    return `<button type="button" data-pk="${x.id}" class="${x.id===chosen?'on':''}"><span class="av">${initials(x)}</span><b>${esc(memberName(x))}</b><span class="muted" style="margin-left:auto;font-size:12.5px">${on.length?esc(on.join(', ')):''}</span></button>`;}).join('')||'<span class="muted" style="padding:14px">No matches.</span>';
+  openDrawer({kicker:seat.role,title:'Choose a member',saveLabel:'Add to board',
+    body:`<input class="inp" id="pkQ" placeholder="Search members" aria-label="Search members"><div class="pick" id="pkL">${html('')}</div>`,
+    wire:r=>{ const bind=()=>r.querySelectorAll('[data-pk]').forEach(b=>b.onclick=()=>{ chosen=b.dataset.pk; r.querySelectorAll('[data-pk]').forEach(x=>x.classList.toggle('on',x===b)); });
+      bind(); r.querySelector('#pkQ').oninput=e=>{ r.querySelector('#pkL').innerHTML=html(e.target.value); bind(); }; },
+    save:()=>{ if(!chosen){ toast('Pick a member'); return false; } seat.memberId=chosen; toast(memberName(memberById(chosen))+' is now '+seat.role); }});
+}
+function editSeat(seat){
+  openDrawer({kicker:'Board',title:seat?'Edit seat':'Add seat',body:field('Role','bsR',seat?.role||'',{ph:'e.g. Handicap Chair'})+field('Term through','bsT',seat?.term||'',{ph:'e.g. 2027'}),
+    save:()=>{ const r=fv('bsR'); if(!r){ toast('Name the role'); return false; } if(seat) Object.assign(seat,{role:r,term:fv('bsT')}); else db.board.push({id:uid(),role:r,memberId:'',term:fv('bsT')}); },
+    del:seat?()=>{ db.board=db.board.filter(b=>b!==seat); }:null,delLabel:'Remove seat'});
+}
+
+/* ---------- Season budget ---------- */
+function vBudget(m){
+  const y=Y(), sc=scalc(y), s=sc.s;
+  const cols='grid-template-columns:minmax(160px,2fr) 140px 130px 130px 120px 120px';
+  const r=(n,d,rv,ex,nt,act,cls='',attr='')=>`<div class="tr num ${cls}" ${attr} style="${cols}"><span style="font-weight:600;color:var(--navy)">${n}</span><span class="muted">${d}</span><span class="r">${rv}</span><span class="r">${ex}</span><b class="r ${typeof nt==='number'?netCls(nt):''}">${typeof nt==='number'?fmtS(nt):nt}</b><span class="r muted">${act}</span></div>`;
+  m.innerHTML=head('Season budget','Tournaments are self-sustaining; dues are the MGA’s own income. Everything rolls up here.',btn('Add MGA line','sbAdd','',I.plus))+`
+  <div class="grid g3">${kpi('Budgeted revenue',fmt(sc.revenue),'tournaments + dues + MGA lines')}${kpi('Budgeted expenses',fmt(sc.expenses),'tournaments + MGA lines')}${kpi('Season net (projected)',fmtS(sc.projected),`Actuals for ${sc.past.length} completed, budget for ${sc.upcoming.length} upcoming · all-budget net ${fmtS(sc.net)}`,netCls(sc.projected))}</div>
+  <div class="card" style="overflow:hidden"><div class="cardhead"><h2 class="h2">Tournaments</h2></div><div class="tw"><div class="t" style="min-width:820px">
+    <div class="tr th" style="${cols}"><span>Tournament</span><span>Dates</span><span class="r">Revenue</span><span class="r">Expenses</span><span class="r">Net</span><span class="r">Actual net</span></div>
+    ${sc.ts.map(({t,c})=>r(esc(t.name)+(isPast(t)?' <span class="chip ok" style="height:20px;font-size:11px;margin-left:6px">Actual counts</span>':''),dateRange(t).replace(/, \d{4}$/,''),fmt(c.revenue),fmt(c.expenses),c.net,fmtS(c.netA),'click',`data-open="${t.id}"`)).join('')||'<div class="tr"><span class="muted">No tournaments this season.</span></div>'}
+    ${r('Tournaments subtotal','',fmt(sc.tRev),fmt(sc.tExp),sc.tRev-sc.tExp,'','tot')}
+  </div></div></div>
+  <div class="card" style="overflow:hidden"><div class="cardhead"><h2 class="h2">MGA-level money</h2></div><div class="tw"><div class="t" style="min-width:820px">
+    <div class="tr th" style="${cols}"><span>Line</span><span>Basis</span><span class="r">Budget</span><span class="r"></span><span class="r"></span><span class="r">Actual</span></div>
+    ${r('Annual dues',`${sc.active} × ${fmt(s.dues.amount)}`,fmt(sc.duesBudget),'','','<span>'+fmt(sc.duesActual)+'</span>','click','id="sbDues"')}
+    <div class="tr" style="${cols};border-top:none;min-height:0;padding-bottom:12px"><span class="muted" style="font-size:12.5px;grid-column:1/-1">${n0(s.dues.installments)>1?`Charged as ${s.dues.installments} × ${fmt(n0(s.dues.amount)/s.dues.installments)}, `:''}not prorated. Actual comes from dues recorded on each member.</span></div>
+    ${r('50/50 raffle (all season)','Assigned to tournaments',fmt(sc.raffle)+' → tournaments','','',fmt(sc.raffleA))}
+    <div class="tr" style="${cols};border-top:none;min-height:0;padding-bottom:12px"><span class="muted" style="font-size:12.5px;grid-column:1/-1">Collected at every event and counted in the tournament it’s assigned to (Member-Member), so it isn’t added again here.</span></div>
+    ${s.lines.map(l=>r(esc(l.desc),esc(l.type),l.type==='Income'?fmt(l.budget):'',l.type==='Income'?'':fmt(l.budget),'',fmt(actualOf(ledgerIndex(y),'',l.type==='Income'?'mgaInc':'mgaExp',l.id,l.actual)),'click',`data-sl="${l.id}"`)).join('')}
+  </div></div></div>`;
+  wireCommon(m);
+  $('sbDues').onclick=editDues; $('sbAdd').onclick=()=>editSeasonLine(null);
+  m.querySelectorAll('[data-sl]').forEach(x=>x.onclick=()=>editSeasonLine(s.lines.find(l=>l.id===x.dataset.sl)));
+}
+function editSeasonLine(l){
+  const s=db.seasons[Y()];
+  openDrawer({kicker:Y()+' season · MGA-level',title:l?l.desc:'Add MGA line',body:field('Description','slD',l?.desc||'',{ph:'e.g. Year-end banquet'})+field('Type','slT',l?.type||'Expense',{type:'select',options:['Income','Expense']})+pair(field('Budget $','slB',l?.budget??'',{type:'number'}),actField('Actual $','slA',Y(),'',(l?.type||'Expense')==='Income'?'mgaInc':'mgaExp',l?.id,l?.actual)),
+    save:()=>{ const d=fv('slD'); if(!d){ toast('Add a description'); return false; } const data={desc:d,type:fv('slT'),budget:fnum('slB'),actual:fnum('slA')};
+      if(l) Object.assign(l,data); else s.lines.push(Object.assign({id:uid()},data)); },
+    del:l?()=>{ s.lines=s.lines.filter(x=>x!==l); }:null});
+}
+
+/* ---------- chrome, login, boot ---------- */
+function newSeasonPrompt(){
+  const ys=Object.keys(db.seasons).map(Number), next=String(Math.max(...ys,new Date().getFullYear())+1);
+  openDrawer({kicker:'Seasons',title:'New season',body:field('Year','nsY',next,{type:'number'})+`<label class="check"><input type="checkbox" id="nsC" checked>Carry over dues settings</label><p class="hint">Tournaments aren’t copied automatically — create each one with “Start from” to copy last year’s structure.</p>`,
+    save:()=>{ const y=String(Math.round(fnum('nsY'))); if(!/^\d{4}$/.test(y)){ toast('Enter a 4-digit year'); return false; } if(db.seasons[y]){ db.activeSeason=y; return; }
+      const cur=db.seasons[Y()]; db.seasons[y]=newSeason(); if($('nsC').checked) db.seasons[y].dues=clone(cur.dues); db.activeSeason=y; toast(y+' season created'); }});
+}
+function dl(content,type,name){ const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([content],{type})); a.download=name; a.click(); setTimeout(()=>URL.revokeObjectURL(a.href),1000); }
+function wireChrome(){
+  $('btnMenu').innerHTML=I.menu; $('dClose').innerHTML=I.x;
+  $('btnMenu').onclick=()=>$('side').classList.toggle('open');
+  $('dClose').onclick=closeDrawer; $('scrim').onclick=closeDrawer;
+  document.addEventListener('keydown',e=>{ if(e.key==='Escape'&&drawerOpen()) closeDrawer(); });
+  $('seasonSel').onchange=e=>{ if(e.target.value==='__new'){ e.target.value=Y(); newSeasonPrompt(); return; } db.activeSeason=e.target.value; persist(); go(view.page==='tournament'?'tournaments':view.page); };
+  $('btnBackup').onclick=()=>{ dl(JSON.stringify(db,null,2),'application/json','mga_hub_backup_'+new Date().toISOString().slice(0,10)+'.json'); toast('Backup downloaded'); };
+  $('btnRestore').onclick=()=>$('fileRestore').click();
+  $('fileRestore').onchange=e=>{ const f=e.target.files[0]; if(!f) return; const r=new FileReader();
+    r.onload=()=>{ try{ const d=JSON.parse(r.result); if(!d.tournaments||!d.seasons) throw 0; if(!confirm('Replace everything in the hub with this backup?')) return; db=normalize(d); persist(); go('dash'); toast('Backup restored'); }catch(_){ toast('That isn’t an MGA Hub backup'); } };
+    r.readAsText(f); e.target.value=''; };
+  $('syncBtn').onclick=()=>{ if(!CLOUD||!sessionOK) return; if(!cloudReady) startCloud(); else { setSync('saving'); pushCloud(); } };
+  $('btnSignOut').onclick=async()=>{ await sb.auth.signOut(); location.reload(); };
+}
+async function doLogin(){
+  const pw=$('loginPw').value; if(!pw) return; $('loginBtn').disabled=true; $('loginErr').textContent='';
+  const {error}=await sb.auth.signInWithPassword({email:CFG.boardEmail,password:pw});
+  $('loginBtn').disabled=false;
+  if(error){ $('loginErr').textContent='That password didn’t work.'; return; }
+  $('login').classList.remove('show'); sessionOK=true; $('btnSignOut').hidden=false; startCloud();
+}
+async function boot(){
+  wireChrome(); render();
+  if(!CLOUD){ setSync('local'); return; }
+  $('loginBtn').onclick=doLogin; $('loginPw').onkeydown=e=>{ if(e.key==='Enter') doLogin(); };
+  const {data}=await sb.auth.getSession();
+  if(data&&data.session){ sessionOK=true; $('btnSignOut').hidden=false; startCloud(); }
+  else { $('login').classList.add('show'); setTimeout(()=>$('loginPw').focus(),100); }
+}
+

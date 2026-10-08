@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0F2A38">
+<title>Check-in</title>
+<link rel="icon" href="crest.png?v=2">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@600;700&family=Public+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script src="config.js"></script>
+<style>
+:root{--navy:#0F2A38;--gold:#C7A13A;--goldl:#D8B75F;--golddk:#7E5F1A;--paper:#F4F0E6;--ivory:#FBFAF5;--line:#E3DCC9;--muted:#56626A;--ink:#14222B;--pos:#1F6B4A;
+  --serif:'Cormorant Garamond',Georgia,serif;--sans:'Public Sans',system-ui,-apple-system,'Segoe UI',sans-serif}
+*{box-sizing:border-box} html,body{margin:0} [hidden]{display:none!important}
+body{font-family:var(--sans);background:var(--paper);color:var(--ink);font-size:16px;line-height:1.35;-webkit-font-smoothing:antialiased;font-variant-numeric:lining-nums}
+button,input{font:inherit;color:inherit} button{cursor:pointer}
+.top{background:radial-gradient(circle at 10% 40%,#1B3D50,var(--navy) 65%);color:#fff;padding:calc(12px + env(safe-area-inset-top,0px)) 18px 12px;display:flex;align-items:center;gap:14px;border-bottom:3px solid var(--gold)}
+.top img{width:38px;height:48px;object-fit:contain}
+.top .t{flex:1;min-width:0} .top b{display:block;font-family:var(--serif);font-size:23px;line-height:1.05;white-space:nowrap;overflow:hidden;text-overflow:ellipsis} .top small{color:var(--goldl);font-size:12px;font-weight:700;letter-spacing:.12em;text-transform:uppercase}
+.pill{font-size:12px;font-weight:700;padding:5px 11px;border-radius:999px;background:rgba(111,191,142,.18);color:#bfe8cf;white-space:nowrap}
+.pill.wait{background:rgba(216,183,95,.2);color:var(--goldl)} .pill.off{background:rgba(224,123,98,.22);color:#f3c1b4}
+main{max-width:820px;margin:0 auto;padding:14px 14px 80px}
+.kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.kpi{background:#fff;border:1px solid var(--line);border-radius:12px;padding:12px 14px}
+.kpi span{display:block;white-space:nowrap;font-size:10px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+.kpi b{display:block;font-family:var(--serif);font-size:28px;line-height:1.1;margin-top:3px}
+.bar{position:sticky;top:0;z-index:10;background:var(--paper);padding:12px 0 10px;display:flex;flex-direction:column;gap:10px}
+.search{width:100%;height:52px;border:1.5px solid #CFC6AE;border-radius:12px;padding:0 16px;background:#fff;font-size:18px}
+.search:focus{outline:none;border-color:var(--gold);box-shadow:0 0 0 3px rgba(199,161,58,.2)}
+.chips{display:flex;gap:8px;overflow-x:auto} .chips button{flex:none;height:38px;padding:0 15px;border-radius:999px;border:1px solid var(--line);background:#fff;font-weight:700;font-size:14px;color:var(--muted)} .chips button.on{background:var(--navy);border-color:var(--navy);color:#fff}
+.card{background:#fff;border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.letter{padding:7px 16px 5px;font-family:var(--serif);font-weight:700;font-size:17px;color:var(--golddk);background:var(--ivory);border-top:1px solid var(--line)}
+.letter:first-child{border-top:none}
+.row{display:flex;align-items:center;gap:12px;padding:11px 16px;border-top:1px solid var(--line);min-height:64px}
+.letter+.row{border-top:none}
+.row.in{background:#F3F8F4}
+.who{flex:1;min-width:0} .who .n{font-size:17px} .who .n b{color:var(--navy)} .who small{display:block;color:var(--muted);font-size:13px;margin-top:2px}
+.p3{white-space:nowrap;display:inline-block;font-size:10.5px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:#6B4F12;background:#F6ECCF;border:1px solid #E5CF8E;border-radius:999px;padding:0 6px}
+.go{flex:none;min-width:124px;height:48px;border-radius:11px;border:none;background:var(--navy);color:#fff;font-weight:800;font-size:15px}
+.go.done{background:#E3F0E8;color:var(--pos);border:1.5px solid #BCD9C7}
+.empty{padding:26px;text-align:center;color:var(--muted)}
+.toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--navy);color:#fff;padding:12px 18px;border-radius:10px;font-weight:600;z-index:60;box-shadow:0 10px 30px rgba(0,0,0,.3)}
+@media (max-width:420px){ .kpi b{font-size:23px} .go{min-width:104px} .who .n{font-size:16px} }
+</style>
+</head>
+<body>
+<header class="top"><img src="crest.png?v=2" alt=""><div class="t"><b id="tName">Check-in</b><small>Registration check-in</small></div><span class="pill" id="sync">Connecting…</span></header>
+<main id="main"><div class="card" style="padding:22px"><p style="color:var(--muted);margin:0">Loading…</p></div></main>
+<script>
+/*CKCORE*/
+
+const $=id=>document.getElementById(id);
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const CFG=window.MM_CONFIG||{}; const sb=(CFG.url&&CFG.anonKey&&window.supabase)?window.supabase.createClient(CFG.url,CFG.anonKey,{auth:{persistSession:false}}):null;
+const TOKEN=(new URLSearchParams(location.search).get('k')||'').trim(), LS='mga_checkin_'+TOKEN;
+let doc=null, base=null, dirty=false, saving=false, online=true, q='', filt='all';
+function toast(m){ const d=document.createElement('div'); d.className='toast'; d.textContent=m; document.body.appendChild(d); setTimeout(()=>d.remove(),2200); }
+function setPill(){ const s=$('sync'); if(!online){ s.className='pill off'; s.textContent=dirty?'Offline · saved on this device':'Offline'; return; } if(saving||dirty){ s.className='pill wait'; s.textContent='Saving…'; return; } s.className='pill'; s.textContent='● Live'; }
+const keep=()=>{ try{ localStorage.setItem(LS,JSON.stringify({doc,base,dirty})); }catch(_){} };
+const get=async()=>{ const {data,error}=await sb.rpc('calcutta_get',{p_token:TOKEN}); if(error) throw new Error(error.message); if(!data) throw new Error('LINKOFF'); return data; };
+const put=async(d,v)=>{ const {data,error}=await sb.rpc('calcutta_put',{p_token:TOKEN,p_doc:d,p_version:v}); if(error) throw new Error(error.message); return data; };
+function fail(msg){ $('main').innerHTML=`<div class="card" style="padding:24px"><b style="font-family:var(--serif);font-size:24px">Player check-in</b><p style="color:var(--muted)">${msg}</p></div>`; $('sync').hidden=true; }
+const time=iso=>iso?new Date(iso).toLocaleTimeString([], {hour:'numeric',minute:'2-digit'}):'';
+function searchList(ps){ const s=q.trim().toLowerCase().replace(/^#/,''); if(!s) return ps; if(/^\d+$/.test(s)) return ps.filter(p=>String(p.team)===s);
+  const words=s.replace(/,/g,' ').split(/\s+/).filter(Boolean);
+  const own=ps.filter(p=>words.every(w=>`${p.first} ${p.last}`.toLowerCase().includes(w)));
+  return own.length?own:ps.filter(p=>words.every(w=>`${p.first} ${p.last} ${p.partner}`.toLowerCase().includes(w))); }
+function shell(){
+  $('main').innerHTML=`<div class="kpis" id="kpis"></div>
+    <div class="bar"><input class="search" id="q" type="search" placeholder="Search a name, partner or team #" autocomplete="off" autocapitalize="off" spellcheck="false" aria-label="Search players">
+      <div class="chips">${[['all','All'],['open','Not yet'],['in','Checked in'],['par3','Par 3']].map(([k,l])=>`<button data-f="${k}">${l}</button>`).join('')}</div></div>
+    <div class="card" id="list"></div>`;
+  $('q').oninput=e=>{ q=e.target.value; render(); };
+  $('q').onkeydown=e=>{ if(e.key==='Enter'){ const open=[...document.querySelectorAll('.go:not(.done)')]; if(open.length===1) open[0].click(); } };
+  document.querySelectorAll('[data-f]').forEach(b=>b.onclick=()=>{ filt=b.dataset.f; render(); });
+  $('list').onclick=e=>{ const b=e.target.closest('.go'); if(!b) return; const p=doc.players.find(x=>x.id===b.dataset.id); if(!p) return;
+    if(p.in){ if(!confirm(`Undo check-in for ${p.first} ${p.last}?`)) return; p.in=false; p.at=''; }
+    else { p.in=true; p.at=new Date().toISOString(); toast(`✓ ${p.first} ${p.last} checked in`); }
+    ckStamp(doc,base); dirty=true; keep(); render(); saveSoon(150); };
+}
+/* the search box and filters stay put; only the counts and the list are redrawn (keeps the phone keyboard open) */
+function render(){
+  if(!doc) return; if(!$('q')) shell();
+  const C=ckCounts(doc);
+  const ps=(doc.players||[]).slice().sort((a,b)=>a.last.localeCompare(b.last)||a.first.localeCompare(b.first));
+  const vis=searchList(ps).filter(p=>filt==='all'||(filt==='open'?!p.in:filt==='in'?p.in:p.par3));
+  const mate=new Map(); const byT=new Map(); ps.forEach(p=>{ const a=byT.get(p.team)||[]; a.push(p); byT.set(p.team,a); }); ps.forEach(p=>mate.set(p.id,(byT.get(p.team)||[]).find(o=>o!==p)));
+  let L='', list='';
+  for(const p of vis){ const l=(p.last[0]||'#').toUpperCase(); if(l!==L&&!q.trim()){ L=l; list+=`<div class="letter">${esc(l)}</div>`; }
+    const m=mate.get(p.id);
+    list+=`<div class="row${p.in?' in':''}"><div class="who"><div class="n"><b>${esc(p.last)},</b> ${esc(p.first)}</div><small>with ${esc(p.partner)} · Team ${esc(p.team)}${p.par3?' · <span class="p3">Par 3</span>':''}${m&&m.in?' · partner here':''}</small></div>
+      <button class="go${p.in?' done':''}" data-id="${esc(p.id)}">${p.in?'✓ '+time(p.at):'Check in'}</button></div>`; }
+  $('kpis').innerHTML=`<div class="kpi"><span>Checked in</span><b>${C.in}<small style="font-size:15px;color:var(--muted)"> / ${C.total}</small></b></div><div class="kpi"><span>To arrive</span><b>${C.left}</b></div><div class="kpi"><span>Teams done</span><b>${C.teamsDone}<small style="font-size:15px;color:var(--muted)"> / ${C.teams}</small></b></div>`;
+  $('list').innerHTML=list||`<div class="empty">No players match${q?` “${esc(q)}”`:''}.</div>`;
+  document.querySelectorAll('[data-f]').forEach(b=>b.classList.toggle('on',b.dataset.f===filt));
+}
+let saveT=null; function saveSoon(ms){ clearTimeout(saveT); saveT=setTimeout(syncNow,ms??250); }
+async function syncNow(){
+  if(saving){ saveSoon(400); return; } saving=true; setPill();
+  try{ const before=ckStable(doc); const res=await ckSyncOnce(get,put,doc); doc=res.doc; base=JSON.parse(JSON.stringify(res.doc)); dirty=false; online=true; keep(); if(ckStable(doc)!==before) render(); }
+  catch(e){ if(e.message==='LINKOFF'||/invalid link/i.test(e.message)){ saving=false; localStorage.removeItem(LS); return fail('This registration link has been turned off. Ask the committee for a new one.'); } online=false; }
+  finally{ saving=false; setPill(); }
+}
+window.__canReload=()=>!dirty&&!saving&&!(document.activeElement&&document.activeElement.id==='q'&&q);
+/*AUTOUPDATE*/
+
+(async function boot(){
+  if(!TOKEN) return fail('This link is missing its key. Ask the committee for the registration link.');
+  if(!sb) return fail('The check-in page isn’t connected yet.');
+  try{ const saved=JSON.parse(localStorage.getItem(LS)||'null'); const r=await get(); doc=r.doc; base=JSON.parse(JSON.stringify(r.doc));
+    if(saved&&saved.dirty&&saved.doc){ doc=ckMerge(r.doc,saved.doc); dirty=true; } }
+  catch(e){ if(e.message==='LINKOFF') return fail('This registration link has been turned off. Ask the committee for a new one.'); return fail('Couldn’t reach the check-in list. Check the connection and reload.'); }
+  doc.players=doc.players||[]; $('tName').textContent=doc.name||'Check-in'; document.title=(doc.name||'')+' · Check-in';
+  render(); setPill(); if(dirty) saveSoon(0);
+  setInterval(()=>{ if(!saving&&document.visibilityState==='visible') syncNow(); },3500);
+  addEventListener('online',()=>saveSoon(0));
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,243 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0F2A38">
+<title>Live Scoring · Walnut Creek MGA</title>
+<link rel="icon" href="crest.png?v=2">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,600;0,700;1,700&family=Public+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script src="config.js"></script>
+<style>
+:root{--navy:#0F2A38;--deep:#0A1C27;--gold:#8C6A1F;--goldl:#D8B75F;--ivory:#FBFAF5;--paper:#F4F0E6;--line:#E3DCC9;--muted:#56626A;--ink:#14222B;--pos:#1F6B4A;--neg:#A1402B;
+  --serif:'Cormorant Garamond',Georgia,serif;--sans:'Public Sans',system-ui,-apple-system,'Segoe UI',sans-serif}
+*{box-sizing:border-box} html,body{margin:0;height:100%} [hidden]{display:none!important}
+body{font-family:var(--sans);background:var(--paper);color:var(--ink);font-size:15px;line-height:1.4;-webkit-font-smoothing:antialiased;-webkit-tap-highlight-color:transparent}
+button,input{font:inherit;color:inherit} button{cursor:pointer}
+:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+body{font-variant-numeric:lining-nums}
+.num{font-variant-numeric:lining-nums tabular-nums}
+.top{background:var(--navy);color:#fff;padding:calc(12px + env(safe-area-inset-top,0px)) 16px 14px;display:flex;align-items:center;gap:12px;position:sticky;top:0;z-index:10}
+.top img{width:34px;height:44px;object-fit:contain}
+.top .t{display:flex;flex-direction:column;min-width:0;flex:1}
+.top b{font-family:var(--serif);font-size:22px;line-height:1.05;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.top small{color:var(--goldl);font-size:12.5px}
+.pill{font-size:12px;font-weight:700;padding:4px 10px;border-radius:999px;background:rgba(111,191,142,.18);color:#bfe8cf;white-space:nowrap}
+.pill.off{background:rgba(224,123,98,.2);color:#f3c1b4} .pill.wait{background:rgba(216,183,95,.2);color:var(--goldl)}
+main{max-width:640px;margin:0 auto;padding:18px 14px calc(96px + env(safe-area-inset-bottom,0px))}
+.card{background:#fff;border:1px solid var(--line);border-radius:12px}
+.pad{padding:20px}
+h1{font-family:var(--serif);font-weight:700;color:var(--navy);font-size:32px;margin:0;line-height:1.05}
+.muted{color:var(--muted)} .pos{color:var(--pos)} .neg{color:var(--neg)}
+.inp{width:100%;height:56px;border:1px solid #CFC6AE;border-radius:10px;padding:0 16px;font-size:24px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;text-align:center;background:#fff}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;height:48px;padding:0 18px;border-radius:10px;border:1px solid var(--line);background:#fff;color:var(--navy);font-weight:700;font-size:15px}
+.btn.pri{background:var(--navy);border-color:var(--navy);color:#fff} .btn.wide{width:100%} .btn[disabled]{opacity:.45}
+.err{color:var(--neg);font-weight:600;min-height:20px;margin:10px 0 0;text-align:center}
+.holehead{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:12px}
+.holehead .n{font-family:var(--serif);font-size:44px;font-weight:700;color:var(--navy);line-height:1}
+.holehead .meta{font-size:14px;color:var(--muted)} .holehead .meta b{color:var(--ink)}
+.nav{width:52px;height:52px;border-radius:50%;border:1px solid var(--line);background:#fff;font-size:22px;color:var(--navy)}
+.pl{display:grid;grid-template-columns:minmax(0,1fr) 56px 64px 56px;gap:10px;align-items:center;padding:12px 14px;border-top:1px solid var(--line)}
+.pl:first-child{border-top:none}
+.pl .nm{font-weight:700;font-size:16px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pl .sub{font-size:12.5px;color:var(--muted)}
+.step{height:56px;border-radius:12px;border:1px solid var(--line);background:var(--ivory);font-size:28px;font-weight:600;color:var(--navy)}
+.val{height:56px;border-radius:12px;border:2px solid var(--navy);display:flex;align-items:center;justify-content:center;font-size:28px;font-weight:800;background:#fff}
+.val.empty{border-style:dashed;border-color:#CFC6AE;color:#A8A08A}
+.val.under{background:#E3F0E8;border-color:var(--pos);color:var(--pos)} .val.over{background:#F8E6DF;border-color:var(--neg);color:var(--neg)}
+.strip{display:grid;grid-template-columns:repeat(9,minmax(0,1fr));gap:6px;margin-top:14px}
+.strip button{height:38px;border-radius:8px;border:1px solid var(--line);background:#fff;font-weight:700;font-size:13px;color:var(--muted)}
+.strip button.done{background:var(--navy);border-color:var(--navy);color:#fff} .strip button.part{border-color:var(--gold);color:var(--gold)}
+.strip button.cur{outline:2px solid var(--gold);outline-offset:1px}
+.tabbar{position:fixed;left:0;right:0;bottom:0;background:#fff;border-top:1px solid var(--line);display:grid;grid-template-columns:repeat(3,1fr);padding-bottom:env(safe-area-inset-bottom,0px);z-index:10}
+.tabbar button{height:62px;border:none;background:none;font-weight:700;font-size:13.5px;color:var(--muted);border-top:3px solid transparent}
+.tabbar button.on{color:var(--navy);border-top-color:var(--gold)}
+.lb{display:grid;grid-template-columns:44px minmax(0,1fr) 44px 48px;gap:8px;align-items:center;padding:12px 16px;border-top:1px solid var(--line)}
+.lb.h{font-size:12px;font-weight:700;color:var(--muted);border-top:none;background:var(--ivory);padding-top:10px;padding-bottom:10px}
+.lb .tp{font-weight:800;font-size:17px;text-align:right} .lb .r{text-align:right}
+.lb.me{background:#FBF4E0}
+.sc{width:100%;border-collapse:collapse;font-size:14px} .sc th,.sc td{border-bottom:1px solid var(--line);padding:8px 6px;text-align:center}
+.sc th{font-size:12px;color:var(--muted);font-weight:700;background:var(--ivory)} .sc td:first-child,.sc th:first-child{text-align:left;padding-left:14px}
+.sc tr.tot td{font-weight:800;background:var(--ivory)}
+.banner{background:#F6ECCF;border:1px solid #E5CF8E;color:#5C4410;border-radius:10px;padding:12px 14px;font-size:14px;margin-bottom:14px}
+.big .lb{grid-template-columns:70px minmax(0,1fr) 90px 110px;font-size:26px;padding:16px 24px}
+.chips{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px}.chips button{height:36px;padding:0 14px;border-radius:999px;border:1px solid var(--line);background:#fff;font-weight:700;font-size:13px;color:var(--muted)}.chips button.on{background:var(--navy);border-color:var(--navy);color:#fff}
+.fmtpill{display:inline-block;padding:4px 12px;border-radius:999px;background:#F6ECCF;border:1px solid #E5CF8E;color:#6B4F12;font-weight:800;font-size:12.5px}
+.pop{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--gold);margin-left:6px;vertical-align:2px}
+.big .lb .tp{font-size:30px} .big main{max-width:1100px}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<header class="top"><img src="crest.png?v=2" alt="Walnut Creek MGA crest"><div class="t"><b id="evName">Live Scoring</b><small id="evSub">Walnut Creek Country Club</small></div><span class="pill" id="sync" hidden></span></header>
+<main id="main"><div class="card pad"><p class="muted">Loading…</p></div></main>
+<nav class="tabbar" id="tabs" hidden aria-label="Scoring"><button data-t="score">Score</button><button data-t="board">Leaderboard</button><button data-t="card">Scorecard</button></nav>
+<script>
+/*GOLFCORE*/
+
+const $=id=>document.getElementById(id);
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const CFG=window.MM_CONFIG||{}; const sb=(CFG.url&&CFG.anonKey&&window.supabase)?window.supabase.createClient(CFG.url,CFG.anonKey,{auth:{persistSession:false}}):null;
+const qs=new URLSearchParams(location.search), SLUG=(qs.get('e')||'').trim(), BIG=qs.get('view')==='board';
+if(BIG) document.body.classList.add('big');
+let pub=null, scores={}, groupId=null, code='', tab=BIG?'board':'score', holeIdx=0, lbFlight=qs.get('flight')||'', lbSort=null, lbView=qs.get('players')?'players':'teams';
+const KEY='mga_score_'+SLUG, QKEY='mga_scoreq_'+SLUG;
+let queue=[]; try{ queue=JSON.parse(localStorage.getItem(QKEY)||'[]'); }catch(_){}
+const saveQ=()=>{ try{ localStorage.setItem(QKEY,JSON.stringify(queue)); }catch(_){} };
+const group=()=>pub&&pub.groups.find(g=>g.id===groupId);
+function setSync(){ const s=$('sync'); if(!groupId&&!BIG){ s.hidden=true; return; } s.hidden=false;
+  if(queue.length){ s.className='pill '+(navigator.onLine?'wait':'off'); s.textContent=navigator.onLine?`Saving ${queue.length}…`:`Offline · ${queue.length} waiting`; }
+  else { s.className='pill'; s.textContent=pub&&pub.status==='live'?'● Live':pub&&pub.status==='final'?'Final':'Saved'; } }
+function fail(msg){ $('main').innerHTML=`<div class="card pad"><h1>Live scoring</h1><p class="muted" style="margin-top:10px">${msg}</p></div>`; }
+
+async function loadScores(){
+  const {data,error}=await sb.from('golf_scores').select('player_id,hole,strokes').eq('event_id',pub.id);
+  if(error) return; const m={}; for(const r of data||[]) (m[r.player_id]=m[r.player_id]||{})[r.hole]=r.strokes;
+  for(const q of queue){ (m[q.p]=m[q.p]||{}); if(q.s) m[q.p][q.h]=q.s; else delete m[q.p][q.h]; } // local edits win until they're saved
+  scores=m;
+}
+async function boot(){
+  if(!SLUG) return fail('This link is missing its event. Ask the committee for the scoring link.');
+  if(!sb) return fail('Live scoring isn’t connected yet.');
+  const {data,error}=await sb.rpc('golf_event',{p_slug:SLUG});
+  if(error) return fail('Couldn’t reach live scoring. Check your signal and reload.');
+  if(!data) return fail('No event found for this link. Check the link with the committee.');
+  pub=data; $('evName').textContent=pub.name; $('evSub').textContent=[pub.date&&new Date(pub.date+'T12:00').toLocaleDateString('en-US',{month:'short',day:'numeric'}),formatSummary(pub),pub.club].filter(Boolean).join(' · ');
+  document.title=pub.name+' · Live Scoring';
+  await loadScores();
+  sb.channel('s-'+pub.id).on('postgres_changes',{event:'*',schema:'public',table:'golf_scores',filter:'event_id=eq.'+pub.id},p=>{
+    const r=p.eventType==='DELETE'?p.old:p.new; if(!r) return; if(queue.some(q=>q.p===r.player_id&&q.h===r.hole)) return;
+    scores[r.player_id]=scores[r.player_id]||{}; if(p.eventType==='DELETE') delete scores[r.player_id][r.hole]; else scores[r.player_id][r.hole]=r.strokes;
+    if(tab!=='score') render(); }).subscribe();
+  setInterval(async()=>{ if(tab==='board'&&document.visibilityState==='visible'){ await loadScores(); render(); } },30000);
+  const saved=(()=>{ try{ return JSON.parse(localStorage.getItem(KEY)||'null'); }catch(_){ return null; } })();
+  const qg=(qs.get('g')||'').trim();
+  if(qg&&!BIG){ const ok=await join(qg,true); if(ok) history.replaceState(null,'',location.pathname+'?e='+encodeURIComponent(SLUG)); }
+  else if(saved&&saved.code&&!BIG) await join(saved.code,true);
+  render(); flush();
+}
+async function join(c,silent){
+  c=String(c||'').trim().toUpperCase(); if(!c) return;
+  const {data,error}=await sb.rpc('golf_join',{p_slug:SLUG,p_code:c});
+  if(error||!data||!pub.groups.find(g=>g.id===data)){ if(!silent){ $('joinErr').textContent=error?'Couldn’t check that — try again.':'That group ID isn’t in this event.'; } else localStorage.removeItem(KEY); return false; }
+  groupId=data; code=c; try{ localStorage.setItem(KEY,JSON.stringify({code:c})); }catch(_){}
+  const g=group(), order=playOrder(g.startHole);
+  const firstOpen=order.findIndex(h=>g.players.some(p=>!(scores[p.id]||{})[h]));
+  holeIdx=firstOpen<0?17:firstOpen; tab='score'; return true;
+}
+/* scores save instantly on screen and queue for the server; the queue survives a dead zone or a closed tab */
+function setStroke(pid,hole,val){
+  scores[pid]=scores[pid]||{}; if(val) scores[pid][hole]=val; else delete scores[pid][hole];
+  queue=queue.filter(q=>!(q.p===pid&&q.h===hole)); queue.push({p:pid,h:hole,s:val||null}); saveQ(); setSync(); flush();
+}
+let flushing=false;
+async function flush(){
+  if(flushing||!queue.length||!code) return; flushing=true;
+  while(queue.length){ const q=queue[0];
+    const {error}=await sb.rpc('golf_submit',{p_event:pub.id,p_code:code,p_player:q.p,p_hole:q.h,p_strokes:q.s});
+    if(error){ if(/closed/i.test(error.message)){ queue=[]; saveQ(); pub.status='final'; render(); alert('Scoring for this event has been closed by the committee.'); }
+      else if(/not in this group|Unknown group/i.test(error.message)){ queue.shift(); saveQ(); continue; }
+      break; }
+    queue.shift(); saveQ(); }
+  flushing=false; setSync();
+}
+addEventListener('online',flush); setInterval(flush,15000);
+
+function render(){
+  setSync(); const tb=$('tabs'); tb.hidden=BIG||!groupId;
+  tb.querySelectorAll('button').forEach(b=>{ b.classList.toggle('on',b.dataset.t===tab); b.onclick=()=>{ tab=b.dataset.t; if(tab==='board') loadScores().then(render); render(); window.scrollTo(0,0); }; });
+  if(BIG||tab==='board'&&groupId) return renderBoard();
+  if(!groupId) return renderJoin();
+  if(tab==='card') return renderCard();
+  renderHole();
+}
+function renderJoin(){
+  $('main').innerHTML=`${pub.status==='final'?'<div class="banner">Scoring is closed. The leaderboard below is final.</div>':pub.status!=='live'?'<div class="banner">Scoring hasn’t opened yet — you can join your group now.</div>':''}
+  <div class="card pad"><h1>${esc(pub.name)}</h1><p class="muted" style="margin:8px 0 18px">Enter the group ID on your cart or pairing sheet.</p>
+  <label for="code" class="muted" style="font-size:13px;font-weight:600">Group ID</label>
+  <input class="inp" id="code" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="e.g. K7Q2M" style="margin:6px 0 12px">
+  <button class="btn pri wide" id="joinBtn">Start scoring</button><p class="err" id="joinErr" role="alert"></p></div>
+  <p style="text-align:center;margin-top:18px"><button class="btn" id="lbBtn">View leaderboard</button></p>`;
+  const go=async()=>{ $('joinBtn').disabled=true; const ok=await join($('code').value); $('joinBtn').disabled=false; if(ok) render(); };
+  $('joinBtn').onclick=go; $('code').onkeydown=e=>{ if(e.key==='Enter') go(); }; setTimeout(()=>$('code').focus(),50);
+  $('lbBtn').onclick=async()=>{ await loadScores(); renderBoard(true); };
+}
+function renderHole(){
+  const g=group(), c=pub.courses[g.course], order=playOrder(g.startHole), h=order[holeIdx], live=pub.status==='live', fmt=holeFormat(pub,h);
+  const par=p=>(c.par[p.set||'M']||c.par.M)[h-1], hcpH=p=>(c.hcp[p.set||'M']||c.hcp.M)[h-1];
+  const p0=g.players[0]||{}; const teeYds=[...new Set(g.players.map(p=>p.tee))].map(t=>{ const y=((c.tees||{})[t]||[])[h-1]; return y?`${t} ${y}`:''; }).filter(Boolean).join(' · ');
+  const teams=groupTeams(g);
+  // who enters a score on this hole: every player, or one entry per team on scramble holes
+  const rows=fmt==='scramble'?teams.map(t=>({id:t.captain.id,label:t.members.map(p=>p.name.split(' ')[0]).join(' & '),p:t.captain,k:(()=>{ const tph=scrambleTeamPH(pub,t.members); return tph==null?0:strokesOn(tph,hcpH(t.captain)); })(),team:t}))
+    :g.players.map(p=>{ const ph=pub.format==='stroke'?p.ph:segPH(pub,p,fmt); return {id:p.id,label:p.name,p,k:typeof ph==='number'?strokesOn(ph,hcpH(p)):0}; });
+  const thru=r=>{ if(r.team){ let n=0,rel=0; for(let hh=1;hh<=18;hh++){ const x=teamHole(pub,c,r.team,hh,scores); if(x){ n++; rel+=(pub.scoring==='net'&&x.net!=null?x.net:x.gross)-x.par; } } return 'Team · '+(n?toParTxt(rel)+(pub.scoring==='net'?' net':'')+' thru '+n:'not started'); }
+    const tot=Object.entries(scores[r.id]||{}).filter(([hh])=>holeFormat(pub,+hh)!=='scramble'); const rel=tot.reduce((a,[hh,v])=>a+v-(c.par[r.p.set||'M']||c.par.M)[hh-1],0); return tot.length?toParTxt(rel)+' thru '+tot.length:'Not started'; };
+  $('main').innerHTML=`${!live?`<div class="banner">${pub.status==='final'?'Scoring is closed — scores can no longer be changed.':'Scoring hasn’t opened yet. Scores will save once the committee opens it.'}</div>`:''}
+  <div class="card" style="overflow:hidden">
+   <div class="pad" style="padding-bottom:12px"><div class="holehead"><button class="nav" id="prev" aria-label="Previous hole"${holeIdx===0?' disabled':''}>‹</button>
+     <div style="text-align:center"><div class="n">Hole ${h}</div><div class="meta">Par <b>${par(p0)}</b>${teeYds?' · '+esc(teeYds)+' yds':''} · Hcp ${hcpH(p0)}</div></div>
+     <button class="nav" id="next" aria-label="Next hole"${holeIdx===17?' disabled':''}>›</button></div>
+     <div class="muted" style="text-align:center;font-size:13px">${esc(c.name)}${g.label?' · '+esc(g.label):''} · Group ${esc(code)} · ${holeIdx+1} of 18</div>
+     ${pub.format==='split'||fmt!=='stroke'?`<div style="text-align:center;margin-top:8px"><span class="fmtpill">${esc(FORMAT_LABEL[fmt])}${fmt==='scramble'?' · one score per team':''}</span></div>`:''}</div>
+   ${rows.map(r=>{ const v=(scores[r.id]||{})[h], pr=par(r.p);
+     return `<div class="pl"><div style="min-width:0"><div class="nm">${esc(r.label)}${r.k>0?'<span class="pop" title="Gets a stroke"></span>'.repeat(Math.min(r.k,2)):''}</div><div class="sub">${thru(r)}${r.p.flight?' · Flight '+esc(r.p.flight):''}</div></div>
+      <button class="step" data-m="${r.id}" aria-label="One less for ${esc(r.label)}"${live?'':' disabled'}>−</button>
+      <div class="val num ${v?(v<pr?'under':v>pr?'over':''):'empty'}" aria-live="polite">${v||pr}</div>
+      <button class="step" data-p="${r.id}" aria-label="One more for ${esc(r.label)}"${live?'':' disabled'}>+</button></div>`; }).join('')}
+   ${fmt==='bestball'||fmt==='shamble'?`<div class="pad" style="padding:10px 14px;border-top:1px solid var(--line);background:var(--ivory);display:flex;flex-direction:column;gap:4px">${teams.map(t=>{ const x=teamHole(pub,c,t,h,scores);
+       return `<div style="display:flex;justify-content:space-between;font-size:14px"><span class="muted">${esc(t.members.map(p=>p.name.split(' ')[0]).join(' & '))}</span><b>${x?'Best '+x.gross+(x.net!=null&&x.net!==x.gross?' · net '+x.net:''):'—'}</b></div>`; }).join('')}</div>`:''}
+   <div class="pad" style="padding-top:14px;display:flex;gap:10px"><button class="btn" id="parAll" style="flex:1"${live?'':' disabled'}>All par</button><button class="btn pri" id="nextBtn" style="flex:2">${holeIdx===17?'Review scorecard':'Save & next hole'}</button></div>
+  </div>
+  <div class="strip" aria-label="Holes">${order.map((hh,i)=>{ const who=holeFormat(pub,hh)==='scramble'?teams.map(t=>t.captain):g.players; const n=who.filter(p=>(scores[p.id]||{})[hh]).length; return `<button data-go="${i}" class="${n===who.length?'done':n?'part':''}${i===holeIdx?' cur':''}" aria-label="Hole ${hh}">${hh}</button>`; }).join('')}</div>
+  <p style="text-align:center;margin-top:18px"><button class="btn" id="leave" style="height:40px;font-size:13px">Not your group? Switch group ID</button></p>`;
+  const bump=(id,d)=>{ const r=rows.find(x=>x.id===id), cur=(scores[id]||{})[h]; const nv=Math.max(1,Math.min(20,(cur||par(r.p))+(cur?d:(d>0?0:-1)))); setStroke(id,h,nv); renderHole(); };
+  document.querySelectorAll('[data-m]').forEach(b=>b.onclick=()=>bump(b.dataset.m,-1));
+  document.querySelectorAll('[data-p]').forEach(b=>b.onclick=()=>bump(b.dataset.p,1));
+  $('parAll').onclick=()=>{ rows.forEach(r=>{ if(!(scores[r.id]||{})[h]) setStroke(r.id,h,par(r.p)); }); renderHole(); };
+  $('prev').onclick=()=>{ holeIdx=Math.max(0,holeIdx-1); renderHole(); };
+  $('next').onclick=()=>{ holeIdx=Math.min(17,holeIdx+1); renderHole(); };
+  $('nextBtn').onclick=()=>{ if(live) rows.forEach(r=>{ if(!(scores[r.id]||{})[h]) setStroke(r.id,h,par(r.p)); });
+    if(holeIdx===17){ tab='card'; render(); } else { holeIdx++; renderHole(); } window.scrollTo(0,0); };
+  document.querySelectorAll('.strip [data-go]').forEach(b=>b.onclick=()=>{ holeIdx=+b.dataset.go; renderHole(); });
+  $('leave').onclick=()=>{ if(queue.length&&!confirm('Some scores haven’t reached the server yet. Switch anyway? They’ll keep trying in the background.')) return; groupId=null; code=''; localStorage.removeItem(KEY); render(); };
+}
+function renderCard(){
+  const g=group(), order=playOrder(g.startHole);
+  $('main').innerHTML=scorecardHTML(pub,g,scores,{split:true})+
+   `<p class="muted" style="text-align:center;font-size:13px;margin:14px 0 6px">${queue.length?queue.length+' score'+(queue.length===1?'':'s')+' still saving…':'All scores saved.'}</p>
+   ${pub.status==='live'?`<p style="text-align:center;font-size:13px;margin:0 0 6px" class="muted">Change a hole:</p><div class="strip">${order.map((h,i)=>`<button data-go="${i}">${h}</button>`).join('')}</div>`:''}`;
+  document.querySelectorAll('.strip [data-go]').forEach(b=>b.onclick=()=>{ holeIdx=+b.dataset.go; tab='score'; render(); window.scrollTo(0,0); });
+}
+function showCardFor(gid,pid){
+  const g=pub.groups.find(x=>x.id===gid); if(!g) return;
+  $('main').innerHTML=`<p style="margin:0 0 12px"><button class="btn" id="cardBack" style="height:40px">‹ Leaderboard</button></p>`+scorecardHTML(pub,g,scores,{split:true,highlight:pid});
+  $('cardBack').onclick=()=>renderBoard(); window.scrollTo(0,0);
+}
+function renderBoard(fromJoin){
+  if(lbSort==null) lbSort=pub.scoring||'gross';
+  const flights=pub.flights||[], hasNet=(pub.groups||[]).some(g=>g.players.some(p=>typeof p.ph==='number'||typeof p.ch==='number')), net=lbSort==='net'&&hasNet;
+  const mine=new Set((group()||{players:[]}).players.map(p=>p.id));
+  if(!BIG&&!lbFlight&&group()&&flights.length){ const me=group().players.find(p=>p.flight); if(me&&renderBoard.first!==false){ lbFlight=me.flight; renderBoard.first=false; } }
+  const BB=isTeamEvent(pub), noPl=eventFormats(pub).includes('scramble'); if(noPl) lbView='teams';
+  const lb=eventBoard(pub,scores,{flight:lbFlight,sort:net?'net':'gross',view:BB?lbView:'players'});
+  $('main').innerHTML=`${BIG?`<h1 style="font-size:44px;margin:6px 4px 16px">${esc(pub.name)}${lbFlight?' · Flight '+esc(lbFlight):''}</h1>`:''}
+   ${!BIG&&(flights.length||hasNet||BB)?`<div class="chips">${BB&&!noPl?[['teams','Teams'],['players','Players']].map(([k,l])=>`<button data-vw="${k}" class="${lbView===k?'on':''}">${l}</button>`).join(''):''}${hasNet?['gross','net'].map(x=>`<button data-sort="${x}" class="${(net?'net':'gross')===x?'on':''}">${x==='net'?'Net':'Gross'}</button>`).join(''):''}${flights.length?['',...flights].map(f=>`<button data-fl="${f}" class="${lbFlight===f?'on':''}">${f?'Flight '+f:'All'}</button>`).join(''):''}</div>`:''}
+   <div class="card" style="overflow:hidden">
+   <div class="lb h"><span>Pos</span><span>${BB&&lbView==='teams'?'Team':'Player'}</span><span class="r">Thru</span><span class="r">${net?'Net':'To par'}</span></div>
+   ${lb.map(r=>`<div class="lb num${mine.has(r.id)||(r.members||[]).some(id=>mine.has(id))?' me':''}" data-card="${esc(r.groupId)}|${esc(r.team?(r.members||[])[0]:r.id)}" style="cursor:pointer"><b>${r.posTxt}</b><div style="min-width:0"><div style="font-weight:700;${r.team?'line-height:1.25':'overflow:hidden;text-overflow:ellipsis;white-space:nowrap'}" title="${esc(r.name)}">${r.team?r.name.split(' / ').map(esc).join('<br>'):esc(r.name)}</div>${BIG?'':`<div class="muted" style="font-size:12px">${esc(r.courseName.replace(' Course',''))}${r.flight&&!lbFlight?' · Flt '+esc(r.flight):''}${r.n?' · '+r.gross+(net&&r.net!=null?' / net '+r.net:''):''}</div>`}</div><span class="r muted">${r.n?r.thru:'—'}</span>${(()=>{ const v=net?r.netToPar:r.toPar; return `<span class="tp ${r.n&&v<0?'pos':r.n?'':'muted'}">${r.n&&v!=null?toParTxt(v):'—'}</span>`; })()}</div>`).join('')||'<div class="lb"><span></span><span class="muted">No players yet.</span></div>'}
+  </div><p class="muted" style="text-align:center;font-size:12.5px">${pub.status==='final'?'Final · ':''}${net?'Net':'Gross'} ${BB&&lbView==='teams'?formatSummary(pub).toLowerCase():'stroke play'}${BIG?'':' · tap a row for the scorecard'}${lbFlight?' · Flight '+esc(lbFlight):''} · updates live</p>${fromJoin?'<p style="text-align:center"><button class="btn" id="backJoin">Back</button></p>':''}`;
+  const bj=$('backJoin'); if(bj) bj.onclick=()=>renderJoin();
+  document.querySelectorAll('[data-fl]').forEach(b=>b.onclick=()=>{ lbFlight=b.dataset.fl; renderBoard.first=false; renderBoard(fromJoin); });
+  document.querySelectorAll('[data-sort]').forEach(b=>b.onclick=()=>{ lbSort=b.dataset.sort; renderBoard(fromJoin); });
+  document.querySelectorAll('[data-vw]').forEach(b=>b.onclick=()=>{ lbView=b.dataset.vw; renderBoard(fromJoin); });
+  if(!BIG) document.querySelectorAll('[data-card]').forEach(r=>r.onclick=()=>{ const [gid,pid]=r.dataset.card.split('|'); showCardFor(gid,pid); });
+}
+boot();
+window.__canReload=()=>!queue.length;
+/*AUTOUPDATE*/
+
+</script>
+</body>
+</html>

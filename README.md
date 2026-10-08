@@ -1,112 +1,255 @@
-# MM Tournament HQ
+# Club Hub
 
-Single-file app for running the MGA Member-Member tournament: sponsors, outreach,
-budget, financial summary, food & beverage, schedule, and open decisions. One shared
-board password, live sync across devices.
+The hub for Walnut Creek Country Club and the organizations inside it. It began as the MGA Hub
+(members, board, every tournament with its meals, events, field, sponsors and budget, the season budget,
+the Calcutta, check-in, the 50/50 drawing, live scoring) and is growing into a club-wide hub with three tiers:
+the **club** (master member directory, club-run tournaments), **associations** (MGA, LGA, SMGA — each with its
+own hub) and **small groups** (a roster, games with entry fees and payouts, live scoring, a money-game ledger).
 
-**Stack:** one static `index.html` (no build step) · Supabase (auth + one JSONB row + realtime) · Render static site.
+One static `index.html` (plus the cashier, check-in and scoring pages), Supabase, Render. The hub keeps its
+own table (`mga_hub`), one row per organization.
 
-## Setup (once)
+## Branches and sites
 
-### 1. Supabase
-1. Create a project at supabase.com.
-2. SQL Editor → run `supabase-setup.sql` (creates the `mm_tournament` table, RLS, realtime).
-3. Authentication → Users → **Add user**
-   - Email: `board@mgamm.app` (doesn't need to be real — check **Auto Confirm**)
-   - Password: this becomes the board password.
-4. Authentication → Sign In / Providers → Email → turn **off** "Allow new users to sign up."
+- `main` → **app.wcccmga.org** — the club hub, the product going forward.
+- `Hub` → **hub.wcccmga.org** — the MGA Hub as the board is using it for the 2026 season (bug fixes only).
 
-### 2. Configure the app (Render environment variables)
-The app reads `window.MM_CONFIG` from a `config.js` file that **Render generates
-at build time from environment variables** — nothing credential-related lives in
-the repo (config.js is gitignored).
+Both use the same Supabase project. Render serves the repo root of each branch; the built pages are committed,
+so a push is a deploy (see `CLAUDE.md` for the build).
 
-1. Render → your static site → **Environment** → add:
-   - `SUPABASE_URL` — e.g. `https://abcd1234.supabase.co`
-   - `SUPABASE_ANON_KEY` — Settings → API → anon public key
-   - `BOARD_EMAIL` — the shared Auth user's email (must match Supabase exactly)
-2. Render → **Settings → Build Command**, paste:
+## Supabase (same project)
 
-   ```
-   printf "window.MM_CONFIG={url:'%s',anonKey:'%s',boardEmail:'%s'};" "$SUPABASE_URL" "$SUPABASE_ANON_KEY" "$BOARD_EMAIL" > config.js
-   ```
+SQL Editor → run `hub-setup.sql` (creates `public.mga_hub` with RLS and realtime), `calcutta-setup.sql`
+(cashier and check-in links) and `golf-setup.sql` (live scoring). The hub signs in with the shared board login.
 
-3. **Manual Deploy → Clear build cache & deploy.**
-4. Verify: `https://<your-site>/config.js` should show your real values, and the
-   site should now open with the board password screen.
+## Staying up to date
 
-Changing any value later = edit the env var in Render and redeploy. No commits.
+`version.json` is written by every build. The hub, cashier and scoring pages check it about once a minute
+and reload themselves when a newer build is live — only at a safe moment (nothing unsaved, no editor or
+sale panel open, not mid-typing; the scoring page waits for its offline queue to empty). Upload
+`version.json` along with the pages each time.
 
-For **local testing** without Render: copy `config.example.js` to `config.js`
-in the folder and fill it in, or skip it entirely — no config.js means the app
-runs local-only per device (no password screen, no sync dot next to the year
-pill). If the deployed site ever shows that, the build command or env vars are
-missing.
+## Working together
 
-### 3. Render
-1. Push this repo to GitHub (private is fine).
-2. Render → **New → Static Site** → connect the repo.
-3. Branch `main`, build command *empty*, publish directory `.` → Create.
-4. Optional: Settings → Custom Domains to hang a subdomain on it (one CNAME).
+Several board members can use the hub at the same time. Every save is checked against the latest
+server copy (a revision number inside the record); if someone else saved in between, the hub fetches
+their version, merges it with yours item by item — tournaments, lots, bidders, members, ledger lines are
+matched by id — and saves the combined result. Changes to different things never collide; if two people
+change the very same field, the later edit wins. Incoming changes merge into the records on your screen in place
+— even with an editor open — so you see others' work live, your typing and scroll position are kept, and
+nothing you're editing is lost. Edits made while a save is still uploading go up right after. Only real edits are saved: browsing, opening
+records and the background sync checks never write anything, so nobody else's screen updates unless
+something actually changed. No setup needed.
 
-### 4. First sign-in
-The first device to sign in seeds the cloud from its local data. After that,
-cloud is the source of truth on every load.
+## 50/50 Drawing
 
-## Operations
+Each tournament has a **50/50 Drawing** tab. **Upload** the "All tickets sold" export (CSV or Excel): tickets are
+tournament + ticket number (numbers restart each tournament); tickets sold by hand without a number are included
+and identified by their sheet row. Players are identified by name — email and phone are ignored because they were
+often the seller's. **Look-alike names** (e.g. "Nate Huneycutt" / "Nate Honeycutt") must be ruled same or different
+before **locking**, which records a SHA-256 **fingerprint** of every ticket; the list can't change after. **Open the
+drawing screen** for the projector: each draw uses the browser's cryptographic random generator (every eligible
+ticket equally likely) and is saved the instant it's drawn; a winner's tickets all leave the drum before the next
+drawing. Voids need a written reason and stay in the log. **Official record (PDF)**: ticket list, fingerprint,
+method, each drawing (random value, eligible count, winning ticket and sheet row), witness lines, tickets by player.
 
-- **Board password change / turnover:** Supabase → Authentication → Users → reset
-  the shared user's password. Nothing to redeploy.
-- **Backups:** app menu (⋯) → *Backup all data* downloads a JSON of every year.
-  Creating a new year auto-downloads one first. *Restore backup* loads it back
-  (and syncs up to the cloud).
-- **Budget workbook:** app menu (⋯) → *Export budget workbook* downloads an .xlsx
-  of the active year: every input, sponsor, payment, F&B line, dinner menu item and
-  misc line, plus Excel formulas that recompute each budget total next to the value
-  the app shows. The **Check** column should be 0 everywhere; anything else is a
-  mismatch worth looking at. (Loads the SheetJS library from jsDelivr on first use.)
-- **Sync status:** dot in the header — green saved, gold saving, red offline
-  (offline changes are kept on-device and pushed on the next edit).
-- **Conflict model:** last-write-wins on the whole state, debounced 800ms.
-  Fine for a small board; if two people edit the same field in the same second,
-  one edit wins.
+## Check-in
 
-## Saturday dinner menu
+Each tournament has a **Check-in** tab (next to Field) listing every player in the field, alphabetical by last
+name with letter dividers. Search a name (own name first; partners only if no one matches) or a team number;
+filter Not yet / Checked in / Par 3. **Check in** marks the time; tap again to undo. Counts show checked in,
+still to arrive and teams complete. **Create registration link** gives the registration table a private page
+(`checkin.html`, no board password) with the same list and big buttons — several devices can check players in
+at once, it keeps working through a dropped connection, and **Turn off** ends access. Uses the same Supabase
+setup as the cashier link (`calcutta-setup.sql`).
 
-Budget tab → **Saturday dinner menu** holds the WCCC dinner quote as line items
-(quantity × unit price, both editable in place; tap an item name to rename, add a
-note, or delete). Prices are the club's all-in prices, so nothing is added on top: the
-menu total is the cost of the Saturday *Dinner (WCCC)* line
-in Event → Food & Bev, so it flows into the Saturday F&B total and the budget.
-That line shows "Menu" instead of a quantity; its WCCC actual bill is still
-entered on the Event line. If the linked line is ever deleted, the Budget card
-shows a button to add it back. The per-person figure uses the Saturday dinner
-headcount planning input for reference only — it doesn't drive the quantities.
+## Checklist
 
-Existing data picks this up automatically on first load: the menu is pre-filled
-from the WCCC quote and the old headcount × per-plate dinner line is converted to
-the menu-linked line.
+Each tournament has a **Checklist** tab. **Start a checklist** from the 2026 Member-Member weekend checklist
+(95 tasks across Pre-event, Thursday set-up and each tournament day, with the NEW / FIX marks), by copying
+another tournament's checklist (tasks come over open and unassigned), or blank. Click any task to edit it,
+**assign** it (type a name — board members come first, with their roles), add **notes**, or mark it done;
+checkboxes work right in the list. Filter by person, Open / Done / Unassigned, or search. **Print** the whole
+checklist or one person's tasks, with names in the Assigned-to column. Add days, sections and tasks anywhere.
 
-## New tournament year
+## Calcutta (players auction)
 
-Year selector (top) → **New year**. Carries over sponsors and prospects with
-contact info (statuses reset, deposits cleared), budget structure, misc expense
-lines, F&B menu, Saturday dinner menu, tiers, and the schedule — with all actuals zeroed. Declined
-prospects stay declined.
+Each tournament has a **Calcutta** tab, split into sub-tabs — **Lots**, **Bidders**, **Buyers & shares**,
+**Money** (by flight, payments, expenses, cash drawer) and **Setup** (cashier link, minimum bid, buy-in,
+team sheet) — with the totals and Run the auction / Export results always at the top. Lots, Bidders and Buyers & shares
+each have a search box: names, paddle numbers (101 or #101), lot numbers, flights; it combines with the filters.
 
-## Keeping free tiers awake
+- **Upload team sheet:** the auction-order spreadsheet (Lot, Team, Flight, Team index…) or the team
+  sheet (Player 1, Player 2, Flight…). Buyers and prices already filled in come across. Re-uploading
+  keeps every recorded sale (teams are matched by their players).
+- **Payouts** (Payouts sub-tab): give each team its finish in its flight; tied teams get the same number. No
+  tie-breaker — tied teams share the money for every place they cover (two tied for 1st split 1st + 2nd; three tied
+  for 4th with four places paid split 4th money), to the cent, with any odd cent going to the lowest lot. Each team's
+  money is split to its owners (buyer 75% / captain 25%, or captain 100% if pre-bought; the pool's buyer for pool
+  teams). **Payouts by person** lists everyone to pay — paddle or not — expandable to the teams behind it, with a
+  paid-out mark (cash, check, Zelle, Venmo). The export adds Payouts by flight and Payouts by person sheets.
+- **Teams added to the field later:** the Lots sub-tab shows a notice when the field has teams the Calcutta
+  doesn't; **Add to the Calcutta** (also on Setup) adds them with a suggested flight (from the team index) and
+  the next lot number — or a lot number of your choice, moving later lots down one. The pool renumbers itself.
+- **What each buyer owes:** every bidder row shows lots bought and the total owed; click (or tap, on the
+  cashier page) to expand the lots — lot, team, flight, price, the pool and its teams — with a total and paid
+  status. Filters: All / Buyers / Unpaid; Expand all in the hub.
+- **Bidders:** add one at a time (member or guest) or **Number the players** to give everyone in the
+  field a bidder number (last-name order, choose the starting number). Each bidder shows what they
+  bought, what they owe, and paid / paid-by.
+- **Run the auction:** a live screen for the night — type the bidder number, Enter, the price, Enter,
+  and it moves to the next lot. Back and Skip are there; any lot can be edited from the Lots list.
+  A bidder number that doesn't exist yet is added on the spot.
+- **Minimum bid** (default $250, editable): a team that doesn't reach it — a lower bid, **No sale →
+  pool**, or no price — goes into **the pool**, auctioned together as one extra lot numbered after the
+  last team (Lot 75 for 74 teams). It comes up on the live screen after the last team and sells to one
+  bidder for one price. That price is shared by the flights in proportion to their teams in the pool.
+  Teams can be taken back out of the pool (the Pool button or the Lots list).
+- **Team buy-in & pre-buy** (off unless turned on for that Calcutta — **Turn on buy-in**): each team owns
+  a share of itself before the auction (default 25% for $300, $150 a player) — the auction buyer gets the
+  rest. A team can **pre-buy** the remainder at registration (default $900 more, $1,200 in all): it then
+  owns 100% and is **skipped in the auction**. Buy-ins go into each team's flight pot. Three payments are kept
+  separate, each with its own paid status and method: the **auction purchase** (paid by the buyer, marked on
+  the bidder), each player's share of the team **buy-in** (e.g. $150 each) and of the **pre-buy** (e.g. $450 each). Payments totals show every method split by kind.
+- **Captains and buyers:** every team's captain is the player with the lower Handicap Index (plus handicaps
+  count as lower; ties or missing indexes are flagged; switch it by hand on any lot). The captain is the
+  buyer of the team's own share — 100% of a pre-bought team, the buy-in share (25%) of an auctioned team —
+  and is paid it, with or without a paddle. Each player's $150 buy-in is tracked separately but is a team
+  payment only. Bidder numbers are for the auction: when a captain takes a paddle (picked by name), their
+  shares join that number automatically. **Buyers & shares** lists everyone to pay out and what they own;
+  the export has the same sheet.
+- **Expenses** (e.g. the auction dinner) come out of the pot **evenly across every flight**.
+- **By flight:** teams sold, gross, expense share, net pot, and the payout by place from each
+  flight's net (40/30/20/10 by default, editable, any number of places).
+- **Download order (Excel)** and **Bidder sheet (PDF)** (Lots sub-tab): the auction order as a spreadsheet,
+  and a blank, downloadable PDF for bettors — the full auction order, then a page per flight with room to write
+  the buyer and price for every team and a flight total. Built in the browser; no print dialog.
+- **Export results:** a workbook with Lots, Bidders (what each owes), By flight and Expenses.
+- **Payments:** totals by Cash, Zelle, Credit card and Check, what's still owed, and a **cash drawer**
+  check — starting cash + cash payments = what should be in the drawer; enter the count to see over/short.
+- **Cashier link** (one-time setup: run `calcutta-setup.sql`, and upload `cashier.html` with `index.html`):
+  **Create cashier link** gives a private address for the cashiers' laptops — no board password. They can
+  record sales and pool decisions, add and edit bidders (players in the field come up as they type), mark
+  bidders paid by method, and count the cash drawer. Several cashiers can work at once; each change saves
+  on its own and appears everywhere within a few seconds (the hub included). Edits to different teams or
+  bidders never overwrite each other; on the same one, the latest wins. A laptop that drops offline keeps
+  its changes and saves them when it reconnects. **Turn off** locks the link immediately; the data stays.
 
-- **Render static sites never sleep** — they're CDN-served. Nothing to do.
-- **Supabase free tier pauses after 7 days of no API activity** (off-season risk).
-  This repo includes `.github/workflows/supabase-keepalive.yml`, which pings the
-  `keepalive` table every 3 days. To activate it:
-  1. Repo → Settings → Secrets and variables → Actions → add two secrets:
-     `SUPABASE_URL` and `SUPABASE_ANON_KEY` (same values as in index.html).
-  2. Actions tab → enable workflows → run **Supabase keep-alive** once manually
-     to confirm it goes green.
-  The workflow also commits a timestamp to a `keepalive` side branch each run so
-  GitHub's 60-day inactive-schedule rule never disables it, without triggering
-  Render deploys (Render only watches `main`).
-- **If it ever pauses anyway:** Supabase dashboard → Restore. Data isn't lost on
-  pause, but don't leave it paused for months — and keep occasional JSON backups
-  from the app menu regardless.
+## Live scoring (Golf)
+
+One-time: Supabase → SQL Editor → run `golf-setup.sql`. Upload `score.html` alongside
+`index.html` on the `hub` branch.
+
+- **Golf → Courses:** Oak and Pecan scorecards (par, men's/women's handicap, every tee).
+- **Golf → New scoring event:** name, date, default tee, a **custom link**, and optionally the
+  tournament it belongs to. Add groups by hand, or **Build groups from the field** (keeps
+  teams together; all Oak, all Pecan, or split; shotgun or off hole 1).
+- **Groups:** each has its own **Group ID** (random by default — change it to a cart number or
+  tee time), course, starting hole, and players (members, field players, or guests), each with
+  a tee and men's/women's par.
+- **Open scoring**, then share the link: `…/score.html?e=<your-link>`. Players enter their
+  Group ID and score hole by hole. Scores save as they tap, queue up in dead zones, and send
+  when signal returns. `…&view=board` is a big-screen leaderboard for the clubhouse TV.
+- **Leaderboard:** gross stroke play, to par for holes played, both courses combined. It's in the
+  event page, on the Dashboard, and a live link sits in the sidebar while scoring is open.
+  Click any player to correct a group's scores from the hub.
+- **Formats per nine:** Round type can be Stroke play, Best ball, Scramble, Shamble, or "Front & back
+  differ" (e.g. Member-Member Saturday: scramble front, shamble back). Scramble holes take one team
+  score (the phone shows one entry per team); best ball and shamble holes take every player's score
+  and the best net ball counts. Cards, leaderboards and the phone follow each hole's format.
+- **Handicap allowances** default to the USGA (WHS Appendix C) recommendations: individual stroke play
+  95%, four-ball 85%, 2-player scramble 35/15%, 4-player scramble 25/20/15/10%. Shamble isn't in the
+  USGA table — it defaults to 85% (it plays as four-ball after the drive). All editable per event,
+  with "Reset to USGA". Scramble team handicap = course handicaps low→high × those percentages.
+- **Course & start by flight** (Flights tab): each flight picks its course and Shotgun or Tee times —
+  first tee time, gap in minutes, and hole 1 or 10 — all editable. Tee-time groups go off in order of
+  combined handicap; a warning shows if one course has both a shotgun and tee times.
+- **Round type:** Stroke play or **Best ball**. Best ball: every player scores their own ball; the
+  team's score on each hole is its best score (gross, or net after each player's strokes — 90%
+  allowance is the usual four-ball setting). Teams come from the linked tournament (Member-Member
+  partners) or are set per group. Leaderboards switch between Teams and Players; the phone shows
+  each team's best on the current hole. Flights keep best-ball teams together.
+- **Handicaps:** each player's Handicap Index comes from their member profile (the Golf Genius
+  import); override it in the group for guests. Course handicap = Index × Slope ÷ 113 + (Course
+  Rating − Par), using the player's course, tee and men's/women's set, at the event's allowance %.
+  Ratings come from the club's printed rating card (all tees, men and women, incl. Blue/White and
+  White/Red) and can be edited on Golf → Courses.
+- **Flights:** event → Flights → enter how many. Filled evenly by course handicap (or Index),
+  lowest in A, sizes differ by at most one. For team events linked to a tournament, teams stay
+  together on combined handicap. Ties at a split are flagged; move anyone by hand afterward.
+- **Event workflow — 1 Field → 2 Flights → 3 Groups:**
+  1. *Field:* **Import field from <tournament>** pulls every player with their team and Handicap
+     Index (re-import adds newcomers, updates teams, optionally removes withdrawals). Add guests here.
+  2. *Flights:* set the number of flights; players and teams get a flight without being grouped.
+  3. *Groups:* **Build groups from flights** forms foursomes inside each flight on the flight's course.
+- **Groups by flight:** with "Build groups by flight" on, flights are sized in whole groups
+  (two 2-person teams per foursome, so every flight has an even number of teams) and groups are
+  formed inside each flight. Whole flights go to one course (split Oak/Pecan, or all on one).
+  Starting holes go 1, 2, 3… from the lowest combined handicap up; extra groups double on par 5s.
+  Players are re-rated on the course they'll actually play before holes are ordered.
+- **Net scoring:** strokes are given by hole handicap (plus handicaps give strokes back). The
+  leaderboard ranks gross or net, filters by flight, and the phone shows a dot on holes where a
+  player gets a stroke. `…&view=board&flight=A` puts one flight on the TV.
+- **Scorecards:** click any leaderboard row (hub or phone) for that group's card, styled after the
+  club's printed card — tee rows, handicap and par rows, gross in every cell with birdie circles
+  and bogey squares, the net score in the corner on holes where a stroke is given, and Hcp / Net
+  totals at the end. Best ball adds a team row per team (the counting score each hole, net or gross
+  per the event) and underlines the ball that counted. Final rounds are stamped FINAL; Print gives
+  a landscape copy. On phones the card stacks front and back nines.
+- **Printed scorecards:** event → Groups → **Print scorecards**. Team events print **one card per team**
+  (team name, and the other team in the group as Marker — teams swap cards), two to a page so each page
+  is one group; or one card per group. Tee-time groups show the tee time as the headline. Each card:
+  event, date, course, format and flight; the group ID and starting hole in a box; yardage, par and
+  handicap rows; each player with their playing handicap and a dot on every hole they get a stroke
+  (+ where a plus handicap gives one back); a blank best-ball line per team; scorer/attest lines;
+  and a QR code that opens live scoring with that group already joined. Two cards per letter page
+  (cut in half for the cart) or one large card per page; all groups or one flight. Open scoring
+  before the round so the QR codes work.
+- **Close scoring** locks it: the public page can no longer change scores.
+- Security: the public page can only read an event's public info, look up a group by its ID, and
+  save scores for that group's players while the event is open. Group IDs are never exposed.
+
+## How it works
+
+- **Editing:** screens are read-only; every change happens in one side panel.
+- **Tournaments:** 1, 2 or 3 days. Each day holds meals and events (fixed quantity,
+  or "every player"), plus catered menus (line items at the club's all-in prices). Tournament-
+  wide expenses are fixed amounts (prizes, gifts, misc) or per-player (pro shop credit).
+  "Start from" copies another tournament's structure with actuals and payments cleared.
+- **Members:** Members → Import member list takes the Golf Genius contact list export
+  (.xlsx) or any spreadsheet/CSV with name columns. Preview first; re-uploading a newer
+  export updates people (matched by Golf Genius ID, GHIN, email, then name) and blank
+  cells never erase existing data. Optionally mark people missing from the file Inactive.
+- **Field:** Field tab → Import roster takes the Golf Genius registration export for the
+  event. Team Id sets the teams, RSVP questions (dinner, plus one, Par 3, anything else)
+  are kept per player, and the dinner headcount (players + plus-ones) can be applied to
+  a catered menu in one click. Re-uploading a newer export updates the field. Teams can
+  also be picked by hand from Members. Players who aren’t current members can still play:
+  they’re added to Members as Inactive and marked “Inactive Member” in the field. A later
+  member-list import that includes them switches them back to Active. The newest file
+  wins for handicap index (by the export’s “created on” time), entry paid and skins per player. The budget
+  uses the planned player count until you switch it to the field in Tournament details.
+- **Season budget:** all tournaments + annual dues (active members × dues, not
+  prorated, recorded per member) + any MGA-level lines. The 50/50 raffle is counted
+  inside the tournament it's assigned to, not added twice.
+- **Treasury** (sidebar): the treasurer's books for the season.
+  - *Ledger* — every dollar in and out: expenses and income recorded here, plus sponsor
+    payments and dues recorded elsewhere. Filter, search, export CSV.
+  - *Budget vs actual* — every line of every tournament plus MGA-level lines, with variance.
+    Use + on a line to record money against it. Once a line has ledger entries, its actual
+    comes from them (the typed "Actual $" field shows the ledger total instead).
+  - *Reconcile* — upload the bank's activity export (CSV, Excel, or OFX/QFX). Re-uploads and
+    overlapping statements are de-duplicated. Suggested matches: same check #, same amount and
+    name, nearest date, and one deposit made of several payments. Accept, Find (tick one or more
+    entries that add up), Add to books, or Set aside (transfers). Shows bank vs book balances,
+    deposits not yet made and checks not yet cleared, and checks the bank's own running balance.
+- **Season net (projected):** actual net for tournaments that are over (marked Complete, or past
+  their last day) plus budgeted net for upcoming ones, plus MGA-level budget lines.
+- **Sync:** last write wins, saved ~0.7s after an edit; open devices update live.
+  Own saves are recognized and not echoed back.
+- **Backups:** sidebar → Backup / Restore (JSON of everything).
+
+## Later
+
+- Microsoft 365 sign-in per board member (Supabase Azure provider).
+- Golf Genius sync for members and signups (needs API access from Golf Genius).
