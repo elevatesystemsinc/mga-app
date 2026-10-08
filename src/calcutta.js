@@ -406,6 +406,9 @@ async function exportCalcutta(t){
 /* ============ Cashier link: share this Calcutta with the cashiers' laptops ============ */
 const cashierLink=t=>SITE_BASE+'cashier.html?k='+encodeURIComponent(calc(t).share.token);
 const newToken=()=>Array.from(crypto.getRandomValues(new Uint8Array(24)),b=>'abcdefghijkmnpqrstuvwxyz23456789'[b%32]).join('');
+/* create, replace or (token null) turn off a shared cashier / check-in row; admin links go through the database function */
+function shareRow(tid,token,name,doc){ return KEYMODE?keyRPC('hub_key_share',{p_tid:tid,p_token:token,p_name:name,p_doc:doc})
+  :token?sb.from('calcutta_share').upsert({tid,token,name,doc,version:1,updated_at:new Date().toISOString()}):sb.from('calcutta_share').update({token:null}).eq('tid',tid); }
 function calcPeople(t){ return (t.field||[]).map(p=>{ const m=memberById(p.memberId); return m?{id:m.id,name:tidyName(memberName(m))}:null; }).filter(Boolean).sort((a,b)=>a.name.localeCompare(b.name)); }
 const SHARE_ST={};
 /* the last cashier copy this device merged with — needed to tell what changed here; kept per device */
@@ -445,7 +448,7 @@ async function startCashierLink(t){
   const c=calc(t); if(!CLOUD||!sessionOK){ toast('The cashier link needs the cloud sign-in'); return; }
   const token=newToken(); c.people=calcPeople(t); c.name=t.name; c._del=c._del||[];
   const doc=calcDoc(c);
-  const {error}=await sb.from('calcutta_share').upsert({tid:t.id,token,name:t.name,doc,version:1,updated_at:new Date().toISOString()});
+  const {error}=await shareRow(t.id,token,t.name,doc);
   if(error){ toast(/relation|does not exist/i.test(error.message)?'Run calcutta-setup.sql in Supabase to turn on cashier links':'Couldn’t create the link: '+error.message); return; }
   c.share={token,created:new Date().toISOString()}; SHARE_ST[t.id]={state:'live',at:new Date().toISOString()}; shareBase.set(t,JSON.parse(JSON.stringify(doc)),1);
   persist(); render(); toast('Cashier link ready');
@@ -454,7 +457,7 @@ function stopCashierLink(t){
   const c=calc(t);
   openDrawer({kicker:t.name+' · Calcutta',title:'Turn off the cashier link?',saveLabel:'Turn it off',
     body:'<p style="margin:0">Anyone with the link loses access right away. Everything they recorded stays in the hub. You can create a new link later — it will have a different address.</p>',
-    save:()=>{ (async()=>{ await calcShareAll(); await sb.from('calcutta_share').update({token:null}).eq('tid',t.id); delete c.share; persist(); render(); toast('Cashier link turned off'); })(); }});
+    save:()=>{ (async()=>{ await calcShareAll(); await shareRow(t.id,null,t.name,null); delete c.share; persist(); render(); toast('Cashier link turned off'); })(); }});
 }
 function editCash(t){
   const c=calc(t), P=calcPayments(c);

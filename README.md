@@ -56,12 +56,37 @@ format's team score and handicap math, with worked examples.
 
 ## Small groups
 
-A small group's hub is the regular game. **Games**: date, course, entry money and an optional skins entry; add the
-regulars from the member list (or a guest), mark who has paid. **Open live scoring** puts everyone in groups of four
-with a group ID for the scoring page on their phones; scores can also be entered in the hub. **Payouts**: split the pot
-by finish (from the leaderboard, or by hand — ties share the places they cover), pay the **skins** from the hole-by-hole
-scores (ties carry over), or add a payout by hand. The **Ledger** shows who is up or down for the season or any quarter
-(paid out − paid in, plus side bets or settle-ups recorded as adjustments), with a one-click settle-up.
+A small group's hub is the regular game, and small tournaments when it wants them (the same Tournaments page as an
+association, with the Calcutta, meals and the rest switched on per tournament). **Games**: date, course, the main game
+from the game library (stroke play, quota, Stableford, best ball with drawn partners…) and any number of **pots**, each
+with its own entry money and players: the main game paid by finish, **skins** (gross or net, gross beats net,
+carry-overs, validation on the next hole), **dots / doodah** (birdies and eagles counted from the scores, sandies and
+greenies tallied by hand), side pots scored as another game on the same scores (low net, **blind-draw partners after
+the round**), and winners entered by hand (closest to the pin, long drive). Add the regulars from the member list (or a
+guest), tick who is in which pot and who has paid. **Open live scoring** puts everyone in groups of four with a group ID
+for the scoring page on their phones; scores can also be entered in the hub. The **Ledger** shows who is up or down for
+the season or any quarter (paid out − paid in across every pot, plus side bets or settle-ups recorded as adjustments),
+with a one-click settle-up.
+
+**Admin links.** A small group (or an association) can be run without the board password: in the club hub, open the
+organization under Organizations and create an **admin link** (`app.wcccmga.org/misfits#key=…`). Whoever opens it gets
+that organization's hub — its games, tournaments, members and live scoring — and sees the club directory (they can add
+people to it, not change them). Nothing else in the club is reachable with the link, it works on the device it was
+opened on until "Leave this hub", and the club can revoke it at any time. Run `admin-links-setup.sql` once to turn
+this on.
+
+## Dues collected by the club
+
+The club charges no dues of its own. An association sets its dues (Members → Dues settings), and new members are
+billed automatically; **Bill dues** bills everyone who still owes (full year or an installment). Each bill goes to the
+club hub's **Dues collection** page: the club exports the open charges for its billing software (or ticks them off
+one by one), marks them *on account*, and when the money is in marks them *collected* — that records the payment on
+the member in the association's books, credited to the association. The club's own budget and treasury never count it.
+
+## The club calendar
+
+The club's Tournaments page and dashboard also list every association's and small group's tournaments — name, dates,
+field size and status, with a button into that organization's hub. Their budgets and money stay in their own hubs.
 
 First time on a database the club hub offers **Set up from the MGA Hub**: it builds the directory from the MGA's list,
 registers the three associations and copies the MGA Hub's data into the MGA's hub. The club hub's Organizations page can
@@ -73,7 +98,8 @@ so a push is a deploy (see `CLAUDE.md` for the build).
 ## Supabase (same project)
 
 SQL Editor → run `hub-setup.sql` (creates `public.mga_hub` with RLS and realtime), `calcutta-setup.sql`
-(cashier and check-in links) and `golf-setup.sql` (live scoring). The hub signs in with the shared board login.
+(cashier and check-in links), `golf-setup.sql` (live scoring) and `admin-links-setup.sql` (admin links for small
+groups and associations). The hub signs in with the shared board login; admin links work without it.
 
 ## Staying up to date
 

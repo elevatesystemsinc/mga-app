@@ -89,7 +89,7 @@ function editGame(g){
       if(g){ Object.assign(g,data); if(mp) mp.entry=fnum('gmE'); const ev=gameEvent(g); if(ev){ ev.date=g.date; ev.scoring=g.net?'net':'gross'; EV_GAME_KEYS.forEach(k=>{ ev[k]=g[k]; }); golfSave(ev); } }
       else { const n=Object.assign({id:uid(),season:Y(),status:'open',players:[],pots:[],golfEventId:''},data); n.pots.push(newPot('finish','Main game',fnum('gmE'),n)); if(fnum('gmS')>0) n.pots.push(newPot('skins','Skins',fnum('gmS'),n)); gamesData().push(n); view.gameId=n.id;
         if(last&&last.players.length) setTimeout(()=>{ if(confirm(`Start with the ${last.players.length} players from ${gameTitle(last)} on ${shortDate(last.date)}?`)){ last.players.forEach(p=>addPlayer(n,{memberId:p.memberId,name:p.name})); persist(); render(); } },50); } },
-    del:g?()=>{ if(!confirm(`Delete ${gameTitle(g)} on ${shortDate(g.date)}? Its money record goes with it.`)) return false; const ev=gameEvent(g); if(ev&&confirm('Also delete its scoring event and scores?')){ golfData().events=golfData().events.filter(e=>e!==ev); if(CLOUD&&sessionOK) sb.from('golf_events').delete().eq('id',ev.id); }
+    del:g?()=>{ if(!confirm(`Delete ${gameTitle(g)} on ${shortDate(g.date)}? Its money record goes with it.`)) return false; const ev=gameEvent(g); if(ev&&confirm('Also delete its scoring event and scores?')){ golfData().events=golfData().events.filter(e=>e!==ev); if(CLOUD&&sessionOK) deleteEventRow(ev.id); }
       db.games=db.games.filter(x=>x!==g); view.gameId=null; }:null,delLabel:'Delete game'});
 }
 function addPlayer(g,o){ const p={id:uid(),memberId:o.memberId||'',name:o.name||'',paid:false,extraIn:0,gpid:''}; g.players.push(p); g.pots.forEach(pot=>{ if(pot.kind!=='manual') pot.inn[p.id]=true; }); return p; }

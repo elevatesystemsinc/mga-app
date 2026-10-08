@@ -44,7 +44,7 @@ src/
   golfcore.js          courses (WCCC Oak/Pecan ratings), WHS math, format engine (FORMATS registry, team handicaps,
                        leaderboards, match play, skins), scorecard renderer — see docs/formats.md       [shared]
   golf.js              Golf page: events, field, flights, groups, live scoring, printed cards
-  games.js             small groups: Games (entry money, payouts by finish / skins, live scoring via golf events), Ledger
+  games.js             small groups: Games with pots (finish, skins, dots, side games, by hand), live scoring via golf events, Ledger
   rounds.js            tournament Rounds & results: rounds with formats → scoring events from the field, combined results,
                        finishes to the Calcutta                                                       [loads last]
   calccore.js          Calcutta pure logic                                                            [shared]
@@ -108,16 +108,46 @@ Tournament = { id, name, season, days, startDate, field:[{id,memberId,team,paid,
   `persons()`/`personById(id)` (directory), and write through `upsertMember(id|null, data)` / `removeMember(id)`
   (which keep both documents right) — `memberSnapshot()`/`memberRestore()` for undo. A person is one record
   club-wide; removing someone from an association only ends the membership.
-- Organization kinds gate the nav (`ORG_NAV` in ui.js): club = directory, organizations, tournaments, golf, budget,
-  treasury; association = everything the MGA has; group = dashboard, games, ledger, golf, members.
-- **Small groups** (`games.js`, group documents only): `db.games` = [{id, season, date, time, name, course, entry,
-  skinsEntry, net, status, players:[{id, memberId|name, paid, inSkins, extraIn, gpid}], payouts:[{kind:'places'|
-  'skins'|'manual', pid, amount, note}], golfEventId}] and `db.ledgerAdj` (side bets / settle-ups). Money is a record
-  of what changed hands: a player's in = entry (+ skins entry if in, + extras), out = Σ payouts; the Ledger's net =
+- Organization kinds gate the nav (`ORG_NAV` in ui.js): club = directory, dues collection, organizations, game
+  library, tournaments, golf, budget, treasury; association = everything the MGA has; group = dashboard, games,
+  ledger, tournaments, golf, members.
+- **The club hub keeps every organization's document open** (`openOrgDocs()` in startCloud / `openLocal`, read with
+  `orgDocs()` → [{meta, db}]). It reads them for the club calendar (`clubCalendar(y)`: the Tournaments page's second
+  card and the dashboard's "Across the club") and for **Dues collection**; it writes to them only to mark a dues
+  charge charged/collected. `persist()` saves whichever open documents changed, so those writes go to the right row.
+- **Dues are billed by associations and collected by the club** (the club charges nothing of its own: `scalc()` gives
+  the club no dues, its budget/treasury show no dues or 50/50 lines, and the raffle feature/tab is hidden in the club
+  hub). Association season: `s.dues = {amount, installments, autoBill}`, `s.duesCharges = [{id, memberId, amount, desc,
+  date, status:'open'|'charged'|'collected', chargedAt, collectedAt}]`, `s.duesPayments` (what the association has
+  received, incl. `{method:'Club account', chargeId}` written by the club when it marks a charge collected).
+  `billNewMember()` (from `upsertMember`, unless `{noBill:true}` — roster imports pass it) bills a new active member the
+  full year; Members → **Bill dues** (`billDues()`) bills everyone who still owes and has nothing pending. The club's
+  `vCollections` lists every association's charges for the season: put on account → collected (records the payment
+  on the member in the association's document), cancel, CSV of open charges for the club's billing software.
+- **Admin links** (`admin-links-setup.sql`, `hub_keys` table): the club hub → Organizations → an organization →
+  *Admin links* creates `…/<org>#key=TOKEN` (`newAdminLink()`: random token, SHA-256 hash stored, the org row created
+  if missing; shown once). Opening it without a board session puts the page in **key mode** (`HUBKEY` from the hash
+  or localStorage `club_hub_key`, `KEYMODE=true`, `sessionOK=true`): `fetchRow`/`pushCloud` go through
+  `hub_key_read` / `hub_key_write` (CAS by `_rev`) for that one organization, the club row arrives as a subset
+  (directory, the org's own listing, game library — no tournaments/money/other orgs), writes to the club document only
+  add people (`hub_key_people`; editMember locks existing people), golf publish/score/delete and cashier/check-in
+  links use `hub_key_golf_event` / `hub_key_score` / `hub_key_golf_delete` / `hub_key_share` (`keyRPC(fn,args)`
+  adds the key). No realtime in key mode — the 15 s poll carries updates. A revoked/unknown key → `keyRejected()`
+  (sign-in card with a message, key forgotten). The link is for one organization: another path redirects to it.
+- **Small groups** (`games.js`, group documents only): `db.games` = [{id, season, date, time, name, course, net,
+  status, game (catalog id) + engine fields, players:[{id, memberId|name, paid, extraIn, gpid}], **pots**:[{id, kind:
+  'finish'|'skins'|'dots'|'format'|'manual', name, entry, inn:{[player id]:true}, rules:{game, skins?, dots?, teamSize?},
+  teams?:{[event player id]:'S1'…}, tally?:{[player id]:{Sandy:n…}}, payouts:[{id,pid,amount,note}]}], golfEventId}]
+  and `db.ledgerAdj` (side bets / settle-ups). Games from before pots are migrated in `gamesData()` (entry → finish
+  pot "Main game", skinsEntry → skins pot, old payouts by kind). Money is a record of what changed hands: a player's
+  in = Σ entries of the pots they are in (+ extras), out = Σ payouts across pots (`gpIn`/`gpOut`); the Ledger's net =
   out − in + adjustments, per season or quarter. `openScoring(g)` creates a golf event for the game (players in groups
-  of four, `gpid` links game player → event player) and `syncGameEvent` keeps it in step; payouts by finish use the
-  event leaderboard (ties share places, cent-exact) or hand-entered positions; skins come from the hole scores
-  (lowest outright wins; ties carry over, optional; carried skins unpaid at the end).
+  of four, `gpid` links game player → event player) and `syncGameEvent` keeps it in step. Paying a pot: `payPlaces`
+  (finish, from the event leaderboard via `payByFinish`, ties share places, cent-exact, or hand-entered positions),
+  `paySkins` (`skinsCalc(g,pot,rules)` → `skinsResult`; rules kept in `pot.rules.skins`), `payDots` (`dotsAuto` counts
+  birdies/eagles from the scores, hand tallies in `pot.tally`), `payFormat` (a side game scored as another catalog
+  entry on the same scores through `sidePub` — low net, blind-draw best ball with `pot.teams` drawn in the drawer),
+  `payManual`. `addPlayer(g,o)` joins every pot except manual ones; `editGamePlayer` has per-pot checkboxes.
 - Arrays of objects carry stable `id`s — the merge (§3) matches by id. Keep it that way for anything new.
 - `_rev` (revision), `_w` (writer/client id), `_at` are bookkeeping, excluded from comparisons.
 - **Device-local, never in the shared doc:** cashier/check-in link status (`SHARE_ST`, `CKI_ST`), the cashier-link merge base (`localStorage mga_cbase_<tid>`), check-in base (`mga_ckibase_<tid>`).
@@ -128,7 +158,8 @@ Tournament = { id, name, season, days, startDate, field:[{id,memberId,team,paid,
 |---|---|
 | `mga_hub` (id, data jsonb) | one row per organization: `club`, `mga`, `lga`, `smga`, `<group id>` — and `main`, the frozen MGA Hub's row (read by the migration only). `hub-setup.sql`, `hub-fix-permissions.sql` |
 | `calcutta_share` (tid, token, name, doc, version) + RPC `calcutta_get(p_token)`, `calcutta_put(p_token,p_doc,p_version)` | token links for people without the board login: the **cashier** page (tid = tournament id) and the **registration/check-in** page (tid = tournament id + `:checkin`). `calcutta_put` is version-checked (conflict → retry). `calcutta-setup.sql` |
-| `golf_events`, `golf_scores` + RPC `golf_event`, `golf_join`, `golf_submit` | public live scoring (`golf-setup.sql`). Built but **not used** this season — don't advertise it. |
+| `golf_events`, `golf_scores` + RPC `golf_event`, `golf_join`, `golf_submit` | public live scoring (`golf-setup.sql`). `public.org` names the owning organization. |
+| `hub_keys` (org_id, key_hash, label, revoked_at) + RPC `hub_key_org/read/write/people/golf_event/golf_delete/score/share` | admin links (`admin-links-setup.sql`): security-definer functions that act for exactly one organization. |
 | `mm_tournament` | the retired Member-Member app's row (`supabase-setup.sql`). Archive only — no hub code reads or writes it. |
 
 ---
@@ -255,6 +286,14 @@ groups, printed scorecards — the printed cards include a live-scoring QR that 
   hub's import / Verify / two-way sync / "Retire current app" code was removed in Oct 2026. Stored documents may still carry `db.legacy`, `t.source` (`kind:'mm-app'`) and
   `t.sync` from that era; nothing reads them and `normalize()` leaves them alone.
 - 2026 Member-Member: Oct 2–4. 150 players / 75 teams (Team 84, Regina & Cagle, added late as Lot 75).
+- **Built Oct 2026 (admin links, dues collection, club calendar):** `admin-links-setup.sql` + key mode in core.js
+  (see §2); associations bill dues (`duesCharges`) and the club's **Dues collection** page charges/collects them; the
+  club hub opens every organization's document and shows their tournaments (calendar + fields, never their money);
+  the club has no dues and no 50/50 of its own. Tests: `test_sync.py` scenario 3 (admin link end to end against the
+  fake, incl. revoke), smoke checks for billing/collection and the club calendar.
+- **Built Oct 2026 (pots):** games hold any number of pots (finish, skins, dots, side games scored as another game,
+  by hand); small groups get Tournaments and the feature toggles; `tests/smoke.py` small-group scenario covers a
+  four-pot game end to end.
 - **Built Oct 2026 (game library):** `GAME_CATALOG` / `gameCatalog()` / `enabledGames()` / `catalogOf(pub)` in golfcore;
   the club hub's **Game library** page stores switches in `CLUB.games.disabled`; `gameOptions()` + `engineFrom(C,…)`
   (golf.js) drive the pickers in editEvent, editRound and editGame; events carry `game` (catalog id) plus the engine
@@ -274,8 +313,10 @@ groups, printed scorecards — the printed cards include a live-scoring QR that 
   the Hub's document with members → memberships; re-running updates the directory and replaces the mga row).
 - **Decided for the club hub (Oct 2026):** the club owns the master roster, seeded from the MGA list, then grown by
   importing the club software's export (merge duplicates by member number → GHIN → email → name, create the rest).
-  Sign-in stays the single shared board login for now (it is master access to every tier); individual sign-in
-  (Microsoft 365 / SSO / email) and per-tier visibility rules come later. Associations keep their own treasury; what
+  Sign-in stays the single shared board login for now (it is master access to every tier); **admin links** give a
+  small group's organizer their own hub without it; individual sign-in (Microsoft 365 / SSO / email) and per-tier
+  visibility rules come later. The club charges no dues and runs no 50/50 of its own; associations' dues are
+  collected by the club on their behalf (Dues collection) and credited to the association. Associations keep their own treasury; what
   the club may see of association finances is decided when access levels exist. One club for now; the club becomes
   a tenant in a master system later — don't hardcode WCCC where a setting will do. Small groups get a season ledger
   of money games (who is up or down, by how much).

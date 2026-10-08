@@ -45,7 +45,7 @@ const DEFAULT_ORGS=[{id:'mga',kind:'association',name:'Men’s Golf Association'
                     {id:'smga',kind:'association',name:'Senior Men’s Golf Association',short:'SMGA'}];
 const DEFAULT_ROLES=['President','Vice President','Treasurer','Secretary','Tournament Chair','Member at Large','Member at Large'];
 const ITEM_KINDS=['Meal','Drinks','Event','Other'];
-function newSeason(){ return {dues:{amount:90,installments:2},duesPayments:[],lines:[],txns:[],bank:[],bankBatches:[],bankOpening:{amount:0,date:''}}; }
+function newSeason(){ return {dues:{amount:90,installments:2},duesPayments:[],duesCharges:[],lines:[],txns:[],bank:[],bankBatches:[],bankOpening:{amount:0,date:''}}; }
 function emptyOrg(meta){
   meta=meta||CLUB_META; const y=String(new Date().getFullYear());
   const d={v:HUB_VERSION,id:meta.id,kind:meta.kind||'association',name:meta.name||'',short:meta.short||'',activeSeason:y,memberships:[],
@@ -71,7 +71,7 @@ function normalize(d,meta){
   if(d.kind==='club'){ d.members=d.members||[]; d.orgs=d.orgs||[]; d.members.forEach(p=>{ if(!p.status) p.status='Active'; }); }
   if(!d.activeSeason) d.activeSeason=String(new Date().getFullYear());
   if(!d.seasons[d.activeSeason]) d.seasons[d.activeSeason]=newSeason();
-  for(const s of Object.values(d.seasons)){ s.dues=s.dues||{amount:90,installments:2}; s.duesPayments=s.duesPayments||[]; s.lines=s.lines||[]; s.txns=s.txns||[]; s.bank=s.bank||[]; s.bankBatches=s.bankBatches||[]; s.bankOpening=s.bankOpening||{amount:0,date:''}; }
+  for(const s of Object.values(d.seasons)){ s.dues=s.dues||{amount:90,installments:2}; s.duesPayments=s.duesPayments||[]; s.duesCharges=s.duesCharges||[]; s.lines=s.lines||[]; s.txns=s.txns||[]; s.bank=s.bank||[]; s.bankBatches=s.bankBatches||[]; s.bankOpening=s.bankOpening||{amount:0,date:''}; }
   for(const t of d.tournaments){
     t.dayItems=t.dayItems||[[],[],[]]; while(t.dayItems.length<3) t.dayItems.push([]);
     for(const k of ['field','sponsors','tiers','income','perPlayer','lines','schedule','decisions','fieldQuestions']) t[k]=t[k]||[];
@@ -130,7 +130,7 @@ function seasonTournaments(y){ return db.tournaments.filter(t=>t.season===y).sor
 function scalc(y){
   const s=db.seasons[y]||newSeason(), ts=seasonTournaments(y).map(t=>({t,c:tcalc(t)}));
   const active=members().filter(m=>m.status!=='Inactive').length;
-  const duesBudget=active*n0(s.dues.amount), duesActual=sum(s.duesPayments,p=>p.amount);
+  const duesBudget=isClub()?0:active*n0(s.dues.amount), duesActual=isClub()?0:sum(s.duesPayments,p=>p.amount);
   const incLines=s.lines.filter(l=>l.type==='Income'), expLines=s.lines.filter(l=>l.type!=='Income');
   const tRev=sum(ts,x=>x.c.revenue), tExp=sum(ts,x=>x.c.expenses), tRevA=sum(ts,x=>x.c.revenueA), tExpA=sum(ts,x=>x.c.expensesA);
   const revenue=tRev+duesBudget+sum(incLines,l=>l.budget), expenses=tExp+sum(expLines,l=>l.budget);
@@ -174,19 +174,28 @@ const membershipOf=id=>isClub()||!db?null:(db.memberships||[]).find(m=>m.id===id
 function memberById(id){ const p=personById(id); return p?memberView(p,membershipOf(id)):undefined; }
 /* create or update a person (club directory) and, in an association / group, their membership here.
    `data` mixes person fields and status / joined / notes; in the club the latter are the person's club status. */
-function upsertMember(id,data){
+function upsertMember(id,data,opt){
   const pf={}, mf={};
   for(const k of Object.keys(data||{})){ if(isClub()||PERSON_KEYS.includes(k)) pf[k]=data[k]; else mf[k]=data[k]; }
   let p=id?personById(id):null;
   if(!p){ p=Object.assign({id:id||uid(),status:'Active'},pf); CLUB.members.push(p); } else Object.assign(p,pf);
-  if(!isClub()){ let m=membershipOf(p.id); if(!m){ m={id:p.id,status:'Active',joined:'',notes:''}; db.memberships.push(m); } Object.assign(m,mf); }
+  if(!isClub()){ let m=membershipOf(p.id); if(!m){ m={id:p.id,status:'Active',joined:'',notes:''}; db.memberships.push(m); Object.assign(m,mf); if(!(opt&&opt.noBill)&&m.status!=='Inactive') billNewMember(p.id); } else Object.assign(m,mf); }
   return p;
 }
+/* ---------- dues collected by the club ----------
+   An association bills dues as charges; the club hub lists every open charge, puts it on the member's club account
+   and marks it collected, which records the payment in the association's books. The club keeps none of it. */
+const duesDesc=(y,short)=>`${y} ${short} dues`;
+function addDuesCharge(s,memberId,amount,desc){ const c={id:uid(),memberId,amount:n0(amount),desc,date:new Date().toISOString().slice(0,10),status:'open',chargedAt:'',collectedAt:''}; s.duesCharges.push(c); return c; }
+function billNewMember(memberId){ if(db.kind!=='association') return null; const y=Y(), s=db.seasons[y]; if(!s||!n0(s.dues.amount)||s.dues.autoBill===false) return null;
+  if(s.duesCharges.some(c=>c.memberId===memberId&&c.status!=='collected')||memberDues(y,memberId)>=n0(s.dues.amount)) return null;
+  return addDuesCharge(s,memberId,s.dues.amount,duesDesc(y,orgShort())); }
+const memberCharges=(y,mid)=>{ const s=db.seasons[y]; return s?s.duesCharges.filter(c=>c.memberId===mid):[]; };
 /* in an association / group this only ends the membership; the person stays in the club directory */
 function removeMember(id){
   if(isClub()) CLUB.members=CLUB.members.filter(p=>p.id!==id); else db.memberships=db.memberships.filter(m=>m.id!==id);
   db.board.forEach(b=>{ if(b.memberId===id) b.memberId=''; }); db.tournaments.forEach(t=>t.field=t.field.filter(p=>p.memberId!==id));
-  for(const ss of Object.values(db.seasons)) ss.duesPayments=ss.duesPayments.filter(p=>p.memberId!==id);
+  for(const ss of Object.values(db.seasons)){ ss.duesPayments=ss.duesPayments.filter(p=>p.memberId!==id); ss.duesCharges=(ss.duesCharges||[]).filter(c=>c.memberId!==id||c.status==='collected'); }
 }
 const memberSnapshot=()=>({persons:clone(CLUB.members),ms:isClub()?null:clone(db.memberships)});
 function memberRestore(sn){ CLUB.members=sn.persons; if(sn.ms) db.memberships=sn.ms; }
@@ -210,6 +219,17 @@ const SITE_BASE=HTTP?location.origin+'/':location.href.split('#')[0].split('?')[
 let ORG_ID=(()=>{ const q=new URLSearchParams(location.search).get('org');
   if(HTTP){ const seg=location.pathname.split('/').filter(s=>s&&!/\.html?$/i.test(s)); return (seg[0]||q||'club').toLowerCase(); }
   return q!=null?q:''; })();
+/* Admin links: /<org>#key=TOKEN. The token stays on this device; without a board sign-in the page then reads and
+   writes that one organization's row (and reads the directory) through the hub_key_* database functions — nothing
+   else is reachable. The club hub creates and revokes these links under Organizations. */
+const KEY_LS='club_hub_key';
+let HUBKEY=(()=>{ try{ const m=location.hash.match(/key=([A-Za-z0-9_-]{16,})/);
+  if(m){ const k={org:ORG_ID,key:m[1]}; localStorage.setItem(KEY_LS,JSON.stringify(k)); try{ history.replaceState(null,'',location.href.split('#')[0]); }catch(_){} return k; }
+  return JSON.parse(localStorage.getItem(KEY_LS)||'null'); }catch(_){ return null; } })();
+let KEYMODE=false;   // set at boot when there is no board session and a key for this organization
+function dropKey(){ try{ localStorage.removeItem(KEY_LS); }catch(_){} HUBKEY=null; }
+/* one call to a hub_key_* function; resolves {data,error} like supabase-js */
+function keyRPC(fn,args){ return sb.rpc(fn,Object.assign({p_key:HUBKEY&&HUBKEY.key},args||{})); }
 const DOCS={};   // id → {id, meta, db, base, pushing, pushAgain, saveT, st, err, chan}
 function docState(id,meta){ const D=DOCS[id]||(DOCS[id]={id,meta:null,db:null,base:null,pushing:false,pushAgain:false,saveT:null,st:'local',err:null,chan:null}); if(meta) D.meta=meta; return D; }
 const openDocs=()=>Object.values(DOCS).filter(D=>D.db);
@@ -219,11 +239,15 @@ let CLUB=null, db=null;
 function openLocal(){
   const C=docState('club',CLUB_META); if(!C.db) C.db=normalize(store.load('club'),CLUB_META); CLUB=C.db;
   if(!CLOUD){ if(!CLUB.orgs.length) CLUB.orgs=clone(DEFAULT_ORGS); if(!ORG_ID) ORG_ID='mga'; }
-  if(ORG_ID==='club') db=CLUB;
+  if(ORG_ID==='club'){ db=CLUB; for(const o of CLUB.orgs) if(!o.archived){ const D=docState(o.id,o); if(!D.db) D.db=normalize(store.load(o.id),o); } }
   else if(ORG_ID){ const meta=orgMeta(ORG_ID); if(meta){ const D=docState(ORG_ID,meta); if(!D.db) D.db=normalize(store.load(ORG_ID),meta); db=D.db; } else db=null; }   // unknown here until the club document loads
   else db=null;
 }
 openLocal();
+/* the club hub keeps every organization's document open (read for the calendar and dues collection; the club
+   writes to them only to record collected dues) */
+const orgDocs=()=>(CLUB&&CLUB.orgs||[]).filter(o=>!o.archived&&DOCS[o.id]&&DOCS[o.id].db).map(o=>({meta:o,db:DOCS[o.id].db}));
+async function openOrgDocs(){ if(ORG_ID!=='club'||!CLUB) return; for(const o of CLUB.orgs){ if(o.archived||(DOCS[o.id]&&DOCS[o.id].base)) continue; try{ await loadDoc(o.id,o,{create:true}); }catch(_){} } }
 /* choose an organization (reload keeps every module's state clean) */
 function chooseOrg(id){ if(HTTP){ location.href=SITE_BASE+(id&&id!=='club'?encodeURIComponent(id):''); return; } const u=new URL(location.href); if(id) u.searchParams.set('org',id); else u.searchParams.delete('org'); location.href=u.toString(); }
 const orgURL=id=>HTTP?SITE_BASE.replace(/^https?:\/\//,'')+(id==='club'?'':id):'?org='+id;
@@ -307,24 +331,38 @@ function persist(){
 function pushAll(){ openDocs().forEach(D=>pushCloud(D)); }
 /* safe to reload for an update: nothing unsaved, not mid-save, no editor open */
 window.__canReload=()=>!(typeof drawerOpen==='function'&&drawerOpen())&&openDocs().every(D=>!D.pushing&&(!CLOUD||!sessionOK||!D.base||!docChanged(D)));
-async function fetchRow(id){ const {data:row,error}=await sb.from('mga_hub').select('data').eq('id',id).maybeSingle(); if(error) throw error; return row&&row.data; }
+async function fetchRow(id){
+  if(KEYMODE){ const {data,error}=await keyRPC('hub_key_read',{p_id:id}); if(error) throw error; return data||null; }
+  const {data:row,error}=await sb.from('mga_hub').select('data').eq('id',id).maybeSingle(); if(error) throw error; return row&&row.data; }
+/* key mode: the group may add people to the directory, never change them; the club document itself is read-only */
+async function pushPeople(D){
+  const have=new Set((D.base&&D.base.members||[]).map(p=>p.id)), add=(D.db.members||[]).filter(p=>!have.has(p.id));
+  if(add.length){ const {error}=await keyRPC('hub_key_people',{p_people:add}); if(error){ setSyncD(D,'offline',error); return; } }
+  const remote=await fetchRow('club'); if(remote){ D.base=JSON.parse(JSON.stringify(remote)); syncTo(D.db,normalize(JSON.parse(JSON.stringify(remote)),D.meta)); D.db._rev=remote._rev; store.save(D.id,D.db); }
+  setSyncD(D,'synced');
+}
 async function pushCloud(D){
   if(D.pushing){ D.pushAgain=true; return; }
   if(D.base&&!docChanged(D)){ setSyncD(D,'synced'); return; }        // nothing actually changed: don't write (or ping anyone)
   D.pushing=true;
   try{
+    if(KEYMODE&&D.id==='club'){ await pushPeople(D); return; }
     for(let n=0;n<6;n++){
       const rev=D.base&&D.base._rev!=null?+D.base._rev:null;
       // a frozen copy of exactly what we send — edits made while it's in flight must not be mistaken for saved
       const next=JSON.parse(JSON.stringify(Object.assign({},D.db,{_rev:(rev||0)+1,_w:CLIENT,_at:Date.now()})));
-      let q=sb.from('mga_hub').update({data:next,updated_at:new Date().toISOString()}).eq('id',D.id);
-      q=rev==null?q.is('data->>_rev',null):q.eq('data->>_rev',String(rev));
-      const {data:rows,error}=await q.select('id');
-      if(error){ setSyncD(D,'offline',error); return; }
-      if(rows&&rows.length){ D.base=next; D.db._rev=next._rev; store.save(D.id,D.db);
+      let landed;
+      if(KEYMODE){ const {data,error}=await keyRPC('hub_key_write',{p_id:D.id,p_data:next,p_rev:rev}); if(error){ setSyncD(D,'offline',error); return; } landed=!!data; }
+      else { let q=sb.from('mga_hub').update({data:next,updated_at:new Date().toISOString()}).eq('id',D.id);
+        q=rev==null?q.is('data->>_rev',null):q.eq('data->>_rev',String(rev));
+        const {data:rows,error}=await q.select('id');
+        if(error){ setSyncD(D,'offline',error); return; }
+        landed=!!(rows&&rows.length); }
+      if(landed){ D.base=next; D.db._rev=next._rev; store.save(D.id,D.db);
         if(bare(D.db)!==bare(next)){ D.pushAgain=true; setSyncD(D,'saving'); } else setSyncD(D,'synced'); return; }
       // someone saved since we last looked (or the row doesn't exist yet): merge theirs into ours and try again
       const remote=await fetchRow(D.id);
+      if(!remote&&KEYMODE){ setSyncD(D,'offline',{message:'This organization has not been set up by the club yet'}); return; }
       if(!remote){ const {error:e2}=await sb.from('mga_hub').upsert({id:D.id,data:next,updated_at:new Date().toISOString()}); if(e2){ setSyncD(D,'offline',e2); return; }
         D.base=JSON.parse(JSON.stringify(next)); D.db._rev=next._rev; store.save(D.id,D.db); setSyncD(D,'synced'); return; }
       mergeIn(D,remote,{quiet:true});
@@ -362,7 +400,7 @@ async function loadDoc(id,meta,opt){
   watchDoc(D); return D.db;
 }
 function watchDoc(D){
-  if(D.chan||!CLOUD) return;
+  if(D.chan||!CLOUD||KEYMODE) return;   // key mode has no realtime (anonymous): the poll below carries updates
   D.chan=sb.channel('hub-'+D.id).on('postgres_changes',{event:'*',schema:'public',table:'mga_hub',filter:'id=eq.'+D.id},p=>{
     const r=p.new&&p.new.data; if(!r||r._w===CLIENT&&D.base&&r._rev===D.base._rev) return; applyRemote(D,r);
   }).subscribe();
@@ -370,22 +408,25 @@ function watchDoc(D){
 let pollStarted=false;
 function startPoll(){
   if(pollStarted) return; pollStarted=true;
-  const check=async()=>{ for(const D of openDocs()){ if(D.pushing||!D.chan) continue; try{ const r=await fetchRow(D.id); if(r&&(!D.base||r._rev!==D.base._rev)) applyRemote(D,r); }catch(_){} } };
+  const check=async()=>{ for(const D of openDocs()){ if(D.pushing||!(D.chan||KEYMODE)) continue; try{ const r=await fetchRow(D.id); if(r&&(!D.base||r._rev!==D.base._rev)) applyRemote(D,r); }catch(_){} } };
   document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='visible') check(); });
   setInterval(()=>{ if(document.visibilityState==='visible') check(); },15000);   // a safety net if a live update is missed
 }
 async function startCloud(){
   paintSync('saving');
   try{
+    if(KEYMODE&&ORG_ID!==HUBKEY.org){ chooseOrg(HUBKEY.org); return; }       // the link is for one organization only
     const club=await loadDoc('club',CLUB_META);
     cloudReady=true;
     if(!club){ setupNeeded=true; CLUB=null; db=null; render(); return; }          // first run: the club hasn't been set up yet
     setupNeeded=false; CLUB=club;
-    if(ORG_ID==='club') db=CLUB;
-    else if(ORG_ID){ const meta=orgMeta(ORG_ID); if(meta&&!meta.archived) db=await loadDoc(ORG_ID,meta,{create:true}); else db=null; }
+    if(ORG_ID==='club'){ db=CLUB; await openOrgDocs(); }
+    else if(ORG_ID){ const meta=orgMeta(ORG_ID); if(meta&&!meta.archived) db=await loadDoc(ORG_ID,meta,{create:!KEYMODE}); else db=null; }
     else db=null;
     render(); startPoll();
-  }catch(error){ setSync('offline',/relation|does not exist/i.test(error.message||'')?{message:'The mga_hub table is missing — run hub-setup.sql in Supabase'}:error); render(); }
+  }catch(error){
+    if(KEYMODE&&/invalid key|not allowed|permission|42501/i.test((error&&(error.message+' '+error.code))||'')){ dropKey(); if(typeof keyRejected==='function') keyRejected(); return; }
+    setSync('offline',/relation|does not exist/i.test(error.message||'')?{message:'The mga_hub table is missing — run hub-setup.sql in Supabase'}:error); render(); }
 }
 /* ---------- one-time set-up / re-import from the MGA Hub (the `main` row) ----------
    Builds the club directory from the MGA's member list (same ids, so fields, boards and Calcuttas keep working),

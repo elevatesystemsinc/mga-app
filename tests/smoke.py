@@ -56,11 +56,28 @@ async def main():
         print('member add via association', r, 'OK' if ok else 'FAIL'); bad+=not ok
         r=await pg.evaluate("()=>{ removeMember(members()[0].id); return {dir:CLUB.members.length, ms:db.memberships.length}; }")
         ok=r=={'dir':5,'ms':4}; print('remove from association keeps the person', r, 'OK' if ok else 'FAIL'); bad+=not ok
+        # dues billed through the club: Ada was billed automatically on joining; Bill dues covers the rest who owe
+        r=await pg.evaluate("""()=>{ const s=db.seasons[Y()]; const auto=s.duesCharges.length; billDues(); const n=document.querySelectorAll('#dBody .mr').length; document.getElementById('dSave').click();
+          return {auto, listed:n, charges:s.duesCharges.map(c=>[c.amount,c.status,c.desc]), owing:members().filter(m=>m.status!=='Inactive'&&memberDues(Y(),m.id)<n0(s.dues.amount)).length}; }""")
+        ok=r['auto']==1 and r['charges'] and all(c[1]=='open' and c[2]==f"{2026} MGA dues" for c in r['charges']) and len(r['charges'])==r['owing']+0 and r['listed']==r['owing']-1
+        print('bill dues through the club', r, 'OK' if ok else 'FAIL'); bad+=not ok
       if org=='club':
         r=await pg.evaluate("""()=>{ go('orgs'); editOrg(null,'group'); document.getElementById('ogN').value='The Misfits'; document.getElementById('ogS').value='Misfits'; document.getElementById('dSave').click();
           const o=CLUB.orgs.find(x=>x.id==='misfits'); db=null; render(); const cards=[...document.querySelectorAll('[data-org]')].map(b=>b.dataset.org); return {o, cards}; }""")
         ok=r['o'] and r['o']['kind']=='group' and r['cards']==['club','mga','lga','smga','misfits']
         print('new small group + picker', r, 'OK' if ok else 'FAIL'); bad+=not ok
+        pg.on('dialog',lambda d:asyncio.ensure_future(d.accept()))
+        # each page is its own browser context, so bill from the MGA in this page, then come back to the club
+        await pg.goto(page('index.html')+'?org=mga'); await pg.wait_for_timeout(400)
+        await pg.evaluate("()=>{ ['Ann Able 4.1','Bo Baker 12.0','Cy Cole 20.3'].forEach((x,i)=>{ const [f,l,h]=x.split(' '); CLUB.members.push({id:'c'+i,first:f,last:l,hcp:h,status:'Active'}); db.memberships.push({id:'c'+i,status:'Active',joined:'',notes:''}); }); db.tournaments.push(newTournament({name:'MGA Open',season:Y(),startDate:'2026-11-01',days:1})); billDues(); document.getElementById('dSave').click(); }")
+        await pg.goto(page('index.html')+'?org=club'); await pg.wait_for_timeout(400)
+        r=await pg.evaluate("""()=>{ go('collections'); const open=document.querySelectorAll('[data-ch]').length; document.getElementById('clCharge').click(); view.cfilter='charged'; render();
+          const first=document.querySelector('[data-co]'); const id=first.dataset.co; first.click(); view.cfilter='all'; render();
+          const mga=DOCS.mga.db, s=mga.seasons[Y()], c=s.duesCharges.find(x=>x.id===id), pay=s.duesPayments.find(p=>p.chargeId===id);
+          go('tournaments'); const orgRows=document.querySelectorAll('[data-org]').length; go('budget'); const noDues=!document.getElementById('sbDues')&&!document.getElementById('main').textContent.includes('50/50 raffle');
+          return {open, statuses:s.duesCharges.map(x=>x.status), c:[c.status,!!c.chargedAt,!!c.collectedAt], pay:pay&&[pay.amount,pay.method], orgRows, noDues, raffleOff:!featuresHTML('x',{}).includes('50/50')}; }""")
+        ok=r['open']>=2 and r['statuses'].count('collected')==1 and r['statuses'].count('charged')==r['open']-1 and r['c']==['collected',True,True] and r['pay']==[r['pay'][0],'Club account'] and r['orgRows']>=1 and r['noDues'] and r['raffleOff']
+        print('club collects dues + sees the calendar, no club dues/raffle', r, 'OK' if ok else 'FAIL'); bad+=not ok
       print('  errors after checks', errs); bad+=bool(errs)
     # --- small group: games, live scoring, payouts by finish + skins, ledger
     pg=await b.new_page(); errs=[]; pg.on('pageerror',lambda e,errs=errs:errs.append(str(e))); await local(pg); await pg.goto(page('index.html')+'?org=club'); await pg.wait_for_timeout(500)

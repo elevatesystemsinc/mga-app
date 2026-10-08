@@ -397,7 +397,7 @@ const DEFAULT_ORGS=[{id:'mga',kind:'association',name:'Men’s Golf Association'
                     {id:'smga',kind:'association',name:'Senior Men’s Golf Association',short:'SMGA'}];
 const DEFAULT_ROLES=['President','Vice President','Treasurer','Secretary','Tournament Chair','Member at Large','Member at Large'];
 const ITEM_KINDS=['Meal','Drinks','Event','Other'];
-function newSeason(){ return {dues:{amount:90,installments:2},duesPayments:[],lines:[],txns:[],bank:[],bankBatches:[],bankOpening:{amount:0,date:''}}; }
+function newSeason(){ return {dues:{amount:90,installments:2},duesPayments:[],duesCharges:[],lines:[],txns:[],bank:[],bankBatches:[],bankOpening:{amount:0,date:''}}; }
 function emptyOrg(meta){
   meta=meta||CLUB_META; const y=String(new Date().getFullYear());
   const d={v:HUB_VERSION,id:meta.id,kind:meta.kind||'association',name:meta.name||'',short:meta.short||'',activeSeason:y,memberships:[],
@@ -423,7 +423,7 @@ function normalize(d,meta){
   if(d.kind==='club'){ d.members=d.members||[]; d.orgs=d.orgs||[]; d.members.forEach(p=>{ if(!p.status) p.status='Active'; }); }
   if(!d.activeSeason) d.activeSeason=String(new Date().getFullYear());
   if(!d.seasons[d.activeSeason]) d.seasons[d.activeSeason]=newSeason();
-  for(const s of Object.values(d.seasons)){ s.dues=s.dues||{amount:90,installments:2}; s.duesPayments=s.duesPayments||[]; s.lines=s.lines||[]; s.txns=s.txns||[]; s.bank=s.bank||[]; s.bankBatches=s.bankBatches||[]; s.bankOpening=s.bankOpening||{amount:0,date:''}; }
+  for(const s of Object.values(d.seasons)){ s.dues=s.dues||{amount:90,installments:2}; s.duesPayments=s.duesPayments||[]; s.duesCharges=s.duesCharges||[]; s.lines=s.lines||[]; s.txns=s.txns||[]; s.bank=s.bank||[]; s.bankBatches=s.bankBatches||[]; s.bankOpening=s.bankOpening||{amount:0,date:''}; }
   for(const t of d.tournaments){
     t.dayItems=t.dayItems||[[],[],[]]; while(t.dayItems.length<3) t.dayItems.push([]);
     for(const k of ['field','sponsors','tiers','income','perPlayer','lines','schedule','decisions','fieldQuestions']) t[k]=t[k]||[];
@@ -482,7 +482,7 @@ function seasonTournaments(y){ return db.tournaments.filter(t=>t.season===y).sor
 function scalc(y){
   const s=db.seasons[y]||newSeason(), ts=seasonTournaments(y).map(t=>({t,c:tcalc(t)}));
   const active=members().filter(m=>m.status!=='Inactive').length;
-  const duesBudget=active*n0(s.dues.amount), duesActual=sum(s.duesPayments,p=>p.amount);
+  const duesBudget=isClub()?0:active*n0(s.dues.amount), duesActual=isClub()?0:sum(s.duesPayments,p=>p.amount);
   const incLines=s.lines.filter(l=>l.type==='Income'), expLines=s.lines.filter(l=>l.type!=='Income');
   const tRev=sum(ts,x=>x.c.revenue), tExp=sum(ts,x=>x.c.expenses), tRevA=sum(ts,x=>x.c.revenueA), tExpA=sum(ts,x=>x.c.expensesA);
   const revenue=tRev+duesBudget+sum(incLines,l=>l.budget), expenses=tExp+sum(expLines,l=>l.budget);
@@ -526,19 +526,28 @@ const membershipOf=id=>isClub()||!db?null:(db.memberships||[]).find(m=>m.id===id
 function memberById(id){ const p=personById(id); return p?memberView(p,membershipOf(id)):undefined; }
 /* create or update a person (club directory) and, in an association / group, their membership here.
    `data` mixes person fields and status / joined / notes; in the club the latter are the person's club status. */
-function upsertMember(id,data){
+function upsertMember(id,data,opt){
   const pf={}, mf={};
   for(const k of Object.keys(data||{})){ if(isClub()||PERSON_KEYS.includes(k)) pf[k]=data[k]; else mf[k]=data[k]; }
   let p=id?personById(id):null;
   if(!p){ p=Object.assign({id:id||uid(),status:'Active'},pf); CLUB.members.push(p); } else Object.assign(p,pf);
-  if(!isClub()){ let m=membershipOf(p.id); if(!m){ m={id:p.id,status:'Active',joined:'',notes:''}; db.memberships.push(m); } Object.assign(m,mf); }
+  if(!isClub()){ let m=membershipOf(p.id); if(!m){ m={id:p.id,status:'Active',joined:'',notes:''}; db.memberships.push(m); Object.assign(m,mf); if(!(opt&&opt.noBill)&&m.status!=='Inactive') billNewMember(p.id); } else Object.assign(m,mf); }
   return p;
 }
+/* ---------- dues collected by the club ----------
+   An association bills dues as charges; the club hub lists every open charge, puts it on the member's club account
+   and marks it collected, which records the payment in the association's books. The club keeps none of it. */
+const duesDesc=(y,short)=>`${y} ${short} dues`;
+function addDuesCharge(s,memberId,amount,desc){ const c={id:uid(),memberId,amount:n0(amount),desc,date:new Date().toISOString().slice(0,10),status:'open',chargedAt:'',collectedAt:''}; s.duesCharges.push(c); return c; }
+function billNewMember(memberId){ if(db.kind!=='association') return null; const y=Y(), s=db.seasons[y]; if(!s||!n0(s.dues.amount)||s.dues.autoBill===false) return null;
+  if(s.duesCharges.some(c=>c.memberId===memberId&&c.status!=='collected')||memberDues(y,memberId)>=n0(s.dues.amount)) return null;
+  return addDuesCharge(s,memberId,s.dues.amount,duesDesc(y,orgShort())); }
+const memberCharges=(y,mid)=>{ const s=db.seasons[y]; return s?s.duesCharges.filter(c=>c.memberId===mid):[]; };
 /* in an association / group this only ends the membership; the person stays in the club directory */
 function removeMember(id){
   if(isClub()) CLUB.members=CLUB.members.filter(p=>p.id!==id); else db.memberships=db.memberships.filter(m=>m.id!==id);
   db.board.forEach(b=>{ if(b.memberId===id) b.memberId=''; }); db.tournaments.forEach(t=>t.field=t.field.filter(p=>p.memberId!==id));
-  for(const ss of Object.values(db.seasons)) ss.duesPayments=ss.duesPayments.filter(p=>p.memberId!==id);
+  for(const ss of Object.values(db.seasons)){ ss.duesPayments=ss.duesPayments.filter(p=>p.memberId!==id); ss.duesCharges=(ss.duesCharges||[]).filter(c=>c.memberId!==id||c.status==='collected'); }
 }
 const memberSnapshot=()=>({persons:clone(CLUB.members),ms:isClub()?null:clone(db.memberships)});
 function memberRestore(sn){ CLUB.members=sn.persons; if(sn.ms) db.memberships=sn.ms; }
@@ -562,6 +571,17 @@ const SITE_BASE=HTTP?location.origin+'/':location.href.split('#')[0].split('?')[
 let ORG_ID=(()=>{ const q=new URLSearchParams(location.search).get('org');
   if(HTTP){ const seg=location.pathname.split('/').filter(s=>s&&!/\.html?$/i.test(s)); return (seg[0]||q||'club').toLowerCase(); }
   return q!=null?q:''; })();
+/* Admin links: /<org>#key=TOKEN. The token stays on this device; without a board sign-in the page then reads and
+   writes that one organization's row (and reads the directory) through the hub_key_* database functions — nothing
+   else is reachable. The club hub creates and revokes these links under Organizations. */
+const KEY_LS='club_hub_key';
+let HUBKEY=(()=>{ try{ const m=location.hash.match(/key=([A-Za-z0-9_-]{16,})/);
+  if(m){ const k={org:ORG_ID,key:m[1]}; localStorage.setItem(KEY_LS,JSON.stringify(k)); try{ history.replaceState(null,'',location.href.split('#')[0]); }catch(_){} return k; }
+  return JSON.parse(localStorage.getItem(KEY_LS)||'null'); }catch(_){ return null; } })();
+let KEYMODE=false;   // set at boot when there is no board session and a key for this organization
+function dropKey(){ try{ localStorage.removeItem(KEY_LS); }catch(_){} HUBKEY=null; }
+/* one call to a hub_key_* function; resolves {data,error} like supabase-js */
+function keyRPC(fn,args){ return sb.rpc(fn,Object.assign({p_key:HUBKEY&&HUBKEY.key},args||{})); }
 const DOCS={};   // id → {id, meta, db, base, pushing, pushAgain, saveT, st, err, chan}
 function docState(id,meta){ const D=DOCS[id]||(DOCS[id]={id,meta:null,db:null,base:null,pushing:false,pushAgain:false,saveT:null,st:'local',err:null,chan:null}); if(meta) D.meta=meta; return D; }
 const openDocs=()=>Object.values(DOCS).filter(D=>D.db);
@@ -571,11 +591,15 @@ let CLUB=null, db=null;
 function openLocal(){
   const C=docState('club',CLUB_META); if(!C.db) C.db=normalize(store.load('club'),CLUB_META); CLUB=C.db;
   if(!CLOUD){ if(!CLUB.orgs.length) CLUB.orgs=clone(DEFAULT_ORGS); if(!ORG_ID) ORG_ID='mga'; }
-  if(ORG_ID==='club') db=CLUB;
+  if(ORG_ID==='club'){ db=CLUB; for(const o of CLUB.orgs) if(!o.archived){ const D=docState(o.id,o); if(!D.db) D.db=normalize(store.load(o.id),o); } }
   else if(ORG_ID){ const meta=orgMeta(ORG_ID); if(meta){ const D=docState(ORG_ID,meta); if(!D.db) D.db=normalize(store.load(ORG_ID),meta); db=D.db; } else db=null; }   // unknown here until the club document loads
   else db=null;
 }
 openLocal();
+/* the club hub keeps every organization's document open (read for the calendar and dues collection; the club
+   writes to them only to record collected dues) */
+const orgDocs=()=>(CLUB&&CLUB.orgs||[]).filter(o=>!o.archived&&DOCS[o.id]&&DOCS[o.id].db).map(o=>({meta:o,db:DOCS[o.id].db}));
+async function openOrgDocs(){ if(ORG_ID!=='club'||!CLUB) return; for(const o of CLUB.orgs){ if(o.archived||(DOCS[o.id]&&DOCS[o.id].base)) continue; try{ await loadDoc(o.id,o,{create:true}); }catch(_){} } }
 /* choose an organization (reload keeps every module's state clean) */
 function chooseOrg(id){ if(HTTP){ location.href=SITE_BASE+(id&&id!=='club'?encodeURIComponent(id):''); return; } const u=new URL(location.href); if(id) u.searchParams.set('org',id); else u.searchParams.delete('org'); location.href=u.toString(); }
 const orgURL=id=>HTTP?SITE_BASE.replace(/^https?:\/\//,'')+(id==='club'?'':id):'?org='+id;
@@ -659,24 +683,38 @@ function persist(){
 function pushAll(){ openDocs().forEach(D=>pushCloud(D)); }
 /* safe to reload for an update: nothing unsaved, not mid-save, no editor open */
 window.__canReload=()=>!(typeof drawerOpen==='function'&&drawerOpen())&&openDocs().every(D=>!D.pushing&&(!CLOUD||!sessionOK||!D.base||!docChanged(D)));
-async function fetchRow(id){ const {data:row,error}=await sb.from('mga_hub').select('data').eq('id',id).maybeSingle(); if(error) throw error; return row&&row.data; }
+async function fetchRow(id){
+  if(KEYMODE){ const {data,error}=await keyRPC('hub_key_read',{p_id:id}); if(error) throw error; return data||null; }
+  const {data:row,error}=await sb.from('mga_hub').select('data').eq('id',id).maybeSingle(); if(error) throw error; return row&&row.data; }
+/* key mode: the group may add people to the directory, never change them; the club document itself is read-only */
+async function pushPeople(D){
+  const have=new Set((D.base&&D.base.members||[]).map(p=>p.id)), add=(D.db.members||[]).filter(p=>!have.has(p.id));
+  if(add.length){ const {error}=await keyRPC('hub_key_people',{p_people:add}); if(error){ setSyncD(D,'offline',error); return; } }
+  const remote=await fetchRow('club'); if(remote){ D.base=JSON.parse(JSON.stringify(remote)); syncTo(D.db,normalize(JSON.parse(JSON.stringify(remote)),D.meta)); D.db._rev=remote._rev; store.save(D.id,D.db); }
+  setSyncD(D,'synced');
+}
 async function pushCloud(D){
   if(D.pushing){ D.pushAgain=true; return; }
   if(D.base&&!docChanged(D)){ setSyncD(D,'synced'); return; }        // nothing actually changed: don't write (or ping anyone)
   D.pushing=true;
   try{
+    if(KEYMODE&&D.id==='club'){ await pushPeople(D); return; }
     for(let n=0;n<6;n++){
       const rev=D.base&&D.base._rev!=null?+D.base._rev:null;
       // a frozen copy of exactly what we send — edits made while it's in flight must not be mistaken for saved
       const next=JSON.parse(JSON.stringify(Object.assign({},D.db,{_rev:(rev||0)+1,_w:CLIENT,_at:Date.now()})));
-      let q=sb.from('mga_hub').update({data:next,updated_at:new Date().toISOString()}).eq('id',D.id);
-      q=rev==null?q.is('data->>_rev',null):q.eq('data->>_rev',String(rev));
-      const {data:rows,error}=await q.select('id');
-      if(error){ setSyncD(D,'offline',error); return; }
-      if(rows&&rows.length){ D.base=next; D.db._rev=next._rev; store.save(D.id,D.db);
+      let landed;
+      if(KEYMODE){ const {data,error}=await keyRPC('hub_key_write',{p_id:D.id,p_data:next,p_rev:rev}); if(error){ setSyncD(D,'offline',error); return; } landed=!!data; }
+      else { let q=sb.from('mga_hub').update({data:next,updated_at:new Date().toISOString()}).eq('id',D.id);
+        q=rev==null?q.is('data->>_rev',null):q.eq('data->>_rev',String(rev));
+        const {data:rows,error}=await q.select('id');
+        if(error){ setSyncD(D,'offline',error); return; }
+        landed=!!(rows&&rows.length); }
+      if(landed){ D.base=next; D.db._rev=next._rev; store.save(D.id,D.db);
         if(bare(D.db)!==bare(next)){ D.pushAgain=true; setSyncD(D,'saving'); } else setSyncD(D,'synced'); return; }
       // someone saved since we last looked (or the row doesn't exist yet): merge theirs into ours and try again
       const remote=await fetchRow(D.id);
+      if(!remote&&KEYMODE){ setSyncD(D,'offline',{message:'This organization has not been set up by the club yet'}); return; }
       if(!remote){ const {error:e2}=await sb.from('mga_hub').upsert({id:D.id,data:next,updated_at:new Date().toISOString()}); if(e2){ setSyncD(D,'offline',e2); return; }
         D.base=JSON.parse(JSON.stringify(next)); D.db._rev=next._rev; store.save(D.id,D.db); setSyncD(D,'synced'); return; }
       mergeIn(D,remote,{quiet:true});
@@ -714,7 +752,7 @@ async function loadDoc(id,meta,opt){
   watchDoc(D); return D.db;
 }
 function watchDoc(D){
-  if(D.chan||!CLOUD) return;
+  if(D.chan||!CLOUD||KEYMODE) return;   // key mode has no realtime (anonymous): the poll below carries updates
   D.chan=sb.channel('hub-'+D.id).on('postgres_changes',{event:'*',schema:'public',table:'mga_hub',filter:'id=eq.'+D.id},p=>{
     const r=p.new&&p.new.data; if(!r||r._w===CLIENT&&D.base&&r._rev===D.base._rev) return; applyRemote(D,r);
   }).subscribe();
@@ -722,22 +760,25 @@ function watchDoc(D){
 let pollStarted=false;
 function startPoll(){
   if(pollStarted) return; pollStarted=true;
-  const check=async()=>{ for(const D of openDocs()){ if(D.pushing||!D.chan) continue; try{ const r=await fetchRow(D.id); if(r&&(!D.base||r._rev!==D.base._rev)) applyRemote(D,r); }catch(_){} } };
+  const check=async()=>{ for(const D of openDocs()){ if(D.pushing||!(D.chan||KEYMODE)) continue; try{ const r=await fetchRow(D.id); if(r&&(!D.base||r._rev!==D.base._rev)) applyRemote(D,r); }catch(_){} } };
   document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='visible') check(); });
   setInterval(()=>{ if(document.visibilityState==='visible') check(); },15000);   // a safety net if a live update is missed
 }
 async function startCloud(){
   paintSync('saving');
   try{
+    if(KEYMODE&&ORG_ID!==HUBKEY.org){ chooseOrg(HUBKEY.org); return; }       // the link is for one organization only
     const club=await loadDoc('club',CLUB_META);
     cloudReady=true;
     if(!club){ setupNeeded=true; CLUB=null; db=null; render(); return; }          // first run: the club hasn't been set up yet
     setupNeeded=false; CLUB=club;
-    if(ORG_ID==='club') db=CLUB;
-    else if(ORG_ID){ const meta=orgMeta(ORG_ID); if(meta&&!meta.archived) db=await loadDoc(ORG_ID,meta,{create:true}); else db=null; }
+    if(ORG_ID==='club'){ db=CLUB; await openOrgDocs(); }
+    else if(ORG_ID){ const meta=orgMeta(ORG_ID); if(meta&&!meta.archived) db=await loadDoc(ORG_ID,meta,{create:!KEYMODE}); else db=null; }
     else db=null;
     render(); startPoll();
-  }catch(error){ setSync('offline',/relation|does not exist/i.test(error.message||'')?{message:'The mga_hub table is missing — run hub-setup.sql in Supabase'}:error); render(); }
+  }catch(error){
+    if(KEYMODE&&/invalid key|not allowed|permission|42501/i.test((error&&(error.message+' '+error.code))||'')){ dropKey(); if(typeof keyRejected==='function') keyRejected(); return; }
+    setSync('offline',/relation|does not exist/i.test(error.message||'')?{message:'The mga_hub table is missing — run hub-setup.sql in Supabase'}:error); render(); }
 }
 /* ---------- one-time set-up / re-import from the MGA Hub (the `main` row) ----------
    Builds the club directory from the MGA's member list (same ids, so fields, boards and Calcuttas keep working),
@@ -803,9 +844,10 @@ const I={
 };
 I.org=svg('<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18M9 20v-6h6v6"/>');
 I.lib=svg('<path d="M4 5h5a3 3 0 013 3v12a2 2 0 00-2-2H4z"/><path d="M20 5h-5a3 3 0 00-3 3v12a2 2 0 012-2h6z"/>');
-const NAV=[['dash','Dashboard',I.home],['tournaments','Tournaments',I.flag],['members','Members',I.users],['board','Board',I.shield],['budget','Season budget',I.ledger],['orgs','Organizations',I.org],['library','Game library',I.lib]];
+I.coins=svg('<ellipse cx="12" cy="6" rx="7" ry="3"/><path d="M5 6v12c0 1.7 3.1 3 7 3s7-1.3 7-3V6"/><path d="M5 12c0 1.7 3.1 3 7 3s7-1.3 7-3"/>');
+const NAV=[['dash','Dashboard',I.home],['tournaments','Tournaments',I.flag],['members','Members',I.users],['collections','Dues collection',I.coins],['board','Board',I.shield],['budget','Season budget',I.ledger],['orgs','Organizations',I.org],['library','Game library',I.lib]];
 /* which pages each kind of organization gets (associations get everything) */
-const ORG_NAV={club:['dash','tournaments','golf','members','orgs','library','budget','treasury'],association:['dash','tournaments','golf','members','board','treasury','budget'],group:['dash','tournaments','golf','members']};
+const ORG_NAV={club:['dash','tournaments','golf','members','collections','orgs','library','budget','treasury'],association:['dash','tournaments','golf','members','board','treasury','budget'],group:['dash','tournaments','golf','members']};
 function navItems(){ const allow=ORG_NAV[db.kind]; return NAV.filter(([k])=>!allow||allow.includes(k)).map(([k,l,ic])=>[k,k==='members'&&isClub()?'Directory':l,ic]); }
 /* the organization on screen: the club's record from CLUB.orgs wins over what the document says */
 const curOrg=()=>!db?null:isClub()?Object.assign({},CLUB_META,{name:CLUB.name||CLUB_META.name,crest:CLUB.crest||CLUB_META.crest}):(orgMeta()||{id:db.id,kind:db.kind,name:db.name,short:db.short});
@@ -871,7 +913,7 @@ function renderInner(){
   const lock=!o||isClub();   // the club hub (and the picker) wear the club's lockup; an organization shows its crest + name
   $('brandCrest').innerHTML=lock?'<img class="lockup" src="club-logo-light.png" alt="'+esc(clubName)+'">':crestHTML(o); $('brandText').hidden=lock; $('brandName').textContent=title; $('brandSub').textContent=clubName;
   $('topCrest').innerHTML=crestHTML(o||CLUB_META,'sm'); $('topName').textContent=title; document.title=title+' · '+clubName;
-  $('btnSwitch').hidden=!CLUB||(!db&&!setupNeeded);
+  $('btnSwitch').hidden=!CLUB||(!db&&!setupNeeded)||KEYMODE;
   if(!db){ $('nav').innerHTML=''; $('seasonBox').hidden=true; (setupNeeded?vSetup:vPicker)($('main')); return; }
   $('seasonBox').hidden=false;
   const ys=Object.keys(db.seasons).sort((a,b)=>b-a);
@@ -882,7 +924,7 @@ function renderInner(){
     live.map(e=>`<button class="nav livelink" data-golfev="${e.id}"><span class="livedot"></span><span class="trunc">Leaderboard · ${esc(e.name)}</span></button>`).join('');
   $('nav').querySelectorAll('[data-go]').forEach(b=>b.onclick=()=>{ if(b.dataset.go==='golf') view.geid=null; go(b.dataset.go); });
   const m=$('main');
-  ({dash:vDash,tournaments:vTournaments,tournament:vTournament,members:vMembers,board:vBoard,budget:vBudget,treasury:vTreasury,golf:vGolf,orgs:vOrgs,pick:vPicker,games:vGames,ledger:vLedger,library:vLibrary}[view.page]||vDash)(m);
+  ({dash:vDash,tournaments:vTournaments,tournament:vTournament,members:vMembers,board:vBoard,budget:vBudget,treasury:vTreasury,golf:vGolf,orgs:vOrgs,pick:vPicker,collections:vCollections,games:vGames,ledger:vLedger,library:vLibrary}[view.page]||vDash)(m);
 }
 
 /* ---------- Organization picker / first-run set-up (shown when no organization is open) ---------- */
@@ -943,12 +985,41 @@ function editOrg(o,kind){
   openDrawer({kicker:ORG_KINDS[kind],title:o?o.name:'New '+ORG_KINDS[kind].toLowerCase(),
     body:field('Name','ogN',o?.name||'',{ph:kind==='group'?'e.g. The Misfits':'e.g. Ladies’ Golf Association'})+pair(field('Short name','ogS',o?.short||'',{ph:kind==='group'?'e.g. Misfits':'e.g. LGA'}),o?field('Address id','ogI',o.id,{disabled:true}):field('Address id','ogI','',{ph:'letters and digits, e.g. misfits'}))+
       (o?'':`<p class="hint">The id becomes the address (${esc(orgURL('misfits'))}) and can’t change later. Leave it blank to use the short name.</p>`)+field('Crest image','ogC',o?.crest||'',{ph:'file name in the site, e.g. mga-crest.png (optional)'})+
-      (o?`<label class="check"><input type="checkbox" id="ogA"${o.archived?' checked':''}>Archived — hidden from the picker; its data is kept</label>`:''),
+      (o?`<label class="check"><input type="checkbox" id="ogA"${o.archived?' checked':''}>Archived — hidden from the picker; its data is kept</label>`:'')+
+      (o&&CLOUD&&sessionOK&&!KEYMODE?`<div class="fld" style="margin-top:6px"><span class="lbl">Admin links</span><div class="mini" id="ogKeys"><div class="mr"><span class="muted">Loading…</span></div></div>
+        <div style="display:flex;gap:8px;align-items:center;margin-top:8px"><input class="inp" id="ogKL" placeholder="Who it’s for, e.g. Dave (organizer)" aria-label="Link label" style="flex:1"><button class="btn sm" type="button" id="ogNewKey">${I.plus}New admin link</button></div>
+        <div id="ogKeyNew"></div><p class="hint">Whoever opens an admin link runs the ${esc(o.short||o.name)} hub without the board password — and can reach nothing else in the club (they see the directory and can add people to it). Revoke a link here at any time.</p></div>`:''),
+    wire:r=>{ if(o&&CLOUD&&sessionOK&&!KEYMODE) adminLinks(r,o); },
     save:()=>{ const name=fv('ogN'); if(!name){ toast('Give it a name'); return false; }
       if(o){ Object.assign(o,{name,short:fv('ogS'),crest:fv('ogC'),archived:$('ogA').checked}); return; }
       let id=(fv('ogI')||fv('ogS')||name).toLowerCase().replace(/[^a-z0-9-]/g,'').slice(0,24);
       if(!id||id==='club'||id==='main'||CLUB.orgs.some(x=>x.id===id)){ toast('That address id is taken — choose another'); return false; }
       CLUB.orgs.push({id,kind,name,short:fv('ogS'),crest:fv('ogC')}); toast(name+' created — open it from the organization picker'); }});
+}
+
+/* admin links for one organization: the list (from hub_keys), revoke, and create — the key itself is shown once */
+async function adminLinks(r,o){
+  const L=r.querySelector('#ogKeys'), N=r.querySelector('#ogKeyNew');
+  const list=async()=>{ const {data,error}=await sb.from('hub_keys').select('id,label,created_at,revoked_at').eq('org_id',o.id);
+    if(error){ L.innerHTML=`<div class="mr"><span class="muted">${/relation|does not exist/i.test(error.message)?'Run admin-links-setup.sql in Supabase to turn on admin links.':esc(error.message)}</span></div>`; return; }
+    const live=(data||[]).filter(k=>!k.revoked_at).sort((a,b)=>(a.created_at||'').localeCompare(b.created_at||''));
+    L.innerHTML=live.length?live.map(k=>`<div class="mr" style="grid-template-columns:minmax(0,1fr) auto"><span>${esc(k.label||'Admin link')} <span class="muted">· ${new Date(k.created_at).toLocaleDateString()}</span></span><button class="btn sm" type="button" data-revoke="${k.id}">Revoke</button></div>`).join(''):'<div class="mr"><span class="muted">No admin links yet.</span></div>';
+    L.querySelectorAll('[data-revoke]').forEach(b=>b.onclick=async()=>{ if(!confirm('Revoke this link? It stops working right away.')) return; const {error:e}=await sb.from('hub_keys').update({revoked_at:new Date().toISOString()}).eq('id',b.dataset.revoke); if(e) toast(e.message); else { toast('Link revoked'); list(); } }); };
+  r.querySelector('#ogNewKey').onclick=async()=>{ const b=r.querySelector('#ogNewKey'); b.disabled=true;
+    try{ const res=await newAdminLink(o,r.querySelector('#ogKL').value.trim()); r.querySelector('#ogKL').value='';
+      N.innerHTML=`<div class="banner" style="margin-top:8px;display:flex;flex-direction:column;gap:6px"><b>Send this link to the organizer — it is shown only once.</b><code style="word-break:break-all;font-size:12.5px">${esc(res.url)}</code><div class="actions"><button class="btn sm" type="button" id="ogCopy">Copy link</button></div></div>`;
+      r.querySelector('#ogCopy').onclick=()=>{ navigator.clipboard&&navigator.clipboard.writeText(res.url); toast('Link copied'); }; list(); }
+    catch(e){ toast(e.message||'Could not create the link'); } b.disabled=false; };
+  list();
+}
+async function sha256hex(s){ const b=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(s)); return Array.from(new Uint8Array(b),x=>x.toString(16).padStart(2,'0')).join(''); }
+async function newAdminLink(o,label){
+  if(!crypto.subtle) throw new Error('This browser cannot create links (needs https)');
+  const token=newToken()+newToken().slice(0,8), hash=await sha256hex(token);
+  if(!(await fetchRow(o.id))) await putDoc(o.id,normalize(null,o));              // the organizer's hub must exist before the link is used
+  const {error}=await sb.from('hub_keys').insert({org_id:o.id,key_hash:hash,label:label||''});
+  if(error) throw new Error(/relation|does not exist/i.test(error.message)?'Run admin-links-setup.sql in Supabase first':error.message);
+  return {token,url:(HTTP?SITE_BASE+encodeURIComponent(o.id):location.href.split('#')[0].split('?')[0]+'?org='+o.id)+'#key='+token};
 }
 
 /* ---------- Dashboard ---------- */
@@ -982,6 +1053,7 @@ function vDash(m){
     </div>
     <div style="display:flex;flex-direction:column;gap:20px">
       ${typeof liveBoardCard==='function'?liveBoardCard():''}
+      ${isClub()?acrossClubCard():''}
       <div class="card pad" style="display:flex;flex-direction:column;gap:12px"><h2 class="h2">Needs attention</h2>
         ${attention.length?attention.map(([c,txt,k,id])=>`<div style="display:flex;gap:10px;align-items:flex-start;font-size:13.5px"><span class="chip ${k}">${c}</span><span>${id?`<a href="#" data-open="${id}">${txt}</a>`:txt}</span></div>`).join(''):'<span class="muted">Nothing outstanding.</span>'}
       </div>
@@ -999,16 +1071,32 @@ function wireCommon(root){
 }
 
 /* ---------- Tournaments list ---------- */
+/* every organization's tournaments this season, for the club's calendar (names, dates, fields — never their money) */
+function clubCalendar(y){ const out=[]; for(const {meta,db:od} of orgDocs()) for(const t of od.tournaments||[]) if(t.season===y) out.push({t,org:meta}); return out.sort((a,b)=>(a.t.startDate||'9').localeCompare(b.t.startDate||'9')); }
+function acrossClubCard(){
+  const up=clubCalendar(Y()).filter(x=>{ const d=daysOut(x.t); return x.t.status!=='Complete'&&(d===null||d>=0); }).slice(0,6);
+  return `<div class="card pad" style="display:flex;flex-direction:column;gap:12px"><div style="display:flex;justify-content:space-between;align-items:center"><h2 class="h2">Across the club</h2><button class="btn sm" data-go="tournaments">Calendar</button></div>
+    ${up.length?up.map(x=>`<div style="display:flex;gap:10px;align-items:center;font-size:13.5px"><span class="chip navy">${esc(x.org.short||x.org.name)}</span><div class="cell2" style="min-width:0"><b class="trunc">${esc(x.t.name)}</b><small>${dateRange(x.t)}${x.t.field.length?' · '+x.t.field.length+' signed up':''}</small></div></div>`).join(''):'<span class="muted">No association or small-group tournaments coming up.</span>'}</div>`;
+}
+function orgTournamentsCard(){
+  const all=clubCalendar(Y()); if(!orgDocs().length) return '';
+  const cols='grid-template-columns:minmax(160px,2fr) 110px 150px 80px 110px 110px 120px';
+  return `<div class="card" style="overflow:hidden;margin-top:20px"><div class="cardhead"><h2 class="h2">Association and small-group tournaments</h2><span class="muted" style="font-size:13px">Run in their own hubs · the club sees the calendar and the fields</span></div>
+    ${all.length?`<div class="tw"><div class="t"><div class="tr th" style="${cols}"><span>Tournament</span><span>Organization</span><span>Dates</span><span>Length</span><span>Field</span><span>Status</span><span></span></div>
+    ${all.map(({t,org})=>`<div class="tr num" style="${cols}"><div class="cell2"><b class="trunc" style="color:var(--navy)">${esc(t.name)}</b><small>${esc(t.venue||'')}</small></div><span><span class="chip navy">${esc(org.short||org.name)}</span></span><span>${dateRange(t)}</span><span class="muted">${t.days} day${t.days>1?'s':''}</span><span>${t.field.length?t.field.length+' signed up':'—'}</span><span>${statusChip(t)}</span><span><button class="btn sm" data-org="${esc(org.id)}">Open ${esc(org.short||'hub')} hub</button></span></div>`).join('')}
+    </div></div>`:'<div class="tr"><span class="muted">Nothing on their calendars this season.</span></div>'}</div>`;
+}
 function vTournaments(m){
   const all=seasonTournaments(Y()), now=all.filter(t=>{const d=daysOut(t);return view.tfilter==='All'||(view.tfilter==='Upcoming'?(d===null||d>=0)&&t.status!=='Complete':t.status==='Complete'||(d!==null&&d<0));});
   const cols='grid-template-columns:minmax(160px,2fr) 150px 80px 110px 150px 110px 40px';
-  m.innerHTML=head('Tournaments',`Every event on the ${Y()} calendar. Each budget rolls up into the season.`,btn('New tournament','tNew','pri',I.plus))+`
+  m.innerHTML=head('Tournaments',isClub()?`The club’s own events on the ${Y()} calendar, and what every association and small group has planned.`:`Every event on the ${Y()} calendar. Each budget rolls up into the season.`,btn('New tournament','tNew','pri',I.plus))+`
   <div class="tabs">${['All','Upcoming','Completed'].map(f=>`<button class="tab${view.tfilter===f?' on':''}" data-f="${f}">${f}${f==='All'?' · '+all.length:''}</button>`).join('')}</div>
   <div class="card" style="overflow:hidden">${now.length?`<div class="tw"><div class="t">
     <div class="tr th" style="${cols}"><span>Tournament</span><span>Dates</span><span>Length</span><span>Field</span><span>Sponsors</span><span class="r">Net</span><span></span></div>
     ${now.map(t=>{const c=tcalc(t);return `<div class="tr num click" data-open="${t.id}" style="${cols}"><div class="cell2"><b class="trunc" style="color:var(--navy)">${esc(t.name)}</b><small>${esc(t.venue||'')}</small></div><span>${dateRange(t)}</span><span class="muted">${t.days} day${t.days>1?'s':''}</span><span>${t.field.length?t.field.length+' signed up':c.players?c.players+' planned':'—'}</span><span>${t.sponsors.length?fmt(c.received)+' of '+fmt(c.pledged):'—'}</span><b class="r ${netCls(c.net)}">${fmtS(c.net)}</b><span class="ib">${I.chev}</span></div>`;}).join('')}
-  </div></div>`:`<div class="empty"><b>Nothing here yet</b><span>Create a tournament to start its schedule, field and budget.</span></div>`}</div>`;
+  </div></div>`:`<div class="empty"><b>Nothing here yet</b><span>Create a tournament to start its schedule, field and budget.</span></div>`}</div>${isClub()?orgTournamentsCard():''}`;
   m.querySelectorAll('[data-f]').forEach(b=>b.onclick=()=>{view.tfilter=b.dataset.f;render();});
+  m.querySelectorAll('[data-org]').forEach(b=>b.onclick=()=>chooseOrg(b.dataset.org));
   $('tNew').onclick=editNewTournament; wireCommon(m);
 }
 function editNewTournament(){
@@ -1047,8 +1135,8 @@ const TT=[['overview','Overview'],['meals','Meals & events'],['field','Field'],[
 /* optional tabs per tournament (Overview, Field, Check-in and Rounds & results are always on) */
 const TOURNEY_FEATURES=[['meals','Meals & events'],['sponsors','Sponsors'],['budget','Budget'],['checklist','Checklist'],['calcutta','Calcutta'],['raffle','50/50 Drawing']];
 const tFeatures=t=>t.features||{};
-const tournamentTabs=t=>TT.filter(([k])=>!(k in tFeatures(t))||tFeatures(t)[k]);
-const featuresHTML=(pre,cur)=>`<div class="fld"><span class="lbl">What this tournament uses</span><div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px 14px">${TOURNEY_FEATURES.map(([k,l])=>`<label class="check" style="font-weight:400"><input type="checkbox" id="${pre}${k}"${cur[k]?' checked':''}>${l}</label>`).join('')}</div><p class="hint">Registration (Field), Check-in and Rounds & results are always there. Turn on the Calcutta, sponsors, meals or the drawing only for the tournaments that have them.</p></div>`;
+const tournamentTabs=t=>TT.filter(([k])=>(!(k in tFeatures(t))||tFeatures(t)[k])&&!(k==='raffle'&&isClub()));
+const featuresHTML=(pre,cur)=>`<div class="fld"><span class="lbl">What this tournament uses</span><div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px 14px">${TOURNEY_FEATURES.filter(([k])=>!(k==='raffle'&&isClub())).map(([k,l])=>`<label class="check" style="font-weight:400"><input type="checkbox" id="${pre}${k}"${cur[k]?' checked':''}>${l}</label>`).join('')}</div><p class="hint">Registration (Field), Check-in and Rounds & results are always there. Turn on the Calcutta, sponsors, meals or the drawing only for the tournaments that have them.</p></div>`;
 const readFeatures=pre=>Object.fromEntries(TOURNEY_FEATURES.map(([k])=>[k,!!($(pre+k)&&$(pre+k).checked)]));
 function vTournament(m){
   const t=T(); if(!t){ go('tournaments'); return; }
@@ -1325,9 +1413,9 @@ function editLine(t,kind,l){
   const inc=kind==='income', groups=[...new Set(['Prizes','Gifts','Entertainment','Misc'].concat(t.lines.map(x=>x.group).filter(Boolean)))];
   openDrawer({kicker:t.name+(inc?' · Income':' · Expense'),title:l?l.desc:(inc?'Add income':'Add expense'),
     body:field('Description','lDesc',l?.desc||'')+(inc?'':field('Group','lGrp',l?.group||'Misc',{type:'select',options:groups}))+pair(field('Budget $','lBud',l?.budget??'',{type:'number'}),actField('Actual $','lAct',t.season,t.id,inc?'inc':'line',l?.id,l?.actual))+
-      (inc?`<label class="check"><input type="checkbox" id="lRaf"${l?.source==='raffle'?' checked':''}>This is season 50/50 raffle money</label>`:'')+field('Notes','lNt',l?.notes||'',{type:'textarea'}),
+      (inc&&!isClub()?`<label class="check"><input type="checkbox" id="lRaf"${l?.source==='raffle'?' checked':''}>This is season 50/50 raffle money</label>`:'')+field('Notes','lNt',l?.notes||'',{type:'textarea'}),
     save:()=>{ const d=fv('lDesc'); if(!d){ toast('Add a description'); return false; }
-      const data={desc:d,budget:fnum('lBud'),actual:fnum('lAct'),notes:fv('lNt')}; if(!inc) data.group=fv('lGrp'); else data.source=$('lRaf').checked?'raffle':'';
+      const data={desc:d,budget:fnum('lBud'),actual:fnum('lAct'),notes:fv('lNt')}; if(!inc) data.group=fv('lGrp'); else data.source=$('lRaf')&&$('lRaf').checked?'raffle':'';
       if(l) Object.assign(l,data); else t[kind].push(Object.assign({id:uid()},data)); },
     del:l?()=>{ const i=t[kind].indexOf(l); t[kind].splice(i,1); toast('Removed',()=>{t[kind].splice(i,0,l);persist();render();}); }:null});
 }
@@ -1356,12 +1444,12 @@ function vMembers(m){
   const cols=simple?'grid-template-columns:40px minmax(0,1.5fr) minmax(0,1.5fr) 130px 70px 110px 110px 90px 40px':'grid-template-columns:40px minmax(0,1.5fr) minmax(0,1.5fr) 130px 70px 150px 120px 90px 40px';
   const headRow=simple?'<span></span><span>Name</span><span>Email</span><span>Phone</span><span>Hcp</span><span>Member #</span><span>GHIN</span><span>Status</span><span></span>'
                     :`<span></span><span>Name</span><span>Email</span><span>Phone</span><span>Hcp</span><span>Board</span><span>${y} dues</span><span>Status</span><span></span>`;
-  const rowOf=x=>{ const br=boardOf(x.id), paid=memberDues(y,x.id);
-    const du=x.status==='Inactive'?['—','']:paid>=amt?['Paid '+fmt(paid),'ok']:paid>0?[fmt(paid)+' of '+fmt(amt),'gold']:s.duesPayments.length?['Unpaid','warn']:['Not recorded',''];
+  const rowOf=x=>{ const br=boardOf(x.id), paid=memberDues(y,x.id), pend=memberCharges(y,x.id).filter(c=>c.status!=='collected');
+    const du=x.status==='Inactive'?['—','']:paid>=amt?['Paid '+fmt(paid),'ok']:pend.length?[`Billed ${fmt(sum(pend,c=>c.amount))} · ${pend.some(c=>c.status==='charged')?'on club account':'with club'}`,'gold']:paid>0?[fmt(paid)+' of '+fmt(amt),'gold']:s.duesPayments.length?['Unpaid','warn']:['Not recorded',''];
     const mid=simple?`<span class="muted">${esc(x.memberNo||'')}</span><span class="muted">${esc(x.ghin||'')}</span>`:`<span>${br.map(r=>`<span class="chip navy">${esc(r)}</span>`).join(' ')}</span><span><span class="chip ${du[1]}">${du[0]}</span></span>`;
     return `<div class="tr num click" data-m="${x.id}" style="${cols}"><span class="av">${initials(x)}</span><div class="cell2"><b class="trunc">${esc(memberName(x))}</b>${!simple&&(x.ghin||x.memberNo)?`<small>${x.ghin?'GHIN '+esc(x.ghin):'#'+esc(x.memberNo)}</small>`:''}</div><span class="trunc muted">${esc(x.email||'')}</span><span class="muted">${esc(x.phone||'')}</span><span>${esc(x.hcp??'')}</span>${mid}<span><span class="chip ${x.status==='Inactive'?'':'ok'}">${esc(x.status||'Active')}</span></span><span class="ib">${I.edit}</span></div>`; };
   m.innerHTML=head(club?'Directory':'Members',club?`Every member of ${esc(CLUB.name||CLUB_META.name)}. Associations and small groups pick their members from this list.`:`Everyone in the ${esc(short)}. Board seats and tournament fields are picked from this list.`,
-      (simple?'':btn('Dues settings','mDues',''))+btn(club?'Import club roster':'Import member list','mCsv','',I.down)+btn('Add member','mAdd','pri',I.plus))+`
+      (simple?'':btn('Dues settings','mDues','')+btn('Bill dues','mBill',''))+(KEYMODE?'':btn(club?'Import club roster':'Import member list','mCsv','',I.down))+btn('Add member','mAdd','pri',I.plus))+`
   <div class="toolbar"><div class="search">${I.search}<input class="inp" id="mq" placeholder="Search name, email, phone, member # or GHIN" value="${esc(view.mq)}" aria-label="Search members"></div>
     <div class="seg">${filters.map(x=>`<button class="${f===x?'on':''}" data-mf="${x}">${x}</button>`).join('')}</div>
     <span class="muted" style="margin-left:auto;font-size:13px">${active} active${simple?` of ${total}`:` · ${y} dues ${fmt(amt)}${n0(s.dues.installments)>1?` (${s.dues.installments} × ${fmt(amt/s.dues.installments)})`:''}`}</span></div>
@@ -1371,13 +1459,14 @@ function vMembers(m){
   const qi=$('mq'); qi.oninput=()=>{ view.mq=qi.value; const pos=qi.selectionStart; render(); const n=$('mq'); n.focus(); n.setSelectionRange(pos,pos); };
   m.querySelectorAll('[data-mf]').forEach(b=>b.onclick=()=>{view.mfilter=b.dataset.mf;render();});
   m.querySelectorAll('[data-m]').forEach(r=>r.onclick=()=>editMember(memberById(r.dataset.m)));
-  $('mAdd').onclick=()=>editMember(null); const md=$('mDues'); if(md) md.onclick=editDues; $('mCsv').onclick=importRoster;
+  $('mAdd').onclick=()=>editMember(null); const md=$('mDues'); if(md) md.onclick=editDues; const mb=$('mBill'); if(mb) mb.onclick=billDues; const mc=$('mCsv'); if(mc) mc.onclick=importRoster;
 }
 /* one form for the club directory and for an organization's members: person fields go to the directory,
    status / joined / notes (and dues) belong to this organization */
 function editMember(mm){
   const y=Y(), s=db.seasons[y], club=isClub(), simple=club||db.kind==='group', short=orgShort(); const pays=mm&&!simple?clone(s.duesPayments.filter(p=>p.memberId===mm.id)):[];
   let pickedId=mm?mm.id:'';
+  const locked=KEYMODE&&!!(mm&&personById(mm.id)), L={disabled:locked};   // an admin link may add people to the directory, not change them
   const payHTML=()=>pays.map((p,i)=>`<div class="mr num" style="grid-template-columns:90px minmax(0,1fr) 28px"><input class="inp r" data-di="${i}" data-k="amount" inputmode="decimal" value="${esc(p.amount)}" aria-label="Dues amount"><input class="inp" data-di="${i}" data-k="date" value="${esc(p.date)}" placeholder="Date" aria-label="Dues date"><button class="ib" data-ddel="${i}" aria-label="Remove">${I.x}</button></div>`).join('')||'<div class="mr"><span class="muted">No dues recorded for '+y+'.</span></div>';
   const inT=mm?db.tournaments.filter(t=>t.field.some(p=>p.memberId===mm.id)):[];
   const candidates=!mm&&!club?persons().filter(p=>!membershipOf(p.id)):[];   // club members who aren't in this organization yet
@@ -1385,8 +1474,9 @@ function editMember(mm){
     .map(p=>`<button type="button" data-pk="${p.id}"><span class="av">${initials(p)}</span><b>${esc(memberName(p))}</b><span class="muted" style="margin-left:auto;font-size:12.5px">${esc(p.email||(p.memberNo?'#'+p.memberNo:''))}</span></button>`).join('')||'<span class="muted" style="padding:10px 14px;display:block">Nobody in the directory matches — fill in the form to add a new person.</span>'; };
   openDrawer({kicker:club?'Directory':short+' member',title:mm?memberName(mm):'Add member',
     body:(candidates.length?`<div class="fld"><span class="lbl">Already a club member? Add them from the directory</span><input class="inp" id="mfPick" placeholder="Search the club directory" autocomplete="off" aria-label="Search the club directory"><div class="pick" id="mfPickL" style="max-height:230px"></div><p class="hint" id="mfPicked" style="margin:0"></p></div>`:'')+
-      pair(field('First name','mfF',mm?.first||''),field('Last name','mfL',mm?.last||''))+pair(field('Email','mfE',mm?.email||''),field('Phone','mfP',mm?.phone||''))+
-      pair(field('Handicap index','mfH',mm?.hcp??''),field('GHIN','mfG',mm?.ghin||''))+pair(field('Member #','mfNo',mm?.memberNo||''),field('Address','mfA',mm?.address1||''))+`<div style="display:grid;grid-template-columns:minmax(0,2fr) 70px minmax(0,1fr);gap:12px">${field('City','mfC',mm?.city||'')}${field('State','mfSt',mm?.state||'')}${field('Zip','mfZ',mm?.zip||'')}</div>`+
+      (locked?'<p class="hint" style="margin-top:0">Directory details are kept by the club — ask the club to change them.</p>':'')+
+      pair(field('First name','mfF',mm?.first||'',L),field('Last name','mfL',mm?.last||'',L))+pair(field('Email','mfE',mm?.email||'',L),field('Phone','mfP',mm?.phone||'',L))+
+      pair(field('Handicap index','mfH',mm?.hcp??'',L),field('GHIN','mfG',mm?.ghin||'',L))+pair(field('Member #','mfNo',mm?.memberNo||'',L),field('Address','mfA',mm?.address1||'',L))+`<div style="display:grid;grid-template-columns:minmax(0,2fr) 70px minmax(0,1fr);gap:12px">${field('City','mfC',mm?.city||'',L)}${field('State','mfSt',mm?.state||'',L)}${field('Zip','mfZ',mm?.zip||'',L)}</div>`+
       pair(field(club?'Club status':short+' status','mfS',mm?.status||'Active',{type:'select',options:['Active','Inactive']}),field('Joined','mfJ',mm?.joined||'',{type:'date'}))+
       (simple?'':`<div class="fld"><div style="display:flex;justify-content:space-between;align-items:center"><span class="lbl">${y} dues · ${fmt(s.dues.amount)}, not prorated</span><button class="btn sm" id="dAdd" type="button">${I.plus}Record payment</button></div><div class="mini"><div id="dRows">${payHTML()}</div></div></div>`)+
       (mm&&mm.ggId?`<p class="hint">Golf Genius ID ${esc(mm.ggId)}${mm.memberType?' · member type '+esc(mm.memberType):''}</p>`:'')+(inT.length?`<div class="fld"><span class="lbl">Tournaments</span><span>${inT.map(t=>esc(t.name)+' ('+t.season+')').join(', ')}</span></div>`:'')+field('Notes','mfNt',mm?.notes||'',{type:'textarea'}),
@@ -1397,7 +1487,7 @@ function editMember(mm){
           [['mfF','first'],['mfL','last'],['mfE','email'],['mfP','phone'],['mfH','hcp'],['mfG','ghin'],['mfNo','memberNo'],['mfA','address1'],['mfC','city'],['mfSt','state'],['mfZ','zip']].forEach(([id,k])=>{ r.querySelector('#'+id).value=p[k]??''; });
           who.innerHTML=`Adding <b>${esc(memberName(p))}</b> from the directory to the ${esc(short)}.`; L.style.display='none'; pk.value=''; }); }; } },
     save:()=>{ const first=fv('mfF'), last=fv('mfL'); if(!first&&!last){ toast('Enter a name'); return false; }
-      const data={first,last,email:fv('mfE'),phone:fv('mfP'),hcp:fv('mfH'),ghin:fv('mfG'),memberNo:fv('mfNo'),address1:fv('mfA'),city:fv('mfC'),state:fv('mfSt'),zip:fv('mfZ'),status:fv('mfS'),joined:fv('mfJ'),notes:fv('mfNt')};
+      const data=locked?{status:fv('mfS'),joined:fv('mfJ'),notes:fv('mfNt')}:{first,last,email:fv('mfE'),phone:fv('mfP'),hcp:fv('mfH'),ghin:fv('mfG'),memberNo:fv('mfNo'),address1:fv('mfA'),city:fv('mfC'),state:fv('mfSt'),zip:fv('mfZ'),status:fv('mfS'),joined:fv('mfJ'),notes:fv('mfNt')};
       const p=upsertMember(pickedId||null,data);
       if(!club) s.duesPayments=s.duesPayments.filter(x=>x.memberId!==p.id).concat(pays.filter(x=>n0(x.amount)).map(x=>({id:x.id||uid(),memberId:p.id,amount:n0(x.amount),date:x.date||''}))); },
     del:mm?()=>{ if(inT.length&&!confirm(`${memberName(mm)} is in ${inT.length} tournament field(s). Remove anyway?`)) return false;
@@ -1405,8 +1495,55 @@ function editMember(mm){
 }
 function editDues(){
   const s=db.seasons[Y()];
-  openDrawer({kicker:Y()+' season',title:'Dues settings',body:pair(field('Annual dues $','duA',s.dues.amount,{type:'number'}),field('Charged in','duI',s.dues.installments,{type:'select',options:[[1,'1 payment'],[2,'2 payments'],[4,'4 payments']]}))+'<p class="hint">Not prorated: members who join late still owe the full year. The season budget counts active members × annual dues.</p>',
-    save:()=>{ s.dues={amount:fnum('duA'),installments:+fv('duI')||1}; }});
+  openDrawer({kicker:Y()+' season',title:'Dues settings',body:pair(field('Annual dues $','duA',s.dues.amount,{type:'number'}),field('Charged in','duI',s.dues.installments,{type:'select',options:[[1,'1 payment'],[2,'2 payments'],[4,'4 payments']]}))+
+      `<label class="check"><input type="checkbox" id="duAuto"${s.dues.autoBill===false?'':' checked'}>Bill new members through the club automatically</label><p class="hint">Not prorated: members who join late still owe the full year. The club collects dues on the ${esc(orgShort())}’s behalf: every bill goes to the club’s Dues collection list, the club puts it on the member’s account, and when it marks the charge collected the payment is recorded here, on the member. The season budget counts active members × annual dues.</p>`,
+    save:()=>{ s.dues={amount:fnum('duA'),installments:+fv('duI')||1,autoBill:$('duAuto').checked}; }});
+}
+const duesBilledText=s=>{ const c=s.duesCharges||[]; const open=c.filter(x=>x.status!=='collected'); return `${c.length} billed · ${open.length} still with the club · ${fmt(sum(c.filter(x=>x.status==='collected'),x=>x.amount))} collected`; };
+/* bill the season's dues to the club, for every active member who still owes and has nothing pending */
+function billDues(){
+  const y=Y(), s=db.seasons[y], amt=n0(s.dues.amount), inst=Math.max(1,n0(s.dues.installments));
+  const owes=m=>Math.max(0,amt-memberDues(y,m.id)-sum(memberCharges(y,m.id).filter(c=>c.status!=='collected'),c=>c.amount));
+  const who=members().filter(m=>m.status!=='Inactive'&&owes(m)>0.004);
+  openDrawer({kicker:y+' season',title:'Bill dues through the club',saveLabel:'Send to the club',
+    body:pair(field('Per member $','bdA',inst>1?Math.round(amt/inst*100)/100:amt,{type:'number',hint:inst>1?`${inst} installments of ${fmt(amt/inst)}`:'the full year'}),field('Shown on the member’s account as','bdD',duesDesc(y,orgShort())))+
+      `<div class="fld"><span class="lbl">Who</span><div class="mini">${who.length?who.slice(0,12).map(m=>`<div class="mr" style="grid-template-columns:minmax(0,1fr) 90px"><span>${esc(memberName(m))}</span><span class="r muted">owes ${fmt(owes(m))}</span></div>`).join('')+(who.length>12?`<div class="mr"><span class="muted">… and ${who.length-12} more</span></div>`:''):'<div class="mr"><span class="muted">Everyone has paid or already has a bill with the club.</span></div>'}</div></div>
+      <p class="hint">Each member is billed the smaller of this amount and what they still owe. The club sees the list under Dues collection, charges the member accounts, and the money is credited to the ${esc(orgShort())}.</p>`,
+    save:()=>{ if(!who.length){ toast('Nothing to bill'); return false; } const per=fnum('bdA'), desc=fv('bdD')||duesDesc(y,orgShort()); if(per<=0){ toast('Enter an amount'); return false; }
+      who.forEach(m=>addDuesCharge(s,m.id,Math.min(per,owes(m)),desc)); toast(`${who.length} member${who.length===1?'':'s'} billed through the club`); }});
+}
+/* ---------- Dues collection (club hub): every association's bills, charged to member accounts and collected ---------- */
+function vCollections(m){
+  if(!isClub()){ go('dash'); return; }
+  const y=Y(), rows=[];
+  for(const {meta,db:od} of orgDocs()){ if(meta.kind!=='association') continue; const s=od.seasons&&od.seasons[y]; if(!s) continue;
+    for(const c of s.duesCharges||[]){ const p=personById(c.memberId); rows.push({c,s,org:meta,p,name:p?memberName(p):'Former member',no:p&&p.memberNo||''}); } }
+  rows.sort((a,b)=>(b.c.date||'').localeCompare(a.c.date||'')||a.name.localeCompare(b.name));
+  const F=[['open','To charge'],['charged','On account'],['collected','Collected'],['all','All']]; if(!F.some(([k])=>k===view.cfilter)) view.cfilter='open';
+  const cnt=k=>rows.filter(r=>r.c.status===k), show=view.cfilter==='all'?rows:cnt(view.cfilter);
+  const tot=l=>fmt(sum(l,r=>r.c.amount));
+  const cols='grid-template-columns:minmax(150px,1.6fr) 90px 110px minmax(120px,1.4fr) 90px 100px 150px 250px';
+  m.innerHTML=head('Dues collection','Associations bill their dues here; the club charges each member’s account and marks the money collected. It is credited to the association — the club keeps none of it.',
+      btn('Export to charge (CSV)','clCsv','',I.down)+btn('All open → on account','clCharge','')+btn('All on account → collected','clCollect','pri'))+`
+  <div class="grid g3">${kpi('To charge',tot(cnt('open')),cnt('open').length+' members')}${kpi('On member accounts',tot(cnt('charged')),cnt('charged').length+' charges')}${kpi('Collected · '+y,tot(cnt('collected')),cnt('collected').length+' charges paid over')}</div>
+  <div class="tabs">${F.map(([k,l])=>`<button class="tab${view.cfilter===k?' on':''}" data-cf="${k}">${l}${k==='all'?'':' · '+cnt(k).length}</button>`).join('')}</div>
+  <div class="card" style="overflow:hidden">${show.length?`<div class="tw"><div class="t" style="min-width:980px"><div class="tr th" style="${cols}"><span>Member</span><span>Member #</span><span>For</span><span>Charge</span><span class="r">Amount</span><span>Billed</span><span>Status</span><span></span></div>
+    ${show.map(r=>`<div class="tr num" style="${cols}"><div class="cell2"><b class="trunc">${esc(r.name)}</b>${r.p&&r.p.email?`<small>${esc(r.p.email)}</small>`:''}</div><span class="muted">${esc(r.no)}</span><span><span class="chip navy">${esc(r.org.short||r.org.name)}</span></span><span class="trunc">${esc(r.c.desc||'Dues')}</span><b class="r">${fmt(r.c.amount)}</b><span class="muted">${esc(r.c.date||'')}</span>
+      <span>${r.c.status==='collected'?`<span class="chip ok">Collected ${esc(r.c.collectedAt||'')}</span>`:r.c.status==='charged'?`<span class="chip gold">On account ${esc(r.c.chargedAt||'')}</span>`:'<span class="chip warn">To charge</span>'}</span>
+      <span class="actions">${r.c.status==='open'?`<button class="btn sm" data-ch="${r.c.id}">Put on account</button>`:''}${r.c.status!=='collected'?`<button class="btn sm" data-co="${r.c.id}">Collected</button>`:''}${r.c.status==='open'?`<button class="ib" data-cx="${r.c.id}" aria-label="Cancel charge">${I.x}</button>`:''}</span></div>`).join('')}
+    </div></div>`:`<div class="empty"><b>${rows.length?'Nothing here':'No dues to collect'}</b><span>${rows.length?'Try another tab.':'When an association bills its members (Members → Bill dues, or automatically when someone joins), the charges appear here.'}</span></div>`}</div>`;
+  const today=()=>new Date().toISOString().slice(0,10), md=()=>{ const d=new Date(); return (d.getMonth()+1)+'/'+d.getDate(); };
+  const find=id=>rows.find(r=>r.c.id===id);
+  const charge=r=>{ r.c.status='charged'; r.c.chargedAt=today(); };
+  const collect=r=>{ r.c.status='collected'; r.c.collectedAt=today(); if(!r.c.chargedAt) r.c.chargedAt=today(); r.s.duesPayments.push({id:uid(),memberId:r.c.memberId,amount:n0(r.c.amount),date:md(),method:'Club account',chargeId:r.c.id}); };
+  m.querySelectorAll('[data-cf]').forEach(b=>b.onclick=()=>{ view.cfilter=b.dataset.cf; render(); });
+  m.querySelectorAll('[data-ch]').forEach(b=>b.onclick=()=>{ charge(find(b.dataset.ch)); persist(); render(); });
+  m.querySelectorAll('[data-co]').forEach(b=>b.onclick=()=>{ collect(find(b.dataset.co)); persist(); render(); toast('Collected — credited to the '+(find(b.dataset.co).org.short||'association')); });
+  m.querySelectorAll('[data-cx]').forEach(b=>b.onclick=()=>{ const r=find(b.dataset.cx); if(!confirm(`Cancel the ${fmt(r.c.amount)} charge for ${r.name}? The ${r.org.short||'association'} will see it is gone.`)) return; r.s.duesCharges=r.s.duesCharges.filter(c=>c!==r.c); persist(); render(); });
+  $('clCharge').onclick=()=>{ const l=cnt('open'); if(!l.length){ toast('Nothing to charge'); return; } if(!confirm(`Mark ${l.length} charge${l.length===1?'':'s'} as put on member accounts?`)) return; l.forEach(charge); persist(); render(); };
+  $('clCollect').onclick=()=>{ const l=cnt('charged'); if(!l.length){ toast('Nothing on account to collect'); return; } if(!confirm(`Mark ${l.length} charge${l.length===1?'':'s'} (${tot(l)}) as collected and credit the associations?`)) return; l.forEach(collect); persist(); render(); };
+  $('clCsv').onclick=()=>{ const l=cnt('open'); if(!l.length){ toast('Nothing to export'); return; } const q=v=>'"'+String(v??'').replace(/"/g,'""')+'"';
+    dl([['Member #','Last','First','Email','Association','Description','Amount','Billed'].map(q).join(',')].concat(l.map(r=>[r.no,r.p?r.p.last:'',r.p?r.p.first:r.name,r.p?r.p.email:'',r.org.short||r.org.name,r.c.desc,n0(r.c.amount).toFixed(2),r.c.date].map(q).join(','))).join('\n'),'text/csv','dues-to-charge-'+today()+'.csv'); };
 }
 /* ---------- Field roster import (Golf Genius event registration export) ---------- */
 function qKind(label){ const l=label.toLowerCase(); return /plus ?1|plus one|\+ ?1|guest/.test(l)?'plus1':/dinner|banquet/.test(l)?'dinner':/par ?3/.test(l)?'par3':'other'; }
@@ -1590,8 +1727,8 @@ function previewRoster(res,fname){
       const inact=$('rosterInact')&&$('rosterInact').checked;
       if(!nChanges&&!inact){ toast('Nothing to change — the hub already matches this file'); return; }
       const before=memberSnapshot();
-      const addPerson=p=>{ const d={status:'Active',joined:'',notes:'',source:'roster'}; ROSTER_FIELDS.forEach(([k])=>{ d[k]=p[k]||''; }); if(p.hcp) d.hcpAt=res.fileDate; upsertMember(null,d); };
-      const apply=u=>{ u.changes.forEach(c=>{ if(c.k==='status') return; u.m[c.k]=c.to; if(c.k==='hcp') u.m.hcpAt=res.fileDate; }); upsertMember(u.m.id,{status:'Active'}); };
+      const addPerson=p=>{ const d={status:'Active',joined:'',notes:'',source:'roster'}; ROSTER_FIELDS.forEach(([k])=>{ d[k]=p[k]||''; }); if(p.hcp) d.hcpAt=res.fileDate; upsertMember(null,d,{noBill:true}); };
+      const apply=u=>{ u.changes.forEach(c=>{ if(c.k==='status') return; u.m[c.k]=c.to; if(c.k==='hcp') u.m.hcpAt=res.fileDate; }); upsertMember(u.m.id,{status:'Active'},{noBill:true}); };
       plan.add.forEach(addPerson); plan.join.forEach(apply); plan.update.forEach(apply);
       let asNew=0; plan.conflict.forEach((c,i)=>{ const v=(document.querySelector(`input[name=cf${i}]:checked`)||{}).value; if(v==='new'){ addPerson(c.p); asNew++; } else apply(c); });
       if(inact) plan.missing.forEach(x=>upsertMember(x.id,{status:'Inactive'}));
@@ -1640,8 +1777,9 @@ function vBudget(m){
   const y=Y(), sc=scalc(y), s=sc.s;
   const cols='grid-template-columns:minmax(160px,2fr) 140px 130px 130px 120px 120px';
   const r=(n,d,rv,ex,nt,act,cls='',attr='')=>`<div class="tr num ${cls}" ${attr} style="${cols}"><span style="font-weight:600;color:var(--navy)">${n}</span><span class="muted">${d}</span><span class="r">${rv}</span><span class="r">${ex}</span><b class="r ${typeof nt==='number'?netCls(nt):''}">${typeof nt==='number'?fmtS(nt):nt}</b><span class="r muted">${act}</span></div>`;
-  m.innerHTML=head('Season budget',`Tournaments are self-sustaining; dues are the ${esc(orgShort())}’s own income. Everything rolls up here.`,btn('Add '+orgShort()+' line','sbAdd','',I.plus))+`
-  <div class="grid g3">${kpi('Budgeted revenue',fmt(sc.revenue),'tournaments + dues + '+orgShort()+' lines')}${kpi('Budgeted expenses',fmt(sc.expenses),'tournaments + MGA lines')}${kpi('Season net (projected)',fmtS(sc.projected),`Actuals for ${sc.past.length} completed, budget for ${sc.upcoming.length} upcoming · all-budget net ${fmtS(sc.net)}`,netCls(sc.projected))}</div>
+  const club=isClub();
+  m.innerHTML=head('Season budget',club?'Club tournaments and club-level lines. Dues and the 50/50 belong to the associations; the club only collects dues on their behalf (Dues collection).':`Tournaments are self-sustaining; dues are the ${esc(orgShort())}’s own income. Everything rolls up here.`,btn('Add '+orgShort()+' line','sbAdd','',I.plus))+`
+  <div class="grid g3">${kpi('Budgeted revenue',fmt(sc.revenue),club?'tournaments + club lines':'tournaments + dues + '+orgShort()+' lines')}${kpi('Budgeted expenses',fmt(sc.expenses),'tournaments + MGA lines')}${kpi('Season net (projected)',fmtS(sc.projected),`Actuals for ${sc.past.length} completed, budget for ${sc.upcoming.length} upcoming · all-budget net ${fmtS(sc.net)}`,netCls(sc.projected))}</div>
   <div class="card" style="overflow:hidden"><div class="cardhead"><h2 class="h2">Tournaments</h2></div><div class="tw"><div class="t" style="min-width:820px">
     <div class="tr th" style="${cols}"><span>Tournament</span><span>Dates</span><span class="r">Revenue</span><span class="r">Expenses</span><span class="r">Net</span><span class="r">Actual net</span></div>
     ${sc.ts.map(({t,c})=>r(esc(t.name)+(isPast(t)?' <span class="chip ok" style="height:20px;font-size:11px;margin-left:6px">Actual counts</span>':''),dateRange(t).replace(/, \d{4}$/,''),fmt(c.revenue),fmt(c.expenses),c.net,fmtS(c.netA),'click',`data-open="${t.id}"`)).join('')||'<div class="tr"><span class="muted">No tournaments this season.</span></div>'}
@@ -1649,14 +1787,15 @@ function vBudget(m){
   </div></div></div>
   <div class="card" style="overflow:hidden"><div class="cardhead"><h2 class="h2">${esc(orgShort())}-level money</h2></div><div class="tw"><div class="t" style="min-width:820px">
     <div class="tr th" style="${cols}"><span>Line</span><span>Basis</span><span class="r">Budget</span><span class="r"></span><span class="r"></span><span class="r">Actual</span></div>
-    ${r('Annual dues',`${sc.active} × ${fmt(s.dues.amount)}`,fmt(sc.duesBudget),'','','<span>'+fmt(sc.duesActual)+'</span>','click','id="sbDues"')}
-    <div class="tr" style="${cols};border-top:none;min-height:0;padding-bottom:12px"><span class="muted" style="font-size:12.5px;grid-column:1/-1">${n0(s.dues.installments)>1?`Charged as ${s.dues.installments} × ${fmt(n0(s.dues.amount)/s.dues.installments)}, `:''}not prorated. Actual comes from dues recorded on each member.</span></div>
-    ${r('50/50 raffle (all season)','Assigned to tournaments',fmt(sc.raffle)+' → tournaments','','',fmt(sc.raffleA))}
-    <div class="tr" style="${cols};border-top:none;min-height:0;padding-bottom:12px"><span class="muted" style="font-size:12.5px;grid-column:1/-1">Collected at every event and counted in the tournament it’s assigned to (Member-Member), so it isn’t added again here.</span></div>
+    ${club?'':r('Annual dues',`${sc.active} × ${fmt(s.dues.amount)}`,fmt(sc.duesBudget),'','','<span>'+fmt(sc.duesActual)+'</span>','click','id="sbDues"')+
+    `<div class="tr" style="${cols};border-top:none;min-height:0;padding-bottom:12px"><span class="muted" style="font-size:12.5px;grid-column:1/-1">${n0(s.dues.installments)>1?`Charged as ${s.dues.installments} × ${fmt(n0(s.dues.amount)/s.dues.installments)}, `:''}not prorated. Billed through the club (${duesBilledText(s)}); actual comes from dues recorded on each member.</span></div>`+
+    r('50/50 raffle (all season)','Assigned to tournaments',fmt(sc.raffle)+' → tournaments','','',fmt(sc.raffleA))+
+    `<div class="tr" style="${cols};border-top:none;min-height:0;padding-bottom:12px"><span class="muted" style="font-size:12.5px;grid-column:1/-1">Collected at every event and counted in the tournament it’s assigned to (Member-Member), so it isn’t added again here.</span></div>`}
+    ${club&&!s.lines.length?`<div class="tr"><span class="muted">No club-level lines yet.</span></div>`:''}
     ${s.lines.map(l=>r(esc(l.desc),esc(l.type),l.type==='Income'?fmt(l.budget):'',l.type==='Income'?'':fmt(l.budget),'',fmt(actualOf(ledgerIndex(y),'',l.type==='Income'?'mgaInc':'mgaExp',l.id,l.actual)),'click',`data-sl="${l.id}"`)).join('')}
   </div></div></div>`;
   wireCommon(m);
-  $('sbDues').onclick=editDues; $('sbAdd').onclick=()=>editSeasonLine(null);
+  const sd=$('sbDues'); if(sd) sd.onclick=editDues; $('sbAdd').onclick=()=>editSeasonLine(null);
   m.querySelectorAll('[data-sl]').forEach(x=>x.onclick=()=>editSeasonLine(s.lines.find(l=>l.id===x.dataset.sl)));
 }
 function editSeasonLine(l){
@@ -1689,7 +1828,7 @@ function wireChrome(){
       const D=DOCS[ORG_ID]; syncTo(D.db,normalize(d,D.meta)); persist(); go('dash'); toast('Backup restored'); }catch(_){ toast('That isn’t a backup of this hub'); } };
     r.readAsText(f); e.target.value=''; };
   $('syncBtn').onclick=()=>{ if(!CLOUD||!sessionOK) return; if(!cloudReady) startCloud(); else pushAll(); };
-  $('btnSignOut').onclick=async()=>{ await sb.auth.signOut(); location.reload(); };
+  $('btnSignOut').onclick=async()=>{ if(KEYMODE){ if(!confirm('Leave this hub? You will need the admin link again to come back.')) return; dropKey(); location.reload(); return; } await sb.auth.signOut(); location.reload(); };
 }
 async function doLogin(){
   const pw=$('loginPw').value; if(!pw) return; $('loginBtn').disabled=true; $('loginErr').textContent='';
@@ -1704,8 +1843,11 @@ async function boot(){
   $('loginBtn').onclick=doLogin; $('loginPw').onkeydown=e=>{ if(e.key==='Enter') doLogin(); };
   const {data}=await sb.auth.getSession();
   if(data&&data.session){ sessionOK=true; $('btnSignOut').hidden=false; startCloud(); }
+  else if(HUBKEY){ KEYMODE=true; sessionOK=true; $('btnSignOut').hidden=false; $('btnSignOut').textContent='Leave this hub'; $('btnRestore').hidden=true; startCloud(); }
   else { $('login').classList.add('show'); setTimeout(()=>$('loginPw').focus(),100); }
 }
+/* the admin link was revoked or never existed: back to the board sign-in, with a word about why */
+function keyRejected(){ KEYMODE=false; sessionOK=false; $('btnSignOut').hidden=true; setSync('local'); $('login').classList.add('show'); $('loginErr').textContent='That admin link is no longer valid — ask the club for a new one.'; }
 
 /* =====================================================================
    MGA Hub — Treasury: one ledger for the season, budget vs actual across
@@ -1860,7 +2002,7 @@ function xBva(el){
     return card(esc(t.name),`${dateRange(t)}${isPast(t)?' · complete — actuals count in the season projection':''}`,c.net,c.netA,gh('Income')+inc.join('')+gh('Expenses')+exp.join(''));
   }).join('')+
   card('MGA-level',`Dues and anything not tied to a tournament`,sc.duesBudget+sum(sc.s.lines,l=>(l.type==='Income'?1:-1)*n0(l.budget)),sc.duesActual+sum(sc.s.lines,l=>(l.type==='Income'?1:-1)*actualOf(IX,'',l.type==='Income'?'mgaInc':'mgaExp',l.id,l.actual)),
-    row('Annual dues',`${sc.active} active × ${fmt(sc.s.dues.amount)} · recorded on each member`,sc.duesBudget,sc.duesActual,true,'',0)+
+    (isClub()?'':row('Annual dues',`${sc.active} active × ${fmt(sc.s.dues.amount)} · recorded on each member`,sc.duesBudget,sc.duesActual,true,'',0))+
     sc.s.lines.map(l=>{ const k=l.type==='Income'?'mgaInc':'mgaExp'; return row(l.desc,l.type,l.budget,actualOf(IX,'',k,l.id,l.actual),l.type==='Income',`|${k}|${l.id}`,cnt('',k,l.id)); }).join('')+
     `<div class="tr"><button class="btn sm" id="bvaMga">${I.plus}Add ${esc(orgShort())}-level line</button></div>`);
   el.querySelectorAll('[data-bx]').forEach(b=>b.onclick=()=>{ const [t,k,id]=b.dataset.bx.split('|'); editTxn(null,{dir:b.dataset.bd,link:{t,k,id}}); });
@@ -2569,7 +2711,7 @@ const hcpOf=(ev,p,grp)=>playerHcp(ev,{course:courseFor(ev,p,grp)},p);
 function publicEvent(ev){
   const courses={}; const tt=db.tournaments.find(x=>x.id===ev.tournamentId); const ftm=new Map(tt?tt.field.map(p=>[p.memberId,'T'+(p.team||0)]):[]);
   for(const g of ev.groups){ if(!courses[g.course]){ const c=courseById(g.course); if(c) courses[g.course]={name:c.name,par:c.par,hcp:c.hcp,tees:Object.fromEntries(c.tees.map(t=>[t.name,t.yards||null]))}; } }
-  return {slug:ev.slug,name:ev.name,date:ev.date,status:ev.status,club:'Walnut Creek Country Club',courses,
+  return {slug:ev.slug,name:ev.name,date:ev.date,status:ev.status,club:'Walnut Creek Country Club',org:ORG_ID,courses,
     groups:ev.groups.map(g=>({id:g.id,label:g.label||'',course:g.course,startHole:+g.startHole||1,teeTime:g.teeTime||'',players:g.players.map(p=>{ const h=playerHcp(ev,g,p); return {id:p.id,name:p.name,tee:p.tee||ev.defaultTee||'White',set:p.set||'M',ch:h.ch,ph:h.ph,flight:p.flight||'',team:evTeam(ev)?(p.team||ftm.get(p.memberId)||''):''}; })})),
     format:ev.format||'stroke',front:ev.front,back:ev.back,teamSize:ev.teamSize||(isTeamEvent(ev)||ev.format==='match'&&ev.teamSize>=2?2:1),count:ev.count||1,countPattern:ev.countPattern||'',quotaBase:ev.quotaBase||36,cap:ev.cap||'',matchScoring:ev.matchScoring||'holes',matchForm:ev.matchForm||'',game:ev.game||'',allow:Object.assign({},ev.allow||{}),scoring:ev.scoring||'gross',flights:(ev.flights&&ev.flights.names)||[]};
 }
@@ -2579,10 +2721,12 @@ const golfScores={}; let golfSub=null;
 async function publishEvent(ev){
   if(!CLOUD||!sessionOK) return;
   const codes=Object.fromEntries(ev.groups.map(g=>[String(g.code).toUpperCase(),g.id]));
-  const {error}=await sb.from('golf_events').upsert({id:ev.id,slug:ev.slug.toLowerCase(),public:publicEvent(ev),codes,updated_at:new Date().toISOString()});
+  const {error}=KEYMODE?await keyRPC('hub_key_golf_event',{p_id:ev.id,p_slug:ev.slug.toLowerCase(),p_public:publicEvent(ev),p_codes:codes})
+    :await sb.from('golf_events').upsert({id:ev.id,slug:ev.slug.toLowerCase(),public:publicEvent(ev),codes,updated_at:new Date().toISOString()});
   if(error) toast(/duplicate|unique/i.test(error.message)?'That link is already used by another event — pick a different one':/relation|does not exist/i.test(error.message)?'Run golf-setup.sql in Supabase to turn on live scoring':'Couldn’t publish the event: '+error.message);
 }
 function golfSave(ev){ persist(); publishEvent(ev); }
+function deleteEventRow(id){ return KEYMODE?keyRPC('hub_key_golf_delete',{p_id:id}):sb.from('golf_events').delete().eq('id',id); }
 function scoresFor(ev){ return CLOUD&&sessionOK?(golfScores[ev.id]||{}):(golfData().localScores[ev.id]||{}); }
 async function loadScores(ev){
   if(!CLOUD||!sessionOK) return;
@@ -2597,7 +2741,8 @@ async function loadScores(ev){
 }
 async function setScore(ev,pid,hole,strokes){
   if(CLOUD&&sessionOK){
-    const q=strokes?sb.from('golf_scores').upsert({event_id:ev.id,player_id:pid,hole,strokes,updated_at:new Date().toISOString()}):sb.from('golf_scores').delete().eq('event_id',ev.id).eq('player_id',pid).eq('hole',hole);
+    const q=KEYMODE?keyRPC('hub_key_score',{p_event:ev.id,p_player:pid,p_hole:hole,p_strokes:strokes||null})
+      :strokes?sb.from('golf_scores').upsert({event_id:ev.id,player_id:pid,hole,strokes,updated_at:new Date().toISOString()}):sb.from('golf_scores').delete().eq('event_id',ev.id).eq('player_id',pid).eq('hole',hole);
     const {error}=await q; if(error){ toast('Couldn’t save score: '+error.message); return false; }
     const m=(golfScores[ev.id]=golfScores[ev.id]||{}); m[pid]=m[pid]||{}; if(strokes) m[pid][hole]=strokes; else delete m[pid][hole]; return true;
   }
@@ -2694,7 +2839,7 @@ function editEvent(ev){
       if(ev) Object.assign(ev,data); else { const e=Object.assign({id:uid(),status:'draft',groups:[],pool:[],flights:{count:0,names:[]},createdAt:new Date().toISOString()},data); g.events.push(e); view.geid=e.id; view.getab='field'; ev=e; }
       golfSave(ev); toast('Saved'); return undefined; },
     del:ev?()=>{ if(!confirm(`Delete ${ev.name}? Its groups and scores are removed.`)) return false; g.events=g.events.filter(x=>x!==ev); view.geid=null;
-      if(CLOUD&&sessionOK) sb.from('golf_events').delete().eq('id',ev.id); }:null,delLabel:'Delete event'});
+      if(CLOUD&&sessionOK) deleteEventRow(ev.id); }:null,delLabel:'Delete event'});
 }
 
 /* Event detail */
@@ -3326,7 +3471,7 @@ function editGame(g){
       if(g){ Object.assign(g,data); if(mp) mp.entry=fnum('gmE'); const ev=gameEvent(g); if(ev){ ev.date=g.date; ev.scoring=g.net?'net':'gross'; EV_GAME_KEYS.forEach(k=>{ ev[k]=g[k]; }); golfSave(ev); } }
       else { const n=Object.assign({id:uid(),season:Y(),status:'open',players:[],pots:[],golfEventId:''},data); n.pots.push(newPot('finish','Main game',fnum('gmE'),n)); if(fnum('gmS')>0) n.pots.push(newPot('skins','Skins',fnum('gmS'),n)); gamesData().push(n); view.gameId=n.id;
         if(last&&last.players.length) setTimeout(()=>{ if(confirm(`Start with the ${last.players.length} players from ${gameTitle(last)} on ${shortDate(last.date)}?`)){ last.players.forEach(p=>addPlayer(n,{memberId:p.memberId,name:p.name})); persist(); render(); } },50); } },
-    del:g?()=>{ if(!confirm(`Delete ${gameTitle(g)} on ${shortDate(g.date)}? Its money record goes with it.`)) return false; const ev=gameEvent(g); if(ev&&confirm('Also delete its scoring event and scores?')){ golfData().events=golfData().events.filter(e=>e!==ev); if(CLOUD&&sessionOK) sb.from('golf_events').delete().eq('id',ev.id); }
+    del:g?()=>{ if(!confirm(`Delete ${gameTitle(g)} on ${shortDate(g.date)}? Its money record goes with it.`)) return false; const ev=gameEvent(g); if(ev&&confirm('Also delete its scoring event and scores?')){ golfData().events=golfData().events.filter(e=>e!==ev); if(CLOUD&&sessionOK) deleteEventRow(ev.id); }
       db.games=db.games.filter(x=>x!==g); view.gameId=null; }:null,delLabel:'Delete game'});
 }
 function addPlayer(g,o){ const p={id:uid(),memberId:o.memberId||'',name:o.name||'',paid:false,extraIn:0,gpid:''}; g.players.push(p); g.pots.forEach(pot=>{ if(pot.kind!=='manual') pot.inn[p.id]=true; }); return p; }
@@ -4175,6 +4320,9 @@ async function exportCalcutta(t){
 /* ============ Cashier link: share this Calcutta with the cashiers' laptops ============ */
 const cashierLink=t=>SITE_BASE+'cashier.html?k='+encodeURIComponent(calc(t).share.token);
 const newToken=()=>Array.from(crypto.getRandomValues(new Uint8Array(24)),b=>'abcdefghijkmnpqrstuvwxyz23456789'[b%32]).join('');
+/* create, replace or (token null) turn off a shared cashier / check-in row; admin links go through the database function */
+function shareRow(tid,token,name,doc){ return KEYMODE?keyRPC('hub_key_share',{p_tid:tid,p_token:token,p_name:name,p_doc:doc})
+  :token?sb.from('calcutta_share').upsert({tid,token,name,doc,version:1,updated_at:new Date().toISOString()}):sb.from('calcutta_share').update({token:null}).eq('tid',tid); }
 function calcPeople(t){ return (t.field||[]).map(p=>{ const m=memberById(p.memberId); return m?{id:m.id,name:tidyName(memberName(m))}:null; }).filter(Boolean).sort((a,b)=>a.name.localeCompare(b.name)); }
 const SHARE_ST={};
 /* the last cashier copy this device merged with — needed to tell what changed here; kept per device */
@@ -4214,7 +4362,7 @@ async function startCashierLink(t){
   const c=calc(t); if(!CLOUD||!sessionOK){ toast('The cashier link needs the cloud sign-in'); return; }
   const token=newToken(); c.people=calcPeople(t); c.name=t.name; c._del=c._del||[];
   const doc=calcDoc(c);
-  const {error}=await sb.from('calcutta_share').upsert({tid:t.id,token,name:t.name,doc,version:1,updated_at:new Date().toISOString()});
+  const {error}=await shareRow(t.id,token,t.name,doc);
   if(error){ toast(/relation|does not exist/i.test(error.message)?'Run calcutta-setup.sql in Supabase to turn on cashier links':'Couldn’t create the link: '+error.message); return; }
   c.share={token,created:new Date().toISOString()}; SHARE_ST[t.id]={state:'live',at:new Date().toISOString()}; shareBase.set(t,JSON.parse(JSON.stringify(doc)),1);
   persist(); render(); toast('Cashier link ready');
@@ -4223,7 +4371,7 @@ function stopCashierLink(t){
   const c=calc(t);
   openDrawer({kicker:t.name+' · Calcutta',title:'Turn off the cashier link?',saveLabel:'Turn it off',
     body:'<p style="margin:0">Anyone with the link loses access right away. Everything they recorded stays in the hub. You can create a new link later — it will have a different address.</p>',
-    save:()=>{ (async()=>{ await calcShareAll(); await sb.from('calcutta_share').update({token:null}).eq('tid',t.id); delete c.share; persist(); render(); toast('Cashier link turned off'); })(); }});
+    save:()=>{ (async()=>{ await calcShareAll(); await shareRow(t.id,null,t.name,null); delete c.share; persist(); render(); toast('Cashier link turned off'); })(); }});
 }
 function editCash(t){
   const c=calc(t), P=calcPayments(c);
@@ -4697,13 +4845,13 @@ const _ckAfter=window.afterPersist; window.afterPersist=function(){ if(typeof _c
 async function startCheckinLink(t){
   if(!CLOUD||!sessionOK){ toast('The registration link needs the cloud sign-in'); return; }
   const token=newToken(); const doc=ckDocFromField(t);
-  const {error}=await sb.from('calcutta_share').upsert({tid:t.id+':checkin',token,name:t.name+' · Check-in',doc,version:1,updated_at:new Date().toISOString()});
+  const {error}=await shareRow(t.id+':checkin',token,t.name+' · Check-in',doc);
   if(error){ toast(/relation|does not exist/i.test(error.message)?'Run calcutta-setup.sql in Supabase to turn on shared links':'Couldn’t create the link: '+error.message); return; }
   t.checkinShare={token,created:new Date().toISOString()}; ckBase.set(t,doc); CKI_ST[t.id]={state:'live',at:new Date().toISOString()}; persist(); render(); toast('Registration link ready'); }
 function stopCheckinLink(t){
   openDrawer({kicker:t.name+' · Check-in',title:'Turn off the registration link?',saveLabel:'Turn it off',
     body:'<p style="margin:0">Anyone with the link loses access right away. Every check-in stays in the hub.</p>',
-    save:()=>{ (async()=>{ await ckShareAll(); await sb.from('calcutta_share').update({token:null}).eq('tid',t.id+':checkin'); delete t.checkinShare; persist(); render(); toast('Registration link turned off'); })(); }}); }
+    save:()=>{ (async()=>{ await ckShareAll(); await shareRow(t.id+':checkin',null,t.name+' · Check-in',null); delete t.checkinShare; persist(); render(); toast('Registration link turned off'); })(); }}); }
 function ckLinkCard(t){
   if(!t.checkinShare) return `<div class="card pad" style="display:flex;gap:14px 24px;align-items:center;flex-wrap:wrap"><div class="cell2" style="flex:1 1 340px"><span class="lbl">Registration link</span><b>Let the registration table check players in from a phone or tablet</b><small class="muted">A private link — no board password. Check-ins there show up here within seconds, and yours show up for them.${!CLOUD||!sessionOK?' Needs the cloud sign-in.':''}</small></div><button class="btn pri" id="ciShare"${!CLOUD||!sessionOK?' disabled':''}>Create registration link</button></div>`;
   const s=CKI_ST[t.id]||{}, link=checkinLink(t);
@@ -5277,7 +5425,7 @@ async function resultsPDF(t,opt){
 /* Keeps every open device on the latest version: checks version.json about once a minute and, when a
    newer build is live, reloads at a safe moment (nothing unsaved, no editor open, not mid-typing). */
 (function(){
-  const ME='20261008205549'; let ready=false, lastCheck=0;
+  const ME='20261008211608'; let ready=false, lastCheck=0;
   const typing=()=>{ const a=document.activeElement; return a&&/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)&&a.value&&a.type!=='search'; };
   const safe=()=>!typing()&&(typeof window.__canReload!=='function'||window.__canReload());
   async function check(){ lastCheck=Date.now(); if(location.protocol==='file:') return;

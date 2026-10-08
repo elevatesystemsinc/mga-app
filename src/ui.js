@@ -23,9 +23,10 @@ const I={
 };
 I.org=svg('<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18M9 20v-6h6v6"/>');
 I.lib=svg('<path d="M4 5h5a3 3 0 013 3v12a2 2 0 00-2-2H4z"/><path d="M20 5h-5a3 3 0 00-3 3v12a2 2 0 012-2h6z"/>');
-const NAV=[['dash','Dashboard',I.home],['tournaments','Tournaments',I.flag],['members','Members',I.users],['board','Board',I.shield],['budget','Season budget',I.ledger],['orgs','Organizations',I.org],['library','Game library',I.lib]];
+I.coins=svg('<ellipse cx="12" cy="6" rx="7" ry="3"/><path d="M5 6v12c0 1.7 3.1 3 7 3s7-1.3 7-3V6"/><path d="M5 12c0 1.7 3.1 3 7 3s7-1.3 7-3"/>');
+const NAV=[['dash','Dashboard',I.home],['tournaments','Tournaments',I.flag],['members','Members',I.users],['collections','Dues collection',I.coins],['board','Board',I.shield],['budget','Season budget',I.ledger],['orgs','Organizations',I.org],['library','Game library',I.lib]];
 /* which pages each kind of organization gets (associations get everything) */
-const ORG_NAV={club:['dash','tournaments','golf','members','orgs','library','budget','treasury'],association:['dash','tournaments','golf','members','board','treasury','budget'],group:['dash','tournaments','golf','members']};
+const ORG_NAV={club:['dash','tournaments','golf','members','collections','orgs','library','budget','treasury'],association:['dash','tournaments','golf','members','board','treasury','budget'],group:['dash','tournaments','golf','members']};
 function navItems(){ const allow=ORG_NAV[db.kind]; return NAV.filter(([k])=>!allow||allow.includes(k)).map(([k,l,ic])=>[k,k==='members'&&isClub()?'Directory':l,ic]); }
 /* the organization on screen: the club's record from CLUB.orgs wins over what the document says */
 const curOrg=()=>!db?null:isClub()?Object.assign({},CLUB_META,{name:CLUB.name||CLUB_META.name,crest:CLUB.crest||CLUB_META.crest}):(orgMeta()||{id:db.id,kind:db.kind,name:db.name,short:db.short});
@@ -91,7 +92,7 @@ function renderInner(){
   const lock=!o||isClub();   // the club hub (and the picker) wear the club's lockup; an organization shows its crest + name
   $('brandCrest').innerHTML=lock?'<img class="lockup" src="club-logo-light.png" alt="'+esc(clubName)+'">':crestHTML(o); $('brandText').hidden=lock; $('brandName').textContent=title; $('brandSub').textContent=clubName;
   $('topCrest').innerHTML=crestHTML(o||CLUB_META,'sm'); $('topName').textContent=title; document.title=title+' · '+clubName;
-  $('btnSwitch').hidden=!CLUB||(!db&&!setupNeeded);
+  $('btnSwitch').hidden=!CLUB||(!db&&!setupNeeded)||KEYMODE;
   if(!db){ $('nav').innerHTML=''; $('seasonBox').hidden=true; (setupNeeded?vSetup:vPicker)($('main')); return; }
   $('seasonBox').hidden=false;
   const ys=Object.keys(db.seasons).sort((a,b)=>b-a);
@@ -102,7 +103,7 @@ function renderInner(){
     live.map(e=>`<button class="nav livelink" data-golfev="${e.id}"><span class="livedot"></span><span class="trunc">Leaderboard · ${esc(e.name)}</span></button>`).join('');
   $('nav').querySelectorAll('[data-go]').forEach(b=>b.onclick=()=>{ if(b.dataset.go==='golf') view.geid=null; go(b.dataset.go); });
   const m=$('main');
-  ({dash:vDash,tournaments:vTournaments,tournament:vTournament,members:vMembers,board:vBoard,budget:vBudget,treasury:vTreasury,golf:vGolf,orgs:vOrgs,pick:vPicker,games:vGames,ledger:vLedger,library:vLibrary}[view.page]||vDash)(m);
+  ({dash:vDash,tournaments:vTournaments,tournament:vTournament,members:vMembers,board:vBoard,budget:vBudget,treasury:vTreasury,golf:vGolf,orgs:vOrgs,pick:vPicker,collections:vCollections,games:vGames,ledger:vLedger,library:vLibrary}[view.page]||vDash)(m);
 }
 
 /* ---------- Organization picker / first-run set-up (shown when no organization is open) ---------- */
@@ -163,12 +164,41 @@ function editOrg(o,kind){
   openDrawer({kicker:ORG_KINDS[kind],title:o?o.name:'New '+ORG_KINDS[kind].toLowerCase(),
     body:field('Name','ogN',o?.name||'',{ph:kind==='group'?'e.g. The Misfits':'e.g. Ladies’ Golf Association'})+pair(field('Short name','ogS',o?.short||'',{ph:kind==='group'?'e.g. Misfits':'e.g. LGA'}),o?field('Address id','ogI',o.id,{disabled:true}):field('Address id','ogI','',{ph:'letters and digits, e.g. misfits'}))+
       (o?'':`<p class="hint">The id becomes the address (${esc(orgURL('misfits'))}) and can’t change later. Leave it blank to use the short name.</p>`)+field('Crest image','ogC',o?.crest||'',{ph:'file name in the site, e.g. mga-crest.png (optional)'})+
-      (o?`<label class="check"><input type="checkbox" id="ogA"${o.archived?' checked':''}>Archived — hidden from the picker; its data is kept</label>`:''),
+      (o?`<label class="check"><input type="checkbox" id="ogA"${o.archived?' checked':''}>Archived — hidden from the picker; its data is kept</label>`:'')+
+      (o&&CLOUD&&sessionOK&&!KEYMODE?`<div class="fld" style="margin-top:6px"><span class="lbl">Admin links</span><div class="mini" id="ogKeys"><div class="mr"><span class="muted">Loading…</span></div></div>
+        <div style="display:flex;gap:8px;align-items:center;margin-top:8px"><input class="inp" id="ogKL" placeholder="Who it’s for, e.g. Dave (organizer)" aria-label="Link label" style="flex:1"><button class="btn sm" type="button" id="ogNewKey">${I.plus}New admin link</button></div>
+        <div id="ogKeyNew"></div><p class="hint">Whoever opens an admin link runs the ${esc(o.short||o.name)} hub without the board password — and can reach nothing else in the club (they see the directory and can add people to it). Revoke a link here at any time.</p></div>`:''),
+    wire:r=>{ if(o&&CLOUD&&sessionOK&&!KEYMODE) adminLinks(r,o); },
     save:()=>{ const name=fv('ogN'); if(!name){ toast('Give it a name'); return false; }
       if(o){ Object.assign(o,{name,short:fv('ogS'),crest:fv('ogC'),archived:$('ogA').checked}); return; }
       let id=(fv('ogI')||fv('ogS')||name).toLowerCase().replace(/[^a-z0-9-]/g,'').slice(0,24);
       if(!id||id==='club'||id==='main'||CLUB.orgs.some(x=>x.id===id)){ toast('That address id is taken — choose another'); return false; }
       CLUB.orgs.push({id,kind,name,short:fv('ogS'),crest:fv('ogC')}); toast(name+' created — open it from the organization picker'); }});
+}
+
+/* admin links for one organization: the list (from hub_keys), revoke, and create — the key itself is shown once */
+async function adminLinks(r,o){
+  const L=r.querySelector('#ogKeys'), N=r.querySelector('#ogKeyNew');
+  const list=async()=>{ const {data,error}=await sb.from('hub_keys').select('id,label,created_at,revoked_at').eq('org_id',o.id);
+    if(error){ L.innerHTML=`<div class="mr"><span class="muted">${/relation|does not exist/i.test(error.message)?'Run admin-links-setup.sql in Supabase to turn on admin links.':esc(error.message)}</span></div>`; return; }
+    const live=(data||[]).filter(k=>!k.revoked_at).sort((a,b)=>(a.created_at||'').localeCompare(b.created_at||''));
+    L.innerHTML=live.length?live.map(k=>`<div class="mr" style="grid-template-columns:minmax(0,1fr) auto"><span>${esc(k.label||'Admin link')} <span class="muted">· ${new Date(k.created_at).toLocaleDateString()}</span></span><button class="btn sm" type="button" data-revoke="${k.id}">Revoke</button></div>`).join(''):'<div class="mr"><span class="muted">No admin links yet.</span></div>';
+    L.querySelectorAll('[data-revoke]').forEach(b=>b.onclick=async()=>{ if(!confirm('Revoke this link? It stops working right away.')) return; const {error:e}=await sb.from('hub_keys').update({revoked_at:new Date().toISOString()}).eq('id',b.dataset.revoke); if(e) toast(e.message); else { toast('Link revoked'); list(); } }); };
+  r.querySelector('#ogNewKey').onclick=async()=>{ const b=r.querySelector('#ogNewKey'); b.disabled=true;
+    try{ const res=await newAdminLink(o,r.querySelector('#ogKL').value.trim()); r.querySelector('#ogKL').value='';
+      N.innerHTML=`<div class="banner" style="margin-top:8px;display:flex;flex-direction:column;gap:6px"><b>Send this link to the organizer — it is shown only once.</b><code style="word-break:break-all;font-size:12.5px">${esc(res.url)}</code><div class="actions"><button class="btn sm" type="button" id="ogCopy">Copy link</button></div></div>`;
+      r.querySelector('#ogCopy').onclick=()=>{ navigator.clipboard&&navigator.clipboard.writeText(res.url); toast('Link copied'); }; list(); }
+    catch(e){ toast(e.message||'Could not create the link'); } b.disabled=false; };
+  list();
+}
+async function sha256hex(s){ const b=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(s)); return Array.from(new Uint8Array(b),x=>x.toString(16).padStart(2,'0')).join(''); }
+async function newAdminLink(o,label){
+  if(!crypto.subtle) throw new Error('This browser cannot create links (needs https)');
+  const token=newToken()+newToken().slice(0,8), hash=await sha256hex(token);
+  if(!(await fetchRow(o.id))) await putDoc(o.id,normalize(null,o));              // the organizer's hub must exist before the link is used
+  const {error}=await sb.from('hub_keys').insert({org_id:o.id,key_hash:hash,label:label||''});
+  if(error) throw new Error(/relation|does not exist/i.test(error.message)?'Run admin-links-setup.sql in Supabase first':error.message);
+  return {token,url:(HTTP?SITE_BASE+encodeURIComponent(o.id):location.href.split('#')[0].split('?')[0]+'?org='+o.id)+'#key='+token};
 }
 
 /* ---------- Dashboard ---------- */
@@ -202,6 +232,7 @@ function vDash(m){
     </div>
     <div style="display:flex;flex-direction:column;gap:20px">
       ${typeof liveBoardCard==='function'?liveBoardCard():''}
+      ${isClub()?acrossClubCard():''}
       <div class="card pad" style="display:flex;flex-direction:column;gap:12px"><h2 class="h2">Needs attention</h2>
         ${attention.length?attention.map(([c,txt,k,id])=>`<div style="display:flex;gap:10px;align-items:flex-start;font-size:13.5px"><span class="chip ${k}">${c}</span><span>${id?`<a href="#" data-open="${id}">${txt}</a>`:txt}</span></div>`).join(''):'<span class="muted">Nothing outstanding.</span>'}
       </div>
@@ -219,16 +250,32 @@ function wireCommon(root){
 }
 
 /* ---------- Tournaments list ---------- */
+/* every organization's tournaments this season, for the club's calendar (names, dates, fields — never their money) */
+function clubCalendar(y){ const out=[]; for(const {meta,db:od} of orgDocs()) for(const t of od.tournaments||[]) if(t.season===y) out.push({t,org:meta}); return out.sort((a,b)=>(a.t.startDate||'9').localeCompare(b.t.startDate||'9')); }
+function acrossClubCard(){
+  const up=clubCalendar(Y()).filter(x=>{ const d=daysOut(x.t); return x.t.status!=='Complete'&&(d===null||d>=0); }).slice(0,6);
+  return `<div class="card pad" style="display:flex;flex-direction:column;gap:12px"><div style="display:flex;justify-content:space-between;align-items:center"><h2 class="h2">Across the club</h2><button class="btn sm" data-go="tournaments">Calendar</button></div>
+    ${up.length?up.map(x=>`<div style="display:flex;gap:10px;align-items:center;font-size:13.5px"><span class="chip navy">${esc(x.org.short||x.org.name)}</span><div class="cell2" style="min-width:0"><b class="trunc">${esc(x.t.name)}</b><small>${dateRange(x.t)}${x.t.field.length?' · '+x.t.field.length+' signed up':''}</small></div></div>`).join(''):'<span class="muted">No association or small-group tournaments coming up.</span>'}</div>`;
+}
+function orgTournamentsCard(){
+  const all=clubCalendar(Y()); if(!orgDocs().length) return '';
+  const cols='grid-template-columns:minmax(160px,2fr) 110px 150px 80px 110px 110px 120px';
+  return `<div class="card" style="overflow:hidden;margin-top:20px"><div class="cardhead"><h2 class="h2">Association and small-group tournaments</h2><span class="muted" style="font-size:13px">Run in their own hubs · the club sees the calendar and the fields</span></div>
+    ${all.length?`<div class="tw"><div class="t"><div class="tr th" style="${cols}"><span>Tournament</span><span>Organization</span><span>Dates</span><span>Length</span><span>Field</span><span>Status</span><span></span></div>
+    ${all.map(({t,org})=>`<div class="tr num" style="${cols}"><div class="cell2"><b class="trunc" style="color:var(--navy)">${esc(t.name)}</b><small>${esc(t.venue||'')}</small></div><span><span class="chip navy">${esc(org.short||org.name)}</span></span><span>${dateRange(t)}</span><span class="muted">${t.days} day${t.days>1?'s':''}</span><span>${t.field.length?t.field.length+' signed up':'—'}</span><span>${statusChip(t)}</span><span><button class="btn sm" data-org="${esc(org.id)}">Open ${esc(org.short||'hub')} hub</button></span></div>`).join('')}
+    </div></div>`:'<div class="tr"><span class="muted">Nothing on their calendars this season.</span></div>'}</div>`;
+}
 function vTournaments(m){
   const all=seasonTournaments(Y()), now=all.filter(t=>{const d=daysOut(t);return view.tfilter==='All'||(view.tfilter==='Upcoming'?(d===null||d>=0)&&t.status!=='Complete':t.status==='Complete'||(d!==null&&d<0));});
   const cols='grid-template-columns:minmax(160px,2fr) 150px 80px 110px 150px 110px 40px';
-  m.innerHTML=head('Tournaments',`Every event on the ${Y()} calendar. Each budget rolls up into the season.`,btn('New tournament','tNew','pri',I.plus))+`
+  m.innerHTML=head('Tournaments',isClub()?`The club’s own events on the ${Y()} calendar, and what every association and small group has planned.`:`Every event on the ${Y()} calendar. Each budget rolls up into the season.`,btn('New tournament','tNew','pri',I.plus))+`
   <div class="tabs">${['All','Upcoming','Completed'].map(f=>`<button class="tab${view.tfilter===f?' on':''}" data-f="${f}">${f}${f==='All'?' · '+all.length:''}</button>`).join('')}</div>
   <div class="card" style="overflow:hidden">${now.length?`<div class="tw"><div class="t">
     <div class="tr th" style="${cols}"><span>Tournament</span><span>Dates</span><span>Length</span><span>Field</span><span>Sponsors</span><span class="r">Net</span><span></span></div>
     ${now.map(t=>{const c=tcalc(t);return `<div class="tr num click" data-open="${t.id}" style="${cols}"><div class="cell2"><b class="trunc" style="color:var(--navy)">${esc(t.name)}</b><small>${esc(t.venue||'')}</small></div><span>${dateRange(t)}</span><span class="muted">${t.days} day${t.days>1?'s':''}</span><span>${t.field.length?t.field.length+' signed up':c.players?c.players+' planned':'—'}</span><span>${t.sponsors.length?fmt(c.received)+' of '+fmt(c.pledged):'—'}</span><b class="r ${netCls(c.net)}">${fmtS(c.net)}</b><span class="ib">${I.chev}</span></div>`;}).join('')}
-  </div></div>`:`<div class="empty"><b>Nothing here yet</b><span>Create a tournament to start its schedule, field and budget.</span></div>`}</div>`;
+  </div></div>`:`<div class="empty"><b>Nothing here yet</b><span>Create a tournament to start its schedule, field and budget.</span></div>`}</div>${isClub()?orgTournamentsCard():''}`;
   m.querySelectorAll('[data-f]').forEach(b=>b.onclick=()=>{view.tfilter=b.dataset.f;render();});
+  m.querySelectorAll('[data-org]').forEach(b=>b.onclick=()=>chooseOrg(b.dataset.org));
   $('tNew').onclick=editNewTournament; wireCommon(m);
 }
 function editNewTournament(){
@@ -267,8 +314,8 @@ const TT=[['overview','Overview'],['meals','Meals & events'],['field','Field'],[
 /* optional tabs per tournament (Overview, Field, Check-in and Rounds & results are always on) */
 const TOURNEY_FEATURES=[['meals','Meals & events'],['sponsors','Sponsors'],['budget','Budget'],['checklist','Checklist'],['calcutta','Calcutta'],['raffle','50/50 Drawing']];
 const tFeatures=t=>t.features||{};
-const tournamentTabs=t=>TT.filter(([k])=>!(k in tFeatures(t))||tFeatures(t)[k]);
-const featuresHTML=(pre,cur)=>`<div class="fld"><span class="lbl">What this tournament uses</span><div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px 14px">${TOURNEY_FEATURES.map(([k,l])=>`<label class="check" style="font-weight:400"><input type="checkbox" id="${pre}${k}"${cur[k]?' checked':''}>${l}</label>`).join('')}</div><p class="hint">Registration (Field), Check-in and Rounds & results are always there. Turn on the Calcutta, sponsors, meals or the drawing only for the tournaments that have them.</p></div>`;
+const tournamentTabs=t=>TT.filter(([k])=>(!(k in tFeatures(t))||tFeatures(t)[k])&&!(k==='raffle'&&isClub()));
+const featuresHTML=(pre,cur)=>`<div class="fld"><span class="lbl">What this tournament uses</span><div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px 14px">${TOURNEY_FEATURES.filter(([k])=>!(k==='raffle'&&isClub())).map(([k,l])=>`<label class="check" style="font-weight:400"><input type="checkbox" id="${pre}${k}"${cur[k]?' checked':''}>${l}</label>`).join('')}</div><p class="hint">Registration (Field), Check-in and Rounds & results are always there. Turn on the Calcutta, sponsors, meals or the drawing only for the tournaments that have them.</p></div>`;
 const readFeatures=pre=>Object.fromEntries(TOURNEY_FEATURES.map(([k])=>[k,!!($(pre+k)&&$(pre+k).checked)]));
 function vTournament(m){
   const t=T(); if(!t){ go('tournaments'); return; }
@@ -545,9 +592,9 @@ function editLine(t,kind,l){
   const inc=kind==='income', groups=[...new Set(['Prizes','Gifts','Entertainment','Misc'].concat(t.lines.map(x=>x.group).filter(Boolean)))];
   openDrawer({kicker:t.name+(inc?' · Income':' · Expense'),title:l?l.desc:(inc?'Add income':'Add expense'),
     body:field('Description','lDesc',l?.desc||'')+(inc?'':field('Group','lGrp',l?.group||'Misc',{type:'select',options:groups}))+pair(field('Budget $','lBud',l?.budget??'',{type:'number'}),actField('Actual $','lAct',t.season,t.id,inc?'inc':'line',l?.id,l?.actual))+
-      (inc?`<label class="check"><input type="checkbox" id="lRaf"${l?.source==='raffle'?' checked':''}>This is season 50/50 raffle money</label>`:'')+field('Notes','lNt',l?.notes||'',{type:'textarea'}),
+      (inc&&!isClub()?`<label class="check"><input type="checkbox" id="lRaf"${l?.source==='raffle'?' checked':''}>This is season 50/50 raffle money</label>`:'')+field('Notes','lNt',l?.notes||'',{type:'textarea'}),
     save:()=>{ const d=fv('lDesc'); if(!d){ toast('Add a description'); return false; }
-      const data={desc:d,budget:fnum('lBud'),actual:fnum('lAct'),notes:fv('lNt')}; if(!inc) data.group=fv('lGrp'); else data.source=$('lRaf').checked?'raffle':'';
+      const data={desc:d,budget:fnum('lBud'),actual:fnum('lAct'),notes:fv('lNt')}; if(!inc) data.group=fv('lGrp'); else data.source=$('lRaf')&&$('lRaf').checked?'raffle':'';
       if(l) Object.assign(l,data); else t[kind].push(Object.assign({id:uid()},data)); },
     del:l?()=>{ const i=t[kind].indexOf(l); t[kind].splice(i,1); toast('Removed',()=>{t[kind].splice(i,0,l);persist();render();}); }:null});
 }
@@ -576,12 +623,12 @@ function vMembers(m){
   const cols=simple?'grid-template-columns:40px minmax(0,1.5fr) minmax(0,1.5fr) 130px 70px 110px 110px 90px 40px':'grid-template-columns:40px minmax(0,1.5fr) minmax(0,1.5fr) 130px 70px 150px 120px 90px 40px';
   const headRow=simple?'<span></span><span>Name</span><span>Email</span><span>Phone</span><span>Hcp</span><span>Member #</span><span>GHIN</span><span>Status</span><span></span>'
                     :`<span></span><span>Name</span><span>Email</span><span>Phone</span><span>Hcp</span><span>Board</span><span>${y} dues</span><span>Status</span><span></span>`;
-  const rowOf=x=>{ const br=boardOf(x.id), paid=memberDues(y,x.id);
-    const du=x.status==='Inactive'?['—','']:paid>=amt?['Paid '+fmt(paid),'ok']:paid>0?[fmt(paid)+' of '+fmt(amt),'gold']:s.duesPayments.length?['Unpaid','warn']:['Not recorded',''];
+  const rowOf=x=>{ const br=boardOf(x.id), paid=memberDues(y,x.id), pend=memberCharges(y,x.id).filter(c=>c.status!=='collected');
+    const du=x.status==='Inactive'?['—','']:paid>=amt?['Paid '+fmt(paid),'ok']:pend.length?[`Billed ${fmt(sum(pend,c=>c.amount))} · ${pend.some(c=>c.status==='charged')?'on club account':'with club'}`,'gold']:paid>0?[fmt(paid)+' of '+fmt(amt),'gold']:s.duesPayments.length?['Unpaid','warn']:['Not recorded',''];
     const mid=simple?`<span class="muted">${esc(x.memberNo||'')}</span><span class="muted">${esc(x.ghin||'')}</span>`:`<span>${br.map(r=>`<span class="chip navy">${esc(r)}</span>`).join(' ')}</span><span><span class="chip ${du[1]}">${du[0]}</span></span>`;
     return `<div class="tr num click" data-m="${x.id}" style="${cols}"><span class="av">${initials(x)}</span><div class="cell2"><b class="trunc">${esc(memberName(x))}</b>${!simple&&(x.ghin||x.memberNo)?`<small>${x.ghin?'GHIN '+esc(x.ghin):'#'+esc(x.memberNo)}</small>`:''}</div><span class="trunc muted">${esc(x.email||'')}</span><span class="muted">${esc(x.phone||'')}</span><span>${esc(x.hcp??'')}</span>${mid}<span><span class="chip ${x.status==='Inactive'?'':'ok'}">${esc(x.status||'Active')}</span></span><span class="ib">${I.edit}</span></div>`; };
   m.innerHTML=head(club?'Directory':'Members',club?`Every member of ${esc(CLUB.name||CLUB_META.name)}. Associations and small groups pick their members from this list.`:`Everyone in the ${esc(short)}. Board seats and tournament fields are picked from this list.`,
-      (simple?'':btn('Dues settings','mDues',''))+btn(club?'Import club roster':'Import member list','mCsv','',I.down)+btn('Add member','mAdd','pri',I.plus))+`
+      (simple?'':btn('Dues settings','mDues','')+btn('Bill dues','mBill',''))+(KEYMODE?'':btn(club?'Import club roster':'Import member list','mCsv','',I.down))+btn('Add member','mAdd','pri',I.plus))+`
   <div class="toolbar"><div class="search">${I.search}<input class="inp" id="mq" placeholder="Search name, email, phone, member # or GHIN" value="${esc(view.mq)}" aria-label="Search members"></div>
     <div class="seg">${filters.map(x=>`<button class="${f===x?'on':''}" data-mf="${x}">${x}</button>`).join('')}</div>
     <span class="muted" style="margin-left:auto;font-size:13px">${active} active${simple?` of ${total}`:` · ${y} dues ${fmt(amt)}${n0(s.dues.installments)>1?` (${s.dues.installments} × ${fmt(amt/s.dues.installments)})`:''}`}</span></div>
@@ -591,13 +638,14 @@ function vMembers(m){
   const qi=$('mq'); qi.oninput=()=>{ view.mq=qi.value; const pos=qi.selectionStart; render(); const n=$('mq'); n.focus(); n.setSelectionRange(pos,pos); };
   m.querySelectorAll('[data-mf]').forEach(b=>b.onclick=()=>{view.mfilter=b.dataset.mf;render();});
   m.querySelectorAll('[data-m]').forEach(r=>r.onclick=()=>editMember(memberById(r.dataset.m)));
-  $('mAdd').onclick=()=>editMember(null); const md=$('mDues'); if(md) md.onclick=editDues; $('mCsv').onclick=importRoster;
+  $('mAdd').onclick=()=>editMember(null); const md=$('mDues'); if(md) md.onclick=editDues; const mb=$('mBill'); if(mb) mb.onclick=billDues; const mc=$('mCsv'); if(mc) mc.onclick=importRoster;
 }
 /* one form for the club directory and for an organization's members: person fields go to the directory,
    status / joined / notes (and dues) belong to this organization */
 function editMember(mm){
   const y=Y(), s=db.seasons[y], club=isClub(), simple=club||db.kind==='group', short=orgShort(); const pays=mm&&!simple?clone(s.duesPayments.filter(p=>p.memberId===mm.id)):[];
   let pickedId=mm?mm.id:'';
+  const locked=KEYMODE&&!!(mm&&personById(mm.id)), L={disabled:locked};   // an admin link may add people to the directory, not change them
   const payHTML=()=>pays.map((p,i)=>`<div class="mr num" style="grid-template-columns:90px minmax(0,1fr) 28px"><input class="inp r" data-di="${i}" data-k="amount" inputmode="decimal" value="${esc(p.amount)}" aria-label="Dues amount"><input class="inp" data-di="${i}" data-k="date" value="${esc(p.date)}" placeholder="Date" aria-label="Dues date"><button class="ib" data-ddel="${i}" aria-label="Remove">${I.x}</button></div>`).join('')||'<div class="mr"><span class="muted">No dues recorded for '+y+'.</span></div>';
   const inT=mm?db.tournaments.filter(t=>t.field.some(p=>p.memberId===mm.id)):[];
   const candidates=!mm&&!club?persons().filter(p=>!membershipOf(p.id)):[];   // club members who aren't in this organization yet
@@ -605,8 +653,9 @@ function editMember(mm){
     .map(p=>`<button type="button" data-pk="${p.id}"><span class="av">${initials(p)}</span><b>${esc(memberName(p))}</b><span class="muted" style="margin-left:auto;font-size:12.5px">${esc(p.email||(p.memberNo?'#'+p.memberNo:''))}</span></button>`).join('')||'<span class="muted" style="padding:10px 14px;display:block">Nobody in the directory matches — fill in the form to add a new person.</span>'; };
   openDrawer({kicker:club?'Directory':short+' member',title:mm?memberName(mm):'Add member',
     body:(candidates.length?`<div class="fld"><span class="lbl">Already a club member? Add them from the directory</span><input class="inp" id="mfPick" placeholder="Search the club directory" autocomplete="off" aria-label="Search the club directory"><div class="pick" id="mfPickL" style="max-height:230px"></div><p class="hint" id="mfPicked" style="margin:0"></p></div>`:'')+
-      pair(field('First name','mfF',mm?.first||''),field('Last name','mfL',mm?.last||''))+pair(field('Email','mfE',mm?.email||''),field('Phone','mfP',mm?.phone||''))+
-      pair(field('Handicap index','mfH',mm?.hcp??''),field('GHIN','mfG',mm?.ghin||''))+pair(field('Member #','mfNo',mm?.memberNo||''),field('Address','mfA',mm?.address1||''))+`<div style="display:grid;grid-template-columns:minmax(0,2fr) 70px minmax(0,1fr);gap:12px">${field('City','mfC',mm?.city||'')}${field('State','mfSt',mm?.state||'')}${field('Zip','mfZ',mm?.zip||'')}</div>`+
+      (locked?'<p class="hint" style="margin-top:0">Directory details are kept by the club — ask the club to change them.</p>':'')+
+      pair(field('First name','mfF',mm?.first||'',L),field('Last name','mfL',mm?.last||'',L))+pair(field('Email','mfE',mm?.email||'',L),field('Phone','mfP',mm?.phone||'',L))+
+      pair(field('Handicap index','mfH',mm?.hcp??'',L),field('GHIN','mfG',mm?.ghin||'',L))+pair(field('Member #','mfNo',mm?.memberNo||'',L),field('Address','mfA',mm?.address1||'',L))+`<div style="display:grid;grid-template-columns:minmax(0,2fr) 70px minmax(0,1fr);gap:12px">${field('City','mfC',mm?.city||'',L)}${field('State','mfSt',mm?.state||'',L)}${field('Zip','mfZ',mm?.zip||'',L)}</div>`+
       pair(field(club?'Club status':short+' status','mfS',mm?.status||'Active',{type:'select',options:['Active','Inactive']}),field('Joined','mfJ',mm?.joined||'',{type:'date'}))+
       (simple?'':`<div class="fld"><div style="display:flex;justify-content:space-between;align-items:center"><span class="lbl">${y} dues · ${fmt(s.dues.amount)}, not prorated</span><button class="btn sm" id="dAdd" type="button">${I.plus}Record payment</button></div><div class="mini"><div id="dRows">${payHTML()}</div></div></div>`)+
       (mm&&mm.ggId?`<p class="hint">Golf Genius ID ${esc(mm.ggId)}${mm.memberType?' · member type '+esc(mm.memberType):''}</p>`:'')+(inT.length?`<div class="fld"><span class="lbl">Tournaments</span><span>${inT.map(t=>esc(t.name)+' ('+t.season+')').join(', ')}</span></div>`:'')+field('Notes','mfNt',mm?.notes||'',{type:'textarea'}),
@@ -617,7 +666,7 @@ function editMember(mm){
           [['mfF','first'],['mfL','last'],['mfE','email'],['mfP','phone'],['mfH','hcp'],['mfG','ghin'],['mfNo','memberNo'],['mfA','address1'],['mfC','city'],['mfSt','state'],['mfZ','zip']].forEach(([id,k])=>{ r.querySelector('#'+id).value=p[k]??''; });
           who.innerHTML=`Adding <b>${esc(memberName(p))}</b> from the directory to the ${esc(short)}.`; L.style.display='none'; pk.value=''; }); }; } },
     save:()=>{ const first=fv('mfF'), last=fv('mfL'); if(!first&&!last){ toast('Enter a name'); return false; }
-      const data={first,last,email:fv('mfE'),phone:fv('mfP'),hcp:fv('mfH'),ghin:fv('mfG'),memberNo:fv('mfNo'),address1:fv('mfA'),city:fv('mfC'),state:fv('mfSt'),zip:fv('mfZ'),status:fv('mfS'),joined:fv('mfJ'),notes:fv('mfNt')};
+      const data=locked?{status:fv('mfS'),joined:fv('mfJ'),notes:fv('mfNt')}:{first,last,email:fv('mfE'),phone:fv('mfP'),hcp:fv('mfH'),ghin:fv('mfG'),memberNo:fv('mfNo'),address1:fv('mfA'),city:fv('mfC'),state:fv('mfSt'),zip:fv('mfZ'),status:fv('mfS'),joined:fv('mfJ'),notes:fv('mfNt')};
       const p=upsertMember(pickedId||null,data);
       if(!club) s.duesPayments=s.duesPayments.filter(x=>x.memberId!==p.id).concat(pays.filter(x=>n0(x.amount)).map(x=>({id:x.id||uid(),memberId:p.id,amount:n0(x.amount),date:x.date||''}))); },
     del:mm?()=>{ if(inT.length&&!confirm(`${memberName(mm)} is in ${inT.length} tournament field(s). Remove anyway?`)) return false;
@@ -625,8 +674,55 @@ function editMember(mm){
 }
 function editDues(){
   const s=db.seasons[Y()];
-  openDrawer({kicker:Y()+' season',title:'Dues settings',body:pair(field('Annual dues $','duA',s.dues.amount,{type:'number'}),field('Charged in','duI',s.dues.installments,{type:'select',options:[[1,'1 payment'],[2,'2 payments'],[4,'4 payments']]}))+'<p class="hint">Not prorated: members who join late still owe the full year. The season budget counts active members × annual dues.</p>',
-    save:()=>{ s.dues={amount:fnum('duA'),installments:+fv('duI')||1}; }});
+  openDrawer({kicker:Y()+' season',title:'Dues settings',body:pair(field('Annual dues $','duA',s.dues.amount,{type:'number'}),field('Charged in','duI',s.dues.installments,{type:'select',options:[[1,'1 payment'],[2,'2 payments'],[4,'4 payments']]}))+
+      `<label class="check"><input type="checkbox" id="duAuto"${s.dues.autoBill===false?'':' checked'}>Bill new members through the club automatically</label><p class="hint">Not prorated: members who join late still owe the full year. The club collects dues on the ${esc(orgShort())}’s behalf: every bill goes to the club’s Dues collection list, the club puts it on the member’s account, and when it marks the charge collected the payment is recorded here, on the member. The season budget counts active members × annual dues.</p>`,
+    save:()=>{ s.dues={amount:fnum('duA'),installments:+fv('duI')||1,autoBill:$('duAuto').checked}; }});
+}
+const duesBilledText=s=>{ const c=s.duesCharges||[]; const open=c.filter(x=>x.status!=='collected'); return `${c.length} billed · ${open.length} still with the club · ${fmt(sum(c.filter(x=>x.status==='collected'),x=>x.amount))} collected`; };
+/* bill the season's dues to the club, for every active member who still owes and has nothing pending */
+function billDues(){
+  const y=Y(), s=db.seasons[y], amt=n0(s.dues.amount), inst=Math.max(1,n0(s.dues.installments));
+  const owes=m=>Math.max(0,amt-memberDues(y,m.id)-sum(memberCharges(y,m.id).filter(c=>c.status!=='collected'),c=>c.amount));
+  const who=members().filter(m=>m.status!=='Inactive'&&owes(m)>0.004);
+  openDrawer({kicker:y+' season',title:'Bill dues through the club',saveLabel:'Send to the club',
+    body:pair(field('Per member $','bdA',inst>1?Math.round(amt/inst*100)/100:amt,{type:'number',hint:inst>1?`${inst} installments of ${fmt(amt/inst)}`:'the full year'}),field('Shown on the member’s account as','bdD',duesDesc(y,orgShort())))+
+      `<div class="fld"><span class="lbl">Who</span><div class="mini">${who.length?who.slice(0,12).map(m=>`<div class="mr" style="grid-template-columns:minmax(0,1fr) 90px"><span>${esc(memberName(m))}</span><span class="r muted">owes ${fmt(owes(m))}</span></div>`).join('')+(who.length>12?`<div class="mr"><span class="muted">… and ${who.length-12} more</span></div>`:''):'<div class="mr"><span class="muted">Everyone has paid or already has a bill with the club.</span></div>'}</div></div>
+      <p class="hint">Each member is billed the smaller of this amount and what they still owe. The club sees the list under Dues collection, charges the member accounts, and the money is credited to the ${esc(orgShort())}.</p>`,
+    save:()=>{ if(!who.length){ toast('Nothing to bill'); return false; } const per=fnum('bdA'), desc=fv('bdD')||duesDesc(y,orgShort()); if(per<=0){ toast('Enter an amount'); return false; }
+      who.forEach(m=>addDuesCharge(s,m.id,Math.min(per,owes(m)),desc)); toast(`${who.length} member${who.length===1?'':'s'} billed through the club`); }});
+}
+/* ---------- Dues collection (club hub): every association's bills, charged to member accounts and collected ---------- */
+function vCollections(m){
+  if(!isClub()){ go('dash'); return; }
+  const y=Y(), rows=[];
+  for(const {meta,db:od} of orgDocs()){ if(meta.kind!=='association') continue; const s=od.seasons&&od.seasons[y]; if(!s) continue;
+    for(const c of s.duesCharges||[]){ const p=personById(c.memberId); rows.push({c,s,org:meta,p,name:p?memberName(p):'Former member',no:p&&p.memberNo||''}); } }
+  rows.sort((a,b)=>(b.c.date||'').localeCompare(a.c.date||'')||a.name.localeCompare(b.name));
+  const F=[['open','To charge'],['charged','On account'],['collected','Collected'],['all','All']]; if(!F.some(([k])=>k===view.cfilter)) view.cfilter='open';
+  const cnt=k=>rows.filter(r=>r.c.status===k), show=view.cfilter==='all'?rows:cnt(view.cfilter);
+  const tot=l=>fmt(sum(l,r=>r.c.amount));
+  const cols='grid-template-columns:minmax(150px,1.6fr) 90px 110px minmax(120px,1.4fr) 90px 100px 150px 250px';
+  m.innerHTML=head('Dues collection','Associations bill their dues here; the club charges each member’s account and marks the money collected. It is credited to the association — the club keeps none of it.',
+      btn('Export to charge (CSV)','clCsv','',I.down)+btn('All open → on account','clCharge','')+btn('All on account → collected','clCollect','pri'))+`
+  <div class="grid g3">${kpi('To charge',tot(cnt('open')),cnt('open').length+' members')}${kpi('On member accounts',tot(cnt('charged')),cnt('charged').length+' charges')}${kpi('Collected · '+y,tot(cnt('collected')),cnt('collected').length+' charges paid over')}</div>
+  <div class="tabs">${F.map(([k,l])=>`<button class="tab${view.cfilter===k?' on':''}" data-cf="${k}">${l}${k==='all'?'':' · '+cnt(k).length}</button>`).join('')}</div>
+  <div class="card" style="overflow:hidden">${show.length?`<div class="tw"><div class="t" style="min-width:980px"><div class="tr th" style="${cols}"><span>Member</span><span>Member #</span><span>For</span><span>Charge</span><span class="r">Amount</span><span>Billed</span><span>Status</span><span></span></div>
+    ${show.map(r=>`<div class="tr num" style="${cols}"><div class="cell2"><b class="trunc">${esc(r.name)}</b>${r.p&&r.p.email?`<small>${esc(r.p.email)}</small>`:''}</div><span class="muted">${esc(r.no)}</span><span><span class="chip navy">${esc(r.org.short||r.org.name)}</span></span><span class="trunc">${esc(r.c.desc||'Dues')}</span><b class="r">${fmt(r.c.amount)}</b><span class="muted">${esc(r.c.date||'')}</span>
+      <span>${r.c.status==='collected'?`<span class="chip ok">Collected ${esc(r.c.collectedAt||'')}</span>`:r.c.status==='charged'?`<span class="chip gold">On account ${esc(r.c.chargedAt||'')}</span>`:'<span class="chip warn">To charge</span>'}</span>
+      <span class="actions">${r.c.status==='open'?`<button class="btn sm" data-ch="${r.c.id}">Put on account</button>`:''}${r.c.status!=='collected'?`<button class="btn sm" data-co="${r.c.id}">Collected</button>`:''}${r.c.status==='open'?`<button class="ib" data-cx="${r.c.id}" aria-label="Cancel charge">${I.x}</button>`:''}</span></div>`).join('')}
+    </div></div>`:`<div class="empty"><b>${rows.length?'Nothing here':'No dues to collect'}</b><span>${rows.length?'Try another tab.':'When an association bills its members (Members → Bill dues, or automatically when someone joins), the charges appear here.'}</span></div>`}</div>`;
+  const today=()=>new Date().toISOString().slice(0,10), md=()=>{ const d=new Date(); return (d.getMonth()+1)+'/'+d.getDate(); };
+  const find=id=>rows.find(r=>r.c.id===id);
+  const charge=r=>{ r.c.status='charged'; r.c.chargedAt=today(); };
+  const collect=r=>{ r.c.status='collected'; r.c.collectedAt=today(); if(!r.c.chargedAt) r.c.chargedAt=today(); r.s.duesPayments.push({id:uid(),memberId:r.c.memberId,amount:n0(r.c.amount),date:md(),method:'Club account',chargeId:r.c.id}); };
+  m.querySelectorAll('[data-cf]').forEach(b=>b.onclick=()=>{ view.cfilter=b.dataset.cf; render(); });
+  m.querySelectorAll('[data-ch]').forEach(b=>b.onclick=()=>{ charge(find(b.dataset.ch)); persist(); render(); });
+  m.querySelectorAll('[data-co]').forEach(b=>b.onclick=()=>{ collect(find(b.dataset.co)); persist(); render(); toast('Collected — credited to the '+(find(b.dataset.co).org.short||'association')); });
+  m.querySelectorAll('[data-cx]').forEach(b=>b.onclick=()=>{ const r=find(b.dataset.cx); if(!confirm(`Cancel the ${fmt(r.c.amount)} charge for ${r.name}? The ${r.org.short||'association'} will see it is gone.`)) return; r.s.duesCharges=r.s.duesCharges.filter(c=>c!==r.c); persist(); render(); });
+  $('clCharge').onclick=()=>{ const l=cnt('open'); if(!l.length){ toast('Nothing to charge'); return; } if(!confirm(`Mark ${l.length} charge${l.length===1?'':'s'} as put on member accounts?`)) return; l.forEach(charge); persist(); render(); };
+  $('clCollect').onclick=()=>{ const l=cnt('charged'); if(!l.length){ toast('Nothing on account to collect'); return; } if(!confirm(`Mark ${l.length} charge${l.length===1?'':'s'} (${tot(l)}) as collected and credit the associations?`)) return; l.forEach(collect); persist(); render(); };
+  $('clCsv').onclick=()=>{ const l=cnt('open'); if(!l.length){ toast('Nothing to export'); return; } const q=v=>'"'+String(v??'').replace(/"/g,'""')+'"';
+    dl([['Member #','Last','First','Email','Association','Description','Amount','Billed'].map(q).join(',')].concat(l.map(r=>[r.no,r.p?r.p.last:'',r.p?r.p.first:r.name,r.p?r.p.email:'',r.org.short||r.org.name,r.c.desc,n0(r.c.amount).toFixed(2),r.c.date].map(q).join(','))).join('\n'),'text/csv','dues-to-charge-'+today()+'.csv'); };
 }
 /* ---------- Field roster import (Golf Genius event registration export) ---------- */
 function qKind(label){ const l=label.toLowerCase(); return /plus ?1|plus one|\+ ?1|guest/.test(l)?'plus1':/dinner|banquet/.test(l)?'dinner':/par ?3/.test(l)?'par3':'other'; }
@@ -810,8 +906,8 @@ function previewRoster(res,fname){
       const inact=$('rosterInact')&&$('rosterInact').checked;
       if(!nChanges&&!inact){ toast('Nothing to change — the hub already matches this file'); return; }
       const before=memberSnapshot();
-      const addPerson=p=>{ const d={status:'Active',joined:'',notes:'',source:'roster'}; ROSTER_FIELDS.forEach(([k])=>{ d[k]=p[k]||''; }); if(p.hcp) d.hcpAt=res.fileDate; upsertMember(null,d); };
-      const apply=u=>{ u.changes.forEach(c=>{ if(c.k==='status') return; u.m[c.k]=c.to; if(c.k==='hcp') u.m.hcpAt=res.fileDate; }); upsertMember(u.m.id,{status:'Active'}); };
+      const addPerson=p=>{ const d={status:'Active',joined:'',notes:'',source:'roster'}; ROSTER_FIELDS.forEach(([k])=>{ d[k]=p[k]||''; }); if(p.hcp) d.hcpAt=res.fileDate; upsertMember(null,d,{noBill:true}); };
+      const apply=u=>{ u.changes.forEach(c=>{ if(c.k==='status') return; u.m[c.k]=c.to; if(c.k==='hcp') u.m.hcpAt=res.fileDate; }); upsertMember(u.m.id,{status:'Active'},{noBill:true}); };
       plan.add.forEach(addPerson); plan.join.forEach(apply); plan.update.forEach(apply);
       let asNew=0; plan.conflict.forEach((c,i)=>{ const v=(document.querySelector(`input[name=cf${i}]:checked`)||{}).value; if(v==='new'){ addPerson(c.p); asNew++; } else apply(c); });
       if(inact) plan.missing.forEach(x=>upsertMember(x.id,{status:'Inactive'}));
@@ -860,8 +956,9 @@ function vBudget(m){
   const y=Y(), sc=scalc(y), s=sc.s;
   const cols='grid-template-columns:minmax(160px,2fr) 140px 130px 130px 120px 120px';
   const r=(n,d,rv,ex,nt,act,cls='',attr='')=>`<div class="tr num ${cls}" ${attr} style="${cols}"><span style="font-weight:600;color:var(--navy)">${n}</span><span class="muted">${d}</span><span class="r">${rv}</span><span class="r">${ex}</span><b class="r ${typeof nt==='number'?netCls(nt):''}">${typeof nt==='number'?fmtS(nt):nt}</b><span class="r muted">${act}</span></div>`;
-  m.innerHTML=head('Season budget',`Tournaments are self-sustaining; dues are the ${esc(orgShort())}’s own income. Everything rolls up here.`,btn('Add '+orgShort()+' line','sbAdd','',I.plus))+`
-  <div class="grid g3">${kpi('Budgeted revenue',fmt(sc.revenue),'tournaments + dues + '+orgShort()+' lines')}${kpi('Budgeted expenses',fmt(sc.expenses),'tournaments + MGA lines')}${kpi('Season net (projected)',fmtS(sc.projected),`Actuals for ${sc.past.length} completed, budget for ${sc.upcoming.length} upcoming · all-budget net ${fmtS(sc.net)}`,netCls(sc.projected))}</div>
+  const club=isClub();
+  m.innerHTML=head('Season budget',club?'Club tournaments and club-level lines. Dues and the 50/50 belong to the associations; the club only collects dues on their behalf (Dues collection).':`Tournaments are self-sustaining; dues are the ${esc(orgShort())}’s own income. Everything rolls up here.`,btn('Add '+orgShort()+' line','sbAdd','',I.plus))+`
+  <div class="grid g3">${kpi('Budgeted revenue',fmt(sc.revenue),club?'tournaments + club lines':'tournaments + dues + '+orgShort()+' lines')}${kpi('Budgeted expenses',fmt(sc.expenses),'tournaments + MGA lines')}${kpi('Season net (projected)',fmtS(sc.projected),`Actuals for ${sc.past.length} completed, budget for ${sc.upcoming.length} upcoming · all-budget net ${fmtS(sc.net)}`,netCls(sc.projected))}</div>
   <div class="card" style="overflow:hidden"><div class="cardhead"><h2 class="h2">Tournaments</h2></div><div class="tw"><div class="t" style="min-width:820px">
     <div class="tr th" style="${cols}"><span>Tournament</span><span>Dates</span><span class="r">Revenue</span><span class="r">Expenses</span><span class="r">Net</span><span class="r">Actual net</span></div>
     ${sc.ts.map(({t,c})=>r(esc(t.name)+(isPast(t)?' <span class="chip ok" style="height:20px;font-size:11px;margin-left:6px">Actual counts</span>':''),dateRange(t).replace(/, \d{4}$/,''),fmt(c.revenue),fmt(c.expenses),c.net,fmtS(c.netA),'click',`data-open="${t.id}"`)).join('')||'<div class="tr"><span class="muted">No tournaments this season.</span></div>'}
@@ -869,14 +966,15 @@ function vBudget(m){
   </div></div></div>
   <div class="card" style="overflow:hidden"><div class="cardhead"><h2 class="h2">${esc(orgShort())}-level money</h2></div><div class="tw"><div class="t" style="min-width:820px">
     <div class="tr th" style="${cols}"><span>Line</span><span>Basis</span><span class="r">Budget</span><span class="r"></span><span class="r"></span><span class="r">Actual</span></div>
-    ${r('Annual dues',`${sc.active} × ${fmt(s.dues.amount)}`,fmt(sc.duesBudget),'','','<span>'+fmt(sc.duesActual)+'</span>','click','id="sbDues"')}
-    <div class="tr" style="${cols};border-top:none;min-height:0;padding-bottom:12px"><span class="muted" style="font-size:12.5px;grid-column:1/-1">${n0(s.dues.installments)>1?`Charged as ${s.dues.installments} × ${fmt(n0(s.dues.amount)/s.dues.installments)}, `:''}not prorated. Actual comes from dues recorded on each member.</span></div>
-    ${r('50/50 raffle (all season)','Assigned to tournaments',fmt(sc.raffle)+' → tournaments','','',fmt(sc.raffleA))}
-    <div class="tr" style="${cols};border-top:none;min-height:0;padding-bottom:12px"><span class="muted" style="font-size:12.5px;grid-column:1/-1">Collected at every event and counted in the tournament it’s assigned to (Member-Member), so it isn’t added again here.</span></div>
+    ${club?'':r('Annual dues',`${sc.active} × ${fmt(s.dues.amount)}`,fmt(sc.duesBudget),'','','<span>'+fmt(sc.duesActual)+'</span>','click','id="sbDues"')+
+    `<div class="tr" style="${cols};border-top:none;min-height:0;padding-bottom:12px"><span class="muted" style="font-size:12.5px;grid-column:1/-1">${n0(s.dues.installments)>1?`Charged as ${s.dues.installments} × ${fmt(n0(s.dues.amount)/s.dues.installments)}, `:''}not prorated. Billed through the club (${duesBilledText(s)}); actual comes from dues recorded on each member.</span></div>`+
+    r('50/50 raffle (all season)','Assigned to tournaments',fmt(sc.raffle)+' → tournaments','','',fmt(sc.raffleA))+
+    `<div class="tr" style="${cols};border-top:none;min-height:0;padding-bottom:12px"><span class="muted" style="font-size:12.5px;grid-column:1/-1">Collected at every event and counted in the tournament it’s assigned to (Member-Member), so it isn’t added again here.</span></div>`}
+    ${club&&!s.lines.length?`<div class="tr"><span class="muted">No club-level lines yet.</span></div>`:''}
     ${s.lines.map(l=>r(esc(l.desc),esc(l.type),l.type==='Income'?fmt(l.budget):'',l.type==='Income'?'':fmt(l.budget),'',fmt(actualOf(ledgerIndex(y),'',l.type==='Income'?'mgaInc':'mgaExp',l.id,l.actual)),'click',`data-sl="${l.id}"`)).join('')}
   </div></div></div>`;
   wireCommon(m);
-  $('sbDues').onclick=editDues; $('sbAdd').onclick=()=>editSeasonLine(null);
+  const sd=$('sbDues'); if(sd) sd.onclick=editDues; $('sbAdd').onclick=()=>editSeasonLine(null);
   m.querySelectorAll('[data-sl]').forEach(x=>x.onclick=()=>editSeasonLine(s.lines.find(l=>l.id===x.dataset.sl)));
 }
 function editSeasonLine(l){
@@ -909,7 +1007,7 @@ function wireChrome(){
       const D=DOCS[ORG_ID]; syncTo(D.db,normalize(d,D.meta)); persist(); go('dash'); toast('Backup restored'); }catch(_){ toast('That isn’t a backup of this hub'); } };
     r.readAsText(f); e.target.value=''; };
   $('syncBtn').onclick=()=>{ if(!CLOUD||!sessionOK) return; if(!cloudReady) startCloud(); else pushAll(); };
-  $('btnSignOut').onclick=async()=>{ await sb.auth.signOut(); location.reload(); };
+  $('btnSignOut').onclick=async()=>{ if(KEYMODE){ if(!confirm('Leave this hub? You will need the admin link again to come back.')) return; dropKey(); location.reload(); return; } await sb.auth.signOut(); location.reload(); };
 }
 async function doLogin(){
   const pw=$('loginPw').value; if(!pw) return; $('loginBtn').disabled=true; $('loginErr').textContent='';
@@ -924,6 +1022,9 @@ async function boot(){
   $('loginBtn').onclick=doLogin; $('loginPw').onkeydown=e=>{ if(e.key==='Enter') doLogin(); };
   const {data}=await sb.auth.getSession();
   if(data&&data.session){ sessionOK=true; $('btnSignOut').hidden=false; startCloud(); }
+  else if(HUBKEY){ KEYMODE=true; sessionOK=true; $('btnSignOut').hidden=false; $('btnSignOut').textContent='Leave this hub'; $('btnRestore').hidden=true; startCloud(); }
   else { $('login').classList.add('show'); setTimeout(()=>$('loginPw').focus(),100); }
 }
+/* the admin link was revoked or never existed: back to the board sign-in, with a word about why */
+function keyRejected(){ KEYMODE=false; sessionOK=false; $('btnSignOut').hidden=true; setSync('local'); $('login').classList.add('show'); $('loginErr').textContent='That admin link is no longer valid — ask the club for a new one.'; }
 
