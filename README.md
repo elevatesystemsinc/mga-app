@@ -126,6 +126,12 @@ each have a search box: names, paddle numbers (101 or #101), lot numbers, flight
 - **Upload team sheet:** the auction-order spreadsheet (Lot, Team, Flight, Team index…) or the team
   sheet (Player 1, Player 2, Flight…). Buyers and prices already filled in come across. Re-uploading
   keeps every recorded sale (teams are matched by their players).
+- **Payouts** (Payouts sub-tab): give each team its finish in its flight; tied teams get the same number. No
+  tie-breaker — tied teams share the money for every place they cover (two tied for 1st split 1st + 2nd; three tied
+  for 4th with four places paid split 4th money), to the cent, with any odd cent going to the lowest lot. Each team's
+  money is split to its owners (buyer 75% / captain 25%, or captain 100% if pre-bought; the pool's buyer for pool
+  teams). **Payouts by person** lists everyone to pay — paddle or not — expandable to the teams behind it, with a
+  paid-out mark (cash, check, Zelle, Venmo). The export adds Payouts by flight and Payouts by person sheets.
 - **Teams added to the field later:** the Lots sub-tab shows a notice when the field has teams the Calcutta
   doesn't; **Add to the Calcutta** (also on Setup) adds them with a suggested flight (from the team index) and
   the next lot number — or a lot number of your choice, moving later lots down one. The pool renumbers itself.
