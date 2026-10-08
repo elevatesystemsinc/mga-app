@@ -1,0 +1,1 @@
+{ "private": true, "description": "Test-only dependency: SheetJS for exports in tests", "devDependencies": { "xlsx": "0.18.5" } }

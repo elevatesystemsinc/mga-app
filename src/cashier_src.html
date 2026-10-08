@@ -1,0 +1,300 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0F2A38">
+<title>Calcutta · Cashier</title>
+<link rel="icon" href="crest.png?v=2">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@600;700&family=Public+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script src="config.js"></script>
+<style>
+:root{--navy:#0F2A38;--deep:#0A1C27;--gold:#8C6A1F;--goldl:#D8B75F;--paper:#F4F0E6;--ivory:#FBFAF5;--line:#E3DCC9;--muted:#56626A;--ink:#14222B;--pos:#1F6B4A;--neg:#A1402B;
+  --serif:'Cormorant Garamond',Georgia,serif;--sans:'Public Sans',system-ui,-apple-system,'Segoe UI',sans-serif}
+*{box-sizing:border-box} html,body{margin:0} [hidden]{display:none!important}
+body{font-family:var(--sans);background:var(--paper);color:var(--ink);font-size:15px;line-height:1.4;-webkit-font-smoothing:antialiased}
+button,input,select{font:inherit;color:inherit} button{cursor:pointer}
+:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+body{font-variant-numeric:lining-nums} .num{font-variant-numeric:lining-nums tabular-nums} .muted{color:var(--muted)} .pos{color:var(--pos)} .neg{color:var(--neg)} .r{text-align:right}
+.top{background:var(--navy);color:#fff;padding:calc(12px + env(safe-area-inset-top,0px)) 20px 12px;display:flex;align-items:center;gap:14px;position:sticky;top:0;z-index:20}
+.top img{width:34px;height:44px;object-fit:contain}
+.top .t{flex:1;min-width:0} .top b{display:block;font-family:var(--serif);font-size:22px;line-height:1.05;white-space:nowrap;overflow:hidden;text-overflow:ellipsis} .top small{color:var(--goldl);font-size:12.5px}
+.pill{font-size:12px;font-weight:700;padding:5px 11px;border-radius:999px;background:rgba(111,191,142,.18);color:#bfe8cf;white-space:nowrap}
+.pill.wait{background:rgba(216,183,95,.2);color:var(--goldl)} .pill.off{background:rgba(224,123,98,.22);color:#f3c1b4}
+main{max-width:1100px;margin:0 auto;padding:18px 18px 60px}
+.kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+.kpi{background:#fff;border:1px solid var(--line);border-radius:12px;padding:14px 16px}
+.kpi span{display:block;font-size:11px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+.kpi b{display:block;font-family:var(--serif);font-size:30px;line-height:1.1;margin-top:4px}
+.kpi small{color:var(--muted);font-size:12.5px}
+.tabs{display:flex;gap:6px;margin:18px 0 12px;border-bottom:1px solid var(--line)}
+.tabs button{border:none;background:none;padding:10px 14px;font-weight:700;color:var(--muted);border-bottom:3px solid transparent;margin-bottom:-1px}
+.tabs button.on{color:var(--navy);border-bottom-color:var(--gold)}
+.bar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:12px}
+.inp{height:42px;border:1px solid #CFC6AE;border-radius:9px;padding:0 12px;background:#fff;min-width:0}
+.search{flex:1 1 260px}
+.chips{display:flex;gap:6px;flex-wrap:wrap} .chips button{height:34px;padding:0 13px;border-radius:999px;border:1px solid var(--line);background:#fff;font-weight:700;font-size:13px;color:var(--muted)} .chips button.on{background:var(--navy);border-color:var(--navy);color:#fff}
+.btn{white-space:nowrap;height:42px;padding:0 16px;border-radius:9px;border:1px solid var(--line);background:#fff;color:var(--navy);font-weight:700;display:inline-flex;align-items:center;gap:6px}
+.btn.pri{background:var(--navy);border-color:var(--navy);color:#fff} .btn.warn{color:var(--neg)} .btn[disabled]{opacity:.45}
+.card{background:#fff;border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.row{display:grid;align-items:center;gap:10px;padding:10px 14px;border-top:1px solid var(--line);min-height:48px}
+.row.h{border-top:none;background:var(--ivory);font-size:11.5px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);min-height:36px}
+.row.click{cursor:pointer} .row.bid.exp{cursor:pointer}
+.bdet{background:var(--ivory);border-top:1px dashed var(--line);padding:6px 14px 10px 64px}
+.bdl{display:grid;grid-template-columns:62px minmax(0,1fr) auto;gap:10px;padding:6px 0;border-top:1px solid #EFE9DA;font-size:14px;align-items:center}
+.bdl:first-child{border-top:none} .bdl span{color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.bdl.tot{border-top:2px solid var(--navy);margin-top:4px;padding-top:8px} .bdl.tot b{font-size:15px}
+@media (max-width:640px){ .bdet{padding:6px 12px 10px} } .row.click:hover{background:#FBF7EC}
+.row.pool{background:#F6ECCF} .row.dim{opacity:.7} .row.tot{background:var(--ivory);font-weight:800}
+.trunc{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tag{display:inline-block;font-size:11.5px;font-weight:800;padding:2px 8px;border-radius:999px;background:#EEF1F2;color:var(--muted)} .tag.p{background:#F6ECCF;color:#6B4F12} .tag.ok{background:#E3F0E8;color:var(--pos)} .tag.due{background:#F8E6DF;color:var(--neg)}
+select.pay{height:36px;border:1px solid #CFC6AE;border-radius:8px;padding:0 8px;background:#fff;font-weight:700;width:100%}
+select.pay.paid{background:#E3F0E8;border-color:#BCD9C7;color:var(--pos)}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:start}
+.h2{font-family:var(--serif);font-size:24px;margin:0;padding:14px 16px 6px}
+.sub{padding:0 16px 12px;color:var(--muted);font-size:13px}
+.modal{position:fixed;inset:0;background:rgba(10,28,39,.45);display:flex;align-items:flex-start;justify-content:center;padding:8vh 16px;z-index:50}
+.sheet{background:#fff;border-radius:14px;width:min(560px,100%);box-shadow:0 30px 70px rgba(0,0,0,.35);overflow:hidden}
+.sheet .hd{background:var(--navy);color:#fff;padding:16px 18px;display:flex;gap:14px;align-items:center}
+.sheet .hd .n{font-family:var(--serif);font-size:40px;font-weight:700;line-height:1;min-width:60px;text-align:center}
+.sheet .hd .n small{display:block;font-family:var(--sans);font-size:10px;letter-spacing:.14em;color:var(--goldl);font-weight:800}
+.sheet .hd b{font-family:var(--serif);font-size:22px;display:block;line-height:1.15} .sheet .hd span{font-size:13px;color:#C9CFD2}
+.sheet .bd{padding:16px 18px;display:flex;flex-direction:column;gap:12px}
+.fld label{display:block;font-size:12px;font-weight:700;color:var(--muted);margin-bottom:5px} .fld .inp{width:100%;font-size:18px;height:48px}
+.hint{font-size:12.5px;color:var(--muted);min-height:16px}
+.acts{display:flex;gap:8px;flex-wrap:wrap} .acts .btn{flex:1;justify-content:center}
+.sug{border:1px solid var(--line);border-radius:9px;overflow:hidden;margin-top:4px}
+.sug div{padding:9px 12px;cursor:pointer} .sug div.on{background:#F6ECCF}
+.toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--navy);color:#fff;padding:12px 18px;border-radius:10px;font-weight:600;z-index:60;box-shadow:0 10px 30px rgba(0,0,0,.3)}
+.banner{background:#F6ECCF;border:1px solid #E5CF8E;color:#5C4410;border-radius:10px;padding:12px 14px;font-size:14px;margin-bottom:12px}
+@media (max-width:760px){ .kpis{grid-template-columns:1fr 1fr} .two{grid-template-columns:1fr} }
+.meta{display:contents}
+.fcards{display:none}
+.fcard{padding:10px 16px;border-top:1px solid var(--line)} .fcard.tot{background:var(--ivory)}
+.fc1{display:flex;justify-content:space-between;gap:10px;font-size:16px} .fc2{font-size:12.5px;margin-top:2px} .fc3{display:flex;gap:14px;flex-wrap:wrap;margin-top:6px;font-size:14px;font-weight:700}
+@media (max-width:640px){ .fcards{display:block} .ftable{display:none} }
+@media (max-width:640px){
+  main{padding:14px 12px 60px} .kpi{padding:12px} .kpi b{font-size:24px}
+  .tabs{overflow-x:auto} .tabs button{white-space:nowrap;padding:10px 10px}
+  .bar .chips{width:100%} .bar .btn{width:100%;justify-content:center}
+  .row.h.lots,.row.h.bids{display:none}
+  .row.lot{grid-template-columns:40px minmax(0,1fr) auto!important;grid-template-areas:"lot team price" "lot meta price";row-gap:3px;padding:10px 12px}
+  .row.lot>.c-lot{grid-area:lot;font-size:17px} .row.lot>.c-team{grid-area:team;white-space:normal;font-weight:600} .row.lot>.c-price{grid-area:price;font-size:16px}
+  .row.lot>.meta{grid-area:meta;display:flex;gap:8px;flex-wrap:wrap;font-size:13px;min-width:0} .row.lot .meta>span{white-space:nowrap}
+  .row.bid{grid-template-columns:52px minmax(0,1fr) auto!important;grid-template-areas:"num name edit" "num meta owes" "pay pay pay";row-gap:6px;padding:10px 12px}
+  .row.bid>.c-num{grid-area:num} .row.bid>.c-name{grid-area:name;white-space:normal;font-weight:600} .row.bid>.c-edit{grid-area:edit;justify-self:end;width:40px;justify-content:center}
+  .row.bid>.c-bought{grid-area:meta;font-size:12.5px} .row.bid>.c-owes{grid-area:owes} .row.bid>.c-pay{grid-area:pay}
+  .sheet .hd .n{font-size:32px;min-width:48px} .sheet .hd b{font-size:19px}
+  .modal{padding:4vh 10px}
+  .acts .btn{flex:1 1 0;white-space:nowrap;padding:0 10px} .acts .btn.pri{flex:1 1 100%;height:50px;font-size:16px}
+}
+</style>
+</head>
+<body>
+<header class="top"><img src="crest.png?v=2" alt=""><div class="t"><b id="tName">Calcutta</b><small>Calcutta · Cashier</small></div><span class="pill" id="sync">Connecting…</span></header>
+<main id="main"><div class="card" style="padding:22px"><p class="muted">Loading…</p></div></main>
+<script>
+/*CALCCORE*/
+
+const $=id=>document.getElementById(id);
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const fmt=v=>{ const n=Math.round(c0(v)); return (n<0?'−$':'$')+Math.abs(n).toLocaleString('en-US'); };
+const uid=()=>Math.random().toString(36).slice(2,10)+Date.now().toString(36).slice(-4);
+const CFG=window.MM_CONFIG||{}; const sb=(CFG.url&&CFG.anonKey&&window.supabase)?window.supabase.createClient(CFG.url,CFG.anonKey,{auth:{persistSession:false}}):null;
+const TOKEN=(new URLSearchParams(location.search).get('k')||'').trim(), LS='mga_cashier_'+TOKEN;
+let bf='all', bOpen={};
+let doc=null, base=null, version=0, tab='sales', filt='all', q='', bq='', dirty=false, saving=false, online=true, modalOpen=false, lastErr='';
+function toast(m){ const d=document.createElement('div'); d.className='toast'; d.textContent=m; document.body.appendChild(d); setTimeout(()=>d.remove(),2600); }
+function setPill(){ const s=$('sync'); if(!online){ s.className='pill off'; s.textContent=dirty?'Offline · changes waiting':'Offline'; return; }
+  if(saving||dirty){ s.className='pill wait'; s.textContent='Saving…'; return; } s.className='pill'; s.textContent='● Live · saved'; }
+const keep=()=>{ try{ localStorage.setItem(LS,JSON.stringify({doc,base,version,dirty})); }catch(_){} };
+const get=async()=>{ const {data,error}=await sb.rpc('calcutta_get',{p_token:TOKEN}); if(error) throw new Error(error.message); if(!data) throw new Error('LINKOFF'); return data; };
+const put=async(d,v)=>{ const {data,error}=await sb.rpc('calcutta_put',{p_token:TOKEN,p_doc:d,p_version:v}); if(error) throw new Error(error.message); return data; };
+function fail(msg){ $('main').innerHTML=`<div class="card" style="padding:26px"><h2 class="h2" style="padding:0 0 8px">Calcutta cashier</h2><p class="muted">${msg}</p></div>`; $('sync').hidden=true; }
+/* every edit: change the working copy, stamp it, save it (merging with anyone else's saves) */
+function edit(fn){ fn(doc); calcStamp(doc,base); dirty=true; keep(); render(); saveSoon(); }
+let saveT=null; function saveSoon(ms){ clearTimeout(saveT); saveT=setTimeout(syncNow,ms??250); }
+async function syncNow(){
+  if(saving) { saveSoon(400); return; } saving=true; setPill();
+  try{ const res=await calcSyncOnce(get,put,calcDoc(doc)); const before=calcStable(calcDoc(doc));
+    doc=res.doc; base=JSON.parse(JSON.stringify(res.doc)); version=res.version; dirty=false; online=true; keep();
+    if(calcStable(calcDoc(doc))!==before&&!modalOpen) render(); }
+  catch(e){ if(e.message==='LINKOFF'||/invalid link/i.test(e.message)){ saving=false; localStorage.removeItem(LS); return fail('This cashier link has been turned off. Ask the committee for a new one.'); }
+    online=false; lastErr=e.message; }
+  finally{ saving=false; setPill(); }
+}
+async function boot(){
+  if(!TOKEN) return fail('This link is missing its key. Ask the committee for the cashier link.');
+  if(!sb) return fail('The cashier page isn’t connected yet.');
+  try{ const saved=JSON.parse(localStorage.getItem(LS)||'null');
+    const r=await get(); doc=r.doc; version=r.version; base=JSON.parse(JSON.stringify(r.doc));
+    if(saved&&saved.dirty&&saved.doc){ doc=calcMerge(r.doc,saved.doc); dirty=true; }   // changes made while offline, then the page was closed
+  }catch(e){ if(e.message==='LINKOFF') return fail('This cashier link has been turned off. Ask the committee for a new one.'); return fail('Couldn’t reach the Calcutta. Check the connection and reload.'); }
+  doc.lots=doc.lots||[]; calcNormalize(doc); doc.bidders=doc.bidders||[]; doc.expenses=doc.expenses||[]; doc.pool=doc.pool||{bidderId:'',price:0}; doc.payout=doc.payout&&doc.payout.length?doc.payout:[40,30,20,10];
+  $('tName').textContent=doc.name||'Calcutta'; document.title=(doc.name||'Calcutta')+' · Cashier';
+  render(); setPill(); if(dirty) saveSoon(0);
+  setInterval(()=>{ if(!modalOpen&&!saving&&document.visibilityState==='visible') syncNow(); },4000);
+  addEventListener('online',()=>saveSoon(0));
+}
+const bidderName=id=>{ const b=bidderById(doc,id); return b?`#${b.num} ${b.name}`:'—'; };
+const nextNum=()=>doc.bidders.reduce((a,b)=>Math.max(a,parseInt(b.num,10)||0),0)+1;
+function ensureBidder(d,num){ let b=bidderByNum(d,num); if(!b){ b={id:uid(),num:String(num),name:'Bidder '+num,memberId:'',paid:false,method:''}; d.bidders.push(b); d.bidders.sort((a,z)=>(+a.num||0)-(+z.num||0)); } return b; }
+
+function render(){
+  if(!doc) return; const T=calcTotalsC(doc), P=calcPayments(doc);
+  const act=document.activeElement&&document.activeElement.id, selS=act&&document.activeElement.selectionStart;
+  $('main').innerHTML=`<div class="kpis">
+      <div class="kpi"><span>Pot</span><b class="num">${fmt(T.pot)}</b><small>${T.sold} of ${T.auctionLots} auctioned sold${T.prebuy?` · ${T.prebuy} pre-bought`:''}</small></div>
+      <div class="kpi"><span>The pool</span><b class="num">${T.pooled?T.pooled+' team'+(T.pooled===1?'':'s'):'—'}</b><small>${T.pooled?`Lot ${T.poolLot}${T.poolPrice?' · sold '+fmt(T.poolPrice):''}`:(doc.minBid?`under ${fmt(doc.minBid)} goes here`:'no minimum')}</small></div>
+      <div class="kpi"><span>Collected</span><b class="num pos">${fmt(P.collected)}</b><small>${P.paid} of ${P.buyers} buyers paid</small></div>
+      <div class="kpi"><span>Still owed</span><b class="num ${P.outstanding>0?'neg':''}">${fmt(P.outstanding)}</b><small>${P.buyers-P.paid} buyer${P.buyers-P.paid===1?'':'s'}${buyInOf(doc).on&&P.biTeams-P.biTeamsPaid?` · ${P.biTeams-P.biTeamsPaid} buy-in${P.biTeams-P.biTeamsPaid===1?'':'s'}`:''}</small></div></div>
+    <div class="tabs">${[['sales','Sales'],['bidders','Bidders & payments'],['totals','Totals']].map(([k,l])=>`<button data-tab="${k}" class="${tab===k?'on':''}">${l}</button>`).join('')}</div>
+    <div id="pane"></div>`;
+  document.querySelectorAll('[data-tab]').forEach(b=>b.onclick=()=>{ tab=b.dataset.tab; render(); });
+  ({sales:paneSales,bidders:paneBidders,totals:paneTotals}[tab])($('pane'),T,P);
+  if(act&&$(act)){ $(act).focus(); try{ $(act).setSelectionRange(selS,selS); }catch(_){} }
+}
+function paneSales(el,T){
+  const BI=buyInOf(doc).on, seq=doc.lots.concat(poolLot(doc)?[poolLot(doc)]:[]), ql=q.toLowerCase().trim();
+  const rows=seq.filter(l=>{ if(filt==='open'&&(l.isPool?l.price>0:(l.prebuy||l.pooled||c0(l.price)>0))) return false; if(filt==='pool'&&!(l.isPool||(l.pooled&&!l.prebuy))) return false;
+    if(filt==='prebuy'&&!l.prebuy) return false; if(filt==='due'&&(l.isPool||!teamParts(doc,l).some(p=>!p.pay.paid))) return false;
+    if(!ql) return true; return String(l.lot)===ql||teamName(l).toLowerCase().includes(ql)||(l.isPool&&'pool'.includes(ql)); });
+  const cols='grid-template-columns:56px minmax(0,1.6fr) 80px minmax(0,1fr) 100px';
+  el.innerHTML=`<div class="bar"><input class="inp search" id="q" placeholder="Find a lot — number or player name" value="${esc(q)}" autocomplete="off"><div class="chips">${[['all','All'],['open','Unsold'],['pool','Pool']].concat(BI?[['prebuy','Pre-bought'],['due','Team payment due']]:[]).map(([k,l])=>`<button data-f="${k}" class="${filt===k?'on':''}">${l}</button>`).join('')}</div></div>
+    ${doc.minBid?`<p class="muted" style="margin:0 0 10px;font-size:13px">Minimum bid ${fmt(doc.minBid)} — teams under it go into the pool${T.pooled?` (Lot ${T.poolLot})`:''}.</p>`:''}
+    <div class="card"><div class="row h lots" style="${cols}"><span>Lot</span><span>Team</span><span>Flight</span><span>Bought by</span><span class="r">Price</span></div>
+    ${rows.map(l=>l.isPool?`<div class="row lot click pool" data-l="__pool" style="${cols}"><b class="c-lot">${l.lot}</b><span class="c-team trunc"><b>The Pool</b> · ${l.count} team${l.count===1?'':'s'}</span><span class="meta"><span class="muted">Mixed</span><span class="trunc">${l.price>0?esc(bidderName(l.bidderId)):'<span class="muted">not sold yet</span>'}</span></span><b class="c-price r num">${l.price>0?fmt(l.price):''}</b></div>`
+      :`<div class="row lot click${l.pooled?' dim':''}" data-l="${l.id}" style="${cols}"><b class="c-lot">${l.lot}</b><span class="c-team trunc">${esc(teamName(l))}</span><span class="meta"><span class="muted">${esc(flightName(l.flight))}</span><span class="trunc">${l.prebuy?`<span class="tag ok">Pre-bought · ${esc(captainName(l))}${(()=>{ const cb=captainBidder(doc,l); return cb?' #'+esc(cb.num):''; })()}</span>`:l.pooled?'<span class="tag p">In the pool</span>':c0(l.price)>0?esc(bidderName(l.bidderId)):'<span class="muted">—</span>'}</span>${BI?(()=>{ const due=teamParts(doc,l).filter(p=>!p.pay.paid), bd=due.filter(p=>p.kind==='buyin'), n=teamPlayers(l).length; return (bd.length?`<span class="tag due">Buy-in due${bd.length<n?' · '+esc(bd.map(p=>p.name.split(' ')[0]).join(', ')):''}</span>`:'')+(()=>{ const pd=due.filter(p=>p.kind==='prebuy'); return pd.length?`<span class="tag due">Pre-buy due${pd.length<n?' · '+esc(pd.map(p=>p.name.split(' ')[0]).join(', ')):''}</span>`:''; })(); })():''}</span><b class="c-price r num">${l.prebuy?fmt(teamDue(doc,l)):!l.pooled&&c0(l.price)>0?fmt(l.price):''}</b></div>`).join('')||'<div class="row"><span class="muted">No lots match.</span></div>'}</div>`;
+  $('q').oninput=e=>{ q=e.target.value; paneSales(el,T); const i=$('q'); i.focus(); i.setSelectionRange(q.length,q.length); };
+  $('q').onkeydown=e=>{ if(e.key==='Enter'){ const first=el.querySelector('[data-l]'); if(first) first.click(); } };
+  el.querySelectorAll('[data-f]').forEach(b=>b.onclick=()=>{ filt=b.dataset.f; render(); });
+  el.querySelectorAll('[data-l]').forEach(r=>r.onclick=()=>openLot(r.dataset.l));
+}
+function modal(html,wire){ modalOpen=true; const m=document.createElement('div'); m.className='modal'; m.innerHTML=`<div class="sheet" role="dialog" aria-modal="true">${html}</div>`; document.body.appendChild(m);
+  const close=()=>{ m.remove(); modalOpen=false; render(); }; m.onclick=e=>{ if(e.target===m) close(); }; m.onkeydown=e=>{ if(e.key==='Escape') close(); }; wire(m,close); }
+function openLot(id){
+  const P=id==='__pool', l=P?poolLot(doc):doc.lots.find(x=>x.id===id); if(!l) return;
+  const b=bidderById(doc,l.bidderId), bi=buyInOf(doc), BI=bi.on&&!P, pre=!!l.prebuy, own=ownership(doc,Object.assign({},l,{prebuy:false}));
+  const payOpts=(cur)=>`<option value="">Not paid</option>${PAY_METHODS.map(mm=>`<option${cur===mm?' selected':''}>${mm}</option>`).join('')}`;
+  modal(`<div class="hd"><div class="n"><small>LOT</small>${l.lot}</div><div style="min-width:0">${P?`<b>The Pool</b><span>${l.count} team${l.count===1?'':'s'} under ${fmt(doc.minBid)}, sold together</span>`:`<b>${esc(l.p1)}<br>${esc(l.p2)}</b><span>${esc(flightName(l.flight))} · team index ${idxTxt2(l.idx)}${pre?' · <b style="color:#bfe8cf">pre-bought</b>':''}</span>`}</div></div>
+    <div class="bd">${P?`<div class="card">${l.teams.map(x=>`<div class="row" style="grid-template-columns:60px minmax(0,1fr) 80px;min-height:38px"><span class="muted">Lot ${x.lot}</span><span class="trunc">${esc(teamName(x))}</span><span class="muted">${esc(flightName(x.flight))}</span></div>`).join('')}</div>`:''}
+      ${pre?`<p style="margin:0">This team pre-bought itself — <b>${fmt(bi.amount)}</b> buy-in + <b>${fmt(bi.prebuyExtra)}</b> pre-buy. It owns 100% and isn’t auctioned.</p>`:`
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px"><div class="fld"><label for="mB">Bidder number</label><input class="inp num" id="mB" inputmode="numeric" value="${esc(b?b.num:'')}" autocomplete="off"><div class="hint" id="mBn"></div></div>
+      <div class="fld"><label for="mP">Price</label><input class="inp num" id="mP" inputmode="decimal" value="${c0(l.price)||''}" placeholder="0" autocomplete="off"><div class="hint">${P||!doc.minBid?'':'Minimum '+fmt(doc.minBid)}</div></div></div>
+      ${BI?`<p class="hint" style="margin:-4px 0 0">Buyer gets ${own.buyer}% · the team keeps ${own.team}%.</p>`:''}
+      <div class="acts"><button class="btn pri" id="mSold">Sold</button>${P?'':`<button class="btn" id="mPool">${l.pooled?'Keep in the pool':'Into the pool'}</button>`}<button class="btn warn" id="mClr">Clear</button><button class="btn" id="mX">Cancel</button></div>`}
+      ${BI?`<div class="card" style="padding:12px 14px;display:flex;flex-direction:column;gap:10px">
+        ${!pre&&c0(l.price)>0&&b?`<div style="display:flex;justify-content:space-between;gap:10px;align-items:center;padding-bottom:10px;border-bottom:1px solid var(--line)"><div><b>Auction purchase · ${fmt(l.price)}</b><div class="hint">Paid by the buyer, ${esc(bidderName(l.bidderId))} — marked on the Bidders tab</div></div><span class="tag ${b.paid?'ok':'due'}">${b.paid?'Paid'+(b.method?' · '+esc(b.method):''):'Not paid'}</span></div>`:''}
+        <div style="display:flex;justify-content:space-between;gap:10px;align-items:center;padding-bottom:10px;border-bottom:1px solid var(--line)"><div style="min-width:0"><b>Captain · ${esc(captainName(l))}</b><div class="hint">The team’s buyer — paid its ${pre?'100%':bi.pct+'%'}.${(()=>{ const cb=captainBidder(doc,l); return cb?` Paddle #${esc(cb.num)}.`:' No paddle needed.'; })()}${l.capFlag&&!l.capSet?' <span class="neg">Check: indexes didn’t decide it.</span>':''}</div></div>
+          <button class="btn" id="mCap" style="height:36px;font-size:13px">Make ${esc((l.cap===1?l.p1:l.p2)||'').split(' ')[0]} captain</button></div>
+        <div><b>Team buy-in · ${fmt(bi.amount)}</b><div class="hint">${fmt(c0(bi.amount)/(teamPlayers(l).length||1))} collected from each player · the team’s ${pre?'100%':bi.pct+'%'} pays out to the captain</div></div>
+        ${teamPlayers(l).map((nm,k)=>{ const pp=(l.buyInP||[])[k]||{}; return `<div style="display:flex;justify-content:space-between;gap:10px;align-items:center"><div style="min-width:0"><b class="trunc" style="display:block">${esc(nm)}</b><div class="hint">${fmt(c0(bi.amount)/(teamPlayers(l).length||1))} buy-in</div></div>
+          <select class="pay${pp.paid?' paid':''}" data-bi="${k}" style="max-width:170px" aria-label="${esc(nm)} buy-in payment">${payOpts(pp.paid?pp.method:'')}</select></div>`; }).join('')}
+        ${pre?`<div style="border-top:1px solid var(--line);padding-top:10px"><b>Pre-buy · ${fmt(bi.prebuyExtra)}</b><div class="hint">${fmt(c0(bi.prebuyExtra)/(teamPlayers(l).length||1))} collected from each player · the rest of the team</div></div>
+        ${teamPlayers(l).map((nm,k)=>{ const pp=(l.prebuyP||[])[k]||{}; return `<div style="display:flex;justify-content:space-between;gap:10px;align-items:center"><div style="min-width:0"><b class="trunc" style="display:block">${esc(nm)}</b><div class="hint">${fmt(c0(bi.prebuyExtra)/(teamPlayers(l).length||1))} pre-buy</div></div>
+          <select class="pay${pp.paid?' paid':''}" data-pb="${k}" style="max-width:170px" aria-label="${esc(nm)} pre-buy payment">${payOpts(pp.paid?pp.method:'')}</select></div>`; }).join('')}`:''}
+        <button class="btn" id="mPre">${pre?'Undo pre-buy — put back in the auction':`Pre-bought · ${fmt(bi.prebuyExtra)} more (owns 100%)`}</button></div>`:''}
+      ${pre?'<div class="acts"><button class="btn" id="mX">Close</button></div>':''}</div>`,
+  (m,close)=>{
+    m.querySelectorAll('[data-bi]').forEach(sel=>sel.onchange=()=>{ const v=sel.value, k=+sel.dataset.bi; edit(d=>{ const t=d.lots.find(z=>z.id===id); setBuyInPay(t,k,{paid:!!v,method:v}); delete t.buyIn; }); sel.className='pay'+(v?' paid':''); toast(v?`${teamPlayers(l)[k]} · buy-in paid · ${v}`:`${teamPlayers(l)[k]} · buy-in not paid`); });
+    m.querySelectorAll('[data-pb]').forEach(sel=>sel.onchange=()=>{ const v=sel.value, k=+sel.dataset.pb; edit(d=>{ const t=d.lots.find(z=>z.id===id); setPrebuyPay(t,k,{paid:!!v,method:v}); delete t.prebuyPay; }); sel.className='pay'+(v?' paid':''); toast(v?`${teamPlayers(l)[k]} · pre-buy paid · ${v}`:`${teamPlayers(l)[k]} · pre-buy not paid`); });
+    const pb2=m.querySelector('#mPre'); if(pb2) pb2.onclick=()=>{ if(!pre&&c0(l.price)>0&&!confirm(`This team already sold for ${fmt(l.price)}. Mark it pre-bought and clear that sale?`)) return;
+      edit(d=>setPrebuy(d,d.lots.find(z=>z.id===id),!pre)); close(); toast(pre?'Back in the auction':`Lot ${l.lot} pre-bought — skipped in the auction`); };
+    const capB=m.querySelector('#mCap'); if(capB) capB.onclick=()=>{ edit(d=>{ const t=d.lots.find(z=>z.id===id); t.cap=t.cap===1?0:1; t.capSet=true; t.capFlag=false; }); close(); toast(`Captain: ${captainName(doc.lots.find(z=>z.id===id))}`); };
+    m.querySelector('#mX').onclick=close;
+    if(pre) return;
+    const bi=m.querySelector('#mB'), pi=m.querySelector('#mP'), hn=m.querySelector('#mBn');
+    const upd=()=>{ const x=bidderByNum(doc,bi.value); hn.textContent=bi.value?(x?x.name:'New bidder number — it will be added'):''; }; bi.oninput=upd; upd(); setTimeout(()=>bi.focus(),30);
+    const sold=()=>{ const num=bi.value.trim(), price=c0(String(pi.value).replace(/[$,]/g,''));
+      if(!(price>0)){ toast('Enter the price'); pi.focus(); return; } if(!num){ toast('Enter the bidder number'); bi.focus(); return; }
+      if(!P&&doc.minBid&&price<doc.minBid){ if(confirm(`${fmt(price)} is under the ${fmt(doc.minBid)} minimum.\n\nOK sends the team to the pool. Cancel lets you change the price.`)){ edit(d=>setPooled(d,d.lots.find(x=>x.id===id),true)); close(); toast('Sent to the pool'); } else pi.focus(); return; }
+      edit(d=>{ const x=ensureBidder(d,num); if(P) d.pool={bidderId:x.id,price}; else { const t=d.lots.find(z=>z.id===id); setPooled(d,t,false); t.bidderId=x.id; t.price=price; } });
+      close(); toast(`Lot ${l.lot} sold · ${fmt(price)}`); };
+    m.querySelector('#mSold').onclick=sold; [bi,pi].forEach(e=>e.onkeydown=ev=>{ if(ev.key==='Enter'){ ev.preventDefault(); if(e===bi) pi.focus(); else sold(); } });
+    const pb=m.querySelector('#mPool'); if(pb) pb.onclick=()=>{ edit(d=>setPooled(d,d.lots.find(x=>x.id===id),true)); close(); toast(`Lot ${l.lot} → the pool`); };
+    m.querySelector('#mClr').onclick=()=>{ if(!confirm('Clear this lot’s sale?')) return; edit(d=>{ if(P) d.pool={bidderId:'',price:0}; else { const t=d.lots.find(z=>z.id===id); setPooled(d,t,false); t.price=0; t.bidderId=''; } }); close(); };
+  });
+}
+function paneBidders(el){
+  const ql=bq.toLowerCase().trim();
+  const rows=doc.bidders.filter(b=>!ql||String(b.num)===ql||b.name.toLowerCase().includes(ql)).map(b=>({b,o:bidderOwes(doc,b)})).filter(({b,o})=>bf==='all'||(bf==='buyers'?o.total>0:o.total>0&&!b.paid)), HOLD=calcHoldings(doc);
+  const owedAll=doc.bidders.filter(b=>!b.paid).reduce((a,b)=>a+bidderOwes(doc,b).total,0);
+  const cols='grid-template-columns:64px minmax(0,1.4fr) minmax(0,1fr) 100px 150px 36px';
+  el.innerHTML=`<div class="bar"><input class="inp search" id="bq" placeholder="Find a bidder — number or name" value="${esc(bq)}" autocomplete="off"><button class="btn pri" id="bAdd">+ Add bidder</button></div>
+    <div class="bar" style="justify-content:space-between"><div class="chips">${[['all','All'],['buyers','Buyers'],['unpaid','Unpaid']].map(([k,l])=>`<button data-bf="${k}" class="${bf===k?'on':''}">${l}</button>`).join('')}</div><span class="muted" style="font-size:13px">${fmt(owedAll)} still owed · tap a buyer to see their lots</span></div>
+    <div class="card"><div class="row h bids" style="${cols}"><span>#</span><span>Name</span><span>Bought</span><span class="r">Owes</span><span>Paid</span><span></span></div>
+    ${rows.map(({b,o})=>`<div class="row bid${o.lots.length?' exp':''}" data-bx="${b.id}" style="${cols}"><b class="c-num">${o.lots.length?(bOpen[b.id]?'▾ ':'▸ '):''}#${esc(b.num)}</b><span class="c-name trunc">${esc(b.name)}</span><span class="c-bought trunc muted" style="font-size:13px">${(()=>{ const h=HOLD.find(x=>x.bidderId===b.id); const caps=h?h.stakes.filter(s=>s.kind==='prebuy'||s.kind==='team').map(s=>`Lot ${s.lot.lot} ${s.kind==='prebuy'?'pre-bought':s.pct+'% own team'}`):[]; return o.lots.map(l=>l.isPool?'Pool':'Lot '+l.lot).concat(caps).join(', ')||'Nothing bought yet'; })()}</span><b class="c-owes r num">${o.total?fmt(o.total):''}</b>
+      <span class="c-pay">${o.total?`<select class="pay${b.paid?' paid':''}" data-pay="${b.id}" aria-label="Payment for bidder ${esc(b.num)}"><option value="">Not paid</option>${PAY_METHODS.map(mm=>`<option${b.paid&&b.method===mm?' selected':''}>${mm}</option>`).join('')}</select>`:''}</span>
+      <button class="btn c-edit" data-eb="${b.id}" style="height:34px;padding:0 10px" aria-label="Edit bidder ${esc(b.num)}">✎</button></div>${bOpen[b.id]&&o.lots.length?`<div class="bdet">${o.lots.map(l=>`<div class="bdl"><b>Lot ${l.lot}</b><span>${l.isPool?'The Pool · '+esc(l.teams.map(x=>teamName(x)).join(', ')):esc(teamName(l))+' · '+esc(flightName(l.flight))}</span><b class="num">${fmt(l.price)}</b></div>`).join('')}<div class="bdl tot"><b>Total</b><span>${b.paid?'Paid'+(b.method?' · '+esc(b.method):''):'Not paid yet'}</span><b class="num">${fmt(o.total)}</b></div></div>`:''}`).join('')||'<div class="row"><span class="muted">No bidders yet.</span></div>'}</div>`;
+  $('bq').oninput=e=>{ bq=e.target.value; paneBidders(el); const i=$('bq'); i.focus(); i.setSelectionRange(bq.length,bq.length); };
+  $('bAdd').onclick=()=>openBidder(null);
+  el.querySelectorAll('[data-bf]').forEach(x=>x.onclick=()=>{ bf=x.dataset.bf; paneBidders(el); });
+  el.querySelectorAll('[data-bx].exp').forEach(r=>r.onclick=e=>{ if(e.target.closest('select,button')) return; bOpen[r.dataset.bx]=!bOpen[r.dataset.bx]; paneBidders(el); });
+  el.querySelectorAll('[data-pay]').forEach(s=>s.onchange=()=>{ const v=s.value; edit(d=>{ const b=d.bidders.find(x=>x.id===s.dataset.pay); b.paid=!!v; b.method=v||''; }); toast(v?`Marked paid · ${v}`:'Marked not paid'); });
+  el.querySelectorAll('[data-eb]').forEach(x=>x.onclick=()=>openBidder(x.dataset.eb));
+}
+function openBidder(id){
+  const b=id?doc.bidders.find(x=>x.id===id):null, people=doc.people||[];
+  modal(`<div class="hd"><div class="n"><small>BIDDER</small>${b?esc(b.num):'+'}</div><div><b>${b?esc(b.name):'Add a bidder'}</b><span>${b?'Edit name or number':'Type a name — players in the field come up as you type'}</span></div></div>
+    <div class="bd"><div class="fld" style="position:relative"><label for="nN">Name</label><input class="inp" id="nN" value="${esc(b?b.name:'')}" autocomplete="off"><div class="sug" id="nS" hidden></div></div>
+      <div class="fld"><label for="nU">Bidder number</label><input class="inp num" id="nU" inputmode="numeric" value="${esc(b?b.num:nextNum())}" autocomplete="off"></div>
+      <div class="acts"><button class="btn pri" id="nOk">${b?'Save':'Add bidder'}</button>${b?'<button class="btn warn" id="nDel">Remove</button>':''}<button class="btn" id="nX">Cancel</button></div></div>`,
+  (m,close)=>{ const ni=m.querySelector('#nN'), su=m.querySelector('#nS'), ui=m.querySelector('#nU'); let hits=[],cur=0,linked=b?b.memberId:'';
+    const draw=()=>{ const v=ni.value.trim().toLowerCase(); hits=v?people.filter(p=>p.name.toLowerCase().split(/\s+/).some(w=>w.startsWith(v))||p.name.toLowerCase().includes(v)).slice(0,6):[]; cur=0;
+      su.hidden=!hits.length; su.innerHTML=hits.map((p,k)=>`<div data-k="${k}" class="${k===cur?'on':''}">${esc(p.name)}${doc.bidders.some(x=>x.memberId===p.id&&x!==b)?` <span class="muted">· already #${esc(doc.bidders.find(x=>x.memberId===p.id).num)}</span>`:''}</div>`).join('');
+      su.querySelectorAll('[data-k]').forEach(d=>d.onmousedown=e=>{ e.preventDefault(); pick(hits[+d.dataset.k]); }); };
+    const pick=p=>{ ni.value=p.name; linked=p.id; su.hidden=true; ui.focus(); ui.select(); };
+    ni.oninput=()=>{ linked=''; draw(); }; ni.onblur=()=>setTimeout(()=>su.hidden=true,120);
+    ni.onkeydown=e=>{ if(!su.hidden&&(e.key==='ArrowDown'||e.key==='ArrowUp')){ cur=(cur+(e.key==='ArrowDown'?1:-1)+hits.length)%hits.length; su.querySelectorAll('[data-k]').forEach((d,k)=>d.className=k===cur?'on':''); e.preventDefault(); }
+      else if(e.key==='Enter'){ e.preventDefault(); if(!su.hidden&&hits[cur]) pick(hits[cur]); else ui.focus(); } };
+    setTimeout(()=>ni.focus(),30);
+    const ok=()=>{ const name=ni.value.trim(), num=ui.value.trim(); if(!name){ toast('Enter a name'); ni.focus(); return; } if(!num){ toast('Enter a bidder number'); ui.focus(); return; }
+      if(doc.bidders.some(x=>x!==b&&String(x.num)===num)){ toast(`Bidder #${num} is already taken`); ui.focus(); return; }
+      if(linked&&doc.bidders.some(x=>x!==b&&x.memberId===linked)){ toast(`${name} already has a number`); return; }
+      edit(d=>{ if(b){ const x=d.bidders.find(z=>z.id===b.id); Object.assign(x,{name,num,memberId:linked||x.memberId||''}); d.bidders.sort((a,z)=>(+a.num||0)-(+z.num||0)); } else { d.bidders.push({id:uid(),num,name,memberId:linked,paid:false,method:''}); d.bidders.sort((a,z)=>(+a.num||0)-(+z.num||0)); } });
+      close(); toast(b?'Bidder saved':`Bidder #${num} added`); };
+    m.querySelector('#nOk').onclick=ok; ui.onkeydown=e=>{ if(e.key==='Enter'){ e.preventDefault(); ok(); } };
+    const del=m.querySelector('#nDel'); if(del) del.onclick=()=>{ const o=bidderOwes(doc,b); if(!confirm(o.lots.length?`#${b.num} bought ${o.lots.length} lot${o.lots.length>1?'s':''}. Remove anyway? Those sales will show no buyer.`:`Remove bidder #${b.num}?`)) return;
+      edit(d=>{ d.lots.forEach(l=>{ if(l.bidderId===b.id) l.bidderId=''; }); if(d.pool&&d.pool.bidderId===b.id) d.pool.bidderId=''; d.bidders=d.bidders.filter(x=>x.id!==b.id); }); close(); };
+    m.querySelector('#nX').onclick=close; });
+}
+function paneTotals(el,T,P){
+  const plc=['1st','2nd','3rd','4th','5th','6th','7th','8th'], fc=`grid-template-columns:minmax(0,1fr) 60px 100px 96px 100px ${doc.payout.map(()=>'84px').join(' ')}`;
+  el.innerHTML=`<div class="card" style="margin-bottom:16px"><h2 class="h2">By flight</h2><div class="sub">Expenses (${fmt(T.exp)}) come out evenly across ${T.flights.length} flights${T.pooled?'; the pool’s price is shared by its teams’ flights':''}.</div>
+      <div class="fcards">${T.byF.map(f=>`<div class="fcard"><div class="fc1"><b>${esc(f.flight)}</b><b class="num ${f.net<0?'neg':''}">${fmt(f.net)} <small class="muted">net</small></b></div>
+          <div class="fc2 num muted">${fmt(f.gross)} gross${f.buyIns?` (${fmt(f.auction+f.fromPool)} auction · ${fmt(f.buyIns)} buy-ins)`:''} · −${fmt(f.share)} expenses · ${f.sold}/${f.teams-f.prebuy} sold${f.pooled?` · ${f.pooled} in pool`:''}${f.prebuy?` · ${f.prebuy} pre-bought`:''}</div>
+          <div class="fc3 num">${doc.payout.map((p,i)=>`<span><small class="muted">${plc[i]||i+1}</small> ${fmt(f.places[i])}</span>`).join('')}</div></div>`).join('')}
+        <div class="fcard tot"><div class="fc1"><b>Total</b><b class="num">${fmt(T.net)} <small class="muted">net</small></b></div><div class="fc2 num muted">${fmt(T.pot)} gross · −${fmt(T.exp)} expenses · ${T.sold}/${T.lots} sold</div></div></div>
+      <div class="ftable" style="overflow-x:auto;-webkit-overflow-scrolling:touch"><div style="min-width:${520+doc.payout.length*84}px"><div class="row h" style="${fc}"><span>Flight</span><span class="r">Sold</span><span class="r">Gross</span><span class="r">Expenses</span><span class="r">Net pot</span>${doc.payout.map((p,i)=>`<span class="r">${plc[i]||i+1} ${p}%</span>`).join('')}</div>
+      ${T.byF.map(f=>`<div class="row num" style="${fc}"><b>${esc(f.flight)}</b><span class="r muted">${f.sold}/${f.teams}</span><span class="r">${fmt(f.gross)}</span><span class="r neg">−${fmt(f.share)}</span><b class="r ${f.net<0?'neg':''}">${fmt(f.net)}</b>${f.places.map(v=>`<span class="r">${fmt(v)}</span>`).join('')}</div>`).join('')}
+      <div class="row num tot" style="${fc}"><span>Total</span><span class="r">${T.sold}/${T.lots}</span><span class="r">${fmt(T.pot)}</span><span class="r neg">−${fmt(T.exp)}</span><span class="r">${fmt(T.net)}</span>${doc.payout.map((p,i)=>`<span class="r">${fmt(T.byF.reduce((a,f)=>a+f.places[i],0))}</span>`).join('')}</div></div></div></div>
+    <div class="card" style="margin-bottom:16px"><h2 class="h2">Buyers &amp; shares</h2><div class="sub">Everyone to pay out — captains own their team’s share with or without a paddle.</div>
+      ${calcHoldings(doc).map(h=>`<div class="row" style="grid-template-columns:62px minmax(0,1fr);align-items:start"><b class="num">${h.num?'#'+esc(h.num):'<span class="muted" style="font-size:12px;font-weight:500">no paddle</span>'}</b><div style="min-width:0"><b>${esc(h.name)}</b><div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:4px">${h.stakes.map(st=>`<span class="tag ${st.kind==='prebuy'?'ok':st.kind==='team'?'':'p'}">Lot ${st.lot.lot} · ${st.pct}%${st.kind==='prebuy'?' · pre-bought':st.kind==='team'?' · own team':st.kind==='pool'?' · pool':''}</span>`).join('')}</div></div></div>`).join('')||'<div class="row"><span class="muted">No buyers yet.</span></div>'}</div>
+    <div class="two"><div class="card"><h2 class="h2">Payments</h2><div class="sub">${buyInOf(doc).on?'Auction purchases are paid by the buyer; buy-ins and pre-buys by the team.':`${P.paid} of ${P.buyers} buyers paid`}</div>
+      ${(()=>{ const BI=buyInOf(doc).on, K=BI?[['auction','Auction'],['buyin','Buy-ins'],['prebuy','Pre-buys']]:[['auction','Auction']];
+        const cols=`grid-template-columns:minmax(0,1fr) ${K.map(()=>'minmax(64px,auto)').join(' ')}${BI?' minmax(70px,auto)':''}`;
+        const line=(lab,vals,tot,cls='')=>`<div class="row num ${cls}" style="${cols};gap:8px">${`<span>${lab}</span>`}${vals.map(v=>`<span class="r">${v}</span>`).join('')}${BI?`<b class="r">${tot}</b>`:''}</div>`;
+        return `<div class="row h" style="${cols};gap:8px"><span>Method</span>${K.map(([,l])=>`<span class="r">${l}</span>`).join('')}${BI?'<span class="r">Total</span>':''}</div>`
+          +PAY_METHODS.map(m=>line(m,K.map(([k])=>fmt(P.g[k].by[m])),fmt(P.by[m]))).join('')
+          +(P.notRecorded?line('<span class="neg">No method</span>',K.map(([k])=>fmt(P.g[k].by.notRecorded)),fmt(P.notRecorded)):'')
+          +line('Collected',K.map(([k])=>fmt(P.g[k].paid)),fmt(P.collected),'tot')
+          +line('Still owed',K.map(([k])=>`<span class="${P.g[k].owed?'neg':''}">${fmt(P.g[k].owed)}</span>`),`<span class="${P.outstanding?'neg':''}">${fmt(P.outstanding)}</span>`); })()}</div>
+    <div class="card"><h2 class="h2">Cash drawer</h2><div class="sub">Count the cash and compare it with what the payments say should be there.</div>
+      <div style="padding:0 16px 16px;display:flex;flex-direction:column;gap:10px">
+        <div class="fld"><label for="cf">Starting cash</label><input class="inp num" id="cf" inputmode="decimal" value="${doc.cashFloat??''}" placeholder="0"></div>
+        <div class="row num" style="grid-template-columns:minmax(0,1fr) auto;padding:6px 0;border:none"><span class="muted">+ Cash payments (all kinds)</span><b>${fmt(P.by.Cash)}</b></div>
+        <div class="row num" style="grid-template-columns:minmax(0,1fr) auto;padding:6px 0;border:none"><b>Should be in the drawer</b><b>${fmt(P.expectedCash)}</b></div>
+        <div class="fld"><label for="cc">Cash counted</label><input class="inp num" id="cc" inputmode="decimal" value="${doc.cashCount??''}" placeholder="Count, then enter"></div>
+        ${P.overShort==null?'':`<div class="banner" style="margin:0;${Math.abs(P.overShort)<0.005?'background:#E3F0E8;border-color:#BCD9C7;color:#174F37':'background:#F8E6DF;border-color:#EBC2B3;color:#6E2A1B'}"><b>${Math.abs(P.overShort)<0.005?'Balanced ✓':(P.overShort>0?'Over by ':'Short by ')+fmt(Math.abs(P.overShort))}</b></div>`}</div></div></div>`;
+  const setCash=(k,v)=>edit(d=>{ d[k]=String(v).trim()===''?null:c0(String(v).replace(/[$,]/g,'')); });
+  $('cf').onchange=e=>setCash('cashFloat',e.target.value); $('cc').onchange=e=>setCash('cashCount',e.target.value);
+}
+window.__canReload=()=>!modalOpen&&!dirty&&!saving;
+/*AUTOUPDATE*/
+
+boot();
+</script>
+</body>
+</html>
