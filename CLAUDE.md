@@ -175,7 +175,18 @@ Sunday best ball). **Create scoring events** builds one golf event per round fro
 days copy the first day's flights; groups copy on request). `tournamentResults(t, basis)` totals the rounds per team
 (or player) in the rounds' unit — strokes to par (gross/net basis), points, holes, match points — ranked overall and
 per flight, marked Final when every event is closed. **Send finishes to Calcutta** writes each lot's `place` from the
-flight positions (lots matched by member id or name).
+flight positions (lots matched by member id or name). **Results sheet (PDF)** = branded jsPDF sheet per flight + overall.
+- **Flights are per tournament** (`t.flights`, `setTournamentFlights`): units = field teams/players by combined
+  Handicap Index (partner cap applied), whole groups per flight, lowest to Flight A; each flight has a course and a
+  start (shotgun / tee times, first time, gap, off hole). `applyFlights(t, ev)` pushes them to every round's event
+  (`createRoundEvents` does it automatically; the event's Flights tab shows a banner and a re-apply button).
+- **Pairings:** day one → `buildGroupsFromFlights(ev)` (by combined handicap: shotgun holes 1, 2, 3… / tee times in
+  order); later days → `pairByStandings(t, round)`: teams ordered by the standings over the earlier rounds within
+  each flight, paired in order; tee-time flights send the leaders off last, shotgun flights put the leaders on hole 1.
+  Groups stay editable on the event.
+- **Partner handicap differential cap** (`t.hcpDiff`, 0/8/10/12, Tournament details): `effIndex(ev, p)` in golf.js
+  pulls the higher partner's index down to the lowest partner's index + cap before the course handicap; the Field
+  tab flags capped players (↓ from). Applies to every event of the tournament and to the tournament flights.
 
 ### Calcutta (`calccore.js`, `calcutta.js`, `payouts.js`)
 Sub-tabs: Lots · Bidders · Buyers & shares · Money · Results · Payouts · Setup.

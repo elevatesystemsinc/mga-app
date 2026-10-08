@@ -28,7 +28,11 @@ status, join date, notes and dues per organization. Editing a person's details a
 Each tournament declares its rounds — one or more per day, each with a format (a day can be scramble on the front
 and shamble on the back, the next day best ball). **Create scoring events** builds the live-scoring events from the
 field in one click, teams and all; later days copy the first day's flights, and groups can be copied too. **Results**
-total every round per team or player, overall and by flight, and can be sent to the Calcutta as finishes. Tournament
+total every round per team or player, overall and by flight, print to a branded **results sheet (PDF)**, and can be
+sent to the Calcutta as finishes. **Flights** are set once per tournament by combined Handicap Index (with the optional
+partner handicap differential cap, e.g. 10 strokes: a +2 and a 12 play as +2 and 8) and pushed to every round; day one
+groups are built by handicap, later days **paired by the standings** (leaders off last with tee times, on hole 1 for a
+shotgun), and every group stays editable. Tournament
 details has checkboxes for which tabs a tournament uses: the Calcutta, sponsors, meals, checklist and the 50/50 drawing
 are optional; registration, check-in and rounds are always there.
 

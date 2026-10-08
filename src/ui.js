@@ -227,6 +227,7 @@ function editNewTournament(){
       pair(field('Start date','nStart','',{type:'date'}),field('Venue','nVenue','Walnut Creek Country Club'))+
       pair(field('Entry fee per player','nFee','',{type:'number',ph:'$'}),field('Skins / day money per player','nSkins','',{type:'number',ph:'$ (optional)'}))+
       pair(field('Expected players','nPlayers','',{type:'number',hint:'Used for the budget until the field is entered.'}),field('Players per team','nTeam',2,{type:'select',options:[[1,'Individual'],[2,'2-person teams'],[3,'3-person teams'],[4,'4-person teams']]}))+
+      field('Partner handicap differential cap','nDiff',0,{type:'select',options:[[0,'Off'],[8,'8 strokes'],[10,'10 strokes'],[12,'12 strokes']],hint:'With a cap, the higher partner’s index is pulled down to the lower index + cap before course handicaps (a +2 with a 10 plays as +2 and 8 under a 10-stroke cap).'})+
       featuresHTML('nf',{budget:true})+
       field('Golf Genius event (optional)','nGG','',{ph:'Event name or link, for syncing signups later'})+
       field('Start from','nCopy','',{type:'select',options:[['','Blank tournament']].concat(prev.map(t=>[t.id,`Copy ${t.name} (${t.season})`])),hint:'Copying brings over meals, events, sponsor tiers, income and expense lines — actuals, payments and the field are cleared.'}),
@@ -234,7 +235,7 @@ function editNewTournament(){
     save:()=>{
       const name=fv('nName'); if(!name){ toast('Give the tournament a name'); return false; }
       const days=+$('nDays').dataset.val||1; const src=db.tournaments.find(t=>t.id===fv('nCopy'));
-      let t=newTournament({season:Y(),name,days,startDate:fv('nStart'),venue:fv('nVenue'),entryFee:fnum('nFee'),skinsFee:fnum('nSkins'),plannedPlayers:fnum('nPlayers'),teamSize:+fv('nTeam'),ggEvent:fv('nGG'),features:readFeatures('nf')});
+      let t=newTournament({season:Y(),name,days,startDate:fv('nStart'),venue:fv('nVenue'),entryFee:fnum('nFee'),skinsFee:fnum('nSkins'),plannedPlayers:fnum('nPlayers'),teamSize:+fv('nTeam'),ggEvent:fv('nGG'),features:readFeatures('nf'),hcpDiff:+fv('nDiff')||0});
       if(src) copyStructure(src,t);
       db.tournaments.push(t); view.tid=t.id; view.page='tournament'; view.ttab=t.features.meals?'meals':'field'; toast('Tournament created');
     }});
@@ -280,10 +281,11 @@ function editTournament(t){
       pair(field('Entry fee per player','eFee',t.entryFee,{type:'number'}),field('Skins / day money per player','eSkins',t.skinsFee,{type:'number'}))+
       field('Budget player count from','eBasis',t.budgetBasis,{type:'select',options:[['planned','Planned count'],['field',`The field (${t.field.length} players now)`]],hint:'Switch to the field once signups close.'})+pair(field('Planned players','ePlayers',t.plannedPlayers,{type:'number'}),field('Players per team','eTeam',t.teamSize,{type:'select',options:[[1,'Individual'],[2,'2-person teams'],[3,'3-person teams'],[4,'4-person teams']]}))+
       pair(field('Status','eStatus',t.status,{type:'select',options:['Planning','Open for signups','Complete']}),field('Sponsorship goal','eGoal',t.goal,{type:'number'}))+
+      field('Partner handicap differential cap','eDiff',t.hcpDiff||0,{type:'select',options:[[0,'Off'],[8,'8 strokes'],[10,'10 strokes'],[12,'12 strokes']],hint:'The higher partner’s index is pulled down to the lower index + cap before course handicaps are worked out.'})+
       featuresHTML('ef',tFeatures(t))+field('Golf Genius event','eGG',t.ggEvent)+field('Notes','eNotes',t.notes,{type:'textarea'}),
     wire:r=>wireSeg(r,'eDays'),
     save:()=>{ Object.assign(t,{name:fv('eName')||t.name,days:+$('eDays').dataset.val||t.days,startDate:fv('eStart'),venue:fv('eVenue'),entryFee:fnum('eFee'),skinsFee:fnum('eSkins'),
-      plannedPlayers:fnum('ePlayers'),budgetBasis:fv('eBasis'),teamSize:+fv('eTeam'),status:fv('eStatus'),goal:fnum('eGoal'),ggEvent:fv('eGG'),notes:fv('eNotes'),features:readFeatures('ef')}); toast('Saved'); },
+      plannedPlayers:fnum('ePlayers'),budgetBasis:fv('eBasis'),teamSize:+fv('eTeam'),status:fv('eStatus'),goal:fnum('eGoal'),ggEvent:fv('eGG'),notes:fv('eNotes'),features:readFeatures('ef'),hcpDiff:+fv('eDiff')||0}); toast('Saved'); },
     del:()=>{ if(!confirm(`Delete ${t.name} and everything in it?`)) return false; const i=db.tournaments.indexOf(t), copy=clone(t);
       db.tournaments.splice(i,1); view.page='tournaments'; toast('Tournament deleted',()=>{db.tournaments.splice(i,0,copy);persist();render();}); },delLabel:'Delete tournament'});
 }

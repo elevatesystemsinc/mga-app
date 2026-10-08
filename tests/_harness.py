@@ -4,9 +4,11 @@ import os,json,copy,collections
 ROOT=os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 XLSX=os.path.join(ROOT,'tests','node_modules','xlsx','dist','xlsx.full.min.js')
 FAKE=os.path.join(ROOT,'tests','fake_supabase.js')
+JSPDF=os.path.join(ROOT,'tests','node_modules','jspdf','dist','jspdf.umd.min.js')
 async def _common(pg):
     await pg.route('**/fonts.googleapis.com/**',lambda r:r.fulfill(body='',content_type='text/css'))
     if os.path.exists(XLSX): await pg.route('**/xlsx.full.min.js',lambda r:r.fulfill(path=XLSX,content_type='text/javascript'))
+    if os.path.exists(JSPDF): await pg.route('**/jspdf.umd.min.js',lambda r:r.fulfill(path=JSPDF,content_type='text/javascript'))
 async def local(pg):
     await pg.route('**/config.js',lambda r:r.fulfill(body="window.MM_CONFIG={};",content_type='text/javascript'))
     await pg.route('**/supabase.min.js',lambda r:r.fulfill(body="",content_type='text/javascript'))

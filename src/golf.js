@@ -36,8 +36,14 @@ function newCode(ev){ let c; do{ c=Array.from({length:5},()=>CODE_CHARS[Math.flo
 const slugify=s=>String(s||'').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'').slice(0,40)||'event';
 function scoringLink(ev){ return SITE_BASE+'score.html?e='+encodeURIComponent(ev.slug); }
 function playerIndex(p){ const own=p.index!=null&&String(p.index).trim()!==''?p.index:null; const m=p.memberId?memberById(p.memberId):null; return parseIndex(own!=null?own:(m?m.hcp:null)); }
-function playerHcp(ev,grp,p){ const c=courseById(grp.course); const idx=playerIndex(p); const ch=c?courseHcp(idx,c,p.tee||ev.defaultTee||'White',p.set||'M'):null;
-  return {idx,ch,ph:phFromCH(ev,ch),missing:idx==null?'index':ch==null?'rating':''}; }
+/* the index a player plays off in an event: the tournament's partner differential cap (e.g. 10 strokes) pulls the
+   higher partner's index down to the lowest partner's index + cap before the course handicap is worked out */
+function effIndex(ev,p){ const raw=playerIndex(p); const t=ev&&ev.tournamentId?db.tournaments.find(x=>x.id===ev.tournamentId):null, cap=t?+t.hcpDiff||0:0;
+  if(!cap||raw==null||!p.team) return {idx:raw,raw,capped:false,cap};
+  const mates=evPlayers(ev).map(x=>x.p).filter(x=>x.team===p.team&&x.id!==p.id).map(playerIndex).filter(v=>v!=null); if(!mates.length) return {idx:raw,raw,capped:false,cap};
+  const low=Math.min(raw,...mates), idx=raw>low+cap?Math.round((low+cap)*10)/10:raw; return {idx,raw,capped:idx!==raw,cap}; }
+function playerHcp(ev,grp,p){ const c=courseById(grp.course); const e=effIndex(ev,p), idx=e.idx; const ch=c?courseHcp(idx,c,p.tee||ev.defaultTee||'White',p.set||'M'):null;
+  return {idx,raw:e.raw,capped:e.capped,cap:e.cap,ch,ph:phFromCH(ev,ch),missing:idx==null?'index':ch==null?'rating':''}; }
 /* every player in the event: in a group, or on the roster waiting for one */
 function evPlayers(ev){ return ev.groups.flatMap(grp=>grp.players.map(p=>({p,grp}))).concat((ev.pool||[]).map(p=>({p,grp:null}))); }
 function courseFor(ev,p,grp){ if(grp) return grp.course; const F=ev.flights||{}; return (F.courseOf&&F.courseOf[p.flight])||(F.courses&&F.courses!=='split'?F.courses:'')||ev.defaultCourse||'oak'; }
@@ -351,7 +357,7 @@ function gField(el,ev){
     <span class="muted" style="margin-left:auto;font-size:13px">${all.length} players${BB||t?` · ${new Set(all.map(x=>x.p.team).filter(Boolean)).size} teams`:''}${noIdx?` · <span class="neg">${noIdx} without an index</span>`:''}</span></div>
   ${!t&&!all.length?'<div class="banner">Link this event to a tournament in Details to import its field, or add players one at a time.</div>':''}
   <div class="card" style="overflow:hidden">${all.length?`<div class="tw"><div class="t" style="min-width:860px"><div class="tr th" style="${cols}"><span>Player</span><span>Team</span><span class="r">Index</span><span class="r">CH</span><span>Tee</span><span>Flight</span><span>Group</span><span></span></div>
-    ${rows.map(({p,grp})=>{ const h=hcpOf(ev,p,grp); return `<div class="tr num click" data-fp="${p.id}" style="${cols}"><div class="cell2"><b class="trunc">${esc(p.name)}</b>${p.memberId?'':'<small>Guest</small>'}</div><span class="muted">${p.team?'Team '+(/^T\d+$/.test(p.team)?p.team.slice(1):teamN.get(p.team)):'—'}</span><span class="r">${h.idx==null?'<span class="neg">—</span>':idxTxt(h.idx)}</span><span class="r">${fmtH(h.ch,'course')}</span><span class="muted">${esc(p.tee||ev.defaultTee)}</span><span>${p.flight?`<span class="chip gold">${esc(p.flight)}</span>`:'<span class="muted">—</span>'}</span><span class="muted">${grp?esc(grp.code):'—'}</span><span class="ib">${I.edit}</span></div>`; }).join('')}</div></div>`
+    ${rows.map(({p,grp})=>{ const h=hcpOf(ev,p,grp); return `<div class="tr num click" data-fp="${p.id}" style="${cols}"><div class="cell2"><b class="trunc">${esc(p.name)}</b>${p.memberId?'':'<small>Guest</small>'}</div><span class="muted">${p.team?'Team '+(/^T\d+$/.test(p.team)?p.team.slice(1):teamN.get(p.team)):'—'}</span><span class="r">${h.idx==null?'<span class="neg">—</span>':idxTxt(h.idx)}${h.capped?`<small class="muted" title="Capped from ${idxTxt(h.raw)}: the tournament’s ${h.cap}-stroke partner differential rule"> ↓${idxTxt(h.raw)}</small>`:''}</span><span class="r">${fmtH(h.ch,'course')}</span><span class="muted">${esc(p.tee||ev.defaultTee)}</span><span>${p.flight?`<span class="chip gold">${esc(p.flight)}</span>`:'<span class="muted">—</span>'}</span><span class="muted">${grp?esc(grp.code):'—'}</span><span class="ib">${I.edit}</span></div>`; }).join('')}</div></div>`
     :`<div class="empty"><b>No players yet</b><span>${t?`Import the ${esc(t.name)} field — teams and handicaps come with it.`:'Add players, or link a tournament to import its field.'}</span></div>`}</div>
   ${all.length?`<div style="display:flex;justify-content:flex-end"><button class="btn" id="gfNext">Next: set flights ${I.chev}</button></div>`:''}`;
   const imp=$('gfImp'); if(imp) imp.onclick=()=>importFieldToEvent(ev,t);
@@ -409,7 +415,8 @@ function gFlights(el,ev){
   const missingTees=[...new Set(noRate.map(x=>`${courseById(courseFor(ev,x.p,x.grp))?.name.replace(' Course','')} ${x.p.tee||ev.defaultTee} (${(x.p.set||'M')==='W'?'women':'men'})`))];
   const cur=F.count?F.names.map(n=>({n,ps:withH.filter(x=>x.p.flight===n)})):[];
   const val=x=>F.basis==='index'?x.h.idx:x.h.ch;
-  el.innerHTML=`<div class="card pad" style="display:flex;flex-direction:column;gap:14px">
+  const tF=t&&t.flights&&t.flights.count?t.flights:null;
+  el.innerHTML=`${tF?`<div class="banner" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap"><span style="flex:1 1 280px">This event belongs to <b>${esc(t.name)}</b>, whose flights are set once for the whole tournament (${tF.count} flights by combined index) on its Rounds &amp; results tab.</span><button class="btn sm" id="flUseT">${F.count?'Re-apply':'Use'} tournament flights</button></div>`:''}<div class="card pad" style="display:flex;flex-direction:column;gap:14px">
     <div style="display:flex;gap:16px;flex-wrap:wrap;align-items:flex-end">
       <div class="fld" style="width:130px"><label class="lbl" for="flN">Number of flights</label><input class="inp num" id="flN" inputmode="numeric" value="${F.count||''}" placeholder="e.g. 4"></div>
       <div class="fld" style="width:230px"><label class="lbl" for="flB">Fill by</label><select class="inp" id="flB"><option value="course"${F.basis!=='index'?' selected':''}>Course handicap (rating & slope)</option><option value="index"${F.basis==='index'?' selected':''}>Handicap Index</option></select></div>
@@ -440,6 +447,7 @@ function gFlights(el,ev){
       ${f.ps.sort((a,b)=>(val(a)??99)-(val(b)??99)).map(x=>`<div class="tr num" style="grid-template-columns:minmax(0,1fr) 44px 58px;min-height:40px;font-size:13px"><span class="trunc">${esc(x.p.name)}</span><span class="r muted">${fmtH(val(x),F.basis)}</span><select class="inp" data-mv="${x.p.id}" aria-label="Move ${esc(x.p.name)}" style="height:30px;padding:0 4px;font-size:12px">${F.names.map(n=>`<option${n===f.n?' selected':''}>${n}</option>`).join('')}</select></div>`).join('')}</div>`; }).join('')}</div>
    ${withH.some(x=>!x.p.flight)?`<p class="hint">${withH.filter(x=>!x.p.flight).length} players aren’t in a flight (no handicap). Add their index and re-flight.</p>`:''}
    <div style="display:flex;justify-content:flex-end"><button class="btn pri" id="flNext">Next: build groups from flights ${I.chev}</button></div>`:''}`;
+  const useT=$('flUseT'); if(useT) useT.onclick=()=>{ applyFlights(t,ev); golfSave(ev); render(); toast('Tournament flights applied to this event'); };
   $('flGo').onclick=()=>{ const n=parseInt(fv('flN'),10); if(!(n>=1&&n<=10)){ toast('Enter 1–10 flights'); return; }
     const basis=fv('flB'), unit=teams?fv('flU'):'player', gsize=+fv('flG')||4, cmode=fv('flC');
     const us0=flightUnits(ev,basis,unit), sz={}; us0.forEach(u=>sz[u.members.length]=(sz[u.members.length]||0)+1); const tsz=+Object.entries(sz).sort((a,b)=>b[1]-a[1])[0]?.[0]||1;
