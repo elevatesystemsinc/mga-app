@@ -13,7 +13,9 @@ own table (`mga_hub`), one row per organization.
 
 - `main` → **app.wcccmga.org** — the club hub, the product going forward. The club is at `/`; each organization has its
   own address: `/mga`, `/lga`, `/smga`, and `/<id>` for a small group. (Render: one Rewrite rule, `/*` → `/index.html`.)
-- `Hub` → **hub.wcccmga.org** — the MGA Hub as the board is using it for the 2026 season (bug fixes only).
+- **hub.wcccmga.org** — the MGA's address. Served from `main` as well (bare host = the MGA hub, `/club` = the club
+  hub), once the Render site for that domain is switched from the old `Hub` branch to `main`; until then it runs the
+  old MGA Hub code against its own row, kept in two-way sync (below).
 
 The MGA's hub on app.wcccmga.org and hub.wcccmga.org show the **same data**: the two are kept in two-way sync while
 anyone has the club hub or the MGA hub open (every half minute, and right after a save). An edit on either site

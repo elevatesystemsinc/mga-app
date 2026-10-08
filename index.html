@@ -595,8 +595,11 @@ const HTTP=/^https?:/.test(location.protocol);
 const SITE_BASE=HTTP?location.origin+'/':location.href.split('#')[0].split('?')[0].replace(/[^/]*$/,'');
 /* Which organization this page is: the first path segment — app.wcccmga.org/ is the club, /mga the MGA, /lga, /smga,
    /<group id> a small group (Render rewrites every path to index.html). ?org= is the fallback for file:// testing. */
+/* The organization a bare host opens: app.wcccmga.org → the club; hub.wcccmga.org (the MGA's old address, now the same
+   site) → the MGA. On a hub host the club hub lives at /club. */
+const HOST_ORG=HTTP&&/^hub\./i.test(location.hostname)?'mga':'club';
 let ORG_ID=(()=>{ const q=new URLSearchParams(location.search).get('org');
-  if(HTTP){ const seg=location.pathname.split('/').filter(s=>s&&!/\.html?$/i.test(s)); return (seg[0]||q||'club').toLowerCase(); }
+  if(HTTP){ const seg=location.pathname.split('/').filter(s=>s&&!/\.html?$/i.test(s)); return (seg[0]||q||HOST_ORG).toLowerCase(); }
   return q!=null?q:''; })();
 /* Admin links: /<org>#key=TOKEN. The token stays on this device; without a board sign-in the page then reads and
    writes that one organization's row (and reads the directory) through the hub_key_* database functions — nothing
@@ -628,8 +631,8 @@ openLocal();
 const orgDocs=()=>(CLUB&&CLUB.orgs||[]).filter(o=>!o.archived&&DOCS[o.id]&&DOCS[o.id].db).map(o=>({meta:o,db:DOCS[o.id].db}));
 async function openOrgDocs(){ if(ORG_ID!=='club'||!CLUB) return; for(const o of CLUB.orgs){ if(o.archived||(DOCS[o.id]&&DOCS[o.id].base)) continue; try{ await loadDoc(o.id,o,{create:true}); }catch(_){} } }
 /* choose an organization (reload keeps every module's state clean) */
-function chooseOrg(id){ if(HTTP){ location.href=SITE_BASE+(id&&id!=='club'?encodeURIComponent(id):''); return; } const u=new URL(location.href); if(id) u.searchParams.set('org',id); else u.searchParams.delete('org'); location.href=u.toString(); }
-const orgURL=id=>HTTP?SITE_BASE.replace(/^https?:\/\//,'')+(id==='club'?'':id):'?org='+id;
+function chooseOrg(id){ if(HTTP){ location.href=SITE_BASE+(id&&id!==HOST_ORG?encodeURIComponent(id):''); return; } const u=new URL(location.href); if(id) u.searchParams.set('org',id); else u.searchParams.delete('org'); location.href=u.toString(); }
+const orgURL=id=>HTTP?SITE_BASE.replace(/^https?:\/\//,'')+(id===HOST_ORG?'':id):'?org='+id;
 
 /* Stable stringify: Postgres jsonb reorders keys, so plain JSON.stringify can't tell "same data" apart. */
 function stable(o){ if(Array.isArray(o)) return '['+o.map(stable).join(',')+']';
@@ -5556,7 +5559,7 @@ async function resultsPDF(t,opt){
 /* Keeps every open device on the latest version: checks version.json about once a minute and, when a
    newer build is live, reloads at a safe moment (nothing unsaved, no editor open, not mid-typing). */
 (function(){
-  const ME='20261008214405'; let ready=false, lastCheck=0;
+  const ME='20261008215042'; let ready=false, lastCheck=0;
   const typing=()=>{ const a=document.activeElement; return a&&/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)&&a.value&&a.type!=='search'; };
   const safe=()=>!typing()&&(typeof window.__canReload!=='function'||window.__canReload());
   async function check(){ lastCheck=Date.now(); if(location.protocol==='file:') return;

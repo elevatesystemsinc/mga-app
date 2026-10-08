@@ -10,13 +10,13 @@ Owner: Zach Walls.
 
 Read this file first. Then read `README.md` (user-facing feature guide) as needed.
 
-> **Branches.** `main` (this branch, deployed at **app.wcccmga.org**) is the product going forward — work here.
-> `Hub` is the frozen MGA Hub the board is using for the 2026 season at **hub.wcccmga.org**; it gets bug fixes
-> only, and any fix made there is cherry-picked to `main`. Both branches share one Supabase project and the
-> `mga_hub` table: `Hub` owns the row with id `main`; this branch owns the rows `club`, `mga`, `lga`, `smga`
-> and one per small group. The MGA's row and the Hub's `main` row are kept in **two-way sync** (`hubSync()` in
-> core.js, §3) — the only writes this branch makes to `main`, always a compare-and-swap merge, never a replace.
-> When the club hub is live and the MGA has moved over, `Hub` is deprecated and the link switched off.
+> **Branches and hosts.** `main` (this branch) is the product — work here. It is deployed at **app.wcccmga.org**
+> (bare host = the club hub) and, once Render's hub.wcccmga.org site is switched from the `Hub` branch to `main`, at
+> **hub.wcccmga.org** too (bare host = the MGA hub: `HOST_ORG` in core.js; the club hub is then `/club` there).
+> `Hub` is the old frozen MGA Hub code; it owned the `mga_hub` row `main`. While hub.wcccmga.org still serves the
+> `Hub` branch, the MGA's row and `main` are kept in **two-way sync** (`hubSync()`, §3) — the only writes this branch
+> makes to `main`, always a compare-and-swap merge. After the host switch, turn the sync off (Organizations → MGA)
+> and treat `main` and the `Hub` branch as history.
 
 ---
 
