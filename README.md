@@ -23,6 +23,15 @@ own hub. An organization's **Members** page is the club members who belong to it
 the organization's own list (club members are matched and joined; new people are added to the directory too), and keep
 status, join date, notes and dues per organization. Editing a person's details anywhere updates the directory.
 
+## Small groups
+
+A small group's hub is the regular game. **Games**: date, course, entry money and an optional skins entry; add the
+regulars from the member list (or a guest), mark who has paid. **Open live scoring** puts everyone in groups of four
+with a group ID for the scoring page on their phones; scores can also be entered in the hub. **Payouts**: split the pot
+by finish (from the leaderboard, or by hand — ties share the places they cover), pay the **skins** from the hole-by-hole
+scores (ties carry over), or add a payout by hand. The **Ledger** shows who is up or down for the season or any quarter
+(paid out − paid in, plus side bets or settle-ups recorded as adjustments), with a one-click settle-up.
+
 First time on a database the club hub offers **Set up from the MGA Hub**: it builds the directory from the MGA's list,
 registers the three associations and copies the MGA Hub's data into the MGA's hub. The club hub's Organizations page can
 re-run that import later.

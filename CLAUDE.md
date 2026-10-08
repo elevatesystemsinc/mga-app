@@ -43,6 +43,7 @@ src/
   treasury.js          season ledger, budget vs actual, bank import
   golfcore.js          courses (WCCC Oak/Pecan ratings), WHS math, scoring engine, scorecard renderer  [shared]
   golf.js              Golf page: events, field, flights, groups, live scoring, printed cards
+  games.js             small groups: Games (entry money, payouts by finish / skins, live scoring via golf events), Ledger
   calccore.js          Calcutta pure logic                                                            [shared]
   pdffonts.js          PDF_FONTS: base64 TTFs for jsPDF (Public Sans 400/700/800, Cormorant 700 w/ lining digits)
   calcutta.js          Calcutta tab: lots, bidders, buyers & shares, money, setup, cashier link, bidder sheet PDF
@@ -105,8 +106,15 @@ Tournament = { id, name, season, days, startDate, field:[{id,memberId,team,paid,
   (which keep both documents right) — `memberSnapshot()`/`memberRestore()` for undo. A person is one record
   club-wide; removing someone from an association only ends the membership.
 - Organization kinds gate the nav (`ORG_NAV` in ui.js): club = directory, organizations, tournaments, golf, budget,
-  treasury; association = everything the MGA has; group = dashboard, tournaments, golf, members (the stripped-down
-  small-group version is still to be built).
+  treasury; association = everything the MGA has; group = dashboard, games, ledger, golf, members.
+- **Small groups** (`games.js`, group documents only): `db.games` = [{id, season, date, time, name, course, entry,
+  skinsEntry, net, status, players:[{id, memberId|name, paid, inSkins, extraIn, gpid}], payouts:[{kind:'places'|
+  'skins'|'manual', pid, amount, note}], golfEventId}] and `db.ledgerAdj` (side bets / settle-ups). Money is a record
+  of what changed hands: a player's in = entry (+ skins entry if in, + extras), out = Σ payouts; the Ledger's net =
+  out − in + adjustments, per season or quarter. `openScoring(g)` creates a golf event for the game (players in groups
+  of four, `gpid` links game player → event player) and `syncGameEvent` keeps it in step; payouts by finish use the
+  event leaderboard (ties share places, cent-exact) or hand-entered positions; skins come from the hole scores
+  (lowest outright wins; ties carry over, optional; carried skins unpaid at the end).
 - Arrays of objects carry stable `id`s — the merge (§3) matches by id. Keep it that way for anything new.
 - `_rev` (revision), `_w` (writer/client id), `_at` are bookkeeping, excluded from comparisons.
 - **Device-local, never in the shared doc:** cashier/check-in link status (`SHARE_ST`, `CKI_ST`), the cashier-link merge base (`localStorage mga_cbase_<tid>`), check-in base (`mga_ckibase_<tid>`).
@@ -223,6 +231,8 @@ groups, printed scorecards — the printed cards include a live-scoring QR that 
   hub's import / Verify / two-way sync / "Retire current app" code was removed in Oct 2026. Stored documents may still carry `db.legacy`, `t.source` (`kind:'mm-app'`) and
   `t.sync` from that era; nothing reads them and `normalize()` leaves them alone.
 - 2026 Member-Member: Oct 2–4. 150 players / 75 teams (Team 84, Regina & Cagle, added late as Lot 75).
+- **Built Oct 2026 (step 3, small groups):** Games, payouts by finish and skins, live scoring through golf events,
+  season/quarter Ledger with settle-ups, a group dashboard; the Members page without dues for groups.
 - **Built Oct 2026 (step 1):** per-organization rows, the club directory + memberships, path routing, the picker,
   the Organizations page (create associations / small groups, archive), the club-side roster import (member number →
   Golf Genius ID → GHIN → email → name; name-only matches that disagree on an identifier are decided by hand), and the

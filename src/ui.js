@@ -101,7 +101,7 @@ function renderInner(){
     live.map(e=>`<button class="nav livelink" data-golfev="${e.id}"><span class="livedot"></span><span class="trunc">Leaderboard · ${esc(e.name)}</span></button>`).join('');
   $('nav').querySelectorAll('[data-go]').forEach(b=>b.onclick=()=>{ if(b.dataset.go==='golf') view.geid=null; go(b.dataset.go); });
   const m=$('main');
-  ({dash:vDash,tournaments:vTournaments,tournament:vTournament,members:vMembers,board:vBoard,budget:vBudget,treasury:vTreasury,golf:vGolf,orgs:vOrgs,pick:vPicker}[view.page]||vDash)(m);
+  ({dash:vDash,tournaments:vTournaments,tournament:vTournament,members:vMembers,board:vBoard,budget:vBudget,treasury:vTreasury,golf:vGolf,orgs:vOrgs,pick:vPicker,games:vGames,ledger:vLedger}[view.page]||vDash)(m);
 }
 
 /* ---------- Organization picker / first-run set-up (shown when no organization is open) ---------- */
@@ -161,6 +161,7 @@ function editOrg(o,kind){
 
 /* ---------- Dashboard ---------- */
 function vDash(m){
+  if(db.kind==='group'&&typeof vGroupDash==='function') return vGroupDash(m);
   const sc=scalc(Y()), next=sc.ts.map(x=>x.t).filter(t=>{const d=daysOut(t);return d!==null&&d>=0;})[0];
   const withBudget=sc.ts.filter(x=>x.c.revenue||x.c.expenses).length;
   const cols='grid-template-columns:minmax(150px,2fr) 90px 100px 100px 96px';
@@ -540,29 +541,29 @@ function editPerPlayer(t,p){
 
 /* ---------- Members ---------- */
 function vMembers(m){
-  const y=Y(), s=db.seasons[y], amt=n0(s.dues.amount), club=isClub(), short=orgShort();
+  const y=Y(), s=db.seasons[y], amt=n0(s.dues.amount), club=isClub(), simple=club||db.kind==='group', short=orgShort();
   const boardOf=id=>db.board.filter(b=>b.memberId===id).map(b=>b.role);
   let list=members().sort((a,b)=>(a.last||'').localeCompare(b.last||'')||(a.first||'').localeCompare(b.first||''));
   const total=list.length, active=list.filter(x=>x.status!=='Inactive').length;
   const q=view.mq.toLowerCase();
   if(q) list=list.filter(x=>[memberName(x),x.email,x.phone,x.memberNo,x.ghin,x.city].join(' ').toLowerCase().includes(q));
-  const filters=club?['All','Active','Inactive']:['All','Active','Board','Dues unpaid','Inactive'];
+  const filters=simple?['All','Active','Inactive']:['All','Active','Board','Dues unpaid','Inactive'];
   if(!filters.includes(view.mfilter)) view.mfilter='All';
   const f=view.mfilter;
   if(f==='Active') list=list.filter(x=>x.status!=='Inactive'); if(f==='Inactive') list=list.filter(x=>x.status==='Inactive');
   if(f==='Board') list=list.filter(x=>boardOf(x.id).length); if(f==='Dues unpaid') list=list.filter(x=>x.status!=='Inactive'&&memberDues(y,x.id)<amt);
-  const cols=club?'grid-template-columns:40px minmax(0,1.5fr) minmax(0,1.5fr) 130px 70px 110px 110px 90px 40px':'grid-template-columns:40px minmax(0,1.5fr) minmax(0,1.5fr) 130px 70px 150px 120px 90px 40px';
-  const headRow=club?'<span></span><span>Name</span><span>Email</span><span>Phone</span><span>Hcp</span><span>Member #</span><span>GHIN</span><span>Status</span><span></span>'
+  const cols=simple?'grid-template-columns:40px minmax(0,1.5fr) minmax(0,1.5fr) 130px 70px 110px 110px 90px 40px':'grid-template-columns:40px minmax(0,1.5fr) minmax(0,1.5fr) 130px 70px 150px 120px 90px 40px';
+  const headRow=simple?'<span></span><span>Name</span><span>Email</span><span>Phone</span><span>Hcp</span><span>Member #</span><span>GHIN</span><span>Status</span><span></span>'
                     :`<span></span><span>Name</span><span>Email</span><span>Phone</span><span>Hcp</span><span>Board</span><span>${y} dues</span><span>Status</span><span></span>`;
   const rowOf=x=>{ const br=boardOf(x.id), paid=memberDues(y,x.id);
     const du=x.status==='Inactive'?['—','']:paid>=amt?['Paid '+fmt(paid),'ok']:paid>0?[fmt(paid)+' of '+fmt(amt),'gold']:s.duesPayments.length?['Unpaid','warn']:['Not recorded',''];
-    const mid=club?`<span class="muted">${esc(x.memberNo||'')}</span><span class="muted">${esc(x.ghin||'')}</span>`:`<span>${br.map(r=>`<span class="chip navy">${esc(r)}</span>`).join(' ')}</span><span><span class="chip ${du[1]}">${du[0]}</span></span>`;
-    return `<div class="tr num click" data-m="${x.id}" style="${cols}"><span class="av">${initials(x)}</span><div class="cell2"><b class="trunc">${esc(memberName(x))}</b>${!club&&(x.ghin||x.memberNo)?`<small>${x.ghin?'GHIN '+esc(x.ghin):'#'+esc(x.memberNo)}</small>`:''}</div><span class="trunc muted">${esc(x.email||'')}</span><span class="muted">${esc(x.phone||'')}</span><span>${esc(x.hcp??'')}</span>${mid}<span><span class="chip ${x.status==='Inactive'?'':'ok'}">${esc(x.status||'Active')}</span></span><span class="ib">${I.edit}</span></div>`; };
+    const mid=simple?`<span class="muted">${esc(x.memberNo||'')}</span><span class="muted">${esc(x.ghin||'')}</span>`:`<span>${br.map(r=>`<span class="chip navy">${esc(r)}</span>`).join(' ')}</span><span><span class="chip ${du[1]}">${du[0]}</span></span>`;
+    return `<div class="tr num click" data-m="${x.id}" style="${cols}"><span class="av">${initials(x)}</span><div class="cell2"><b class="trunc">${esc(memberName(x))}</b>${!simple&&(x.ghin||x.memberNo)?`<small>${x.ghin?'GHIN '+esc(x.ghin):'#'+esc(x.memberNo)}</small>`:''}</div><span class="trunc muted">${esc(x.email||'')}</span><span class="muted">${esc(x.phone||'')}</span><span>${esc(x.hcp??'')}</span>${mid}<span><span class="chip ${x.status==='Inactive'?'':'ok'}">${esc(x.status||'Active')}</span></span><span class="ib">${I.edit}</span></div>`; };
   m.innerHTML=head(club?'Directory':'Members',club?`Every member of ${esc(CLUB.name||CLUB_META.name)}. Associations and small groups pick their members from this list.`:`Everyone in the ${esc(short)}. Board seats and tournament fields are picked from this list.`,
-      (club?'':btn('Dues settings','mDues',''))+btn(club?'Import club roster':'Import member list','mCsv','',I.down)+btn('Add member','mAdd','pri',I.plus))+`
+      (simple?'':btn('Dues settings','mDues',''))+btn(club?'Import club roster':'Import member list','mCsv','',I.down)+btn('Add member','mAdd','pri',I.plus))+`
   <div class="toolbar"><div class="search">${I.search}<input class="inp" id="mq" placeholder="Search name, email, phone, member # or GHIN" value="${esc(view.mq)}" aria-label="Search members"></div>
     <div class="seg">${filters.map(x=>`<button class="${f===x?'on':''}" data-mf="${x}">${x}</button>`).join('')}</div>
-    <span class="muted" style="margin-left:auto;font-size:13px">${active} active${club?` of ${total}`:` · ${y} dues ${fmt(amt)}${n0(s.dues.installments)>1?` (${s.dues.installments} × ${fmt(amt/s.dues.installments)})`:''}`}</span></div>
+    <span class="muted" style="margin-left:auto;font-size:13px">${active} active${simple?` of ${total}`:` · ${y} dues ${fmt(amt)}${n0(s.dues.installments)>1?` (${s.dues.installments} × ${fmt(amt/s.dues.installments)})`:''}`}</span></div>
   <div class="card" style="overflow:hidden">${list.length?`<div class="tw"><div class="t" style="min-width:980px"><div class="tr th" style="${cols}">${headRow}</div>
   ${list.map(rowOf).join('')}</div></div>`
   :`<div class="empty"><b>${total?'No members match':club?'The directory is empty':'No members yet'}</b><span>${total?'Try a different search or filter.':club?'Import the club software’s member export, or add members one at a time.':`Import the ${esc(short)} member list, add club members from the directory, or add people one at a time.`}</span></div>`}</div>`;
@@ -574,7 +575,7 @@ function vMembers(m){
 /* one form for the club directory and for an organization's members: person fields go to the directory,
    status / joined / notes (and dues) belong to this organization */
 function editMember(mm){
-  const y=Y(), s=db.seasons[y], club=isClub(), short=orgShort(); const pays=mm&&!club?clone(s.duesPayments.filter(p=>p.memberId===mm.id)):[];
+  const y=Y(), s=db.seasons[y], club=isClub(), simple=club||db.kind==='group', short=orgShort(); const pays=mm&&!simple?clone(s.duesPayments.filter(p=>p.memberId===mm.id)):[];
   let pickedId=mm?mm.id:'';
   const payHTML=()=>pays.map((p,i)=>`<div class="mr num" style="grid-template-columns:90px minmax(0,1fr) 28px"><input class="inp r" data-di="${i}" data-k="amount" inputmode="decimal" value="${esc(p.amount)}" aria-label="Dues amount"><input class="inp" data-di="${i}" data-k="date" value="${esc(p.date)}" placeholder="Date" aria-label="Dues date"><button class="ib" data-ddel="${i}" aria-label="Remove">${I.x}</button></div>`).join('')||'<div class="mr"><span class="muted">No dues recorded for '+y+'.</span></div>';
   const inT=mm?db.tournaments.filter(t=>t.field.some(p=>p.memberId===mm.id)):[];
@@ -586,7 +587,7 @@ function editMember(mm){
       pair(field('First name','mfF',mm?.first||''),field('Last name','mfL',mm?.last||''))+pair(field('Email','mfE',mm?.email||''),field('Phone','mfP',mm?.phone||''))+
       pair(field('Handicap index','mfH',mm?.hcp??''),field('GHIN','mfG',mm?.ghin||''))+pair(field('Member #','mfNo',mm?.memberNo||''),field('Address','mfA',mm?.address1||''))+`<div style="display:grid;grid-template-columns:minmax(0,2fr) 70px minmax(0,1fr);gap:12px">${field('City','mfC',mm?.city||'')}${field('State','mfSt',mm?.state||'')}${field('Zip','mfZ',mm?.zip||'')}</div>`+
       pair(field(club?'Club status':short+' status','mfS',mm?.status||'Active',{type:'select',options:['Active','Inactive']}),field('Joined','mfJ',mm?.joined||'',{type:'date'}))+
-      (club?'':`<div class="fld"><div style="display:flex;justify-content:space-between;align-items:center"><span class="lbl">${y} dues · ${fmt(s.dues.amount)}, not prorated</span><button class="btn sm" id="dAdd" type="button">${I.plus}Record payment</button></div><div class="mini"><div id="dRows">${payHTML()}</div></div></div>`)+
+      (simple?'':`<div class="fld"><div style="display:flex;justify-content:space-between;align-items:center"><span class="lbl">${y} dues · ${fmt(s.dues.amount)}, not prorated</span><button class="btn sm" id="dAdd" type="button">${I.plus}Record payment</button></div><div class="mini"><div id="dRows">${payHTML()}</div></div></div>`)+
       (mm&&mm.ggId?`<p class="hint">Golf Genius ID ${esc(mm.ggId)}${mm.memberType?' · member type '+esc(mm.memberType):''}</p>`:'')+(inT.length?`<div class="fld"><span class="lbl">Tournaments</span><span>${inT.map(t=>esc(t.name)+' ('+t.season+')').join(', ')}</span></div>`:'')+field('Notes','mfNt',mm?.notes||'',{type:'textarea'}),
     wire:r=>{ const bind=()=>{ r.querySelectorAll('[data-di]').forEach(e=>e.oninput=()=>pays[+e.dataset.di][e.dataset.k]=e.value); r.querySelectorAll('[data-ddel]').forEach(b=>b.onclick=()=>{pays.splice(+b.dataset.ddel,1);r.querySelector('#dRows').innerHTML=payHTML();bind();}); };
       bind(); const da=r.querySelector('#dAdd'); if(da) da.onclick=()=>{ const inst=n0(s.dues.amount)/Math.max(1,n0(s.dues.installments)); const d=new Date(); pays.push({id:uid(),amount:inst,date:(d.getMonth()+1)+'/'+d.getDate()}); r.querySelector('#dRows').innerHTML=payHTML(); bind(); };
