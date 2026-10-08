@@ -94,6 +94,36 @@ function bestBallBoard(pub,scores,opt){
 function eventBoard(pub,scores,opt){ opt=opt||{}; return pub.format==='bestball'&&opt.view!=='players'?bestBallBoard(pub,scores,opt):leaderboard(pub,scores,opt); }
 const FORMAT_LABEL={stroke:'Stroke play',bestball:'Best ball'};
 
+/* ---------- skins ----------
+   skinsResult(pub, scores, rules, playerIds) → {wins:[{hole,pid,name,score,net,count,status:'won'|'void'|'pending',checkHole}],
+   per:{pid:count}, total, carried, lost, incomplete}
+   rules: net (play net skins), grossBeatsNet (a net tie goes to the one player who made that score without a stroke),
+   carry (ties carry to the next hole), validate: 'none' | 'gross' (par or better on the next hole) | 'net' (net par or
+   better). A hole counts once everyone in the game has scored it. A void skin goes back into the carry (or is lost
+   when ties don't carry); a skin on a player's last hole needs no validation; one that can't be checked yet is pending. */
+function skinsResult(pub,scores,rules,playerIds){
+  rules=rules||{}; const inG=playerIds?new Set(playerIds):null, pl=[];
+  for(const g of pub.groups||[]){ const c=pub.courses[g.course]; if(!c) continue; const order=playOrder(g.startHole);
+    for(const p of g.players||[]) if(!inG||inG.has(p.id)) pl.push({p,c,next:h=>{ const i=order.indexOf(h); return i<0||i===17?null:order[i+1]; }}); }
+  const at=(x,h)=>{ const s=+((scores[x.p.id]||{})[h]); if(!s) return null; const set=x.p.set||'M', hc=(x.c.hcp[set]||x.c.hcp.M)[h-1], par=(x.c.par[set]||x.c.par.M)[h-1];
+    const k=rules.net&&typeof x.p.ph==='number'?strokesOn(x.p.ph,hc):0; return {s,net:s-k,par,k}; };
+  const wins=[], per={}; let carried=0, lost=0, incomplete=0;
+  for(let h=1;h<=18;h++){
+    const rows=pl.map(x=>({x,r:at(x,h)})); if(!rows.length) continue;
+    if(rows.some(r=>!r.r)){ incomplete++; continue; }
+    const key=r=>rules.net?r.r.net:r.r.s, low=Math.min(...rows.map(key)); let lows=rows.filter(r=>key(r)===low);
+    if(lows.length>1&&rules.net&&rules.grossBeatsNet){ const g=lows.filter(r=>r.r.k===0); if(g.length===1) lows=g; }
+    if(lows.length!==1){ if(rules.carry) carried++; continue; }
+    const {x,r}=lows[0], w={hole:h,pid:x.p.id,name:x.p.name,score:r.s,net:r.net,count:1+(rules.carry?carried:0),status:'won',checkHole:null}; carried=0;
+    if(rules.validate&&rules.validate!=='none'){ const nh=x.next(h);
+      if(nh!=null){ w.checkHole=nh; const r2=at(x,nh);
+        if(!r2) w.status='pending';
+        else if(!(rules.validate==='net'?r2.net<=r2.par:r2.s<=r2.par)){ w.status='void'; if(rules.carry) carried+=w.count; else lost+=w.count; } } }
+    wins.push(w); if(w.status==='won') per[w.pid]=(per[w.pid]||0)+w.count;
+  }
+  return {wins,per,total:wins.filter(w=>w.status==='won').reduce((a,w)=>a+w.count,0),carried,lost,incomplete,pending:wins.filter(w=>w.status==='pending').length,players:pl.length};
+}
+
 /* ---------- WCCC-style scorecard ----------
    Styled after the club's printed card: course header, tee rows in their colors, par and
    handicap rows, then players. Gross in every cell; where a player gets a stroke the net

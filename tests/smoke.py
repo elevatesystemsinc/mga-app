@@ -50,7 +50,7 @@ async def main():
     # scores: Ann 4s everywhere; Bo 4s but a 3 on hole 2 (outright skin) ; Cy/Di/Ed 5s; hole 7: Ann 3, Bo 3 (tie → carry), hole 8: Cy 3 outright → 2 skins with carry
     r=await pg.evaluate("""async()=>{ const g=GAME(), ev=gameEvent(g); const gp=id=>g.players.find(p=>p.id===id).gpid; const S=async(id,h,v)=>setScore(ev,gp(id),h,v);
       for(let h=1;h<=18;h++){ await S('gp_p0',h,h===7?3:4); await S('gp_p1',h,h===2?3:h===7?3:4); await S('gp_p2',h,h===8?3:5); await S('gp_p3',h,5); await S('gp_p4',h,5); await S('gp_guest',h,6); }
-      const sk=skinsCalc(g,false,true); const lb=eventBoard(publicEvent(ev),scoresFor(ev),{sort:'gross'}).map(r=>[r.name,r.pos,r.gross]);
+      const sk=skinsCalc(g,{net:false,carry:true,validate:'none'}); const lb=eventBoard(publicEvent(ev),scoresFor(ev),{sort:'gross'}).map(r=>[r.name,r.pos,r.gross]);
       return {skins:sk.wins.map(w=>[w.hole,w.name,w.count]), total:sk.total, lb}; }""")
     # hole 1 ties (carry 1) → Bo wins 2 on hole 2; holes 3–7 tie (carry 5) → Cy wins 6 on hole 8; the rest carry unpaid
     ok=r['skins']==[[2,'Bo Baker',2],[8,'Cy Cole',6]] and r['total']==8 and r['lb'][0]==['Bo Baker',1,70] and r['lb'][1]==['Ann Able',2,71]

@@ -195,38 +195,32 @@ function payPlaces(g){
       toast(`${res.length} finish payout${res.length===1?'':'s'} recorded`); }});
 }
 const gOrdinal=n=>n+(['th','st','nd','rd'][(n%100>>3^1&&n%10)||0]||'th');
-/* skins: a hole is won outright by the lowest score among everyone in the skins game; ties carry over (optional) */
-function skinsCalc(g,net,carry){
+/* skins come from the hole scores of the players marked "in skins" (see skinsResult in golfcore) */
+const SKINS_DEFAULT=g=>Object.assign({net:!!g.net,grossBeatsNet:false,carry:true,validate:'none'},g.skinsRules||{});
+function skinsCalc(g,rules){
   const ev=gameEvent(g); if(!ev) return null;
-  const pub=publicEvent(ev), sc=scoresFor(ev), byG=new Map(g.players.filter(p=>p.inSkins).map(p=>[p.gpid,p]));
-  const pl=pub.groups.flatMap(gr=>gr.players.filter(p=>byG.has(p.id)).map(p=>({p,c:pub.courses[gr.course],gp:byG.get(p.id)})));
-  const wins=[], per={}; let carried=0, incomplete=0;
-  for(let h=1;h<=18;h++){
-    const rows=pl.map(x=>{ const s=+((sc[x.p.id]||{})[h]); if(!s) return null; const hc=x.c.hcp[x.p.set||'M']||x.c.hcp.M; const k=net&&typeof x.p.ph==='number'?s-strokesOn(x.p.ph,hc[h-1]):s; return {x,k,s}; });
-    if(rows.some(r=>!r)){ incomplete++; continue; }
-    if(!rows.length) continue;
-    const low=Math.min(...rows.map(r=>r.k)), lows=rows.filter(r=>r.k===low);
-    if(lows.length===1){ const n=1+(carry?carried:0); carried=0; wins.push({hole:h,pid:lows[0].x.gp.id,name:gpName(lows[0].x.gp),score:lows[0].s,count:n}); per[lows[0].x.gp.id]=(per[lows[0].x.gp.id]||0)+n; }
-    else if(carry) carried++;
-  }
-  return {wins,per,total:wins.reduce((a,w)=>a+w.count,0),incomplete,carried,players:pl.length};
+  const byG=new Map(g.players.filter(p=>p.inSkins&&p.gpid).map(p=>[p.gpid,p]));
+  const r=skinsResult(publicEvent(ev),scoresFor(ev),rules||SKINS_DEFAULT(g),[...byG.keys()]);
+  r.wins.forEach(w=>{ const p=byG.get(w.pid); w.pid=p.id; w.name=gpName(p); }); r.per=Object.fromEntries(Object.entries(r.per).map(([k,v])=>[byG.get(k).id,v])); return r;
 }
+const skinsRuleText=r=>[r.net?(r.grossBeatsNet?'net, gross beats net':'net'):'gross',r.carry?'carry-overs':'no carry-overs',r.validate==='gross'?'validated by par on the next hole':r.validate==='net'?'validated by net par on the next hole':''].filter(Boolean).join(' · ');
 function paySkins(g){
   const ev=gameEvent(g), mo=gameMoney(g);
   if(!ev){ toast('Open live scoring first — skins come from the hole-by-hole scores'); return; }
-  let net=!!g.net, carry=true;
-  const calc=()=>{ const r=skinsCalc(g,net,carry), pot=fnum('skAmt'), el=$('skPrev'); if(!el) return r;
-    if(!r||!r.total){ el.innerHTML=`<div class="mr"><span class="muted">${r&&r.incomplete===18?'No scores yet':'No skins won yet'+(r&&r.carried?` · ${r.carried} carried`:'')}.</span></div>`; return r; }
-    const val=pot/r.total;
-    el.innerHTML=r.wins.map(w=>`<div class="mr num" style="grid-template-columns:60px minmax(0,1fr) 60px 90px"><b>Hole ${w.hole}</b><span>${esc(w.name)}</span><span class="muted">${w.s||w.score}${w.count>1?' · '+w.count+' skins':''}</span><b class="r">${gMoney(val*w.count)}</b></div>`).join('')+
-      `<div class="mr num" style="grid-template-columns:minmax(0,1fr) 90px"><span class="muted">${r.total} skin${r.total===1?'':'s'} at ${gMoney(val)}${r.incomplete?` · ${r.incomplete} hole${r.incomplete===1?'':'s'} not finished by everyone`:''}${r.carried?` · ${r.carried} carried, unpaid`:''}</span><b class="r">${gMoney(pot)}</b></div>`; return r; };
+  const rules=SKINS_DEFAULT(g);
+  const calc=()=>{ const r=skinsCalc(g,rules), pot=fnum('skAmt'), el=$('skPrev'); if(!el) return r;
+    if(!r||!r.wins.length){ el.innerHTML=`<div class="mr"><span class="muted">${r&&r.incomplete===18?'No scores yet':'No skins won yet'+(r&&r.carried?` · ${r.carried} carried`:'')}.</span></div>`; return r; }
+    const val=r.total?pot/r.total:0;
+    el.innerHTML=r.wins.map(w=>`<div class="mr num" style="grid-template-columns:60px minmax(0,1fr) 90px"><b>Hole ${w.hole}</b><div class="cell2"><span>${esc(w.name)} <span class="muted">${w.score}${rules.net&&w.net!==w.score?' (net '+w.net+')':''}${w.count>1?' · '+w.count+' skins':''}</span></span>${w.status==='void'?`<small class="neg">Void — missed ${rules.validate==='net'?'net ':''}par on hole ${w.checkHole}${rules.carry?', carried':''}</small>`:w.status==='pending'?`<small class="muted">Waiting on hole ${w.checkHole} to validate</small>`:''}</div><b class="r ${w.status==='won'?'':'muted'}">${w.status==='won'?gMoney(val*w.count):'—'}</b></div>`).join('')+
+      `<div class="mr num" style="grid-template-columns:minmax(0,1fr) 90px"><span class="muted">${r.total} skin${r.total===1?'':'s'}${r.total?' at '+gMoney(val):''}${r.pending?` · ${r.pending} pending`:''}${r.incomplete?` · ${r.incomplete} hole${r.incomplete===1?'':'s'} not finished by everyone`:''}${r.carried?` · ${r.carried} carried, unpaid`:''}${r.lost?` · ${r.lost} void, unpaid`:''}</span><b class="r">${gMoney(r.total?pot:0)}</b></div>`; return r; };
   openDrawer({kicker:gameTitle(g),title:'Pay out skins',saveLabel:'Record skins',
-    body:pair(field('Skins pot $','skAmt',mo.skins,{type:'number'}),`<div class="fld"><span class="lbl">Scoring</span>${seg('skNet',[['gross','Gross'],['net','Net']],net?'net':'gross')}</div>`)+
-      `<label class="check"><input type="checkbox" id="skCarry" checked>Ties carry over to the next hole</label><div class="fld"><span class="lbl">Skins</span><div class="mini" id="skPrev"></div></div><p class="hint">Only the players marked “in skins” count. Carried skins with no winner by the 18th are not paid.</p>`,
-    wire:r=>{ wireSeg(r,'skNet',v=>{ net=v==='net'; calc(); }); r.querySelector('#skCarry').onchange=e=>{ carry=e.target.checked; calc(); }; r.querySelector('#skAmt').oninput=calc; calc(); },
-    save:()=>{ const r=skinsCalc(g,net,carry); if(!r||!r.total){ toast('No skins to pay yet'); return false; } const pot=fnum('skAmt'), val=pot/r.total;
+    body:pair(field('Skins pot $','skAmt',mo.skins,{type:'number'}),`<div class="fld"><span class="lbl">Scoring</span>${seg('skNet',[['gross','Gross'],['net','Net'],['gbn','Net · gross beats net']],rules.net?(rules.grossBeatsNet?'gbn':'net'):'gross')}</div>`)+
+      pair(field('Validation','skVal',rules.validate,{type:'select',options:[['none','None — a skin stands on its own'],['gross','Par or better on the next hole'],['net','Net par or better on the next hole']]}),`<div class="fld"><span class="lbl">Ties</span><label class="check" style="height:42px"><input type="checkbox" id="skCarry"${rules.carry?' checked':''}>Carry over to the next hole</label></div>`)+
+      `<div class="fld"><span class="lbl">Skins</span><div class="mini" id="skPrev"></div></div><p class="hint">Only players marked “in skins” count, and a hole counts once all of them have scored it. Gross beats net: on a net tie, the one player who made that score without a stroke takes the skin. Validation: the winner must make par (or net par) on their next hole or the skin is void — it goes back into the carry, or is lost without carry-overs; a skin on the last hole stands. Carried skins with no winner at the end are not paid.</p>`,
+    wire:r=>{ wireSeg(r,'skNet',v=>{ rules.net=v!=='gross'; rules.grossBeatsNet=v==='gbn'; calc(); }); r.querySelector('#skVal').onchange=e=>{ rules.validate=e.target.value; calc(); }; r.querySelector('#skCarry').onchange=e=>{ rules.carry=e.target.checked; calc(); }; r.querySelector('#skAmt').oninput=calc; calc(); },
+    save:()=>{ const r=skinsCalc(g,rules); g.skinsRules=Object.assign({},rules); if(!r||!r.total){ toast(r&&r.pending?'Skins are still waiting on validation holes':'No skins to pay yet'); return false; } const pot=fnum('skAmt'), val=pot/r.total;
       const cents=Object.entries(r.per).map(([pid,n])=>({pid,n,c:Math.floor(pot*100*n/r.total)})); let rem=Math.round(pot*100)-cents.reduce((a,x)=>a+x.c,0); for(let i=0;rem>0;i++,rem--) cents[i%cents.length].c++;
-      g.payouts=g.payouts.filter(x=>x.kind!=='skins').concat(cents.map(x=>({id:uid(),kind:'skins',pid:x.pid,amount:x.c/100,note:`${x.n} skin${x.n===1?'':'s'} (${net?'net':'gross'})`})));
+      g.payouts=g.payouts.filter(x=>x.kind!=='skins').concat(cents.map(x=>({id:uid(),kind:'skins',pid:x.pid,amount:x.c/100,note:`${x.n} skin${x.n===1?'':'s'} · ${skinsRuleText(rules)}`})));
       toast(`${r.total} skins paid at ${gMoney(val)}`); }});
 }
 function payManual(g,x){
