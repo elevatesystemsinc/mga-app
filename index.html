@@ -853,7 +853,7 @@ function orgToHub(M,org,persons){
 function hubSyncSoon(){ clearTimeout(hubSyncT); hubSyncT=setTimeout(hubSync,2500); }
 function paintHubSync(){ const el=$('hubSync'); if(!el) return; const o=linkedOrg(), on=CLOUD&&sessionOK&&!KEYMODE&&o&&DOCS[o.id]&&DOCS[o.id].base; el.style.display=on?'flex':'none'; if(!on) return;
   const s=HUB_SYNC, when=s.at?new Date(s.at).toLocaleTimeString([],{hour:'numeric',minute:'2-digit'}):'';
-  el.innerHTML=`<span class="dot ${s.state==='error'?'offline':s.state==='busy'?'saving':s.state==='ok'?'':'local'}"></span><span>MGA Hub ${s.state==='ok'?'in sync · '+when:s.state==='busy'?'syncing…':s.state==='error'?'sync failed — '+esc(s.msg||''):'not synced yet'}</span><button class="linkbtn" id="hubSyncNow" type="button">Sync now</button>`;
+  el.innerHTML=`<span class="dot ${s.state==='error'?'offline':s.state==='busy'?'saving':s.state==='ok'?'':'local'}"></span><span>MGA Hub ${s.state==='ok'?'in sync · '+when:s.state==='busy'?'syncing…':s.state==='error'?'sync failed — '+esc(s.msg||''):'not synced yet'+(s.msg?' · '+esc(s.msg):'')}</span><button class="linkbtn" id="hubSyncNow" type="button">Sync now</button>`;
   $('hubSyncNow').onclick=()=>hubSync({force:true}); }
 async function casWrite(id,data,rev){
   const next=Object.assign({},data,{_rev:(rev||0)+1,_w:CLIENT,_at:Date.now()});
@@ -863,8 +863,9 @@ async function casWrite(id,data,rev){
 async function hubSync(opt){
   if(!CLOUD||!sessionOK||KEYMODE||hubSyncBusy||typeof CLUB==='undefined'||!CLUB) return false;
   const org=linkedOrg(); if(!org) return false;
-  const D=DOCS[org.id], C=DOCS.club; if(!D||!D.db||!D.base||!C||!C.base||D.pushing||C.pushing) return false;   // both documents open and loaded
-  if(docChanged(D)||docChanged(C)||D.saveT||C.saveT){ hubSyncSoon(); return false; }   // a local save is on its way: the server copies would read as a revert — wait for it
+  const D=DOCS[org.id], C=DOCS.club;
+  if(!D||!D.db||!D.base||!C||!C.base){ HUB_SYNC={state:'idle',msg:'waiting for the documents to load'}; paintHubSync(); return false; }   // both documents open and loaded
+  if(D.pushing||C.pushing||D.saveT||C.saveT||D.pushAgain||C.pushAgain){ HUB_SYNC=Object.assign({},HUB_SYNC,{msg:'waiting for a save to finish'}); paintHubSync(); hubSyncSoon(); return false; }   // a save is in flight: the server copies would read as a revert — wait for it
   hubSyncBusy=true; HUB_SYNC=Object.assign({},HUB_SYNC,{state:'busy'}); paintHubSync();
   let changed=false;
   try{
@@ -5559,7 +5560,7 @@ async function resultsPDF(t,opt){
 /* Keeps every open device on the latest version: checks version.json about once a minute and, when a
    newer build is live, reloads at a safe moment (nothing unsaved, no editor open, not mid-typing). */
 (function(){
-  const ME='20261008215042'; let ready=false, lastCheck=0;
+  const ME='20261008215951'; let ready=false, lastCheck=0;
   const typing=()=>{ const a=document.activeElement; return a&&/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)&&a.value&&a.type!=='search'; };
   const safe=()=>!typing()&&(typeof window.__canReload!=='function'||window.__canReload());
   async function check(){ lastCheck=Date.now(); if(location.protocol==='file:') return;
