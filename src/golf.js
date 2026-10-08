@@ -31,7 +31,7 @@ const GEV=()=>golfData().events.find(e=>e.id===view.geid);
 const CODE_CHARS='ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 function newCode(ev){ let c; do{ c=Array.from({length:5},()=>CODE_CHARS[Math.floor(Math.random()*CODE_CHARS.length)]).join(''); }while(ev.groups.some(g=>g.code===c)); return c; }
 const slugify=s=>String(s||'').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'').slice(0,40)||'event';
-function scoringLink(ev){ const base=location.href.split('#')[0].split('?')[0].replace(/[^/]*$/,''); return base+'score.html?e='+encodeURIComponent(ev.slug); }
+function scoringLink(ev){ return SITE_BASE+'score.html?e='+encodeURIComponent(ev.slug); }
 function playerIndex(p){ const own=p.index!=null&&String(p.index).trim()!==''?p.index:null; const m=p.memberId?memberById(p.memberId):null; return parseIndex(own!=null?own:(m?m.hcp:null)); }
 function playerHcp(ev,grp,p){ const c=courseById(grp.course); const idx=playerIndex(p); const ch=c?courseHcp(idx,c,p.tee||ev.defaultTee||'White',p.set||'M'):null;
   const A=Object.assign({},USGA_ALLOW,ev.allow||{}), pct=+A[evPlayerFmt(ev)]||100;
@@ -186,7 +186,7 @@ function editGroup(ev,grp){
   const players=grp?clone(grp.players):[];
   const inOther=new Set(ev.groups.filter(x=>x!==grp).flatMap(x=>x.players.map(p=>p.memberId).filter(Boolean)));
   const fieldIds=new Set(t?t.field.map(p=>p.memberId):[]);
-  const pool=db.members.slice().sort((a,b)=>(fieldIds.has(b.id)-fieldIds.has(a.id))||memberName(a).localeCompare(memberName(b)));
+  const pool=members().sort((a,b)=>(fieldIds.has(b.id)-fieldIds.has(a.id))||memberName(a).localeCompare(memberName(b)));
   const opts=`<option value="">— Add a member —</option>`+(t?`<optgroup label="${esc(t.name)} field">${pool.filter(m=>fieldIds.has(m.id)).map(m=>`<option value="${m.id}">${esc(memberName(m))}${inOther.has(m.id)?' (in another group)':''}</option>`).join('')}</optgroup><optgroup label="All members">`:'')+pool.filter(m=>!t||!fieldIds.has(m.id)).map(m=>`<option value="${m.id}">${esc(memberName(m))}${inOther.has(m.id)?' (in another group)':''}</option>`).join('')+(t?'</optgroup>':'');
   const tees=c=>(courseById(c)||g.courses[0]).tees.map(x=>x.name);
   const chTxt=p=>{ const c=courseById(($('ggC')&&$('ggC').value)||grp?.course||'oak'); const idx=parseIndex(p.index!=null&&String(p.index).trim()!==''?p.index:(memberById(p.memberId)||{}).hcp); const ch=c?courseHcp(idx,c,p.tee||ev.defaultTee,p.set||'M'):null; return ch==null?(idx==null?'no index':'no rating'):'CH '+ch; };
@@ -364,7 +364,7 @@ function editFieldPlayer(ev,x){
   const p=x?x.p:{id:uid(),memberId:'',name:'',tee:ev.defaultTee||'White',set:'M',team:'',index:'',flight:''};
   const teams=[...new Set(evPlayers(ev).map(y=>y.p.team).filter(Boolean))];
   const m=p.memberId?memberById(p.memberId):null, c=courseById(courseFor(ev,p,x&&x.grp))||golfData().courses[0];
-  const memOpts=[['','— Guest (not a member) —']].concat(db.members.slice().sort((a,b)=>memberName(a).localeCompare(memberName(b))).map(mm=>[mm.id,memberName(mm)]));
+  const memOpts=[['','— Guest (not a member) —']].concat(members().sort((a,b)=>memberName(a).localeCompare(memberName(b))).map(mm=>[mm.id,memberName(mm)]));
   openDrawer({kicker:ev.name+' · Field',title:x?p.name:'Add player',
     body:(x?'':field('Member','fpM','',{type:'select',options:memOpts}))+field('Name','fpN',p.name,{ph:'Guest name'})+
       pair(field('Handicap Index','fpI',p.index||(m?m.hcp:'')||'',{hint:m?'From the member profile'+(m.hcp?' ('+esc(m.hcp)+')':'')+'. Type over it for this event only.':'Use + for plus handicaps, e.g. +1.2'}),field('Tee','fpT',p.tee||ev.defaultTee,{type:'select',options:c.tees.map(tt=>tt.name)}))+
@@ -518,7 +518,7 @@ const QR_SRC=['https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrc
 const groupLink=(ev,grp)=>scoringLink(ev)+'&g='+encodeURIComponent(grp.code);
 /* the crest embedded as data so the print page never depends on loading a file */
 let CREST_DATA='';
-function crestSrc(){ if(CREST_DATA) return CREST_DATA; const abs=location.href.split('#')[0].split('?')[0].replace(/[^/]*$/,'')+'crest.png?v=2';
+function crestSrc(){ if(CREST_DATA) return CREST_DATA; const abs=SITE_BASE+'crest.png?v=2';
   try{ const im=document.querySelector('.brand img'); if(im&&im.complete&&im.naturalWidth){ const c=document.createElement('canvas'); c.width=im.naturalWidth; c.height=im.naturalHeight; c.getContext('2d').drawImage(im,0,0); CREST_DATA=c.toDataURL('image/png'); return CREST_DATA; } }catch(_){}
   return abs; }
 function printCardHTML(ev,pub,grp,teamKeyOnly){
@@ -639,7 +639,7 @@ function printScorecards(ev){
       const fsel=$('pcF')?fv('pcF'):'', order=fv('pcO'), layout=fv('pcL'), pub=publicEvent(ev);
       let gs=ev.groups.filter(g=>!fsel||g.players.some(p=>p.flight===fsel));
       gs=gs.slice().sort(order==='code'?(a,b)=>a.code.localeCompare(b.code):order==='flight'?(a,b)=>((a.players[0]||{}).flight||'~').localeCompare((b.players[0]||{}).flight||'~')||(a.course+a.startHole).localeCompare(b.course+b.startHole,undefined,{numeric:true}):(a,b)=>a.course.localeCompare(b.course)||(+a.startHole-+b.startHole)||a.label.localeCompare(b.label));
-      const base=location.href.split('#')[0].split('?')[0].replace(/[^/]*$/,'');
+      const base=SITE_BASE;
       const team=isTeamEvent(pub)&&fv('pcU')!=='group';
       const cards=gs.flatMap(g=>{ const pg=pub.groups.find(x=>x.id===g.id); return team&&pg?groupTeams(pg).map(t=>printCardHTML(ev,pub,g,t.key)):[printCardHTML(ev,pub,g)]; });
       const html=(`<!doctype html><html><head><meta charset="utf-8"><base href="${base}"><title>${esc(ev.name)} · Scorecards</title>

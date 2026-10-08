@@ -13,7 +13,7 @@ function calc(t){ if(!t.calcutta) t.calcutta={lots:[],bidders:[],expenses:[],pay
 const calcTotals=t=>calcTotalsC(calc(t));
 /* link each lot's two players to member records, then pick the captain (lower Handicap Index) unless set by hand */
 function resolveCaptains(t,c){
-  const pool=((t.field||[]).map(p=>memberById(p.memberId)).filter(Boolean)).concat(db.members);
+  const pool=((t.field||[]).map(p=>memberById(p.memberId)).filter(Boolean)).concat(members());
   const byKey=new Map(); for(const m of pool){ const k=nameKey(memberName(m)); if(k&&!byKey.has(k)) byKey.set(k,m); }
   const idx=(given,m)=>{ if(given!=null&&given!=='') return +given; const v=m&&typeof parseIndex==='function'?parseIndex(m.hcp):null; return v==null?null:v; };
   for(const l of c.lots){
@@ -90,7 +90,7 @@ function memberMatches(t,q,limit){
   const lev=(a,b)=>{ const d=Array.from({length:a.length+1},(_,i)=>[i]); for(let j=1;j<=b.length;j++) d[0][j]=j;
     for(let i=1;i<=a.length;i++) for(let j=1;j<=b.length;j++) d[i][j]=Math.min(d[i-1][j]+1,d[i][j-1]+1,d[i-1][j-1]+(a[i-1]===b[j-1]?0:1)); return d[a.length][b.length]; };
   const qt=q.split(' ');
-  return db.members.map(m=>{ const name=tidyName(memberName(m)), n=name.toLowerCase(), toks=n.split(/[\s-]+/);
+  return members().map(m=>{ const name=tidyName(memberName(m)), n=name.toLowerCase(), toks=n.split(/[\s-]+/);
       let sc=0;
       if(n.startsWith(q)) sc=100;
       else if(qt.every(w=>toks.some(x=>x.startsWith(w)))) sc=90;
@@ -404,7 +404,7 @@ async function exportCalcutta(t){
 }
 
 /* ============ Cashier link: share this Calcutta with the cashiers' laptops ============ */
-const cashierLink=t=>location.href.split('#')[0].split('?')[0].replace(/[^/]*$/,'')+'cashier.html?k='+encodeURIComponent(calc(t).share.token);
+const cashierLink=t=>SITE_BASE+'cashier.html?k='+encodeURIComponent(calc(t).share.token);
 const newToken=()=>Array.from(crypto.getRandomValues(new Uint8Array(24)),b=>'abcdefghijkmnpqrstuvwxyz23456789'[b%32]).join('');
 function calcPeople(t){ return (t.field||[]).map(p=>{ const m=memberById(p.memberId); return m?{id:m.id,name:tidyName(memberName(m))}:null; }).filter(Boolean).sort((a,b)=>a.name.localeCompare(b.name)); }
 const SHARE_ST={};
@@ -532,7 +532,7 @@ async function exportOrder(t){
 function loadJsPDF(){ if(window.jspdf) return Promise.resolve();
   return new Promise((res,rej)=>{ const sc=document.createElement('script'); sc.src='https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js'; sc.onload=()=>res(); sc.onerror=()=>rej(new Error('Couldn’t load the PDF maker — check the connection')); document.head.appendChild(sc); }); }
 async function crestPNG(){ const s=typeof crestSrc==='function'?crestSrc():''; if(s&&s.startsWith('data:')) return s;
-  const r=await fetch(new URL('crest.png',location.href)); const b=await r.blob(); return await new Promise(ok=>{ const fr=new FileReader(); fr.onload=()=>ok(fr.result); fr.readAsDataURL(b); }); }
+  const r=await fetch(SITE_BASE+'crest.png'); const b=await r.blob(); return await new Promise(ok=>{ const fr=new FileReader(); fr.onload=()=>ok(fr.result); fr.readAsDataURL(b); }); }
 async function downloadBidSheet(t){
   const c=calc(t);
   try{ await loadJsPDF(); }catch(e){ toast(e.message); return; }

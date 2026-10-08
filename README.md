@@ -11,8 +11,21 @@ own table (`mga_hub`), one row per organization.
 
 ## Branches and sites
 
-- `main` → **app.wcccmga.org** — the club hub, the product going forward.
+- `main` → **app.wcccmga.org** — the club hub, the product going forward. The club is at `/`; each organization has its
+  own address: `/mga`, `/lga`, `/smga`, and `/<id>` for a small group. (Render: one Rewrite rule, `/*` → `/index.html`.)
 - `Hub` → **hub.wcccmga.org** — the MGA Hub as the board is using it for the 2026 season (bug fixes only).
+
+## Organizations and members
+
+The **club hub** keeps the **Directory** (every club member, one record each — import the club software's export, or
+add people by hand) and the list of **Organizations**: associations (MGA, LGA, SMGA) and small groups, each with its
+own hub. An organization's **Members** page is the club members who belong to it: add one from the directory, import
+the organization's own list (club members are matched and joined; new people are added to the directory too), and keep
+status, join date, notes and dues per organization. Editing a person's details anywhere updates the directory.
+
+First time on a database the club hub offers **Set up from the MGA Hub**: it builds the directory from the MGA's list,
+registers the three associations and copies the MGA Hub's data into the MGA's hub. The club hub's Organizations page can
+re-run that import later.
 
 Both use the same Supabase project. Render serves the repo root of each branch; the built pages are committed,
 so a push is a deploy (see `CLAUDE.md` for the build).

@@ -1,5 +1,5 @@
 /* =====================================================================
-   MGA Hub — UI. Screens are read-only; every edit happens in ONE drawer.
+   Club Hub — UI. Screens are read-only; every edit happens in ONE drawer.
    ===================================================================== */
 const tA=(t,k,id,m)=>actualOf(ledgerIndex(t.season),t.id,k,id,m);
 /* Actual $ input, or — when Treasury entries are linked — a read-only total that points to the ledger. */
@@ -21,9 +21,18 @@ const I={
   down:svg('<path d="M12 4v12M6 11l6 6 6-6M5 20h14"/>'), menu:svg('<path d="M4 7h16M4 12h16M4 17h16"/>'),
   trash:svg('<path d="M4 7h16M10 7V4h4v3M6 7l1 13h10l1-13"/>'), check:svg('<path d="M5 12l5 5 9-10"/>'), refresh:svg('<path d="M20 11a8 8 0 10-2.3 5.7"/><path d="M20 4v7h-7"/>'),
 };
-const NAV=[['dash','Dashboard',I.home],['tournaments','Tournaments',I.flag],['members','Members',I.users],['board','Board',I.shield],['budget','Season budget',I.ledger]];
+I.org=svg('<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18M9 20v-6h6v6"/>');
+const NAV=[['dash','Dashboard',I.home],['tournaments','Tournaments',I.flag],['members','Members',I.users],['board','Board',I.shield],['budget','Season budget',I.ledger],['orgs','Organizations',I.org]];
+/* which pages each kind of organization gets (associations get everything) */
+const ORG_NAV={club:['dash','tournaments','golf','members','orgs','budget','treasury'],association:['dash','tournaments','golf','members','board','treasury','budget'],group:['dash','tournaments','golf','members']};
+function navItems(){ const allow=ORG_NAV[db.kind]; return NAV.filter(([k])=>!allow||allow.includes(k)).map(([k,l,ic])=>[k,k==='members'&&isClub()?'Directory':l,ic]); }
+/* the organization on screen: the club's record from CLUB.orgs wins over what the document says */
+const curOrg=()=>!db?null:isClub()?Object.assign({},CLUB_META,{name:CLUB.name||CLUB_META.name,crest:CLUB.crest||''}):(orgMeta()||{id:db.id,kind:db.kind,name:db.name,short:db.short});
+const orgShort=()=>{ const o=curOrg(); return o?(o.short||o.name||'club'):'club'; };
+const orgName=()=>{ const o=curOrg(); return o?(o.name||o.short||''):''; };
+function crestHTML(o,cls=''){ const short=(o&&(o.short||o.name)||'?').replace(/[^A-Za-z0-9]/g,'').slice(0,4)||'?'; return o&&o.crest?`<img class="crest ${cls}" src="${esc(o.crest)}" alt="">`:`<span class="mono ${cls}"${short.length>3?' style="font-size:.8em;letter-spacing:0"':''}>${esc(short)}</span>`; }
 let view={page:'dash',tid:null,ttab:'budget',mfilter:'All',mq:'',tfilter:'All'};
-const Y=()=>db.activeSeason;
+const Y=()=>db?db.activeSeason:String(new Date().getFullYear());
 const T=()=>db.tournaments.find(t=>t.id===view.tid);
 function go(page,extra){ view=Object.assign(view,{page},extra||{}); $('side').classList.remove('open'); render(); window.scrollTo(0,0); }
 
@@ -47,14 +56,14 @@ function openDrawer({kicker='',title,body,save,saveLabel='Save',del,delLabel='De
   const f=$('dBody').querySelector('input:not([type=checkbox]),select,textarea'); if(f) setTimeout(()=>f.focus(),60);
 }
 function closeDrawer(){ $('drawer').classList.remove('show'); $('scrim').classList.remove('show'); drawerCtx=null;
-  if(pendingRemote){ const r=pendingRemote; pendingRemote=null; setTimeout(()=>applyRemote(r),0); } }
+}
 const fv=id=>{ const e=$(id); return e?e.value.trim():''; };
 const fnum=id=>n0(fv(id));
 function field(label,id,val,o={}){
   const t=o.type||'text';
   if(t==='select') return `<div class="fld"><label class="lbl" for="${id}">${label}</label><select class="inp" id="${id}">${o.options.map(x=>{const [v,l]=Array.isArray(x)?x:[x,x];return `<option value="${esc(v)}"${String(v)===String(val??'')?' selected':''}>${esc(l)}</option>`;}).join('')}</select>${o.hint?`<p class="hint">${o.hint}</p>`:''}</div>`;
   if(t==='textarea') return `<div class="fld"><label class="lbl" for="${id}">${label}</label><textarea class="inp" id="${id}">${esc(val)}</textarea></div>`;
-  return `<div class="fld"><label class="lbl" for="${id}">${label}</label><input class="inp${t==='number'?' num':''}" id="${id}" type="${t==='number'?'text':t}" ${t==='number'?'inputmode="decimal"':''} value="${esc(val??'')}" ${o.ph?`placeholder="${esc(o.ph)}"`:''}>${o.hint?`<p class="hint">${o.hint}</p>`:''}</div>`;
+  return `<div class="fld"><label class="lbl" for="${id}">${label}</label><input class="inp${t==='number'?' num':''}" id="${id}" type="${t==='number'?'text':t}" ${t==='number'?'inputmode="decimal"':''} value="${esc(val??'')}" ${o.disabled?'disabled ':''}${o.ph?`placeholder="${esc(o.ph)}"`:''}>${o.hint?`<p class="hint">${o.hint}</p>`:''}</div>`;
 }
 const pair=(a,b)=>`<div class="frow2">${a}${b}</div>`;
 function seg(id,opts,val){ return `<div class="seg" id="${id}" data-val="${esc(val)}">${opts.map(([v,l])=>`<button type="button" data-v="${esc(v)}" class="${String(v)===String(val)?'on':''}">${esc(l)}</button>`).join('')}</div>`; }
@@ -76,14 +85,77 @@ function render(){
   if(Math.abs(window.scrollY-sy)>2) window.scrollTo(0,sy);
 }
 function renderInner(){
+  const o=curOrg(), clubName=CLUB&&CLUB.name||CLUB_META.name;
+  const title=o?(isClub()?'Club Hub':orgShort()+' Hub'):'Club Hub';
+  $('brandCrest').innerHTML=crestHTML(o||CLUB_META); $('brandName').textContent=title; $('brandSub').textContent=o&&!isClub()?clubName:(o?'Club hub':clubName);
+  $('topCrest').innerHTML=crestHTML(o||CLUB_META,'sm'); $('topName').textContent=title; document.title=title+' · '+clubName;
+  $('btnSwitch').hidden=!CLUB||(!db&&!setupNeeded);
+  if(!db){ $('nav').innerHTML=''; $('seasonBox').hidden=true; (setupNeeded?vSetup:vPicker)($('main')); return; }
+  $('seasonBox').hidden=false;
   const ys=Object.keys(db.seasons).sort((a,b)=>b-a);
   $('seasonSel').innerHTML=ys.map(y=>`<option value="${y}"${y===Y()?' selected':''}>${y} season</option>`).join('')+'<option value="__new">+ New season…</option>';
   const live=typeof liveEvents==='function'?liveEvents():[];
-  $('nav').innerHTML=NAV.map(([k,l,ic])=>`<button class="nav${(view.page===k||(k==='tournaments'&&view.page==='tournament'))?' on':''}" data-go="${k}">${ic}<span>${l}</span>${k==='golf'&&live.length?'<span class="livedot" aria-label="Live scoring"></span>':''}</button>`).join('')+
+  const items=navItems(); if(view.page!=='pick'&&!items.some(([k])=>k===view.page||(k==='tournaments'&&view.page==='tournament'))) view.page='dash';
+  $('nav').innerHTML=items.map(([k,l,ic])=>`<button class="nav${(view.page===k||(k==='tournaments'&&view.page==='tournament'))?' on':''}" data-go="${k}">${ic}<span>${l}</span>${k==='golf'&&live.length?'<span class="livedot" aria-label="Live scoring"></span>':''}</button>`).join('')+
     live.map(e=>`<button class="nav livelink" data-golfev="${e.id}"><span class="livedot"></span><span class="trunc">Leaderboard · ${esc(e.name)}</span></button>`).join('');
   $('nav').querySelectorAll('[data-go]').forEach(b=>b.onclick=()=>{ if(b.dataset.go==='golf') view.geid=null; go(b.dataset.go); });
   const m=$('main');
-  ({dash:vDash,tournaments:vTournaments,tournament:vTournament,members:vMembers,board:vBoard,budget:vBudget,treasury:vTreasury,golf:vGolf}[view.page]||vDash)(m);
+  ({dash:vDash,tournaments:vTournaments,tournament:vTournament,members:vMembers,board:vBoard,budget:vBudget,treasury:vTreasury,golf:vGolf,orgs:vOrgs,pick:vPicker}[view.page]||vDash)(m);
+}
+
+/* ---------- Organization picker / first-run set-up (shown when no organization is open) ---------- */
+function vPicker(m){
+  const orgs=(CLUB&&CLUB.orgs||[]).filter(x=>!x.archived), club=Object.assign({},CLUB_META,{name:CLUB&&CLUB.name||CLUB_META.name,crest:CLUB&&CLUB.crest||''});
+  const card=(id,x,sub)=>`<button class="orgcard" data-org="${esc(id)}">${crestHTML(x)}<div class="cell2"><b>${esc(x.name)}</b><small>${esc(sub)} · ${esc(orgURL(id))}</small></div>${I.chev}</button>`;
+  const unknown=ORG_ID&&ORG_ID!=='club'&&!orgMeta(ORG_ID)&&!db?`<div class="banner">There is no organization at ${esc(orgURL(ORG_ID))}. Pick one below.</div>`:'';
+  const grp=(k,empty)=>{ const l=orgs.filter(x=>x.kind===k); return l.length?l.map(x=>card(x.id,x,ORG_KINDS[k]+(x.short?' · '+x.short:''))).join(''):`<p class="muted" style="margin:0;font-size:13.5px">${empty}</p>`; };
+  m.innerHTML=`<div class="phead"><div><h1 class="h1">${esc(club.name)}</h1><p class="sub">Choose what to work on. Each organization has its own hub; the club keeps the member directory.</p></div></div><div class="rule"></div>
+  ${unknown}<div class="orgs">${card('club',club,'Club hub · member directory · club tournaments · organizations')}
+    <h2 class="h2" style="margin-top:10px">Associations</h2>${grp('association','No associations yet — create one in the club hub under Organizations.')}
+    <h2 class="h2" style="margin-top:10px">Small groups</h2>${grp('group','No small groups yet — create one in the club hub under Organizations.')}</div>`;
+  m.querySelectorAll('[data-org]').forEach(b=>b.onclick=()=>chooseOrg(b.dataset.org));
+}
+function vSetup(m){
+  m.innerHTML=head('Set up the club hub','This is the first time the club hub has been opened on this database.')+`
+  <div class="card pad" style="max-width:680px;display:flex;flex-direction:column;gap:14px">
+    <p style="margin:0">The MGA Hub’s data becomes the starting point:</p>
+    <div class="mini">${[['1','The club directory is built from the MGA’s member list — same people, same ids, so fields, boards and Calcuttas keep working'],['2','The MGA, LGA and SMGA are registered as associations'],['3','The MGA Hub’s tournaments, budgets, treasury, Calcuttas and drawings are copied into the MGA’s hub here']].map(([n,t])=>`<div class="mr" style="grid-template-columns:24px minmax(0,1fr)"><b>${n}</b><span>${t}</span></div>`).join('')}</div>
+    <p class="hint">hub.wcccmga.org keeps working on its own data; nothing there changes. You can re-import from it later from the club hub’s Organizations page.</p>
+    <div class="actions"><button class="btn pri" id="suGo">Set up from the MGA Hub</button><button class="btn" id="suEmpty">Start empty</button></div>
+    <p class="hint" id="suMsg" aria-live="polite"></p></div>`;
+  const msg=$('suMsg');
+  $('suGo').onclick=async()=>{ $('suGo').disabled=true; msg.textContent='Importing…'; try{ const r=await migrateFromHub(); toast(`Set up · ${r.people} people · ${r.tournaments} tournaments`); chooseOrg('club'); }catch(e){ $('suGo').disabled=false; msg.textContent=e.message||'That didn’t work'; } };
+  $('suEmpty').onclick=async()=>{ if(!confirm('Start with an empty directory? The MGA Hub can still be imported later.')) return;
+    try{ const C=docState('club',CLUB_META); C.db=normalize(null,CLUB_META); C.db.orgs=clone(DEFAULT_ORGS); CLUB=C.db; await putDoc('club',clone(C.db)); setupNeeded=false; watchDoc(C); chooseOrg('club'); }catch(e){ msg.textContent=e.message||'That didn’t work'; } };
+}
+/* ---------- Organizations (club hub) ---------- */
+function vOrgs(m){
+  if(!isClub()){ go('dash'); return; }
+  const cols='grid-template-columns:48px minmax(0,1fr) 120px 100px 40px';
+  const row=x=>`<div class="tr click" data-o="${esc(x.id)}" style="${cols}">${crestHTML(x,'sm')}<div class="cell2"><b>${esc(x.name)}</b><small>${esc(x.short||'')} · ${esc(orgURL(x.id))}</small></div><span class="muted">${ORG_KINDS[x.kind]||x.kind}</span><span>${x.archived?'<span class="chip">Archived</span>':'<span class="chip ok">Active</span>'}</span><span class="ib">${I.edit}</span></div>`;
+  const grp=k=>CLUB.orgs.filter(x=>x.kind===k).map(row).join('')||'<div class="tr"><span class="muted">None yet.</span></div>';
+  m.innerHTML=head('Organizations','Associations and small groups inside the club. Each has its own hub; their members come from the club directory.',btn('New small group','oGrp','',I.plus)+btn('New association','oAssoc','pri',I.plus))+`
+  <div class="card" style="overflow:hidden"><div class="cardhead"><h2 class="h2">Associations</h2></div><div class="t">${grp('association')}</div></div>
+  <div class="card" style="overflow:hidden"><div class="cardhead"><h2 class="h2">Small groups</h2></div><div class="t">${grp('group')}</div></div>
+  ${CLOUD?`<div class="card pad" style="display:flex;flex-direction:column;gap:10px"><h2 class="h2">MGA Hub (hub.wcccmga.org)</h2>
+    <p class="hint" style="margin:0">${CLUB.migratedAt?'Last imported '+new Date(CLUB.migratedAt).toLocaleString()+'.':'Not imported yet.'} Re-importing updates the directory from the MGA’s member list and <b>replaces</b> the MGA’s hub here with the MGA Hub’s current data.</p>
+    <div class="actions"><button class="btn" id="oMig">Re-import from the MGA Hub</button></div></div>`:''}`;
+  m.querySelectorAll('[data-o]').forEach(r=>r.onclick=()=>editOrg(CLUB.orgs.find(x=>x.id===r.dataset.o)));
+  $('oGrp').onclick=()=>editOrg(null,'group'); $('oAssoc').onclick=()=>editOrg(null,'association');
+  const mg=$('oMig'); if(mg) mg.onclick=async()=>{ if(!confirm('Replace the MGA’s hub here with the MGA Hub’s current data, and update the directory from its member list?')) return; mg.disabled=true;
+    try{ const r=await migrateFromHub(); toast(`Imported · ${r.people} people · ${r.tournaments} tournaments`); render(); }catch(e){ mg.disabled=false; toast(e.message||'Import failed'); } };
+}
+function editOrg(o,kind){
+  kind=o?o.kind:kind;
+  openDrawer({kicker:ORG_KINDS[kind],title:o?o.name:'New '+ORG_KINDS[kind].toLowerCase(),
+    body:field('Name','ogN',o?.name||'',{ph:kind==='group'?'e.g. The Misfits':'e.g. Ladies’ Golf Association'})+pair(field('Short name','ogS',o?.short||'',{ph:kind==='group'?'e.g. Misfits':'e.g. LGA'}),o?field('Address id','ogI',o.id,{disabled:true}):field('Address id','ogI','',{ph:'letters and digits, e.g. misfits'}))+
+      (o?'':`<p class="hint">The id becomes the address (${esc(orgURL('misfits'))}) and can’t change later. Leave it blank to use the short name.</p>`)+field('Crest image','ogC',o?.crest||'',{ph:'file name in the site, e.g. mga-crest.png (optional)'})+
+      (o?`<label class="check"><input type="checkbox" id="ogA"${o.archived?' checked':''}>Archived — hidden from the picker; its data is kept</label>`:''),
+    save:()=>{ const name=fv('ogN'); if(!name){ toast('Give it a name'); return false; }
+      if(o){ Object.assign(o,{name,short:fv('ogS'),crest:fv('ogC'),archived:$('ogA').checked}); return; }
+      let id=(fv('ogI')||fv('ogS')||name).toLowerCase().replace(/[^a-z0-9-]/g,'').slice(0,24);
+      if(!id||id==='club'||id==='main'||CLUB.orgs.some(x=>x.id===id)){ toast('That address id is taken — choose another'); return false; }
+      CLUB.orgs.push({id,kind,name,short:fv('ogS'),crest:fv('ogC')}); toast(name+' created — open it from the organization picker'); }});
 }
 
 /* ---------- Dashboard ---------- */
@@ -96,14 +168,14 @@ function vDash(m){
     const owed=t.sponsors.filter(s=>n0(s.pledged)>spPaid(s)+0.004);
     if(owed.length) attention.push([fmt(sum(owed,s=>n0(s.pledged)-spPaid(s))),`${esc(t.name)}: ${owed.length} sponsor${owed.length>1?'s':''} still owe money`,'warn',t.id]);
   }
-  const unpaid=db.members.filter(x=>x.status!=='Inactive'&&memberDues(Y(),x.id)<n0(sc.s.dues.amount)).length;
-  if(db.members.length&&unpaid&&sc.s.duesPayments.length) attention.push([String(unpaid),`member${unpaid>1?'s have':' has'} not paid full ${Y()} dues`,'warn',null]);
-  m.innerHTML=head(`${Y()} Season`,'Walnut Creek Country Club Men’s Golf Association',btn('New tournament','dNew','pri',I.plus))+`
+  const ms=members(), unpaid=isClub()?0:ms.filter(x=>x.status!=='Inactive'&&memberDues(Y(),x.id)<n0(sc.s.dues.amount)).length;
+  if(ms.length&&unpaid&&sc.s.duesPayments.length) attention.push([String(unpaid),`member${unpaid>1?'s have':' has'} not paid full ${Y()} dues`,'warn',null]);
+  m.innerHTML=head(`${Y()} Season`,esc(CLUB.name||CLUB_META.name)+(isClub()?'':' · '+esc(orgName())),btn('New tournament','dNew','pri',I.plus))+`
   <div class="grid g4">
     ${kpi('Season net (projected)',fmtS(sc.projected),`Actuals for ${sc.past.length} completed · budget for ${sc.upcoming.length} upcoming`,netCls(sc.projected))}
     ${kpi('Next up',next?dayShort(next,0)||'TBD':'—',next?`${esc(next.name)} · ${daysOut(next)===0?'today':daysOut(next)+' days out'}`:'No upcoming tournaments')}
     ${kpi('Sponsor money received',fmt(sc.received),`of ${fmt(sc.pledged)} pledged this season`)}
-    ${kpi('Members',String(sc.active),`active · ${db.board.filter(b=>b.memberId).length} on the board`)}
+    ${kpi('Members',String(sc.active),isClub()?'active in the club directory':`active · ${db.board.filter(b=>b.memberId).length} on the board`)}
   </div>
   <div class="split">
     <div class="card" style="overflow:hidden">
@@ -295,7 +367,7 @@ function editMenu(t,di,it){
 }
 
 /* Field */
-const inactiveBadge=m=>m&&m.status==='Inactive'?' <span class="chip inact" title="Not on the active MGA member list">Not Active</span>':'';
+const inactiveBadge=m=>m&&m.status==='Inactive'?` <span class="chip inact" title="Not on the active ${esc(orgShort())} member list">Not Active</span>`:'';
 function tField(el,t){
   const size=t.teamSize||2, teams={};
   t.field.forEach(p=>{ (teams[p.team||0]=teams[p.team||0]||[]).push(p); });
@@ -308,7 +380,7 @@ function tField(el,t){
   el.innerHTML=`<div class="grid g4">${kpi('Players in field',String(t.field.length),(size>1?`${nums.length} team${nums.length===1?'':'s'} of ${size}`:'individual')+(nInact?` · ${nInact} not active`:''))}${kpi('Entry fee',fmt(t.entryFee),'per player')}${kpi('Entry fees paid',String(paid),`of ${t.field.length} · ${fmt(paid*n0(t.entryFee))} collected`)}${rs.headcount!=null?kpi('Dinner headcount',String(rs.headcount),`${rs.dinner} players${rs.guests!=null?' + '+rs.guests+' plus-ones':''}`):kpi('Skins entered',String(skins),n0(t.skinsFee)?'× '+fmt(t.skinsFee):'no skins fee set')}</div>
   ${qs.length?`<div class="card pad" style="display:flex;gap:10px 24px;flex-wrap:wrap;align-items:center;font-size:13.5px"><span class="lbl">RSVPs</span>${qs.map(q=>`<span><b class="num">${t.field.filter(p=>yes((p.answers||{})[q.key])).length}</b> <span class="muted">${esc(q.label)}</span></span>`).join('')}${t.rosterFile?`<span class="muted" style="margin-left:auto;font-size:12.5px">From ${esc(t.rosterFile)} · ${new Date(t.rosterImportedAt).toLocaleDateString()}</span>`:''}</div>`:''}
   ${t.budgetBasis!=='field'?`<div class="banner">The budget uses ${n0(t.plannedPlayers)} planned players. Switch it to the field in Tournament details once signups close.</div>`:''}
-  <div class="toolbar"><div class="actions"><button class="btn pri" id="fImp">${I.down}Import roster</button><button class="btn" id="fAdd">${I.plus}Add ${size>1?'team':'player'}</button></div><span class="muted" style="margin-left:auto;font-size:13px">Players are picked from Members${db.members.length?'':' — add members first'}.</span></div>
+  <div class="toolbar"><div class="actions"><button class="btn pri" id="fImp">${I.down}Import roster</button><button class="btn" id="fAdd">${I.plus}Add ${size>1?'team':'player'}</button></div><span class="muted" style="margin-left:auto;font-size:13px">Players are picked from ${isClub()?'the Directory':'Members'}${members().length?'':' — add members first'}.</span></div>
   <div class="card" style="overflow:hidden">${t.field.length?`<div class="tw"><div class="t"><div class="tr th" style="${cols}"><span>${size>1?'Team':'#'}</span>${Array.from({length:size},(_,i)=>`<span>Player ${i+1}</span>`).join('')}<span>Entry</span><span></span></div>
     ${nums.map(n=>`<div class="tr click" data-team="${n}" style="${cols}"><span class="muted">${size>1?'Team '+n:n}</span>${Array.from({length:size},(_,i)=>{const p=teams[n][i];const mm=p&&memberById(p.memberId);return p?`<div class="cell2"><b class="trunc">${esc(mm?memberName(mm):p.name||'Unknown')}${inactiveBadge(mm)}${p.skins?' <span class="chip" style="height:20px;font-size:11px">Skins</span>':''}</b>${ansLine(p)?`<small class="trunc">${esc(ansLine(p))}</small>`:''}</div>`:'<span class="muted">—</span>';}).join('')}<span>${teams[n].every(p=>p.paid)?'<span class="chip ok">Paid</span>':`<span class="chip warn">${fmt(teams[n].filter(p=>!p.paid).length*n0(t.entryFee))} due</span>`}</span><span class="ib">${I.edit}</span></div>`).join('')}</div></div>`:`<div class="empty"><b>No field yet</b><span>Import the Golf Genius roster, or add ${size>1?'teams':'players'} from the member list as they sign up.</span></div>`}</div>`;
   $('fAdd').onclick=()=>editTeam(t,null); $('fImp').onclick=()=>importField(t);
@@ -318,26 +390,26 @@ function editTeam(t,num){
   const size=t.teamSize||2, existing=num!=null?t.field.filter(p=>(p.team||0)===num):[];
   const next=num!=null?num:(Math.max(0,...t.field.map(p=>p.team||0))+1);
   const taken=new Set(t.field.filter(p=>(p.team||0)!==num).map(p=>p.memberId));
-  const opts=[['','— Choose member —'],['__new','+ New player (not an MGA member — added as Not Active)']].concat(db.members.slice().sort((a,b)=>memberName(a).localeCompare(memberName(b))).map(m=>[m.id,memberName(m)+(m.status==='Inactive'?' — Not Active':'')+(taken.has(m.id)?' (already in field)':'')]));
+  const opts=[['','— Choose member —'],['__new',`+ New player (not ${isClub()?'in the directory':'a '+orgShort()+' member'} — added as Not Active)`]].concat(members().sort((a,b)=>memberName(a).localeCompare(memberName(b))).map(m=>[m.id,memberName(m)+(m.status==='Inactive'?' — Not Active':'')+(taken.has(m.id)?' (already in field)':'')]));
   openDrawer({kicker:t.name+' · Field',title:size>1?(num!=null?'Team '+num:'Add team'):(num!=null?'Edit player':'Add player'),
     body:(size>1?field('Team number','tmNum',next,{type:'number'}):'')+Array.from({length:size},(_,i)=>{const p=existing[i]||{};return `<div class="card pad" style="display:flex;flex-direction:column;gap:10px">${field('Player '+(i+1),'tmM'+i,p.memberId||'',{type:'select',options:opts})}<div id="tmB${i}">${inactiveBadge(memberById(p.memberId))?`<span class="chip inact">Not Active</span>`:''}</div>
       <div id="tmN${i}" hidden style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px"><input class="inp" id="tmNF${i}" placeholder="First name" aria-label="New player first name"><input class="inp" id="tmNL${i}" placeholder="Last name" aria-label="New player last name"><input class="inp" id="tmNE${i}" placeholder="Email (optional)" aria-label="New player email"></div><div style="display:flex;gap:10px 18px;flex-wrap:wrap"><label class="check"><input type="checkbox" id="tmP${i}"${p.paid?' checked':''}>Entry paid</label><label class="check"><input type="checkbox" id="tmS${i}"${p.skins?' checked':''}>In skins</label>${(t.fieldQuestions||[]).map((q,qi)=>`<label class="check"><input type="checkbox" id="tmQ${i}_${qi}"${yes((p.answers||{})[q.key])?' checked':''}>${esc(q.short||qShort(q.label))}</label>`).join('')}</div></div>`;}).join('')+
-      '<p class="hint">Players who aren’t active MGA members can still play. Pick “New player” to add them to Members as Inactive; they show as Not Active in the field.</p>',
+      `<p class="hint">Players who aren’t active ${esc(orgShort())} members can still play. Pick “New player” to add them as Inactive; they show as Not Active in the field.</p>`,
     wire:r=>{ for(let i=0;i<size;i++){ const s=r.querySelector('#tmM'+i); const upd=()=>{ const n=r.querySelector('#tmN'+i); n.hidden=s.value!=='__new'; n.style.display=s.value==='__new'?'grid':'none';
         r.querySelector('#tmB'+i).innerHTML=(s.value==='__new'||inactiveBadge(memberById(s.value)))?'<span class="chip inact">Not Active</span>':''; if(s.value==='__new') r.querySelector('#tmNF'+i).focus(); }; s.onchange=upd; upd(); } },
     save:()=>{ const team=size>1?(+fv('tmNum')||next):next; const picks=[], created=[];
       for(let i=0;i<size;i++){ let mid=fv('tmM'+i); if(!mid) continue;
         if(mid==='__new'){ const f=fv('tmNF'+i), l=fv('tmNL'+i); if(!f&&!l){ toast('Enter the new player’s name'); return false; }
-          const dup=db.members.find(m=>(m.first||'').toLowerCase()===f.toLowerCase()&&(m.last||'').toLowerCase()===l.toLowerCase());
+          const dup=persons().find(m=>(m.first||'').toLowerCase()===f.toLowerCase()&&(m.last||'').toLowerCase()===l.toLowerCase());
           if(dup){ mid=dup.id; } else { const m={id:uid(),first:f,last:l,email:fv('tmNE'+i).toLowerCase(),status:'Inactive',joined:'',notes:'Added from the '+t.name+' field',source:'field'}; created.push(m); mid=m.id; } } if(taken.has(mid)){ toast(memberName(memberById(mid))+' is already in the field'); return false; }
         if(picks.some(p=>p.memberId===mid)){ toast('Same member picked twice'); return false; }
         const prev=existing.find(p=>p.memberId===mid)||existing[i]||{}; const answers=Object.assign({},prev.memberId===mid?prev.answers:{});
         (t.fieldQuestions||[]).forEach((q,qi)=>{ answers[q.key]=$(`tmQ${i}_${qi}`).checked?'Yes':'No'; });
         picks.push({...(prev.memberId===mid?prev:{}),id:(prev.memberId===mid&&prev.id)||uid(),memberId:mid,team,paid:$('tmP'+i).checked,skins:$('tmS'+i).checked,answers}); }
       if(!picks.length){ toast('Pick at least one player'); return false; }
-      created.forEach(m=>db.members.push(m));
+      created.forEach(m=>{ const {id,...data}=m; upsertMember(id,data); });
       t.field=t.field.filter(p=>(p.team||0)!==num).concat(picks);
-      if(created.length) toast(created.map(memberName).join(' and ')+' added to Members as Inactive'); },
+      if(created.length) toast(created.map(memberName).join(' and ')+' added as Inactive'); },
     del:num!=null?()=>{ t.field=t.field.filter(p=>(p.team||0)!==num); }:null,delLabel:size>1?'Remove team':'Remove player'});
 }
 
@@ -467,46 +539,66 @@ function editPerPlayer(t,p){
 
 /* ---------- Members ---------- */
 function vMembers(m){
-  const y=Y(), s=db.seasons[y], amt=n0(s.dues.amount);
+  const y=Y(), s=db.seasons[y], amt=n0(s.dues.amount), club=isClub(), short=orgShort();
   const boardOf=id=>db.board.filter(b=>b.memberId===id).map(b=>b.role);
-  let list=db.members.slice().sort((a,b)=>(a.last||'').localeCompare(b.last||'')||(a.first||'').localeCompare(b.first||''));
+  let list=members().sort((a,b)=>(a.last||'').localeCompare(b.last||'')||(a.first||'').localeCompare(b.first||''));
+  const total=list.length, active=list.filter(x=>x.status!=='Inactive').length;
   const q=view.mq.toLowerCase();
   if(q) list=list.filter(x=>[memberName(x),x.email,x.phone,x.memberNo,x.ghin,x.city].join(' ').toLowerCase().includes(q));
+  const filters=club?['All','Active','Inactive']:['All','Active','Board','Dues unpaid','Inactive'];
+  if(!filters.includes(view.mfilter)) view.mfilter='All';
   const f=view.mfilter;
   if(f==='Active') list=list.filter(x=>x.status!=='Inactive'); if(f==='Inactive') list=list.filter(x=>x.status==='Inactive');
   if(f==='Board') list=list.filter(x=>boardOf(x.id).length); if(f==='Dues unpaid') list=list.filter(x=>x.status!=='Inactive'&&memberDues(y,x.id)<amt);
-  const cols='grid-template-columns:40px minmax(0,1.5fr) minmax(0,1.5fr) 130px 70px 150px 120px 90px 40px';
-  m.innerHTML=head('Members','Everyone in the MGA. Board seats and tournament fields are picked from this list.',btn('Dues settings','mDues','')+btn('Import member list','mCsv','',I.down)+btn('Add member','mAdd','pri',I.plus))+`
-  <div class="toolbar"><div class="search">${I.search}<input class="inp" id="mq" placeholder="Search name, email, phone or GHIN" value="${esc(view.mq)}" aria-label="Search members"></div>
-    <div class="seg">${['All','Active','Board','Dues unpaid','Inactive'].map(x=>`<button class="${f===x?'on':''}" data-mf="${x}">${x}</button>`).join('')}</div>
-    <span class="muted" style="margin-left:auto;font-size:13px">${db.members.filter(x=>x.status!=='Inactive').length} active · ${y} dues ${fmt(amt)}${n0(s.dues.installments)>1?` (${s.dues.installments} × ${fmt(amt/s.dues.installments)})`:''}</span></div>
-  <div class="card" style="overflow:hidden">${list.length?`<div class="tw"><div class="t" style="min-width:980px"><div class="tr th" style="${cols}"><span></span><span>Name</span><span>Email</span><span>Phone</span><span>Hcp</span><span>Board</span><span>${y} dues</span><span>Status</span><span></span></div>
-  ${list.map(x=>{const paid=memberDues(y,x.id), br=boardOf(x.id); const du=x.status==='Inactive'?['—','']:paid>=amt?['Paid '+fmt(paid),'ok']:paid>0?[fmt(paid)+' of '+fmt(amt),'gold']:s.duesPayments.length?['Unpaid','warn']:['Not recorded',''];
-    return `<div class="tr num click" data-m="${x.id}" style="${cols}"><span class="av">${initials(x)}</span><div class="cell2"><b class="trunc">${esc(memberName(x))}</b>${(x.ghin||x.memberNo)?`<small>${x.ghin?'GHIN '+esc(x.ghin):'#'+esc(x.memberNo)}</small>`:''}</div><span class="trunc muted">${esc(x.email||'')}</span><span class="muted">${esc(x.phone||'')}</span><span>${esc(x.hcp??'')}</span><span>${br.map(r=>`<span class="chip navy">${esc(r)}</span>`).join(' ')}</span><span><span class="chip ${du[1]}">${du[0]}</span></span><span><span class="chip ${x.status==='Inactive'?'':'ok'}">${esc(x.status||'Active')}</span></span><span class="ib">${I.edit}</span></div>`;}).join('')}</div></div>`
-  :`<div class="empty"><b>${db.members.length?'No members match':'No members yet'}</b><span>${db.members.length?'Try a different search or filter.':'Import the Golf Genius contact list export, or add members one at a time.'}</span></div>`}</div>`;
+  const cols=club?'grid-template-columns:40px minmax(0,1.5fr) minmax(0,1.5fr) 130px 70px 110px 110px 90px 40px':'grid-template-columns:40px minmax(0,1.5fr) minmax(0,1.5fr) 130px 70px 150px 120px 90px 40px';
+  const headRow=club?'<span></span><span>Name</span><span>Email</span><span>Phone</span><span>Hcp</span><span>Member #</span><span>GHIN</span><span>Status</span><span></span>'
+                    :`<span></span><span>Name</span><span>Email</span><span>Phone</span><span>Hcp</span><span>Board</span><span>${y} dues</span><span>Status</span><span></span>`;
+  const rowOf=x=>{ const br=boardOf(x.id), paid=memberDues(y,x.id);
+    const du=x.status==='Inactive'?['—','']:paid>=amt?['Paid '+fmt(paid),'ok']:paid>0?[fmt(paid)+' of '+fmt(amt),'gold']:s.duesPayments.length?['Unpaid','warn']:['Not recorded',''];
+    const mid=club?`<span class="muted">${esc(x.memberNo||'')}</span><span class="muted">${esc(x.ghin||'')}</span>`:`<span>${br.map(r=>`<span class="chip navy">${esc(r)}</span>`).join(' ')}</span><span><span class="chip ${du[1]}">${du[0]}</span></span>`;
+    return `<div class="tr num click" data-m="${x.id}" style="${cols}"><span class="av">${initials(x)}</span><div class="cell2"><b class="trunc">${esc(memberName(x))}</b>${!club&&(x.ghin||x.memberNo)?`<small>${x.ghin?'GHIN '+esc(x.ghin):'#'+esc(x.memberNo)}</small>`:''}</div><span class="trunc muted">${esc(x.email||'')}</span><span class="muted">${esc(x.phone||'')}</span><span>${esc(x.hcp??'')}</span>${mid}<span><span class="chip ${x.status==='Inactive'?'':'ok'}">${esc(x.status||'Active')}</span></span><span class="ib">${I.edit}</span></div>`; };
+  m.innerHTML=head(club?'Directory':'Members',club?`Every member of ${esc(CLUB.name||CLUB_META.name)}. Associations and small groups pick their members from this list.`:`Everyone in the ${esc(short)}. Board seats and tournament fields are picked from this list.`,
+      (club?'':btn('Dues settings','mDues',''))+btn(club?'Import club roster':'Import member list','mCsv','',I.down)+btn('Add member','mAdd','pri',I.plus))+`
+  <div class="toolbar"><div class="search">${I.search}<input class="inp" id="mq" placeholder="Search name, email, phone, member # or GHIN" value="${esc(view.mq)}" aria-label="Search members"></div>
+    <div class="seg">${filters.map(x=>`<button class="${f===x?'on':''}" data-mf="${x}">${x}</button>`).join('')}</div>
+    <span class="muted" style="margin-left:auto;font-size:13px">${active} active${club?` of ${total}`:` · ${y} dues ${fmt(amt)}${n0(s.dues.installments)>1?` (${s.dues.installments} × ${fmt(amt/s.dues.installments)})`:''}`}</span></div>
+  <div class="card" style="overflow:hidden">${list.length?`<div class="tw"><div class="t" style="min-width:980px"><div class="tr th" style="${cols}">${headRow}</div>
+  ${list.map(rowOf).join('')}</div></div>`
+  :`<div class="empty"><b>${total?'No members match':club?'The directory is empty':'No members yet'}</b><span>${total?'Try a different search or filter.':club?'Import the club software’s member export, or add members one at a time.':`Import the ${esc(short)} member list, add club members from the directory, or add people one at a time.`}</span></div>`}</div>`;
   const qi=$('mq'); qi.oninput=()=>{ view.mq=qi.value; const pos=qi.selectionStart; render(); const n=$('mq'); n.focus(); n.setSelectionRange(pos,pos); };
   m.querySelectorAll('[data-mf]').forEach(b=>b.onclick=()=>{view.mfilter=b.dataset.mf;render();});
-  m.querySelectorAll('[data-m]').forEach(r=>r.onclick=()=>editMember(db.members.find(x=>x.id===r.dataset.m)));
-  $('mAdd').onclick=()=>editMember(null); $('mDues').onclick=editDues; $('mCsv').onclick=importRoster;
+  m.querySelectorAll('[data-m]').forEach(r=>r.onclick=()=>editMember(memberById(r.dataset.m)));
+  $('mAdd').onclick=()=>editMember(null); const md=$('mDues'); if(md) md.onclick=editDues; $('mCsv').onclick=importRoster;
 }
+/* one form for the club directory and for an organization's members: person fields go to the directory,
+   status / joined / notes (and dues) belong to this organization */
 function editMember(mm){
-  const y=Y(), s=db.seasons[y]; const pays=mm?clone(s.duesPayments.filter(p=>p.memberId===mm.id)):[];
+  const y=Y(), s=db.seasons[y], club=isClub(), short=orgShort(); const pays=mm&&!club?clone(s.duesPayments.filter(p=>p.memberId===mm.id)):[];
+  let pickedId=mm?mm.id:'';
   const payHTML=()=>pays.map((p,i)=>`<div class="mr num" style="grid-template-columns:90px minmax(0,1fr) 28px"><input class="inp r" data-di="${i}" data-k="amount" inputmode="decimal" value="${esc(p.amount)}" aria-label="Dues amount"><input class="inp" data-di="${i}" data-k="date" value="${esc(p.date)}" placeholder="Date" aria-label="Dues date"><button class="ib" data-ddel="${i}" aria-label="Remove">${I.x}</button></div>`).join('')||'<div class="mr"><span class="muted">No dues recorded for '+y+'.</span></div>';
   const inT=mm?db.tournaments.filter(t=>t.field.some(p=>p.memberId===mm.id)):[];
-  openDrawer({kicker:'Member',title:mm?memberName(mm):'Add member',
-    body:pair(field('First name','mfF',mm?.first||''),field('Last name','mfL',mm?.last||''))+pair(field('Email','mfE',mm?.email||''),field('Phone','mfP',mm?.phone||''))+
-      pair(field('Handicap index','mfH',mm?.hcp??''),field('GHIN','mfG',mm?.ghin||''))+field('Address','mfA',mm?.address1||'')+`<div style="display:grid;grid-template-columns:minmax(0,2fr) 70px minmax(0,1fr);gap:12px">${field('City','mfC',mm?.city||'')}${field('State','mfSt',mm?.state||'')}${field('Zip','mfZ',mm?.zip||'')}</div>`+pair(field('Status','mfS',mm?.status||'Active',{type:'select',options:['Active','Inactive']}),field('Joined','mfJ',mm?.joined||'',{type:'date'}))+
-      `<div class="fld"><div style="display:flex;justify-content:space-between;align-items:center"><span class="lbl">${y} dues · ${fmt(s.dues.amount)}, not prorated</span><button class="btn sm" id="dAdd" type="button">${I.plus}Record payment</button></div><div class="mini"><div id="dRows">${payHTML()}</div></div></div>`+
+  const candidates=!mm&&!club?persons().filter(p=>!membershipOf(p.id)):[];   // club members who aren't in this organization yet
+  const candHTML=q=>{ q=q.toLowerCase().trim(); if(!q) return ''; return candidates.filter(p=>[memberName(p),p.email,p.memberNo].join(' ').toLowerCase().includes(q)).slice(0,8)
+    .map(p=>`<button type="button" data-pk="${p.id}"><span class="av">${initials(p)}</span><b>${esc(memberName(p))}</b><span class="muted" style="margin-left:auto;font-size:12.5px">${esc(p.email||(p.memberNo?'#'+p.memberNo:''))}</span></button>`).join('')||'<span class="muted" style="padding:10px 14px;display:block">Nobody in the directory matches — fill in the form to add a new person.</span>'; };
+  openDrawer({kicker:club?'Directory':short+' member',title:mm?memberName(mm):'Add member',
+    body:(candidates.length?`<div class="fld"><span class="lbl">Already a club member? Add them from the directory</span><input class="inp" id="mfPick" placeholder="Search the club directory" autocomplete="off" aria-label="Search the club directory"><div class="pick" id="mfPickL" style="max-height:230px"></div><p class="hint" id="mfPicked" style="margin:0"></p></div>`:'')+
+      pair(field('First name','mfF',mm?.first||''),field('Last name','mfL',mm?.last||''))+pair(field('Email','mfE',mm?.email||''),field('Phone','mfP',mm?.phone||''))+
+      pair(field('Handicap index','mfH',mm?.hcp??''),field('GHIN','mfG',mm?.ghin||''))+pair(field('Member #','mfNo',mm?.memberNo||''),field('Address','mfA',mm?.address1||''))+`<div style="display:grid;grid-template-columns:minmax(0,2fr) 70px minmax(0,1fr);gap:12px">${field('City','mfC',mm?.city||'')}${field('State','mfSt',mm?.state||'')}${field('Zip','mfZ',mm?.zip||'')}</div>`+
+      pair(field(club?'Club status':short+' status','mfS',mm?.status||'Active',{type:'select',options:['Active','Inactive']}),field('Joined','mfJ',mm?.joined||'',{type:'date'}))+
+      (club?'':`<div class="fld"><div style="display:flex;justify-content:space-between;align-items:center"><span class="lbl">${y} dues · ${fmt(s.dues.amount)}, not prorated</span><button class="btn sm" id="dAdd" type="button">${I.plus}Record payment</button></div><div class="mini"><div id="dRows">${payHTML()}</div></div></div>`)+
       (mm&&mm.ggId?`<p class="hint">Golf Genius ID ${esc(mm.ggId)}${mm.memberType?' · member type '+esc(mm.memberType):''}</p>`:'')+(inT.length?`<div class="fld"><span class="lbl">Tournaments</span><span>${inT.map(t=>esc(t.name)+' ('+t.season+')').join(', ')}</span></div>`:'')+field('Notes','mfNt',mm?.notes||'',{type:'textarea'}),
     wire:r=>{ const bind=()=>{ r.querySelectorAll('[data-di]').forEach(e=>e.oninput=()=>pays[+e.dataset.di][e.dataset.k]=e.value); r.querySelectorAll('[data-ddel]').forEach(b=>b.onclick=()=>{pays.splice(+b.dataset.ddel,1);r.querySelector('#dRows').innerHTML=payHTML();bind();}); };
-      bind(); r.querySelector('#dAdd').onclick=()=>{ const inst=n0(s.dues.amount)/Math.max(1,n0(s.dues.installments)); const d=new Date(); pays.push({id:uid(),amount:inst,date:(d.getMonth()+1)+'/'+d.getDate()}); r.querySelector('#dRows').innerHTML=payHTML(); bind(); }; },
+      bind(); const da=r.querySelector('#dAdd'); if(da) da.onclick=()=>{ const inst=n0(s.dues.amount)/Math.max(1,n0(s.dues.installments)); const d=new Date(); pays.push({id:uid(),amount:inst,date:(d.getMonth()+1)+'/'+d.getDate()}); r.querySelector('#dRows').innerHTML=payHTML(); bind(); };
+      const pk=r.querySelector('#mfPick'); if(pk){ const L=r.querySelector('#mfPickL'), who=r.querySelector('#mfPicked'); L.style.display='none';
+        pk.oninput=()=>{ L.innerHTML=candHTML(pk.value); L.style.display=L.innerHTML?'':'none'; L.querySelectorAll('[data-pk]').forEach(b=>b.onclick=()=>{ const p=personById(b.dataset.pk); pickedId=p.id;
+          [['mfF','first'],['mfL','last'],['mfE','email'],['mfP','phone'],['mfH','hcp'],['mfG','ghin'],['mfNo','memberNo'],['mfA','address1'],['mfC','city'],['mfSt','state'],['mfZ','zip']].forEach(([id,k])=>{ r.querySelector('#'+id).value=p[k]??''; });
+          who.innerHTML=`Adding <b>${esc(memberName(p))}</b> from the directory to the ${esc(short)}.`; L.style.display='none'; pk.value=''; }); }; } },
     save:()=>{ const first=fv('mfF'), last=fv('mfL'); if(!first&&!last){ toast('Enter a name'); return false; }
-      const data={first,last,email:fv('mfE'),phone:fv('mfP'),hcp:fv('mfH'),ghin:fv('mfG'),address1:fv('mfA'),city:fv('mfC'),state:fv('mfSt'),zip:fv('mfZ'),status:fv('mfS'),joined:fv('mfJ'),notes:fv('mfNt')};
-      let target=mm; if(mm) Object.assign(mm,data); else { target=Object.assign({id:uid()},data); db.members.push(target); }
-      s.duesPayments=s.duesPayments.filter(p=>p.memberId!==target.id).concat(pays.filter(p=>n0(p.amount)).map(p=>({id:p.id||uid(),memberId:target.id,amount:n0(p.amount),date:p.date||''}))); },
+      const data={first,last,email:fv('mfE'),phone:fv('mfP'),hcp:fv('mfH'),ghin:fv('mfG'),memberNo:fv('mfNo'),address1:fv('mfA'),city:fv('mfC'),state:fv('mfSt'),zip:fv('mfZ'),status:fv('mfS'),joined:fv('mfJ'),notes:fv('mfNt')};
+      const p=upsertMember(pickedId||null,data);
+      if(!club) s.duesPayments=s.duesPayments.filter(x=>x.memberId!==p.id).concat(pays.filter(x=>n0(x.amount)).map(x=>({id:x.id||uid(),memberId:p.id,amount:n0(x.amount),date:x.date||''}))); },
     del:mm?()=>{ if(inT.length&&!confirm(`${memberName(mm)} is in ${inT.length} tournament field(s). Remove anyway?`)) return false;
-      db.members=db.members.filter(x=>x!==mm); db.board.forEach(b=>{ if(b.memberId===mm.id) b.memberId=''; }); db.tournaments.forEach(t=>t.field=t.field.filter(p=>p.memberId!==mm.id));
-      for(const ss of Object.values(db.seasons)) ss.duesPayments=ss.duesPayments.filter(p=>p.memberId!==mm.id); toast('Member removed'); }:null,delLabel:'Remove member'});
+      removeMember(mm.id); toast(club?'Removed from the directory':`Removed from the ${short} — still in the club directory`); }:null,delLabel:club?'Remove from directory':'Remove from '+short});
 }
 function editDues(){
   const s=db.seasons[Y()];
@@ -557,17 +649,17 @@ function previewField(t,res,fname){
       <p class="hint">${rows.length-newMembers.length} matched to existing members${rows.filter(r=>r.m&&r.m.status==='Inactive').length?` (${rows.filter(r=>r.m&&r.m.status==='Inactive').length} Inactive)`:''}${newMembers.length?` · <b>${newMembers.length} not in Members</b>`:''}${moved.length?` · ${moved.length} changing teams`:''}${res.skippedGuests?` · ${res.skippedGuests} guests skipped`:''}.</p>
       ${qs.length?`<div class="fld"><span class="lbl">RSVP questions found</span><span style="font-size:13.5px">${tally}</span></div>`:''}
       ${odd.length?`<div class="banner">${odd.length} team${odd.length>1?'s don’t':' doesn’t'} have ${size} players: ${odd.slice(0,6).map(([n,c])=>'Team '+n+' ('+c+')').join(', ')}${odd.length>6?'…':''}. They’ll import as-is so you can fix them on the Field tab.</div>`:''}
-      ${newMembers.length?`<div class="fld"><span class="lbl">Not on the MGA member list — will play as Not Active</span><div class="mini">${newMembers.slice(0,6).map(r=>`<div class="mr"><div class="cell2"><b>${pn(r)}</b><small>${esc([r.p.email,r.p.ghin&&'GHIN '+r.p.ghin].filter(Boolean).join(' · '))}</small></div></div>`).join('')}${newMembers.length>6?`<div class="mr"><span class="muted">+ ${newMembers.length-6} more</span></div>`:''}</div></div>`:''}
+      ${newMembers.length?`<div class="fld"><span class="lbl">Not on the ${esc(orgShort())} member list — will play as Not Active</span><div class="mini">${newMembers.slice(0,6).map(r=>`<div class="mr"><div class="cell2"><b>${pn(r)}</b><small>${esc([r.p.email,r.p.ghin&&'GHIN '+r.p.ghin].filter(Boolean).join(' · '))}</small></div></div>`).join('')}${newMembers.length>6?`<div class="mr"><span class="muted">+ ${newMembers.length-6} more</span></div>`:''}</div></div>`:''}
       ${removed.length?`<div class="fld"><span class="lbl">In the field now but not in this roster</span><div class="mini">${removed.slice(0,6).map(x=>`<div class="mr"><b>${esc(memberName(memberById(x.memberId))||'Unknown')}</b></div>`).join('')}${removed.length>6?`<div class="mr"><span class="muted">+ ${removed.length-6} more</span></div>`:''}</div></div>`:''}
       <div class="fld" style="gap:10px">
-        ${newMembers.length?`<label class="check"><input type="checkbox" id="fiAdd" checked>Add the ${newMembers.length} player${newMembers.length>1?'s':''} who aren’t on the MGA member list to Members as <b>Inactive</b> (they still play, marked Not Active)</label>`:''}
+        ${newMembers.length?`<label class="check"><input type="checkbox" id="fiAdd" checked>Add the ${newMembers.length} player${newMembers.length>1?'s':''} who aren’t on the ${esc(orgShort())} member list as <b>Inactive</b> (they still play, marked Not Active)</label>`:''}
         ${hcpChanges||fills?`<label class="check" style="align-items:flex-start"><input type="checkbox" id="fiUpd" checked><span>Update members from this roster <span class="muted">(${hcpChanges} handicap index${hcpChanges===1?'':'es'}${fills?`, fill in ${fills} missing phone/email/GHIN`:''})</span></span></label>`:''}
         ${removed.length?`<label class="check"><input type="checkbox" id="fiRem" checked>Remove the ${removed.length} player${removed.length>1?'s':''} not in this roster from the field</label>`:''}
         <label class="check"><input type="checkbox" id="fiPaid">Mark every imported player’s entry fee as paid</label>
         ${t.budgetBasis!=='field'?`<label class="check" style="align-items:flex-start"><input type="checkbox" id="fiBasis"><span>Use the field for the budget player count <span class="muted">(now ${n0(t.plannedPlayers)} planned → ${rows.length} in the field)</span></span></label>`:''}
       </div>`,
     save:()=>{
-      const chk=id=>$(id)&&$(id).checked, before={field:clone(t.field),members:clone(db.members),q:clone(t.fieldQuestions||[]),basis:t.budgetBasis};
+      const chk=id=>$(id)&&$(id).checked, before={field:clone(t.field),members:memberSnapshot(),q:clone(t.fieldQuestions||[]),basis:t.budgetBasis};
       if(newMembers.length&&!chk('fiAdd')&&!confirm(`${newMembers.length} player(s) aren’t in Members and will be left out of the field. Continue?`)) return false;
       // questions
       const qmap=new Map((t.fieldQuestions||[]).map(q=>[q.label,q]));
@@ -578,7 +670,7 @@ function previewField(t,res,fname){
       const next=[];
       for(const r of rows){
         let m=r.m;
-        if(!m){ if(!chk('fiAdd')) continue; m={id:uid(),status:'Inactive',joined:'',notes:'Added from the '+t.name+' roster',source:'field-roster'}; ROSTER_FIELDS.forEach(([k])=>{ if(k!=='ggId') m[k]=r.p[k]||''; }); if(r.p.hcp) m.hcpAt=res.fileDate; db.members.push(m); }
+        if(!m){ if(!chk('fiAdd')) continue; const d={status:'Inactive',joined:'',notes:'Added from the '+t.name+' roster',source:'field-roster'}; ROSTER_FIELDS.forEach(([k])=>{ if(k!=='ggId') d[k]=r.p[k]||''; }); if(r.p.hcp) d.hcpAt=res.fileDate; m=upsertMember(null,d); }
         else if(upd){ if(newerHcp(r)){ m.hcp=r.p.hcp; m.hcpAt=res.fileDate; } ['phone','email','ghin','address1','city','state','zip'].forEach(k=>{ if(r.p[k]&&!m[k]) m[k]=r.p[k]; }); }
         const prev=inField.get(m.id)||{};
         const answers=Object.assign({},prev.answers||{}); qs.forEach(l=>{ answers[keyOf(l)]=r.p.answers[l]||''; });
@@ -588,7 +680,7 @@ function previewField(t,res,fname){
       t.field=next.concat(keep);
       if(chk('fiBasis')) t.budgetBasis='field';
       t.rosterFile=fname; t.rosterImportedAt=new Date().toISOString();
-      toast(`${next.length} players imported into ${new Set(next.map(x=>x.team)).size} teams`,()=>{ t.field=before.field; db.members=before.members; t.fieldQuestions=before.q; t.budgetBasis=before.basis; persist(); render(); });
+      toast(`${next.length} players imported into ${new Set(next.map(x=>x.team)).size} teams`,()=>{ t.field=before.field; memberRestore(before.members); t.fieldQuestions=before.q; t.budgetBasis=before.basis; persist(); render(); });
     }});
 }
 
@@ -637,55 +729,71 @@ function mapRoster(rows){
 }
 const ROSTER_FIELDS=[['first','First name'],['last','Last name'],['email','Email'],['phone','Phone'],['hcp','Handicap'],['ghin','GHIN'],['memberNo','Member #'],['ggId','Golf Genius ID'],
   ['address1','Address'],['address2','Address 2'],['city','City'],['state','State'],['zip','Zip'],['dob','Date of birth'],['memberType','Member type']];
-function matchMember(p,used,noGG){
-  const key=s=>(s||'').toLowerCase().replace(/[^a-z]/g,'');
-  const tries=[x=>!noGG&&p.ggId&&x.ggId===p.ggId, x=>p.ghin&&x.ghin===p.ghin, x=>p.email&&(x.email||'').toLowerCase()===p.email, x=>key(x.first)===key(p.first)&&key(x.last)===key(p.last)];
-  for(const t of tries){ const m=db.members.find(x=>!used.has(x.id)&&t(x)); if(m) return m; }
+/* match a row from a file to someone already in the club directory: member number → Golf Genius ID → GHIN → email → name */
+function matchPerson(p,used,noGG){
+  const key=x=>(x||'').toLowerCase().replace(/[^a-z]/g,'');
+  const tries=[['memberNo',x=>p.memberNo&&x.memberNo===p.memberNo],['ggId',x=>!noGG&&p.ggId&&x.ggId===p.ggId],['ghin',x=>p.ghin&&x.ghin===p.ghin],
+               ['email',x=>p.email&&(x.email||'').toLowerCase()===p.email],['name',x=>key(x.first)===key(p.first)&&key(x.last)===key(p.last)]];
+  for(const [how,t] of tries){ const m=persons().find(x=>!used.has(x.id)&&t(x)); if(m) return {m,how}; }
   return null;
 }
+function matchMember(p,used,noGG){ const r=matchPerson(p,used,noGG); return r?r.m:null; }
 function planRoster(people,fileDate){
-  const used=new Set(), plan={add:[],update:[],same:[]};
+  const used=new Set(), plan={add:[],join:[],update:[],same:[],conflict:[]}, club=isClub();
+  const changesFor=(m,p)=>ROSTER_FIELDS.filter(([k])=>p[k]&&String(m[k]??'')!==p[k]&&!(k==='hcp'&&m.hcpAt&&fileDate<m.hcpAt)).map(([k,l])=>({k,l,from:m[k]??'',to:p[k]}));
   for(const p of people){
-    const m=matchMember(p,used);
-    if(!m){ plan.add.push(p); continue; }
-    used.add(m.id);
-    const changes=ROSTER_FIELDS.filter(([k])=>p[k]&&String(m[k]??'')!==p[k]&&!(k==='hcp'&&m.hcpAt&&fileDate<m.hcpAt)).map(([k,l])=>({k,l,from:m[k]??'',to:p[k]}));
-    if(m.status==='Inactive') changes.push({k:'status',l:'Status',from:'Inactive',to:'Active'});
+    const r=matchPerson(p,used);
+    if(!r){ plan.add.push(p); continue; }
+    const m=r.m; used.add(m.id);
+    // a match on name alone that disagrees on an identifier is a decision for a person, not a guess
+    const clash=r.how==='name'?['memberNo','ghin','email'].filter(k=>p[k]&&m[k]&&String(m[k]).toLowerCase()!==String(p[k]).toLowerCase()):[];
+    if(clash.length){ plan.conflict.push({m,p,clash,changes:changesFor(m,p)}); continue; }
+    const changes=changesFor(m,p), ms=club?null:membershipOf(m.id);
+    if(!club&&!ms){ plan.join.push({m,p,changes}); continue; }
+    if((club?m.status:ms.status)==='Inactive') changes.push({k:'status',l:'Status',from:'Inactive',to:'Active'});
     (changes.length?plan.update:plan.same).push({m,p,changes});
   }
-  plan.missing=db.members.filter(x=>!used.has(x.id)&&x.status!=='Inactive');
+  plan.missing=members().filter(x=>!used.has(x.id)&&x.status!=='Inactive');
   return plan;
 }
 function importRoster(){
-  openDrawer({kicker:'Members',title:'Import member list',
-    body:`<p style="margin:0">Upload the Golf Genius contact list export (<b>.xlsx</b>) or any spreadsheet or CSV with first and last name columns.</p>
-      <p class="hint">Picks up email, handicap index, GHIN, Golf Genius ID, phone and address. People already in the hub are matched by Golf Genius ID, GHIN, email, then name, so uploading a newer export updates them instead of adding duplicates. You’ll see a preview before anything is saved.</p>
+  const club=isClub(), short=orgShort();
+  openDrawer({kicker:club?'Directory':'Members',title:club?'Import club roster':'Import member list',
+    body:`<p style="margin:0">${club?'Upload the club software’s member export (<b>.xlsx</b> or <b>.csv</b>) or any spreadsheet with first and last name columns.':`Upload the ${esc(short)} member list — the Golf Genius contact list export (<b>.xlsx</b>) or any spreadsheet or CSV with first and last name columns.`}</p>
+      <p class="hint">Picks up email, phone, handicap index, GHIN, member number, Golf Genius ID and address. People already in the club directory are matched by member number, Golf Genius ID, GHIN, email, then name, so a newer export updates them instead of adding duplicates${club?'':`, and club members who aren’t in the ${esc(short)} yet are added to it`}. A match on name alone that disagrees on an identifier is left for you to decide. You’ll see a preview before anything is saved.</p>
       <input type="file" id="rosterF" accept=".xlsx,.xls,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv" class="inp" style="padding-top:8px"><p class="hint" id="rosterMsg" aria-live="polite"></p>`,
     wire:r=>{ r.querySelector('#rosterF').onchange=async e=>{ const f=e.target.files[0]; if(!f) return; const msg=r.querySelector('#rosterMsg'); msg.style.color=''; msg.textContent='Reading '+f.name+'…';
       try{ const res=mapRoster(await readRosterFile(f)); if(!res.people.length) throw new Error('No people found under the header row');
         closeDrawer(); previewRoster(res,f.name); }
       catch(err){ msg.style.color='var(--neg)'; msg.textContent=err.message||'Couldn’t read that file'; } }; }});
 }
-function previewRoster(res,fname,eventFile){
-  const plan=planRoster(res.people,res.fileDate);
+function previewRoster(res,fname){
+  const plan=planRoster(res.people,res.fileDate), club=isClub(), short=orgShort();
   const li=(t,sub)=>`<div class="mr" style="grid-template-columns:minmax(0,1fr)"><div class="cell2"><b>${t}</b>${sub?`<small>${sub}</small>`:''}</div></div>`;
   const more=(n,shown)=>n>shown?`<div class="mr"><span class="muted">+ ${n-shown} more</span></div>`:'';
-  const SHOW=8;
-  openDrawer({kicker:'Import · '+fname,title:'Review import',saveLabel:`Import ${plan.add.length+plan.update.length} change${plan.add.length+plan.update.length===1?'':'s'}`,
-    body:`<div class="grid g3" style="gap:10px">${[['New',plan.add.length],['Updated',plan.update.length],['No change',plan.same.length]].map(([l,v])=>`<div class="card pad kpi" style="padding:14px"><span class="lbl">${l}</span><span class="v num" style="font-size:30px">${v}</span></div>`).join('')}</div>
-      <p class="hint">Everyone in this file is imported as an <b>Active</b> MGA member. ${res.people.length} people read from the file${res.skippedGuests?` · ${res.skippedGuests} guests skipped`:''}${res.skippedBlank?` · ${res.skippedBlank} rows without a name skipped`:''}.</p>
-      ${plan.add.length?`<div class="fld"><span class="lbl">New members</span><div class="mini">${plan.add.slice(0,SHOW).map(p=>li(esc(p.first+' '+p.last),esc([p.email,p.hcp&&'Index '+p.hcp,p.ghin&&'GHIN '+p.ghin].filter(Boolean).join(' · ')))).join('')}${more(plan.add.length,SHOW)}</div></div>`:''}
-      ${plan.update.length?`<div class="fld"><span class="lbl">Updates to existing members</span><div class="mini">${plan.update.slice(0,SHOW).map(u=>li(esc(memberName(u.m)),u.changes.map(c=>esc(c.l)+': '+(c.from?esc(c.from)+' → ':'')+esc(c.to)).join(' · '))).join('')}${more(plan.update.length,SHOW)}</div><p class="hint">Blank cells in the file never erase what’s already in the hub.</p></div>`:''}
-      ${plan.missing.length?`<label class="check" style="align-items:flex-start;font-weight:400"><input type="checkbox" id="rosterInact"${(plan.update.length+plan.same.length)>=0.6*(plan.update.length+plan.same.length+plan.missing.length)?' checked':''}><span>Mark the ${plan.missing.length} active member${plan.missing.length===1?'':'s'} not on this MGA roster as Inactive <span class="muted">(${esc(plan.missing.slice(0,4).map(memberName).join(', '))}${plan.missing.length>4?'…':''})</span></span></label>`:''}`,
+  const SHOW=8, who=p=>esc([p.email,p.memberNo&&'#'+p.memberNo,p.hcp&&'Index '+p.hcp,p.ghin&&'GHIN '+p.ghin].filter(Boolean).join(' · '));
+  const chg=u=>u.changes.map(c=>esc(c.l)+': '+(c.from?esc(c.from)+' → ':'')+esc(c.to)).join(' · ');
+  const nChanges=plan.add.length+plan.join.length+plan.update.length+plan.conflict.length;
+  const kp=[['New',plan.add.length]].concat(club?[]:[['Joining',plan.join.length]]).concat([['Updated',plan.update.length],['No change',plan.same.length]]).concat(plan.conflict.length?[['To decide',plan.conflict.length]]:[]);
+  openDrawer({kicker:'Import · '+fname,title:'Review import',saveLabel:`Import ${nChanges} change${nChanges===1?'':'s'}`,wide:plan.conflict.length>0,
+    body:`<div class="grid g3" style="gap:10px">${kp.map(([l,v])=>`<div class="card pad kpi" style="padding:14px"><span class="lbl">${l}</span><span class="v num" style="font-size:30px">${v}</span></div>`).join('')}</div>
+      <p class="hint">${club?'Everyone in this file is imported as an <b>Active</b> club member.':`Everyone in this file is imported as an <b>Active</b> ${esc(short)} member (new people are added to the club directory too).`} ${res.people.length} people read from the file${res.skippedGuests?` · ${res.skippedGuests} guests skipped`:''}${res.skippedBlank?` · ${res.skippedBlank} rows without a name skipped`:''}.</p>
+      ${plan.conflict.length?`<div class="fld"><span class="lbl">Same person or not? These match an existing name but disagree on an identifier</span><div class="mini">${plan.conflict.map((c,i)=>`<div class="mr" style="grid-template-columns:minmax(0,1fr) auto;align-items:start"><div class="cell2"><b>${esc(c.p.first+' '+c.p.last)}</b><small>In the file: ${who(c.p)||'—'}<br>In the directory: ${who(c.m)||'—'}</small></div><div style="display:flex;flex-direction:column;gap:6px;font-size:13px"><label class="check" style="font-weight:400"><input type="radio" name="cf${i}" value="same" checked>Same person — update</label><label class="check" style="font-weight:400"><input type="radio" name="cf${i}" value="new">Different person — add as new</label></div></div>`).join('')}</div></div>`:''}
+      ${plan.add.length?`<div class="fld"><span class="lbl">New ${club?'members':'to the club'}</span><div class="mini">${plan.add.slice(0,SHOW).map(p=>li(esc(p.first+' '+p.last),who(p))).join('')}${more(plan.add.length,SHOW)}</div></div>`:''}
+      ${plan.join.length?`<div class="fld"><span class="lbl">Club members joining the ${esc(short)}</span><div class="mini">${plan.join.slice(0,SHOW).map(u=>li(esc(memberName(u.m)),chg(u)||who(u.m))).join('')}${more(plan.join.length,SHOW)}</div></div>`:''}
+      ${plan.update.length?`<div class="fld"><span class="lbl">Updates to existing members</span><div class="mini">${plan.update.slice(0,SHOW).map(u=>li(esc(memberName(u.m)),chg(u))).join('')}${more(plan.update.length,SHOW)}</div><p class="hint">Blank cells in the file never erase what’s already in the hub.</p></div>`:''}
+      ${plan.missing.length?`<label class="check" style="align-items:flex-start;font-weight:400"><input type="checkbox" id="rosterInact"${(plan.update.length+plan.same.length)>=0.6*(plan.update.length+plan.same.length+plan.missing.length)?' checked':''}><span>Mark the ${plan.missing.length} active ${esc(club?'club':short)} member${plan.missing.length===1?'':'s'} not in this file as Inactive <span class="muted">(${esc(plan.missing.slice(0,4).map(memberName).join(', '))}${plan.missing.length>4?'…':''})</span></span></label>`:''}`,
     save:()=>{
       const inact=$('rosterInact')&&$('rosterInact').checked;
-      if(!plan.add.length&&!plan.update.length&&!inact){ toast('Nothing to change — the hub already matches this file'); return; }
-      const before=clone(db.members);
-      for(const p of plan.add){ const m={id:uid(),status:'Active',joined:'',notes:''}; ROSTER_FIELDS.forEach(([k])=>{ m[k]=p[k]||''; }); m.source='roster'; if(p.hcp) m.hcpAt=res.fileDate; db.members.push(m); }
-      for(const u of plan.update){ u.changes.forEach(c=>{ u.m[c.k]=c.to; if(c.k==='hcp') u.m.hcpAt=res.fileDate; }); if(u.m.status==='Inactive') u.m.status='Active'; }
-      if(inact) plan.missing.forEach(m=>m.status='Inactive');
+      if(!nChanges&&!inact){ toast('Nothing to change — the hub already matches this file'); return; }
+      const before=memberSnapshot();
+      const addPerson=p=>{ const d={status:'Active',joined:'',notes:'',source:'roster'}; ROSTER_FIELDS.forEach(([k])=>{ d[k]=p[k]||''; }); if(p.hcp) d.hcpAt=res.fileDate; upsertMember(null,d); };
+      const apply=u=>{ u.changes.forEach(c=>{ if(c.k==='status') return; u.m[c.k]=c.to; if(c.k==='hcp') u.m.hcpAt=res.fileDate; }); upsertMember(u.m.id,{status:'Active'}); };
+      plan.add.forEach(addPerson); plan.join.forEach(apply); plan.update.forEach(apply);
+      let asNew=0; plan.conflict.forEach((c,i)=>{ const v=(document.querySelector(`input[name=cf${i}]:checked`)||{}).value; if(v==='new'){ addPerson(c.p); asNew++; } else apply(c); });
+      if(inact) plan.missing.forEach(x=>upsertMember(x.id,{status:'Inactive'}));
       db.rosterImportedAt=new Date().toISOString(); db.rosterFile=fname;
-      toast(`${plan.add.length} added · ${plan.update.length} updated${inact?` · ${plan.missing.length} marked inactive`:''}`,()=>{ db.members=before; persist(); render(); });
+      toast(`${plan.add.length+asNew} added${plan.join.length?` · ${plan.join.length} joined`:''} · ${plan.update.length+plan.conflict.length-asNew} updated${inact?` · ${plan.missing.length} marked inactive`:''}`,()=>{ memberRestore(before); persist(); render(); });
     }});
 }
 function parseCSV(txt){ const rows=[]; let row=[],cur='',q=false;
@@ -695,7 +803,7 @@ function parseCSV(txt){ const rows=[]; let row=[],cur='',q=false;
   if(cur||row.length){ row.push(cur); rows.push(row); } return rows.filter(r=>r.some(c=>c.trim())); }
 /* ---------- Board ---------- */
 function vBoard(m){
-  m.innerHTML=head('Board',`${Y()} MGA board. Each seat is filled from the member list.`,btn('Add seat','bAdd','',I.plus))+`
+  m.innerHTML=head('Board',`${Y()} ${esc(orgShort())} board. Each seat is filled from the member list.`,btn('Add seat','bAdd','',I.plus))+`
   <div class="grid g4 board">${db.board.map(b=>{const mm=memberById(b.memberId);const sub=b.term?'Term through '+b.term:(mm&&mm.email)||'';return `<div class="card seat">
     <div class="seat-top"><span class="lbl trunc">${esc(b.role)}</span><button class="ib" data-bs="${b.id}" aria-label="Edit ${esc(b.role)} seat">${I.edit}</button></div>
     ${mm?`<div class="seat-who"><span class="av">${initials(mm)}</span><div class="cell2"><b class="trunc" title="${esc(memberName(mm))}">${esc(memberName(mm))}</b><small class="trunc" title="${esc(sub)}">${esc(sub)}</small></div></div>
@@ -707,9 +815,9 @@ function vBoard(m){
   $('bAdd').onclick=()=>editSeat(null);
 }
 function pickMember(seat){
-  if(!db.members.length){ toast('Add members first'); go('members'); return; }
+  if(!members().length){ toast('Add members first'); go('members'); return; }
   let chosen=seat.memberId;
-  const list=db.members.filter(x=>x.status!=='Inactive').sort((a,b)=>memberName(a).localeCompare(memberName(b)));
+  const list=members().filter(x=>x.status!=='Inactive').sort((a,b)=>memberName(a).localeCompare(memberName(b)));
   const html=q=>list.filter(x=>memberName(x).toLowerCase().includes(q.toLowerCase())).map(x=>{const on=db.board.filter(b=>b.memberId===x.id&&b.id!==seat.id).map(b=>b.role);
     return `<button type="button" data-pk="${x.id}" class="${x.id===chosen?'on':''}"><span class="av">${initials(x)}</span><b>${esc(memberName(x))}</b><span class="muted" style="margin-left:auto;font-size:12.5px">${on.length?esc(on.join(', ')):''}</span></button>`;}).join('')||'<span class="muted" style="padding:14px">No matches.</span>';
   openDrawer({kicker:seat.role,title:'Choose a member',saveLabel:'Add to board',
@@ -729,14 +837,14 @@ function vBudget(m){
   const y=Y(), sc=scalc(y), s=sc.s;
   const cols='grid-template-columns:minmax(160px,2fr) 140px 130px 130px 120px 120px';
   const r=(n,d,rv,ex,nt,act,cls='',attr='')=>`<div class="tr num ${cls}" ${attr} style="${cols}"><span style="font-weight:600;color:var(--navy)">${n}</span><span class="muted">${d}</span><span class="r">${rv}</span><span class="r">${ex}</span><b class="r ${typeof nt==='number'?netCls(nt):''}">${typeof nt==='number'?fmtS(nt):nt}</b><span class="r muted">${act}</span></div>`;
-  m.innerHTML=head('Season budget','Tournaments are self-sustaining; dues are the MGA’s own income. Everything rolls up here.',btn('Add MGA line','sbAdd','',I.plus))+`
-  <div class="grid g3">${kpi('Budgeted revenue',fmt(sc.revenue),'tournaments + dues + MGA lines')}${kpi('Budgeted expenses',fmt(sc.expenses),'tournaments + MGA lines')}${kpi('Season net (projected)',fmtS(sc.projected),`Actuals for ${sc.past.length} completed, budget for ${sc.upcoming.length} upcoming · all-budget net ${fmtS(sc.net)}`,netCls(sc.projected))}</div>
+  m.innerHTML=head('Season budget',`Tournaments are self-sustaining; dues are the ${esc(orgShort())}’s own income. Everything rolls up here.`,btn('Add '+orgShort()+' line','sbAdd','',I.plus))+`
+  <div class="grid g3">${kpi('Budgeted revenue',fmt(sc.revenue),'tournaments + dues + '+orgShort()+' lines')}${kpi('Budgeted expenses',fmt(sc.expenses),'tournaments + MGA lines')}${kpi('Season net (projected)',fmtS(sc.projected),`Actuals for ${sc.past.length} completed, budget for ${sc.upcoming.length} upcoming · all-budget net ${fmtS(sc.net)}`,netCls(sc.projected))}</div>
   <div class="card" style="overflow:hidden"><div class="cardhead"><h2 class="h2">Tournaments</h2></div><div class="tw"><div class="t" style="min-width:820px">
     <div class="tr th" style="${cols}"><span>Tournament</span><span>Dates</span><span class="r">Revenue</span><span class="r">Expenses</span><span class="r">Net</span><span class="r">Actual net</span></div>
     ${sc.ts.map(({t,c})=>r(esc(t.name)+(isPast(t)?' <span class="chip ok" style="height:20px;font-size:11px;margin-left:6px">Actual counts</span>':''),dateRange(t).replace(/, \d{4}$/,''),fmt(c.revenue),fmt(c.expenses),c.net,fmtS(c.netA),'click',`data-open="${t.id}"`)).join('')||'<div class="tr"><span class="muted">No tournaments this season.</span></div>'}
     ${r('Tournaments subtotal','',fmt(sc.tRev),fmt(sc.tExp),sc.tRev-sc.tExp,'','tot')}
   </div></div></div>
-  <div class="card" style="overflow:hidden"><div class="cardhead"><h2 class="h2">MGA-level money</h2></div><div class="tw"><div class="t" style="min-width:820px">
+  <div class="card" style="overflow:hidden"><div class="cardhead"><h2 class="h2">${esc(orgShort())}-level money</h2></div><div class="tw"><div class="t" style="min-width:820px">
     <div class="tr th" style="${cols}"><span>Line</span><span>Basis</span><span class="r">Budget</span><span class="r"></span><span class="r"></span><span class="r">Actual</span></div>
     ${r('Annual dues',`${sc.active} × ${fmt(s.dues.amount)}`,fmt(sc.duesBudget),'','','<span>'+fmt(sc.duesActual)+'</span>','click','id="sbDues"')}
     <div class="tr" style="${cols};border-top:none;min-height:0;padding-bottom:12px"><span class="muted" style="font-size:12.5px;grid-column:1/-1">${n0(s.dues.installments)>1?`Charged as ${s.dues.installments} × ${fmt(n0(s.dues.amount)/s.dues.installments)}, `:''}not prorated. Actual comes from dues recorded on each member.</span></div>
@@ -770,12 +878,14 @@ function wireChrome(){
   $('dClose').onclick=closeDrawer; $('scrim').onclick=closeDrawer;
   document.addEventListener('keydown',e=>{ if(e.key==='Escape'&&drawerOpen()) closeDrawer(); });
   $('seasonSel').onchange=e=>{ if(e.target.value==='__new'){ e.target.value=Y(); newSeasonPrompt(); return; } db.activeSeason=e.target.value; persist(); go(view.page==='tournament'?'tournaments':view.page); };
-  $('btnBackup').onclick=()=>{ dl(JSON.stringify(db,null,2),'application/json','mga_hub_backup_'+new Date().toISOString().slice(0,10)+'.json'); toast('Backup downloaded'); };
+  $('btnBackup').onclick=()=>{ if(!db) return; dl(JSON.stringify(db,null,2),'application/json',ORG_ID+'_hub_backup_'+new Date().toISOString().slice(0,10)+'.json'); toast('Backup downloaded'); };
+  $('btnSwitch').onclick=()=>{ view.page='pick'; render(); window.scrollTo(0,0); };
   $('btnRestore').onclick=()=>$('fileRestore').click();
   $('fileRestore').onchange=e=>{ const f=e.target.files[0]; if(!f) return; const r=new FileReader();
-    r.onload=()=>{ try{ const d=JSON.parse(r.result); if(!d.tournaments||!d.seasons) throw 0; if(!confirm('Replace everything in the hub with this backup?')) return; db=normalize(d); persist(); go('dash'); toast('Backup restored'); }catch(_){ toast('That isn’t an MGA Hub backup'); } };
+    r.onload=()=>{ try{ const d=JSON.parse(r.result); if(!db||!d.tournaments||!d.seasons) throw 0; if((d.kind||'association')!==db.kind) throw 0; if(!confirm(`Replace everything in the ${orgShort()} hub with this backup?`)) return;
+      const D=DOCS[ORG_ID]; syncTo(D.db,normalize(d,D.meta)); persist(); go('dash'); toast('Backup restored'); }catch(_){ toast('That isn’t a backup of this hub'); } };
     r.readAsText(f); e.target.value=''; };
-  $('syncBtn').onclick=()=>{ if(!CLOUD||!sessionOK) return; if(!cloudReady) startCloud(); else { setSync('saving'); pushCloud(); } };
+  $('syncBtn').onclick=()=>{ if(!CLOUD||!sessionOK) return; if(!cloudReady) startCloud(); else pushAll(); };
   $('btnSignOut').onclick=async()=>{ await sb.auth.signOut(); location.reload(); };
 }
 async function doLogin(){

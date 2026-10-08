@@ -24,6 +24,11 @@ Read this file first. Then read `README.md` (user-facing feature guide) as neede
 - **Plain static site.** No framework, no bundler, no npm runtime deps. Vanilla JS + HTML + CSS.
 - **Hosting:** Render static sites serving the **repo root**: `main` → app.wcccmga.org, `Hub` → hub.wcccmga.org.
   Deploy = push. Render does **not** run a build — the built HTML files are committed.
+- **Addresses:** the club hub is `/`; each organization is its own path — `/mga`, `/lga`, `/smga`, `/<group id>`
+  (`ORG_ID` = first path segment; `?org=` is the fallback used by the file:// tests). This needs **one Render rule** on
+  the app.wcccmga.org site: Redirects/Rewrites → source `/*`, destination `/index.html`, action **Rewrite** (existing
+  files such as cashier.html still win). `head.html` writes `<base href="/">` on http so relative files load from the
+  root; links to the cashier / check-in / scoring pages and to crest.png are built from `SITE_BASE`.
 - **Backend:** Supabase (Postgres + RLS + Realtime). Connection in `config.js` (anon key; protected by RLS — the
   board signs in with one shared login, `boardEmail` in config).
 - **External scripts (CDN, loaded on demand):** supabase-js 2.45.4 (jsDelivr), SheetJS (cdnjs, `loadXLSX()`),
@@ -68,26 +73,40 @@ deploy must include `version.json`**, and all four pages must be rebuilt togethe
 ./build.sh                    # builds + syntax-checks every page (node --check)
 python3 tests/smoke.py        # every page + every hub screen/tab renders with no script errors
 python3 tests/test_payouts.py # Calcutta tie-splitting / owner payouts end to end
+python3 tests/test_sync.py    # migration + two devices on a shared fake database (see §3)
 git add -A && git commit && git push origin main  # Render deploys main to app.wcccmga.org
 ```
 Tests need `pip install playwright && playwright install chromium` and `cd tests && npm i xlsx@0.18.5`.
-They run the pages **in local mode** (stubbed `config.js`, no Supabase) — fine for UI and math. Multi-device /
-sync behaviour was verified during development against an atomic in-memory stand-in for Postgres; if you change
-`core.js` saving/merging, rebuild that kind of test (two browser contexts, one shared fake DB, concurrent edits)
-before shipping. See §3 for what must hold.
+smoke/payouts run the pages **in local mode** (stubbed `config.js`, no Supabase; `?org=mga` / `?org=club`).
+`test_sync.py` runs them against `tests/fake_supabase.js` + `FakeDB` in `_harness.py` (shared in-memory rows,
+compare-and-swap, 250 ms polling "realtime"). If you change `core.js` saving/merging or the member API, keep it green.
 
 ---
 
 ## 2. Data model
 
-One JSONB document, `db`, normalized by `normalize()` in core.js. Top level (abridged):
+**One JSONB document per organization**, all in `mga_hub`, each normalized by `normalize(doc, meta)` in core.js:
 ```
-db = { seasons:{[year]:{...}}, members:[{id,first,last,hcp,email,...}], board:[{role,memberId}],
-       tournaments:[ Tournament ], ledger/treasury..., _rev, _w, _at }
+club row (CLUB)  = { v, id:'club', kind:'club', name, short, crest?,
+                     members:[ Person ],              ← the master directory (first,last,email,phone,hcp,hcpAt,ghin,
+                                                        memberNo,ggId,address…,status = club status)
+                     orgs:[{id,kind:'association'|'group',name,short,crest?,archived?}],
+                     activeSeason, seasons, board, tournaments, golf?, migratedAt?, _rev,_w,_at }   ← the club's own hub
+org row (db)     = { v, id:'mga', kind, name, short, activeSeason,
+                     memberships:[{id:<person id>, status, joined, notes}],   ← who belongs here + per-org fields
+                     board, seasons:{[year]:{...}}, tournaments:[ Tournament ], golf?, ledger/treasury…, _rev,_w,_at }
 Tournament = { id, name, season, days, startDate, field:[{id,memberId,team,paid,skins,answers,checkin?}],
                fieldQuestions:[...], sponsors, tiers, income, perPlayer, lines, dayItems, actuals, schedule,
                decisions, calcutta?, checklist?, raffle?, checkinShare? }
 ```
+- `db` is the organization on screen; `CLUB` is the club document (`db===CLUB` in the club hub, `isClub()`). Code never
+  touches `db.members`: use `members()` (read-only views = person + this org's status/joined/notes), `memberById(id)`,
+  `persons()`/`personById(id)` (directory), and write through `upsertMember(id|null, data)` / `removeMember(id)`
+  (which keep both documents right) — `memberSnapshot()`/`memberRestore()` for undo. A person is one record
+  club-wide; removing someone from an association only ends the membership.
+- Organization kinds gate the nav (`ORG_NAV` in ui.js): club = directory, organizations, tournaments, golf, budget,
+  treasury; association = everything the MGA has; group = dashboard, tournaments, golf, members (the stripped-down
+  small-group version is still to be built).
 - Arrays of objects carry stable `id`s — the merge (§3) matches by id. Keep it that way for anything new.
 - `_rev` (revision), `_w` (writer/client id), `_at` are bookkeeping, excluded from comparisons.
 - **Device-local, never in the shared doc:** cashier/check-in link status (`SHARE_ST`, `CKI_ST`), the cashier-link merge base (`localStorage mga_cbase_<tid>`), check-in base (`mga_ckibase_<tid>`).
@@ -96,7 +115,7 @@ Tournament = { id, name, season, days, startDate, field:[{id,memberId,team,paid,
 ### Supabase objects
 | object | purpose |
 |---|---|
-| `mga_hub` (id 'main', data jsonb) | the whole hub document (`hub-setup.sql`, `hub-fix-permissions.sql`) |
+| `mga_hub` (id, data jsonb) | one row per organization: `club`, `mga`, `lga`, `smga`, `<group id>` — and `main`, the frozen MGA Hub's row (read by the migration only). `hub-setup.sql`, `hub-fix-permissions.sql` |
 | `calcutta_share` (tid, token, name, doc, version) + RPC `calcutta_get(p_token)`, `calcutta_put(p_token,p_doc,p_version)` | token links for people without the board login: the **cashier** page (tid = tournament id) and the **registration/check-in** page (tid = tournament id + `:checkin`). `calcutta_put` is version-checked (conflict → retry). `calcutta-setup.sql` |
 | `golf_events`, `golf_scores` + RPC `golf_event`, `golf_join`, `golf_submit` | public live scoring (`golf-setup.sql`). Built but **not used** this season — don't advertise it. |
 | `mm_tournament` | the retired Member-Member app's row (`supabase-setup.sql`). Archive only — no hub code reads or writes it. |
@@ -105,7 +124,9 @@ Tournament = { id, name, season, days, startDate, field:[{id,memberId,team,paid,
 
 ## 3. Collaborative saving — the part not to break
 
-Several board members edit at once. `core.js` implements:
+Several board members edit at once, across two open documents (club + organization; `DOCS[id]` holds each one's
+server copy, save state and realtime channel). `persist()` saves whichever open documents actually changed; the member
+form can touch both (person → club row, membership/dues → org row). Per document, `core.js` implements:
 - **Compare-and-swap on `_rev`:** `update ... where data->>_rev = <base rev>` returning rows. 0 rows → someone
   saved first → fetch theirs, **three-way merge** (`merge3(base, local, remote)`), retry (≤6).
 - **merge3:** objects merge key by key; arrays of `{id}` objects merge element by element (adds/deletes from both
@@ -118,9 +139,11 @@ Several board members edit at once. `core.js` implements:
 - **Ignore stale copies:** apply a remote only if its `_rev` > `base._rev`.
 - **Realtime + 15 s safety poll**; render keeps focus/cursor/scroll; status line says "updated 12:31", no pop-ups.
 
-Invariants verified before handoff: browsing (switching tabs, opening/closing records, searching, background
-checks) = **0 writes**; one edit = 1 hub write (+1 cashier-link write if a Calcutta link is live); 40 overlapping
-edits from two devices all kept, both screens and server identical.
+Invariants, checked by `tests/test_sync.py` (two browser contexts, one shared fake Postgres with atomic CAS and write
+counts): browsing = **0 writes**; one tournament edit = 1 write to the org row and 0 to the club row; a person edit from
+an association = 1 write to the club row only; 40 overlapping sponsor adds + 20 new people from two devices all kept,
+both devices and the server identical. Also covered there: first-run set-up from the `main` row and its re-run.
+(Cashier-link writes add 1 per edit when a Calcutta link is live.)
 
 The cashier and check-in pages use their own per-item merge (`calcMerge` / `ckMerge`): each item carries `u`
 (updated-at); newest wins per item; deletes are tombstones; settings merge as a unit (`_su`). Stamping is
@@ -197,6 +220,11 @@ groups, printed scorecards — the printed cards include a live-scoring QR that 
   hub's import / Verify / two-way sync / "Retire current app" code was removed in Oct 2026. Stored documents may still carry `db.legacy`, `t.source` (`kind:'mm-app'`) and
   `t.sync` from that era; nothing reads them and `normalize()` leaves them alone.
 - 2026 Member-Member: Oct 2–4. 150 players / 75 teams (Team 84, Regina & Cagle, added late as Lot 75).
+- **Built Oct 2026 (step 1):** per-organization rows, the club directory + memberships, path routing, the picker,
+  the Organizations page (create associations / small groups, archive), the club-side roster import (member number →
+  Golf Genius ID → GHIN → email → name; name-only matches that disagree on an identifier are decided by hand), and the
+  set-up / re-import from the MGA Hub (`migrateFromHub()`: directory from the MGA list with the same ids; mga row =
+  the Hub's document with members → memberships; re-running updates the directory and replaces the mga row).
 - **Decided for the club hub (Oct 2026):** the club owns the master roster, seeded from the MGA list, then grown by
   importing the club software's export (merge duplicates by member number → GHIN → email → name, create the rest).
   Sign-in stays the single shared board login for now (it is master access to every tier); individual sign-in

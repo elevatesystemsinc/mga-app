@@ -49,7 +49,7 @@ function tCheckin(el,t){
 }
 /* ---------- registration link ---------- */
 const CKI_ST={};
-const checkinLink=t=>location.href.split('#')[0].split('?')[0].replace(/[^/]*$/,'')+'checkin.html?k='+encodeURIComponent(t.checkinShare.token);
+const checkinLink=t=>SITE_BASE+'checkin.html?k='+encodeURIComponent(t.checkinShare.token);
 const ckBase={ get(t){ try{ return JSON.parse(localStorage.getItem('mga_ckibase_'+t.id)||'null'); }catch(_){ return null; } }, set(t,doc){ try{ localStorage.setItem('mga_ckibase_'+t.id,JSON.stringify(doc)); }catch(_){} } };
 function ckDocFromField(t){ const prev=ckBase.get(t), um=new Map(((prev&&prev.players)||[]).map(p=>[p.id,p]));
   const doc={name:t.name,players:ckPlayers(t).map(r=>{ const o={id:r.id,last:r.last,first:r.first,partner:r.partner,team:r.team,par3:r.par3,in:!!r.p.checkin,at:r.p.checkin?r.p.checkin.at:''}; const b=um.get(r.id); if(b&&b.u) o.u=b.u; return o; })};

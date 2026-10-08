@@ -3,7 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>MGA Hub · Walnut Creek Country Club</title>
+<script>if(/^https?:/.test(location.protocol))document.write('<base href="/">');</script><!-- the page is served at /, /mga, /lga, … (Render rewrites every path to index.html); relative files always come from the root -->
+<title>Club Hub · Walnut Creek Country Club</title>
 <link rel="icon" href="crest.png?v=2">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;0,700;1,700&family=Public+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -32,6 +33,14 @@ body{font-variant-numeric:lining-nums}
 .side{width:248px;flex-shrink:0;background:var(--navy);color:#E9E4D6;display:flex;flex-direction:column;padding:24px 16px;position:sticky;top:0;height:100vh}
 .brand{display:flex;align-items:center;gap:12px;padding:0 8px 22px;border-bottom:1px solid rgba(216,183,95,.3)}
 .brand img{width:44px;height:57px;object-fit:contain}
+.mono{display:inline-flex;align-items:center;justify-content:center;width:44px;height:57px;border-radius:8px;background:var(--deep);border:1px solid rgba(216,183,95,.45);color:var(--goldl);font-family:var(--serif);font-weight:700;font-size:15px;letter-spacing:.02em;flex-shrink:0}
+.mono.sm,.crest.sm{width:28px;height:36px;font-size:11px;border-radius:6px}
+.topbar .crest.sm{width:24px;height:30px}
+.orgs{display:flex;flex-direction:column;gap:12px;max-width:640px}
+.orgcard{display:flex;align-items:center;gap:14px;width:100%;text-align:left;padding:14px 16px;border:1px solid var(--line);border-radius:12px;background:var(--card);cursor:pointer;font:inherit;color:var(--ink)}
+.orgcard:hover{border-color:var(--gold);box-shadow:0 2px 10px rgba(15,42,56,.08)}
+.orgcard .crest{width:40px;height:52px;object-fit:contain} .orgcard .mono{background:var(--navy)} .orgcard .cell2{flex:1;min-width:0} .orgcard b{font-size:16px;color:var(--navy)} .orgcard svg{width:18px;height:18px;color:var(--muted)}
+.tr .crest.sm,.tr .mono.sm{justify-self:start}
 .brand b{font-family:var(--serif);font-size:26px;color:#fff;line-height:1;display:block}
 .brand small{font-size:12px;color:var(--goldl);display:block;margin-top:4px}
 .season{padding:18px 8px 10px}
@@ -306,17 +315,17 @@ textarea.inp{height:auto;min-height:84px;padding:10px 12px;resize:vertical}
 <body>
 <div class="app">
   <aside class="side" id="side">
-    <div class="brand"><img src="crest.png?v=2" alt="Walnut Creek Country Club MGA crest"><div><b>MGA Hub</b><small>Walnut Creek Country Club</small></div></div>
-    <div class="season"><label for="seasonSel">Season</label><select id="seasonSel"></select></div>
+    <div class="brand"><span id="brandCrest"><img src="mga-crest.png" alt=""></span><div><b id="brandName">Club Hub</b><small id="brandSub">Walnut Creek Country Club</small></div></div>
+    <div class="season" id="seasonBox"><label for="seasonSel">Season</label><select id="seasonSel"></select></div>
     <nav class="navlist" id="nav" aria-label="Main"></nav>
     <div class="sidefoot">
       <button class="sync linkbtn" id="syncBtn" style="text-decoration:none"><span class="dot local" id="syncDot"></span><span id="syncTxt">This device only</span></button>
       <p id="syncErr" hidden style="margin:0;font-size:11.5px;color:#F0B8A8;word-break:break-word"></p>
-      <div style="display:flex;gap:14px;flex-wrap:wrap"><button class="linkbtn" id="btnBackup">Backup</button><button class="linkbtn" id="btnRestore">Restore</button><button class="linkbtn" id="btnSignOut" hidden>Sign out</button></div>
+      <div style="display:flex;gap:14px;flex-wrap:wrap"><button class="linkbtn" id="btnSwitch" hidden>Switch hub</button><button class="linkbtn" id="btnBackup">Backup</button><button class="linkbtn" id="btnRestore">Restore</button><button class="linkbtn" id="btnSignOut" hidden>Sign out</button></div>
       <input type="file" id="fileRestore" accept="application/json" hidden>
     </div>
   </aside>
-  <header class="topbar"><button class="ib" id="btnMenu" aria-label="Open menu"></button><img src="crest.png?v=2" alt=""><b>MGA Hub</b></header>
+  <header class="topbar"><button class="ib" id="btnMenu" aria-label="Open menu"></button><span id="topCrest"><img src="mga-crest.png" alt=""></span><b id="topName">Club Hub</b></header>
   <main class="main" id="main"></main>
 </div>
 <div class="scrim" id="scrim"></div>
@@ -328,9 +337,9 @@ textarea.inp{height:auto;min-height:84px;padding:10px 12px;resize:vertical}
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 <div class="login" id="login">
   <div class="card">
-    <img src="crest.png?v=2" alt="Walnut Creek Country Club MGA crest">
-    <h1 class="h2" style="font-size:30px">MGA Hub</h1>
-    <p class="muted" style="margin:0">Board sign-in</p>
+    <img src="mga-crest.png" alt="">
+    <h1 class="h2" style="font-size:30px">Club Hub</h1>
+    <p class="muted" style="margin:0">Walnut Creek Country Club · Board sign-in</p>
     <input class="inp" type="password" id="loginPw" placeholder="Board password" autocomplete="current-password" aria-label="Board password">
     <button class="btn pri" id="loginBtn" style="width:100%">Sign in</button>
     <p class="hint" id="loginErr" style="color:var(--neg);min-height:18px"></p>
@@ -338,8 +347,11 @@ textarea.inp{height:auto;min-height:84px;padding:10px 12px;resize:vertical}
 </div>
 <script>
 /* =====================================================================
-   MGA Hub — core: data model, calculations, storage + collaborative cloud save
-   Data lives in ONE jsonb row: public.mga_hub (id 'main').
+   Club Hub — core: data model, calculations, storage + collaborative cloud save
+   Data lives in public.mga_hub, ONE jsonb row per organization: `club` (the member directory, the list of
+   organizations and the club's own hub) plus one row per association (`mga`, `lga`, `smga`) and per small
+   group. Two rows are open at a time: the club's (CLUB) and the selected organization's (db — the same object
+   as CLUB when the club itself is selected). The `main` row is the frozen MGA Hub (Hub branch): read-only here.
    ===================================================================== */
 const $=id=>document.getElementById(id);
 const uid=()=>(crypto.randomUUID?crypto.randomUUID():Date.now().toString(36)+Math.random().toString(36).slice(2));
@@ -367,16 +379,29 @@ function dayLabel(t,i){
 function dayShort(t,i){ const d=parseD(t.startDate); if(!d) return ''; const x=addDays(d,i); return MONTHS[x.getMonth()]+' '+x.getDate(); }
 function daysOut(t){ const d=parseD(t.startDate); if(!d) return null; const now=new Date(); now.setHours(0,0,0,0); return Math.round((d-now)/864e5); }
 
-/* ---------- model ---------- */
-const HUB_VERSION=1;
+/* ---------- model ----------
+   Organization document (one per row): { v, id, kind:'club'|'association'|'group', name, short, crest?, activeSeason,
+     memberships:[{id:<person id>, status, joined, notes}], board, seasons, tournaments, golf?, ... }
+   The club's document also carries members:[person] (the master directory — first, last, email, phone, hcp, ghin,
+   memberNo, address…, status = club status) and orgs:[{id, kind, name, short, crest?, archived?}].
+   A person is one record club-wide; each organization's membership adds its own status / joined / notes. */
+const HUB_VERSION=2;
+const ORG_KINDS={club:'Club',association:'Association',group:'Small group'};
+const CLUB_META={id:'club',kind:'club',name:'Walnut Creek Country Club',short:'Club'};
+const DEFAULT_ORGS=[{id:'mga',kind:'association',name:'Men’s Golf Association',short:'MGA',crest:'mga-crest.png'},
+                    {id:'lga',kind:'association',name:'Ladies’ Golf Association',short:'LGA'},
+                    {id:'smga',kind:'association',name:'Senior Men’s Golf Association',short:'SMGA'}];
 const DEFAULT_ROLES=['President','Vice President','Treasurer','Secretary','Tournament Chair','Member at Large','Member at Large'];
 const ITEM_KINDS=['Meal','Drinks','Event','Other'];
 function newSeason(){ return {dues:{amount:90,installments:2},duesPayments:[],lines:[],txns:[],bank:[],bankBatches:[],bankOpening:{amount:0,date:''}}; }
-function emptyHub(){
-  const y=String(new Date().getFullYear());
-  return {v:HUB_VERSION,activeSeason:y,members:[],board:DEFAULT_ROLES.map(r=>({id:uid(),role:r,memberId:'',term:''})),
-          seasons:{[y]:newSeason()},tournaments:[]};
+function emptyOrg(meta){
+  meta=meta||CLUB_META; const y=String(new Date().getFullYear());
+  const d={v:HUB_VERSION,id:meta.id,kind:meta.kind||'association',name:meta.name||'',short:meta.short||'',activeSeason:y,memberships:[],
+           board:DEFAULT_ROLES.map(r=>({id:uid(),role:r,memberId:'',term:''})),seasons:{[y]:newSeason()},tournaments:[]};
+  if(d.kind==='club'){ d.members=[]; d.orgs=[]; }
+  return d;
 }
+const emptyHub=()=>emptyOrg(CLUB_META);
 function newTournament(o){
   const days=Math.min(3,Math.max(1,+o.days||1));
   return {id:uid(),season:o.season,name:o.name||'New tournament',startDate:o.startDate||'',days,venue:o.venue||'Walnut Creek Country Club',
@@ -385,9 +410,11 @@ function newTournament(o){
     dayItems:[[],[],[]].slice(0,3),income:[],perPlayer:[],lines:[],
     actuals:{entryFees:0,skins:0,skinsPaid:0},schedule:[],decisions:[],notes:'',source:null};
 }
-function normalize(d){
-  if(!d||typeof d!=='object') return emptyHub();
-  d.v=d.v||HUB_VERSION; d.members=d.members||[]; d.board=d.board||[]; d.seasons=d.seasons||{}; d.tournaments=d.tournaments||[];
+function normalize(d,meta){
+  if(!d||typeof d!=='object') return emptyOrg(meta);
+  d.v=d.v||HUB_VERSION; if(meta){ d.id=d.id||meta.id; d.kind=d.kind||meta.kind; if(!d.name) d.name=meta.name||''; if(!d.short) d.short=meta.short||''; }
+  d.kind=d.kind||'association'; d.memberships=d.memberships||[]; d.board=d.board||[]; d.seasons=d.seasons||{}; d.tournaments=d.tournaments||[];
+  if(d.kind==='club'){ d.members=d.members||[]; d.orgs=d.orgs||[]; d.members.forEach(p=>{ if(!p.status) p.status='Active'; }); }
   if(!d.activeSeason) d.activeSeason=String(new Date().getFullYear());
   if(!d.seasons[d.activeSeason]) d.seasons[d.activeSeason]=newSeason();
   for(const s of Object.values(d.seasons)){ s.dues=s.dues||{amount:90,installments:2}; s.duesPayments=s.duesPayments||[]; s.lines=s.lines||[]; s.txns=s.txns||[]; s.bank=s.bank||[]; s.bankBatches=s.bankBatches||[]; s.bankOpening=s.bankOpening||{amount:0,date:''}; }
@@ -447,7 +474,7 @@ function isPast(t){ if(t.status==='Complete') return true; const e=tEnd(t); if(!
 function seasonTournaments(y){ return db.tournaments.filter(t=>t.season===y).sort((a,b)=>(a.startDate||'9').localeCompare(b.startDate||'9')); }
 function scalc(y){
   const s=db.seasons[y]||newSeason(), ts=seasonTournaments(y).map(t=>({t,c:tcalc(t)}));
-  const active=db.members.filter(m=>m.status!=='Inactive').length;
+  const active=members().filter(m=>m.status!=='Inactive').length;
   const duesBudget=active*n0(s.dues.amount), duesActual=sum(s.duesPayments,p=>p.amount);
   const incLines=s.lines.filter(l=>l.type==='Income'), expLines=s.lines.filter(l=>l.type!=='Income');
   const tRev=sum(ts,x=>x.c.revenue), tExp=sum(ts,x=>x.c.expenses), tRevA=sum(ts,x=>x.c.revenueA), tExpA=sum(ts,x=>x.c.expensesA);
@@ -468,25 +495,95 @@ function scalc(y){
 function memberDues(y,mid){ const s=db.seasons[y]; return s?sum(s.duesPayments.filter(p=>p.memberId===mid),p=>p.amount):0; }
 const memberName=m=>m?[m.first,m.last].filter(Boolean).join(' ')||'(no name)':'';
 const initials=m=>m?((m.first||'?')[0]+((m.last||'')[0]||'')).toUpperCase():'—';
-const memberById=id=>db.members.find(m=>m.id===id);
 
-/* ---------- storage + cloud sync ---------- */
-const LS_KEY='mga_hub_v1';
-const store={ load(){ try{ return JSON.parse(localStorage.getItem(LS_KEY)); }catch(_){ return null; } },
-              save(d){ try{ localStorage.setItem(LS_KEY,JSON.stringify(d)); }catch(_){} } };
+/* ---------- members: the club directory + this organization's memberships ----------
+   People live once, in CLUB.members. An association or small group lists who belongs in db.memberships
+   (status / joined / notes are per organization). members() returns read-only views that combine the two;
+   every write goes through upsertMember / removeMember so both documents are kept right. */
+const isClub=()=>!!db&&db===CLUB;
+const persons=()=>CLUB?CLUB.members:[];
+const personById=id=>persons().find(p=>p.id===id);
+const PERSON_KEYS=['first','last','email','phone','hcp','hcpAt','ghin','memberNo','ggId','address1','address2','city','state','zip','dob','memberType','gender','source'];
+function memberView(p,ms){
+  const v=Object.assign({},p);
+  if(!isClub()) Object.assign(v,{status:ms?(ms.status||'Active'):'Inactive',joined:ms?(ms.joined||''):'',notes:ms?(ms.notes||''):''});
+  Object.defineProperty(v,'_p',{value:p}); Object.defineProperty(v,'_ms',{value:ms||null}); return v;
+}
+function members(){
+  if(!db) return [];
+  if(isClub()) return persons().map(p=>memberView(p,null));
+  const by=new Map(persons().map(p=>[p.id,p]));
+  return (db.memberships||[]).map(ms=>{ const p=by.get(ms.id); return p?memberView(p,ms):null; }).filter(Boolean);
+}
+const membershipOf=id=>isClub()||!db?null:(db.memberships||[]).find(m=>m.id===id)||null;
+function memberById(id){ const p=personById(id); return p?memberView(p,membershipOf(id)):undefined; }
+/* create or update a person (club directory) and, in an association / group, their membership here.
+   `data` mixes person fields and status / joined / notes; in the club the latter are the person's club status. */
+function upsertMember(id,data){
+  const pf={}, mf={};
+  for(const k of Object.keys(data||{})){ if(isClub()||PERSON_KEYS.includes(k)) pf[k]=data[k]; else mf[k]=data[k]; }
+  let p=id?personById(id):null;
+  if(!p){ p=Object.assign({id:id||uid(),status:'Active'},pf); CLUB.members.push(p); } else Object.assign(p,pf);
+  if(!isClub()){ let m=membershipOf(p.id); if(!m){ m={id:p.id,status:'Active',joined:'',notes:''}; db.memberships.push(m); } Object.assign(m,mf); }
+  return p;
+}
+/* in an association / group this only ends the membership; the person stays in the club directory */
+function removeMember(id){
+  if(isClub()) CLUB.members=CLUB.members.filter(p=>p.id!==id); else db.memberships=db.memberships.filter(m=>m.id!==id);
+  db.board.forEach(b=>{ if(b.memberId===id) b.memberId=''; }); db.tournaments.forEach(t=>t.field=t.field.filter(p=>p.memberId!==id));
+  for(const ss of Object.values(db.seasons)) ss.duesPayments=ss.duesPayments.filter(p=>p.memberId!==id);
+}
+const memberSnapshot=()=>({persons:clone(CLUB.members),ms:isClub()?null:clone(db.memberships)});
+function memberRestore(sn){ CLUB.members=sn.persons; if(sn.ms) db.memberships=sn.ms; }
+
+/* ---------- storage + cloud sync ----------
+   Per-row engine. Each open document (DOCS[id]) has its own server copy (base), compare-and-swap save and
+   realtime subscription; persist() saves whichever open documents changed. */
+const LS_KEY='club_hub_v1';
+const store={ load(id){ try{ return JSON.parse(localStorage.getItem(LS_KEY+':'+id)); }catch(_){ return null; } },
+              save(id,d){ try{ localStorage.setItem(LS_KEY+':'+id,JSON.stringify(d)); }catch(_){} } };
 const CFG=window.MM_CONFIG||{};
 const CLOUD=!!(CFG.url&&CFG.anonKey&&window.supabase);
 const sb=CLOUD?window.supabase.createClient(CFG.url,CFG.anonKey):null;
 const CLIENT=uid();
-let db=normalize(store.load()||emptyHub());
-let saveT=null, pendingRemote=null, lastPushed='';
+/* The site root (app.wcccmga.org/). Links to the cashier, check-in and scoring pages and to crest.png are built from
+   it, so they work from any organization's path. */
+const HTTP=/^https?:/.test(location.protocol);
+const SITE_BASE=HTTP?location.origin+'/':location.href.split('#')[0].split('?')[0].replace(/[^/]*$/,'');
+/* Which organization this page is: the first path segment — app.wcccmga.org/ is the club, /mga the MGA, /lga, /smga,
+   /<group id> a small group (Render rewrites every path to index.html). ?org= is the fallback for file:// testing. */
+let ORG_ID=(()=>{ const q=new URLSearchParams(location.search).get('org');
+  if(HTTP){ const seg=location.pathname.split('/').filter(s=>s&&!/\.html?$/i.test(s)); return (seg[0]||q||'club').toLowerCase(); }
+  return q!=null?q:''; })();
+const DOCS={};   // id → {id, meta, db, base, pushing, pushAgain, saveT, st, err, chan}
+function docState(id,meta){ const D=DOCS[id]||(DOCS[id]={id,meta:null,db:null,base:null,pushing:false,pushAgain:false,saveT:null,st:'local',err:null,chan:null}); if(meta) D.meta=meta; return D; }
+const openDocs=()=>Object.values(DOCS).filter(D=>D.db);
+function orgMeta(id){ id=id||ORG_ID; if(id==='club') return CLUB_META; return (CLUB&&CLUB.orgs||[]).find(o=>o.id===id)||null; }
+let CLUB=null, db=null;
+/* local mode (no cloud, or before sign-in): open the device's copies */
+function openLocal(){
+  const C=docState('club',CLUB_META); if(!C.db) C.db=normalize(store.load('club'),CLUB_META); CLUB=C.db;
+  if(!CLOUD){ if(!CLUB.orgs.length) CLUB.orgs=clone(DEFAULT_ORGS); if(!ORG_ID) ORG_ID='mga'; }
+  if(ORG_ID==='club') db=CLUB;
+  else if(ORG_ID){ const meta=orgMeta(ORG_ID); if(meta){ const D=docState(ORG_ID,meta); if(!D.db) D.db=normalize(store.load(ORG_ID),meta); db=D.db; } else db=null; }   // unknown here until the club document loads
+  else db=null;
+}
+openLocal();
+/* choose an organization (reload keeps every module's state clean) */
+function chooseOrg(id){ if(HTTP){ location.href=SITE_BASE+(id&&id!=='club'?encodeURIComponent(id):''); return; } const u=new URL(location.href); if(id) u.searchParams.set('org',id); else u.searchParams.delete('org'); location.href=u.toString(); }
+const orgURL=id=>HTTP?SITE_BASE.replace(/^https?:\/\//,'')+(id==='club'?'':id):'?org='+id;
+
 /* Stable stringify: Postgres jsonb reorders keys, so plain JSON.stringify can't tell "same data" apart. */
 function stable(o){ if(Array.isArray(o)) return '['+o.map(stable).join(',')+']';
   if(o&&typeof o==='object') return '{'+Object.keys(o).filter(k=>k!=='_w'&&k!=='_at'&&o[k]!==undefined).sort().map(k=>JSON.stringify(k)+':'+stable(o[k])).join(',')+'}';
   return JSON.stringify(o); }
 let lastSyncErr='';
-function setSync(s,err){
-  const d=$('syncDot'), t=$('syncTxt'); d.className='dot '+s;
+/* the status line shows the worst state across the open documents */
+function setSyncD(D,s,err){ D.st=s; D.err=err||null; showSync(); }
+function showSync(){ const ds=openDocs(); const off=ds.find(D=>D.st==='offline'); paintSync(off?'offline':ds.some(D=>D.st==='saving')?'saving':ds.some(D=>D.st==='local')?'local':'synced',off&&off.err); }
+function setSync(s,err){ openDocs().forEach(D=>{ D.st=s; D.err=err||null; }); paintSync(s,err); }
+function paintSync(s,err){
+  const d=$('syncDot'), t=$('syncTxt'); if(!d||!t) return; d.className='dot '+s;
   t.textContent=({synced:'All changes saved',saving:'Saving…',offline:'Not saving to cloud — tap to retry',local:'This device only'}[s]||s)+(t.dataset.upd&&s!=='offline'?` · updated ${t.dataset.upd}`:'');
   if(s==='offline'){ const m=err?(err.message||String(err))+(err.code?' ('+err.code+')':''):'Cloud unreachable';
     if(m!==lastSyncErr) toast('Cloud save failed: '+m); lastSyncErr=m; $('syncErr').textContent=m; $('syncErr').hidden=false; }
@@ -500,7 +597,6 @@ function setSync(s,err){
    lines are matched by id — so edits to different things never collide; when two people change
    the very same field, the later edit wins. Incoming changes merge into ours the same way, so
    unsaved local edits survive. */
-let base=null;   // the last server copy we know about
 const SKIP_KEYS={_w:1,_at:1,_rev:1};
 const isObj=x=>x&&typeof x==='object'&&!Array.isArray(x);
 const sameJ=(a,b)=>a===b||stable(a)===stable(b);
@@ -544,82 +640,139 @@ function syncArr(ta,sa){
 /* runs after every local save; the Calcutta cashier link and check-in link modules chain onto it */
 function afterPersist(){ if(typeof calcAfterPersist==='function') calcAfterPersist(); }
 let lastRemoteAt=0;
+const bare=x=>stable(Object.assign({},x,{_w:0,_at:0,_rev:0}));
+const docChanged=D=>!D.base||bare(D.db)!==bare(D.base);
 function persist(){
   if(typeof calcStampNow==='function') calcStampNow();   // mark what changed in shared Calcuttas before this save goes out
-  db._w=CLIENT; db._at=Date.now(); store.save(db); if(typeof afterPersist==='function') afterPersist();
+  for(const D of openDocs()){ D.db._w=CLIENT; D.db._at=Date.now(); store.save(D.id,D.db); }
+  if(typeof afterPersist==='function') afterPersist();
   if(!CLOUD||!sessionOK){ setSync('local'); return; }
-  setSync('saving'); clearTimeout(saveT); saveT=setTimeout(pushCloud,300);
+  for(const D of openDocs()){ if(!docChanged(D)) continue; setSyncD(D,'saving'); clearTimeout(D.saveT); D.saveT=setTimeout(()=>pushCloud(D),300); }
 }
-let pushing=false, pushAgain=false;
+function pushAll(){ openDocs().forEach(D=>pushCloud(D)); }
 /* safe to reload for an update: nothing unsaved, not mid-save, no editor open */
-window.__canReload=()=>!pushing&&!(typeof drawerOpen==='function'&&drawerOpen())&&(!CLOUD||!sessionOK||!base||stable(Object.assign({},db,{_w:0,_at:0,_rev:0}))===stable(Object.assign({},base,{_w:0,_at:0,_rev:0})));
-async function fetchHub(){ const {data:row,error}=await sb.from('mga_hub').select('data').eq('id','main').maybeSingle(); if(error) throw error; return row&&row.data; }
-async function pushCloud(){
-  if(pushing){ pushAgain=true; return; }
-  const bare=x=>stable(Object.assign({},x,{_w:0,_at:0,_rev:0}));
-  if(base&&bare(db)===bare(base)){ setSync('synced'); return; }        // nothing actually changed: don't write (or ping anyone)
-  pushing=true;
+window.__canReload=()=>!(typeof drawerOpen==='function'&&drawerOpen())&&openDocs().every(D=>!D.pushing&&(!CLOUD||!sessionOK||!D.base||!docChanged(D)));
+async function fetchRow(id){ const {data:row,error}=await sb.from('mga_hub').select('data').eq('id',id).maybeSingle(); if(error) throw error; return row&&row.data; }
+async function pushCloud(D){
+  if(D.pushing){ D.pushAgain=true; return; }
+  if(D.base&&!docChanged(D)){ setSyncD(D,'synced'); return; }        // nothing actually changed: don't write (or ping anyone)
+  D.pushing=true;
   try{
     for(let n=0;n<6;n++){
-      const rev=base&&base._rev!=null?+base._rev:null;
+      const rev=D.base&&D.base._rev!=null?+D.base._rev:null;
       // a frozen copy of exactly what we send — edits made while it's in flight must not be mistaken for saved
-      const next=JSON.parse(JSON.stringify(Object.assign({},db,{_rev:(rev||0)+1,_w:CLIENT,_at:Date.now()})));
-      let q=sb.from('mga_hub').update({data:next,updated_at:new Date().toISOString()}).eq('id','main');
+      const next=JSON.parse(JSON.stringify(Object.assign({},D.db,{_rev:(rev||0)+1,_w:CLIENT,_at:Date.now()})));
+      let q=sb.from('mga_hub').update({data:next,updated_at:new Date().toISOString()}).eq('id',D.id);
       q=rev==null?q.is('data->>_rev',null):q.eq('data->>_rev',String(rev));
       const {data:rows,error}=await q.select('id');
-      if(error){ setSync('offline',error); return; }
-      if(rows&&rows.length){ base=next; db._rev=next._rev; store.save(db); lastPushed=stable(next);
-        const pendingEdits=stable(Object.assign({},db,{_w:0,_at:0,_rev:0}))!==stable(Object.assign({},next,{_w:0,_at:0,_rev:0}));
-        if(pendingEdits){ pushAgain=true; setSync('saving'); } else setSync('synced'); return; }
-      // someone saved since we last looked: merge theirs into ours and try again
-      const remote=await fetchHub();
-      if(!remote){ const {error:e2}=await sb.from('mga_hub').upsert({id:'main',data:next,updated_at:new Date().toISOString()}); if(e2){ setSync('offline',e2); return; } base=JSON.parse(JSON.stringify(next)); setSync('synced'); return; }
-      mergeIn(remote,{quiet:true});
+      if(error){ setSyncD(D,'offline',error); return; }
+      if(rows&&rows.length){ D.base=next; D.db._rev=next._rev; store.save(D.id,D.db);
+        if(bare(D.db)!==bare(next)){ D.pushAgain=true; setSyncD(D,'saving'); } else setSyncD(D,'synced'); return; }
+      // someone saved since we last looked (or the row doesn't exist yet): merge theirs into ours and try again
+      const remote=await fetchRow(D.id);
+      if(!remote){ const {error:e2}=await sb.from('mga_hub').upsert({id:D.id,data:next,updated_at:new Date().toISOString()}); if(e2){ setSyncD(D,'offline',e2); return; }
+        D.base=JSON.parse(JSON.stringify(next)); D.db._rev=next._rev; store.save(D.id,D.db); setSyncD(D,'synced'); return; }
+      mergeIn(D,remote,{quiet:true});
     }
-    setSync('offline',{message:'Too many people saving at once — retrying'}); setTimeout(pushCloud,1500);
-  }catch(e){ setSync('offline',e); }
-  finally{ pushing=false; if(pushAgain){ pushAgain=false; setTimeout(pushCloud,50); } }
+    setSyncD(D,'offline',{message:'Too many people saving at once — retrying'}); setTimeout(()=>pushCloud(D),1500);
+  }catch(e){ setSyncD(D,'offline',e); }
+  finally{ D.pushing=false; if(D.pushAgain){ D.pushAgain=false; setTimeout(()=>pushCloud(D),50); } }
 }
 /* bring someone else's saved copy into ours */
-function mergeIn(remote,opt){
-  const before=stable(db);
-  const merged=normalize(JSON.parse(JSON.stringify(merge3(base||remote,db,remote))));
-  base=JSON.parse(JSON.stringify(remote));
-  syncTo(db,merged); db._rev=remote._rev; store.save(db);          // same objects, new values
-  const changed=stable(db)!==before;
+function mergeIn(D,remote,opt){
+  const before=stable(D.db);
+  const merged=normalize(JSON.parse(JSON.stringify(merge3(D.base||remote,D.db,remote))),D.meta);
+  D.base=JSON.parse(JSON.stringify(remote));
+  syncTo(D.db,merged); D.db._rev=remote._rev; store.save(D.id,D.db);          // same objects, new values
+  const changed=stable(D.db)!==before;
   if(changed){ lastRemoteAt=Date.now(); if(!(opt&&opt.noRender)) render(); if(!(opt&&opt.quiet)) noteRemote(); }
   return changed;
 }
-function noteRemote(){ const t=$('syncTxt'); if(!t) return; t.dataset.upd=new Date().toLocaleTimeString([], {hour:'numeric',minute:'2-digit'}); setSync(pushing?'saving':'synced'); }
-function applyRemote(remote){
-  if(base&&remote._rev!=null&&base._rev!=null&&+remote._rev<=+base._rev) return;   // already have it — or it's an older copy arriving late
+function noteRemote(){ const t=$('syncTxt'); if(!t) return; t.dataset.upd=new Date().toLocaleTimeString([], {hour:'numeric',minute:'2-digit'}); showSync(); }
+function applyRemote(D,remote){
+  if(D.base&&remote._rev!=null&&D.base._rev!=null&&+remote._rev<=+D.base._rev) return;   // already have it — or it's an older copy arriving late
   // merged in place, so it's safe even with an editor open: the editor keeps the live record
-  const hadLocal=base&&stable(db)!==stable(Object.assign({},base,{_w:db._w,_at:db._at}));
-  mergeIn(remote);
+  const hadLocal=D.base&&stable(D.db)!==stable(Object.assign({},D.base,{_w:D.db._w,_at:D.db._at}));
+  mergeIn(D,remote);
   if(hadLocal) persist();                                            // our unsaved edits still need to go up
 }
-let sessionOK=false, cloudReady=false;
-async function startCloud(){
-  setSync('saving');
-  const {data:row,error}=await sb.from('mga_hub').select('data').eq('id','main').maybeSingle();
-  if(error){ setSync('offline',/relation|does not exist/i.test(error.message)?{message:'The mga_hub table is missing — run hub-setup.sql in Supabase'}:error); render(); return; }
-  cloudReady=true;
-  if(row&&row.data){ const local=db; base=JSON.parse(JSON.stringify(row.data)); db=normalize(row.data);
-    // edits made on this device while it was offline: merge them in and save
-    if(local&&local._w===CLIENT&&local._rev===row.data._rev&&stable(local)!==stable(db)){ db=normalize(merge3(row.data,local,row.data)); }
-    store.save(db); setSync('synced'); }
-  else { base=null; await pushCloud(); }
-  render();
-  sb.channel('mga-hub').on('postgres_changes',{event:'*',schema:'public',table:'mga_hub',filter:'id=eq.main'},p=>{
-    const r=p.new&&p.new.data; if(!r||r._w===CLIENT&&base&&r._rev===base._rev) return; applyRemote(r);
-  }).subscribe();
-  const check=async()=>{ try{ const r=await fetchHub(); if(r&&(!base||r._rev!==base._rev)) applyRemote(r); }catch(_){} };
-  document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='visible') check(); });
-  setInterval(()=>{ if(document.visibilityState==='visible'&&!pushing) check(); },15000);   // a safety net if a live update is missed
+let sessionOK=false, cloudReady=false, setupNeeded=false;
+/* open one row: server copy wins over the device's; the row is created when `create` is set */
+async function loadDoc(id,meta,opt){
+  const D=docState(id,meta);
+  const remote=await fetchRow(id);
+  if(remote){ D.base=JSON.parse(JSON.stringify(remote)); D.db=normalize(remote,meta); store.save(id,D.db); setSyncD(D,'synced'); }
+  else if(opt&&opt.create){ D.db=normalize(null,meta); D.base=null; await pushCloud(D); }
+  else return null;
+  watchDoc(D); return D.db;
 }
-
+function watchDoc(D){
+  if(D.chan||!CLOUD) return;
+  D.chan=sb.channel('hub-'+D.id).on('postgres_changes',{event:'*',schema:'public',table:'mga_hub',filter:'id=eq.'+D.id},p=>{
+    const r=p.new&&p.new.data; if(!r||r._w===CLIENT&&D.base&&r._rev===D.base._rev) return; applyRemote(D,r);
+  }).subscribe();
+}
+let pollStarted=false;
+function startPoll(){
+  if(pollStarted) return; pollStarted=true;
+  const check=async()=>{ for(const D of openDocs()){ if(D.pushing||!D.chan) continue; try{ const r=await fetchRow(D.id); if(r&&(!D.base||r._rev!==D.base._rev)) applyRemote(D,r); }catch(_){} } };
+  document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='visible') check(); });
+  setInterval(()=>{ if(document.visibilityState==='visible') check(); },15000);   // a safety net if a live update is missed
+}
+async function startCloud(){
+  paintSync('saving');
+  try{
+    const club=await loadDoc('club',CLUB_META);
+    cloudReady=true;
+    if(!club){ setupNeeded=true; CLUB=null; db=null; render(); return; }          // first run: the club hasn't been set up yet
+    setupNeeded=false; CLUB=club;
+    if(ORG_ID==='club') db=CLUB;
+    else if(ORG_ID){ const meta=orgMeta(ORG_ID); if(meta&&!meta.archived) db=await loadDoc(ORG_ID,meta,{create:true}); else db=null; }
+    else db=null;
+    render(); startPoll();
+  }catch(error){ setSync('offline',/relation|does not exist/i.test(error.message||'')?{message:'The mga_hub table is missing — run hub-setup.sql in Supabase'}:error); render(); }
+}
+/* ---------- one-time set-up / re-import from the MGA Hub (the `main` row) ----------
+   Builds the club directory from the MGA's member list (same ids, so fields, boards and Calcuttas keep working),
+   registers the default organizations, and copies the MGA Hub's document to the `mga` row with its members turned
+   into memberships. Re-running updates the directory and REPLACES the mga row with the Hub's current data. */
+async function putDoc(id,data){
+  for(let n=0;n<6;n++){
+    const cur=await fetchRow(id), rev=cur&&cur._rev!=null?+cur._rev:null;
+    const next=Object.assign({},data,{_rev:(rev||0)+1,_w:CLIENT,_at:Date.now()}), stamp=new Date().toISOString();
+    if(!cur){ const {error}=await sb.from('mga_hub').upsert({id,data:next,updated_at:stamp}); if(error) throw error; }
+    else { let q=sb.from('mga_hub').update({data:next,updated_at:stamp}).eq('id',id); q=rev==null?q.is('data->>_rev',null):q.eq('data->>_rev',String(rev));
+      const {data:rows,error}=await q.select('id'); if(error) throw error; if(!rows||!rows.length) continue; }
+    const D=DOCS[id]; if(D&&D.db){ D.base=JSON.parse(JSON.stringify(next)); syncTo(D.db,normalize(JSON.parse(JSON.stringify(next)),D.meta)); D.db._rev=next._rev; store.save(id,D.db); }
+    return next;
+  }
+  throw new Error('Could not save '+id+' — try again');
+}
+function hubToClub(main,club){
+  const by=new Map(club.members.map(p=>[p.id,p]));
+  for(const m of main.members||[]){ const person={}; for(const k of Object.keys(m)) if(!['status','joined','notes'].includes(k)) person[k]=m[k];
+    const p=by.get(m.id); if(p) Object.assign(p,person); else club.members.push(Object.assign({status:'Active'},person)); }
+  for(const o of DEFAULT_ORGS) if(!club.orgs.some(x=>x.id===o.id)) club.orgs.push(clone(o));
+  club.migratedAt=new Date().toISOString();
+}
+function hubToOrg(main,meta){
+  const d={}; for(const k of Object.keys(main)) if(!['members','_rev','_w','_at'].includes(k)) d[k]=main[k];
+  d.id=meta.id; d.kind=meta.kind; d.name=meta.name; d.short=meta.short;
+  d.memberships=(main.members||[]).map(m=>({id:m.id,status:m.status||'Active',joined:m.joined||'',notes:m.notes||''}));
+  return normalize(JSON.parse(JSON.stringify(d)),meta);
+}
+async function migrateFromHub(){
+  const main=await fetchRow('main'); if(!main||!main.tournaments) throw new Error('The MGA Hub’s data (row “main”) was not found');
+  const C=docState('club',CLUB_META);
+  if(!C.db){ const remote=await fetchRow('club'); C.base=remote?JSON.parse(JSON.stringify(remote)):null; C.db=normalize(remote,CLUB_META); }
+  hubToClub(main,C.db); CLUB=C.db; if(ORG_ID==='club') db=CLUB;
+  await putDoc('club',JSON.parse(JSON.stringify(C.db)));
+  await putDoc('mga',hubToOrg(main,DEFAULT_ORGS[0]));
+  setupNeeded=false; watchDoc(C); startPoll();
+  return {people:main.members.length,tournaments:main.tournaments.length};
+}
 /* =====================================================================
-   MGA Hub — UI. Screens are read-only; every edit happens in ONE drawer.
+   Club Hub — UI. Screens are read-only; every edit happens in ONE drawer.
    ===================================================================== */
 const tA=(t,k,id,m)=>actualOf(ledgerIndex(t.season),t.id,k,id,m);
 /* Actual $ input, or — when Treasury entries are linked — a read-only total that points to the ledger. */
@@ -641,9 +794,18 @@ const I={
   down:svg('<path d="M12 4v12M6 11l6 6 6-6M5 20h14"/>'), menu:svg('<path d="M4 7h16M4 12h16M4 17h16"/>'),
   trash:svg('<path d="M4 7h16M10 7V4h4v3M6 7l1 13h10l1-13"/>'), check:svg('<path d="M5 12l5 5 9-10"/>'), refresh:svg('<path d="M20 11a8 8 0 10-2.3 5.7"/><path d="M20 4v7h-7"/>'),
 };
-const NAV=[['dash','Dashboard',I.home],['tournaments','Tournaments',I.flag],['members','Members',I.users],['board','Board',I.shield],['budget','Season budget',I.ledger]];
+I.org=svg('<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18M9 20v-6h6v6"/>');
+const NAV=[['dash','Dashboard',I.home],['tournaments','Tournaments',I.flag],['members','Members',I.users],['board','Board',I.shield],['budget','Season budget',I.ledger],['orgs','Organizations',I.org]];
+/* which pages each kind of organization gets (associations get everything) */
+const ORG_NAV={club:['dash','tournaments','golf','members','orgs','budget','treasury'],association:['dash','tournaments','golf','members','board','treasury','budget'],group:['dash','tournaments','golf','members']};
+function navItems(){ const allow=ORG_NAV[db.kind]; return NAV.filter(([k])=>!allow||allow.includes(k)).map(([k,l,ic])=>[k,k==='members'&&isClub()?'Directory':l,ic]); }
+/* the organization on screen: the club's record from CLUB.orgs wins over what the document says */
+const curOrg=()=>!db?null:isClub()?Object.assign({},CLUB_META,{name:CLUB.name||CLUB_META.name,crest:CLUB.crest||''}):(orgMeta()||{id:db.id,kind:db.kind,name:db.name,short:db.short});
+const orgShort=()=>{ const o=curOrg(); return o?(o.short||o.name||'club'):'club'; };
+const orgName=()=>{ const o=curOrg(); return o?(o.name||o.short||''):''; };
+function crestHTML(o,cls=''){ const short=(o&&(o.short||o.name)||'?').replace(/[^A-Za-z0-9]/g,'').slice(0,4)||'?'; return o&&o.crest?`<img class="crest ${cls}" src="${esc(o.crest)}" alt="">`:`<span class="mono ${cls}"${short.length>3?' style="font-size:.8em;letter-spacing:0"':''}>${esc(short)}</span>`; }
 let view={page:'dash',tid:null,ttab:'budget',mfilter:'All',mq:'',tfilter:'All'};
-const Y=()=>db.activeSeason;
+const Y=()=>db?db.activeSeason:String(new Date().getFullYear());
 const T=()=>db.tournaments.find(t=>t.id===view.tid);
 function go(page,extra){ view=Object.assign(view,{page},extra||{}); $('side').classList.remove('open'); render(); window.scrollTo(0,0); }
 
@@ -667,14 +829,14 @@ function openDrawer({kicker='',title,body,save,saveLabel='Save',del,delLabel='De
   const f=$('dBody').querySelector('input:not([type=checkbox]),select,textarea'); if(f) setTimeout(()=>f.focus(),60);
 }
 function closeDrawer(){ $('drawer').classList.remove('show'); $('scrim').classList.remove('show'); drawerCtx=null;
-  if(pendingRemote){ const r=pendingRemote; pendingRemote=null; setTimeout(()=>applyRemote(r),0); } }
+}
 const fv=id=>{ const e=$(id); return e?e.value.trim():''; };
 const fnum=id=>n0(fv(id));
 function field(label,id,val,o={}){
   const t=o.type||'text';
   if(t==='select') return `<div class="fld"><label class="lbl" for="${id}">${label}</label><select class="inp" id="${id}">${o.options.map(x=>{const [v,l]=Array.isArray(x)?x:[x,x];return `<option value="${esc(v)}"${String(v)===String(val??'')?' selected':''}>${esc(l)}</option>`;}).join('')}</select>${o.hint?`<p class="hint">${o.hint}</p>`:''}</div>`;
   if(t==='textarea') return `<div class="fld"><label class="lbl" for="${id}">${label}</label><textarea class="inp" id="${id}">${esc(val)}</textarea></div>`;
-  return `<div class="fld"><label class="lbl" for="${id}">${label}</label><input class="inp${t==='number'?' num':''}" id="${id}" type="${t==='number'?'text':t}" ${t==='number'?'inputmode="decimal"':''} value="${esc(val??'')}" ${o.ph?`placeholder="${esc(o.ph)}"`:''}>${o.hint?`<p class="hint">${o.hint}</p>`:''}</div>`;
+  return `<div class="fld"><label class="lbl" for="${id}">${label}</label><input class="inp${t==='number'?' num':''}" id="${id}" type="${t==='number'?'text':t}" ${t==='number'?'inputmode="decimal"':''} value="${esc(val??'')}" ${o.disabled?'disabled ':''}${o.ph?`placeholder="${esc(o.ph)}"`:''}>${o.hint?`<p class="hint">${o.hint}</p>`:''}</div>`;
 }
 const pair=(a,b)=>`<div class="frow2">${a}${b}</div>`;
 function seg(id,opts,val){ return `<div class="seg" id="${id}" data-val="${esc(val)}">${opts.map(([v,l])=>`<button type="button" data-v="${esc(v)}" class="${String(v)===String(val)?'on':''}">${esc(l)}</button>`).join('')}</div>`; }
@@ -696,14 +858,77 @@ function render(){
   if(Math.abs(window.scrollY-sy)>2) window.scrollTo(0,sy);
 }
 function renderInner(){
+  const o=curOrg(), clubName=CLUB&&CLUB.name||CLUB_META.name;
+  const title=o?(isClub()?'Club Hub':orgShort()+' Hub'):'Club Hub';
+  $('brandCrest').innerHTML=crestHTML(o||CLUB_META); $('brandName').textContent=title; $('brandSub').textContent=o&&!isClub()?clubName:(o?'Club hub':clubName);
+  $('topCrest').innerHTML=crestHTML(o||CLUB_META,'sm'); $('topName').textContent=title; document.title=title+' · '+clubName;
+  $('btnSwitch').hidden=!CLUB||(!db&&!setupNeeded);
+  if(!db){ $('nav').innerHTML=''; $('seasonBox').hidden=true; (setupNeeded?vSetup:vPicker)($('main')); return; }
+  $('seasonBox').hidden=false;
   const ys=Object.keys(db.seasons).sort((a,b)=>b-a);
   $('seasonSel').innerHTML=ys.map(y=>`<option value="${y}"${y===Y()?' selected':''}>${y} season</option>`).join('')+'<option value="__new">+ New season…</option>';
   const live=typeof liveEvents==='function'?liveEvents():[];
-  $('nav').innerHTML=NAV.map(([k,l,ic])=>`<button class="nav${(view.page===k||(k==='tournaments'&&view.page==='tournament'))?' on':''}" data-go="${k}">${ic}<span>${l}</span>${k==='golf'&&live.length?'<span class="livedot" aria-label="Live scoring"></span>':''}</button>`).join('')+
+  const items=navItems(); if(view.page!=='pick'&&!items.some(([k])=>k===view.page||(k==='tournaments'&&view.page==='tournament'))) view.page='dash';
+  $('nav').innerHTML=items.map(([k,l,ic])=>`<button class="nav${(view.page===k||(k==='tournaments'&&view.page==='tournament'))?' on':''}" data-go="${k}">${ic}<span>${l}</span>${k==='golf'&&live.length?'<span class="livedot" aria-label="Live scoring"></span>':''}</button>`).join('')+
     live.map(e=>`<button class="nav livelink" data-golfev="${e.id}"><span class="livedot"></span><span class="trunc">Leaderboard · ${esc(e.name)}</span></button>`).join('');
   $('nav').querySelectorAll('[data-go]').forEach(b=>b.onclick=()=>{ if(b.dataset.go==='golf') view.geid=null; go(b.dataset.go); });
   const m=$('main');
-  ({dash:vDash,tournaments:vTournaments,tournament:vTournament,members:vMembers,board:vBoard,budget:vBudget,treasury:vTreasury,golf:vGolf}[view.page]||vDash)(m);
+  ({dash:vDash,tournaments:vTournaments,tournament:vTournament,members:vMembers,board:vBoard,budget:vBudget,treasury:vTreasury,golf:vGolf,orgs:vOrgs,pick:vPicker}[view.page]||vDash)(m);
+}
+
+/* ---------- Organization picker / first-run set-up (shown when no organization is open) ---------- */
+function vPicker(m){
+  const orgs=(CLUB&&CLUB.orgs||[]).filter(x=>!x.archived), club=Object.assign({},CLUB_META,{name:CLUB&&CLUB.name||CLUB_META.name,crest:CLUB&&CLUB.crest||''});
+  const card=(id,x,sub)=>`<button class="orgcard" data-org="${esc(id)}">${crestHTML(x)}<div class="cell2"><b>${esc(x.name)}</b><small>${esc(sub)} · ${esc(orgURL(id))}</small></div>${I.chev}</button>`;
+  const unknown=ORG_ID&&ORG_ID!=='club'&&!orgMeta(ORG_ID)&&!db?`<div class="banner">There is no organization at ${esc(orgURL(ORG_ID))}. Pick one below.</div>`:'';
+  const grp=(k,empty)=>{ const l=orgs.filter(x=>x.kind===k); return l.length?l.map(x=>card(x.id,x,ORG_KINDS[k]+(x.short?' · '+x.short:''))).join(''):`<p class="muted" style="margin:0;font-size:13.5px">${empty}</p>`; };
+  m.innerHTML=`<div class="phead"><div><h1 class="h1">${esc(club.name)}</h1><p class="sub">Choose what to work on. Each organization has its own hub; the club keeps the member directory.</p></div></div><div class="rule"></div>
+  ${unknown}<div class="orgs">${card('club',club,'Club hub · member directory · club tournaments · organizations')}
+    <h2 class="h2" style="margin-top:10px">Associations</h2>${grp('association','No associations yet — create one in the club hub under Organizations.')}
+    <h2 class="h2" style="margin-top:10px">Small groups</h2>${grp('group','No small groups yet — create one in the club hub under Organizations.')}</div>`;
+  m.querySelectorAll('[data-org]').forEach(b=>b.onclick=()=>chooseOrg(b.dataset.org));
+}
+function vSetup(m){
+  m.innerHTML=head('Set up the club hub','This is the first time the club hub has been opened on this database.')+`
+  <div class="card pad" style="max-width:680px;display:flex;flex-direction:column;gap:14px">
+    <p style="margin:0">The MGA Hub’s data becomes the starting point:</p>
+    <div class="mini">${[['1','The club directory is built from the MGA’s member list — same people, same ids, so fields, boards and Calcuttas keep working'],['2','The MGA, LGA and SMGA are registered as associations'],['3','The MGA Hub’s tournaments, budgets, treasury, Calcuttas and drawings are copied into the MGA’s hub here']].map(([n,t])=>`<div class="mr" style="grid-template-columns:24px minmax(0,1fr)"><b>${n}</b><span>${t}</span></div>`).join('')}</div>
+    <p class="hint">hub.wcccmga.org keeps working on its own data; nothing there changes. You can re-import from it later from the club hub’s Organizations page.</p>
+    <div class="actions"><button class="btn pri" id="suGo">Set up from the MGA Hub</button><button class="btn" id="suEmpty">Start empty</button></div>
+    <p class="hint" id="suMsg" aria-live="polite"></p></div>`;
+  const msg=$('suMsg');
+  $('suGo').onclick=async()=>{ $('suGo').disabled=true; msg.textContent='Importing…'; try{ const r=await migrateFromHub(); toast(`Set up · ${r.people} people · ${r.tournaments} tournaments`); chooseOrg('club'); }catch(e){ $('suGo').disabled=false; msg.textContent=e.message||'That didn’t work'; } };
+  $('suEmpty').onclick=async()=>{ if(!confirm('Start with an empty directory? The MGA Hub can still be imported later.')) return;
+    try{ const C=docState('club',CLUB_META); C.db=normalize(null,CLUB_META); C.db.orgs=clone(DEFAULT_ORGS); CLUB=C.db; await putDoc('club',clone(C.db)); setupNeeded=false; watchDoc(C); chooseOrg('club'); }catch(e){ msg.textContent=e.message||'That didn’t work'; } };
+}
+/* ---------- Organizations (club hub) ---------- */
+function vOrgs(m){
+  if(!isClub()){ go('dash'); return; }
+  const cols='grid-template-columns:48px minmax(0,1fr) 120px 100px 40px';
+  const row=x=>`<div class="tr click" data-o="${esc(x.id)}" style="${cols}">${crestHTML(x,'sm')}<div class="cell2"><b>${esc(x.name)}</b><small>${esc(x.short||'')} · ${esc(orgURL(x.id))}</small></div><span class="muted">${ORG_KINDS[x.kind]||x.kind}</span><span>${x.archived?'<span class="chip">Archived</span>':'<span class="chip ok">Active</span>'}</span><span class="ib">${I.edit}</span></div>`;
+  const grp=k=>CLUB.orgs.filter(x=>x.kind===k).map(row).join('')||'<div class="tr"><span class="muted">None yet.</span></div>';
+  m.innerHTML=head('Organizations','Associations and small groups inside the club. Each has its own hub; their members come from the club directory.',btn('New small group','oGrp','',I.plus)+btn('New association','oAssoc','pri',I.plus))+`
+  <div class="card" style="overflow:hidden"><div class="cardhead"><h2 class="h2">Associations</h2></div><div class="t">${grp('association')}</div></div>
+  <div class="card" style="overflow:hidden"><div class="cardhead"><h2 class="h2">Small groups</h2></div><div class="t">${grp('group')}</div></div>
+  ${CLOUD?`<div class="card pad" style="display:flex;flex-direction:column;gap:10px"><h2 class="h2">MGA Hub (hub.wcccmga.org)</h2>
+    <p class="hint" style="margin:0">${CLUB.migratedAt?'Last imported '+new Date(CLUB.migratedAt).toLocaleString()+'.':'Not imported yet.'} Re-importing updates the directory from the MGA’s member list and <b>replaces</b> the MGA’s hub here with the MGA Hub’s current data.</p>
+    <div class="actions"><button class="btn" id="oMig">Re-import from the MGA Hub</button></div></div>`:''}`;
+  m.querySelectorAll('[data-o]').forEach(r=>r.onclick=()=>editOrg(CLUB.orgs.find(x=>x.id===r.dataset.o)));
+  $('oGrp').onclick=()=>editOrg(null,'group'); $('oAssoc').onclick=()=>editOrg(null,'association');
+  const mg=$('oMig'); if(mg) mg.onclick=async()=>{ if(!confirm('Replace the MGA’s hub here with the MGA Hub’s current data, and update the directory from its member list?')) return; mg.disabled=true;
+    try{ const r=await migrateFromHub(); toast(`Imported · ${r.people} people · ${r.tournaments} tournaments`); render(); }catch(e){ mg.disabled=false; toast(e.message||'Import failed'); } };
+}
+function editOrg(o,kind){
+  kind=o?o.kind:kind;
+  openDrawer({kicker:ORG_KINDS[kind],title:o?o.name:'New '+ORG_KINDS[kind].toLowerCase(),
+    body:field('Name','ogN',o?.name||'',{ph:kind==='group'?'e.g. The Misfits':'e.g. Ladies’ Golf Association'})+pair(field('Short name','ogS',o?.short||'',{ph:kind==='group'?'e.g. Misfits':'e.g. LGA'}),o?field('Address id','ogI',o.id,{disabled:true}):field('Address id','ogI','',{ph:'letters and digits, e.g. misfits'}))+
+      (o?'':`<p class="hint">The id becomes the address (${esc(orgURL('misfits'))}) and can’t change later. Leave it blank to use the short name.</p>`)+field('Crest image','ogC',o?.crest||'',{ph:'file name in the site, e.g. mga-crest.png (optional)'})+
+      (o?`<label class="check"><input type="checkbox" id="ogA"${o.archived?' checked':''}>Archived — hidden from the picker; its data is kept</label>`:''),
+    save:()=>{ const name=fv('ogN'); if(!name){ toast('Give it a name'); return false; }
+      if(o){ Object.assign(o,{name,short:fv('ogS'),crest:fv('ogC'),archived:$('ogA').checked}); return; }
+      let id=(fv('ogI')||fv('ogS')||name).toLowerCase().replace(/[^a-z0-9-]/g,'').slice(0,24);
+      if(!id||id==='club'||id==='main'||CLUB.orgs.some(x=>x.id===id)){ toast('That address id is taken — choose another'); return false; }
+      CLUB.orgs.push({id,kind,name,short:fv('ogS'),crest:fv('ogC')}); toast(name+' created — open it from the organization picker'); }});
 }
 
 /* ---------- Dashboard ---------- */
@@ -716,14 +941,14 @@ function vDash(m){
     const owed=t.sponsors.filter(s=>n0(s.pledged)>spPaid(s)+0.004);
     if(owed.length) attention.push([fmt(sum(owed,s=>n0(s.pledged)-spPaid(s))),`${esc(t.name)}: ${owed.length} sponsor${owed.length>1?'s':''} still owe money`,'warn',t.id]);
   }
-  const unpaid=db.members.filter(x=>x.status!=='Inactive'&&memberDues(Y(),x.id)<n0(sc.s.dues.amount)).length;
-  if(db.members.length&&unpaid&&sc.s.duesPayments.length) attention.push([String(unpaid),`member${unpaid>1?'s have':' has'} not paid full ${Y()} dues`,'warn',null]);
-  m.innerHTML=head(`${Y()} Season`,'Walnut Creek Country Club Men’s Golf Association',btn('New tournament','dNew','pri',I.plus))+`
+  const ms=members(), unpaid=isClub()?0:ms.filter(x=>x.status!=='Inactive'&&memberDues(Y(),x.id)<n0(sc.s.dues.amount)).length;
+  if(ms.length&&unpaid&&sc.s.duesPayments.length) attention.push([String(unpaid),`member${unpaid>1?'s have':' has'} not paid full ${Y()} dues`,'warn',null]);
+  m.innerHTML=head(`${Y()} Season`,esc(CLUB.name||CLUB_META.name)+(isClub()?'':' · '+esc(orgName())),btn('New tournament','dNew','pri',I.plus))+`
   <div class="grid g4">
     ${kpi('Season net (projected)',fmtS(sc.projected),`Actuals for ${sc.past.length} completed · budget for ${sc.upcoming.length} upcoming`,netCls(sc.projected))}
     ${kpi('Next up',next?dayShort(next,0)||'TBD':'—',next?`${esc(next.name)} · ${daysOut(next)===0?'today':daysOut(next)+' days out'}`:'No upcoming tournaments')}
     ${kpi('Sponsor money received',fmt(sc.received),`of ${fmt(sc.pledged)} pledged this season`)}
-    ${kpi('Members',String(sc.active),`active · ${db.board.filter(b=>b.memberId).length} on the board`)}
+    ${kpi('Members',String(sc.active),isClub()?'active in the club directory':`active · ${db.board.filter(b=>b.memberId).length} on the board`)}
   </div>
   <div class="split">
     <div class="card" style="overflow:hidden">
@@ -915,7 +1140,7 @@ function editMenu(t,di,it){
 }
 
 /* Field */
-const inactiveBadge=m=>m&&m.status==='Inactive'?' <span class="chip inact" title="Not on the active MGA member list">Not Active</span>':'';
+const inactiveBadge=m=>m&&m.status==='Inactive'?` <span class="chip inact" title="Not on the active ${esc(orgShort())} member list">Not Active</span>`:'';
 function tField(el,t){
   const size=t.teamSize||2, teams={};
   t.field.forEach(p=>{ (teams[p.team||0]=teams[p.team||0]||[]).push(p); });
@@ -928,7 +1153,7 @@ function tField(el,t){
   el.innerHTML=`<div class="grid g4">${kpi('Players in field',String(t.field.length),(size>1?`${nums.length} team${nums.length===1?'':'s'} of ${size}`:'individual')+(nInact?` · ${nInact} not active`:''))}${kpi('Entry fee',fmt(t.entryFee),'per player')}${kpi('Entry fees paid',String(paid),`of ${t.field.length} · ${fmt(paid*n0(t.entryFee))} collected`)}${rs.headcount!=null?kpi('Dinner headcount',String(rs.headcount),`${rs.dinner} players${rs.guests!=null?' + '+rs.guests+' plus-ones':''}`):kpi('Skins entered',String(skins),n0(t.skinsFee)?'× '+fmt(t.skinsFee):'no skins fee set')}</div>
   ${qs.length?`<div class="card pad" style="display:flex;gap:10px 24px;flex-wrap:wrap;align-items:center;font-size:13.5px"><span class="lbl">RSVPs</span>${qs.map(q=>`<span><b class="num">${t.field.filter(p=>yes((p.answers||{})[q.key])).length}</b> <span class="muted">${esc(q.label)}</span></span>`).join('')}${t.rosterFile?`<span class="muted" style="margin-left:auto;font-size:12.5px">From ${esc(t.rosterFile)} · ${new Date(t.rosterImportedAt).toLocaleDateString()}</span>`:''}</div>`:''}
   ${t.budgetBasis!=='field'?`<div class="banner">The budget uses ${n0(t.plannedPlayers)} planned players. Switch it to the field in Tournament details once signups close.</div>`:''}
-  <div class="toolbar"><div class="actions"><button class="btn pri" id="fImp">${I.down}Import roster</button><button class="btn" id="fAdd">${I.plus}Add ${size>1?'team':'player'}</button></div><span class="muted" style="margin-left:auto;font-size:13px">Players are picked from Members${db.members.length?'':' — add members first'}.</span></div>
+  <div class="toolbar"><div class="actions"><button class="btn pri" id="fImp">${I.down}Import roster</button><button class="btn" id="fAdd">${I.plus}Add ${size>1?'team':'player'}</button></div><span class="muted" style="margin-left:auto;font-size:13px">Players are picked from ${isClub()?'the Directory':'Members'}${members().length?'':' — add members first'}.</span></div>
   <div class="card" style="overflow:hidden">${t.field.length?`<div class="tw"><div class="t"><div class="tr th" style="${cols}"><span>${size>1?'Team':'#'}</span>${Array.from({length:size},(_,i)=>`<span>Player ${i+1}</span>`).join('')}<span>Entry</span><span></span></div>
     ${nums.map(n=>`<div class="tr click" data-team="${n}" style="${cols}"><span class="muted">${size>1?'Team '+n:n}</span>${Array.from({length:size},(_,i)=>{const p=teams[n][i];const mm=p&&memberById(p.memberId);return p?`<div class="cell2"><b class="trunc">${esc(mm?memberName(mm):p.name||'Unknown')}${inactiveBadge(mm)}${p.skins?' <span class="chip" style="height:20px;font-size:11px">Skins</span>':''}</b>${ansLine(p)?`<small class="trunc">${esc(ansLine(p))}</small>`:''}</div>`:'<span class="muted">—</span>';}).join('')}<span>${teams[n].every(p=>p.paid)?'<span class="chip ok">Paid</span>':`<span class="chip warn">${fmt(teams[n].filter(p=>!p.paid).length*n0(t.entryFee))} due</span>`}</span><span class="ib">${I.edit}</span></div>`).join('')}</div></div>`:`<div class="empty"><b>No field yet</b><span>Import the Golf Genius roster, or add ${size>1?'teams':'players'} from the member list as they sign up.</span></div>`}</div>`;
   $('fAdd').onclick=()=>editTeam(t,null); $('fImp').onclick=()=>importField(t);
@@ -938,26 +1163,26 @@ function editTeam(t,num){
   const size=t.teamSize||2, existing=num!=null?t.field.filter(p=>(p.team||0)===num):[];
   const next=num!=null?num:(Math.max(0,...t.field.map(p=>p.team||0))+1);
   const taken=new Set(t.field.filter(p=>(p.team||0)!==num).map(p=>p.memberId));
-  const opts=[['','— Choose member —'],['__new','+ New player (not an MGA member — added as Not Active)']].concat(db.members.slice().sort((a,b)=>memberName(a).localeCompare(memberName(b))).map(m=>[m.id,memberName(m)+(m.status==='Inactive'?' — Not Active':'')+(taken.has(m.id)?' (already in field)':'')]));
+  const opts=[['','— Choose member —'],['__new',`+ New player (not ${isClub()?'in the directory':'a '+orgShort()+' member'} — added as Not Active)`]].concat(members().sort((a,b)=>memberName(a).localeCompare(memberName(b))).map(m=>[m.id,memberName(m)+(m.status==='Inactive'?' — Not Active':'')+(taken.has(m.id)?' (already in field)':'')]));
   openDrawer({kicker:t.name+' · Field',title:size>1?(num!=null?'Team '+num:'Add team'):(num!=null?'Edit player':'Add player'),
     body:(size>1?field('Team number','tmNum',next,{type:'number'}):'')+Array.from({length:size},(_,i)=>{const p=existing[i]||{};return `<div class="card pad" style="display:flex;flex-direction:column;gap:10px">${field('Player '+(i+1),'tmM'+i,p.memberId||'',{type:'select',options:opts})}<div id="tmB${i}">${inactiveBadge(memberById(p.memberId))?`<span class="chip inact">Not Active</span>`:''}</div>
       <div id="tmN${i}" hidden style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px"><input class="inp" id="tmNF${i}" placeholder="First name" aria-label="New player first name"><input class="inp" id="tmNL${i}" placeholder="Last name" aria-label="New player last name"><input class="inp" id="tmNE${i}" placeholder="Email (optional)" aria-label="New player email"></div><div style="display:flex;gap:10px 18px;flex-wrap:wrap"><label class="check"><input type="checkbox" id="tmP${i}"${p.paid?' checked':''}>Entry paid</label><label class="check"><input type="checkbox" id="tmS${i}"${p.skins?' checked':''}>In skins</label>${(t.fieldQuestions||[]).map((q,qi)=>`<label class="check"><input type="checkbox" id="tmQ${i}_${qi}"${yes((p.answers||{})[q.key])?' checked':''}>${esc(q.short||qShort(q.label))}</label>`).join('')}</div></div>`;}).join('')+
-      '<p class="hint">Players who aren’t active MGA members can still play. Pick “New player” to add them to Members as Inactive; they show as Not Active in the field.</p>',
+      `<p class="hint">Players who aren’t active ${esc(orgShort())} members can still play. Pick “New player” to add them as Inactive; they show as Not Active in the field.</p>`,
     wire:r=>{ for(let i=0;i<size;i++){ const s=r.querySelector('#tmM'+i); const upd=()=>{ const n=r.querySelector('#tmN'+i); n.hidden=s.value!=='__new'; n.style.display=s.value==='__new'?'grid':'none';
         r.querySelector('#tmB'+i).innerHTML=(s.value==='__new'||inactiveBadge(memberById(s.value)))?'<span class="chip inact">Not Active</span>':''; if(s.value==='__new') r.querySelector('#tmNF'+i).focus(); }; s.onchange=upd; upd(); } },
     save:()=>{ const team=size>1?(+fv('tmNum')||next):next; const picks=[], created=[];
       for(let i=0;i<size;i++){ let mid=fv('tmM'+i); if(!mid) continue;
         if(mid==='__new'){ const f=fv('tmNF'+i), l=fv('tmNL'+i); if(!f&&!l){ toast('Enter the new player’s name'); return false; }
-          const dup=db.members.find(m=>(m.first||'').toLowerCase()===f.toLowerCase()&&(m.last||'').toLowerCase()===l.toLowerCase());
+          const dup=persons().find(m=>(m.first||'').toLowerCase()===f.toLowerCase()&&(m.last||'').toLowerCase()===l.toLowerCase());
           if(dup){ mid=dup.id; } else { const m={id:uid(),first:f,last:l,email:fv('tmNE'+i).toLowerCase(),status:'Inactive',joined:'',notes:'Added from the '+t.name+' field',source:'field'}; created.push(m); mid=m.id; } } if(taken.has(mid)){ toast(memberName(memberById(mid))+' is already in the field'); return false; }
         if(picks.some(p=>p.memberId===mid)){ toast('Same member picked twice'); return false; }
         const prev=existing.find(p=>p.memberId===mid)||existing[i]||{}; const answers=Object.assign({},prev.memberId===mid?prev.answers:{});
         (t.fieldQuestions||[]).forEach((q,qi)=>{ answers[q.key]=$(`tmQ${i}_${qi}`).checked?'Yes':'No'; });
         picks.push({...(prev.memberId===mid?prev:{}),id:(prev.memberId===mid&&prev.id)||uid(),memberId:mid,team,paid:$('tmP'+i).checked,skins:$('tmS'+i).checked,answers}); }
       if(!picks.length){ toast('Pick at least one player'); return false; }
-      created.forEach(m=>db.members.push(m));
+      created.forEach(m=>{ const {id,...data}=m; upsertMember(id,data); });
       t.field=t.field.filter(p=>(p.team||0)!==num).concat(picks);
-      if(created.length) toast(created.map(memberName).join(' and ')+' added to Members as Inactive'); },
+      if(created.length) toast(created.map(memberName).join(' and ')+' added as Inactive'); },
     del:num!=null?()=>{ t.field=t.field.filter(p=>(p.team||0)!==num); }:null,delLabel:size>1?'Remove team':'Remove player'});
 }
 
@@ -1087,46 +1312,66 @@ function editPerPlayer(t,p){
 
 /* ---------- Members ---------- */
 function vMembers(m){
-  const y=Y(), s=db.seasons[y], amt=n0(s.dues.amount);
+  const y=Y(), s=db.seasons[y], amt=n0(s.dues.amount), club=isClub(), short=orgShort();
   const boardOf=id=>db.board.filter(b=>b.memberId===id).map(b=>b.role);
-  let list=db.members.slice().sort((a,b)=>(a.last||'').localeCompare(b.last||'')||(a.first||'').localeCompare(b.first||''));
+  let list=members().sort((a,b)=>(a.last||'').localeCompare(b.last||'')||(a.first||'').localeCompare(b.first||''));
+  const total=list.length, active=list.filter(x=>x.status!=='Inactive').length;
   const q=view.mq.toLowerCase();
   if(q) list=list.filter(x=>[memberName(x),x.email,x.phone,x.memberNo,x.ghin,x.city].join(' ').toLowerCase().includes(q));
+  const filters=club?['All','Active','Inactive']:['All','Active','Board','Dues unpaid','Inactive'];
+  if(!filters.includes(view.mfilter)) view.mfilter='All';
   const f=view.mfilter;
   if(f==='Active') list=list.filter(x=>x.status!=='Inactive'); if(f==='Inactive') list=list.filter(x=>x.status==='Inactive');
   if(f==='Board') list=list.filter(x=>boardOf(x.id).length); if(f==='Dues unpaid') list=list.filter(x=>x.status!=='Inactive'&&memberDues(y,x.id)<amt);
-  const cols='grid-template-columns:40px minmax(0,1.5fr) minmax(0,1.5fr) 130px 70px 150px 120px 90px 40px';
-  m.innerHTML=head('Members','Everyone in the MGA. Board seats and tournament fields are picked from this list.',btn('Dues settings','mDues','')+btn('Import member list','mCsv','',I.down)+btn('Add member','mAdd','pri',I.plus))+`
-  <div class="toolbar"><div class="search">${I.search}<input class="inp" id="mq" placeholder="Search name, email, phone or GHIN" value="${esc(view.mq)}" aria-label="Search members"></div>
-    <div class="seg">${['All','Active','Board','Dues unpaid','Inactive'].map(x=>`<button class="${f===x?'on':''}" data-mf="${x}">${x}</button>`).join('')}</div>
-    <span class="muted" style="margin-left:auto;font-size:13px">${db.members.filter(x=>x.status!=='Inactive').length} active · ${y} dues ${fmt(amt)}${n0(s.dues.installments)>1?` (${s.dues.installments} × ${fmt(amt/s.dues.installments)})`:''}</span></div>
-  <div class="card" style="overflow:hidden">${list.length?`<div class="tw"><div class="t" style="min-width:980px"><div class="tr th" style="${cols}"><span></span><span>Name</span><span>Email</span><span>Phone</span><span>Hcp</span><span>Board</span><span>${y} dues</span><span>Status</span><span></span></div>
-  ${list.map(x=>{const paid=memberDues(y,x.id), br=boardOf(x.id); const du=x.status==='Inactive'?['—','']:paid>=amt?['Paid '+fmt(paid),'ok']:paid>0?[fmt(paid)+' of '+fmt(amt),'gold']:s.duesPayments.length?['Unpaid','warn']:['Not recorded',''];
-    return `<div class="tr num click" data-m="${x.id}" style="${cols}"><span class="av">${initials(x)}</span><div class="cell2"><b class="trunc">${esc(memberName(x))}</b>${(x.ghin||x.memberNo)?`<small>${x.ghin?'GHIN '+esc(x.ghin):'#'+esc(x.memberNo)}</small>`:''}</div><span class="trunc muted">${esc(x.email||'')}</span><span class="muted">${esc(x.phone||'')}</span><span>${esc(x.hcp??'')}</span><span>${br.map(r=>`<span class="chip navy">${esc(r)}</span>`).join(' ')}</span><span><span class="chip ${du[1]}">${du[0]}</span></span><span><span class="chip ${x.status==='Inactive'?'':'ok'}">${esc(x.status||'Active')}</span></span><span class="ib">${I.edit}</span></div>`;}).join('')}</div></div>`
-  :`<div class="empty"><b>${db.members.length?'No members match':'No members yet'}</b><span>${db.members.length?'Try a different search or filter.':'Import the Golf Genius contact list export, or add members one at a time.'}</span></div>`}</div>`;
+  const cols=club?'grid-template-columns:40px minmax(0,1.5fr) minmax(0,1.5fr) 130px 70px 110px 110px 90px 40px':'grid-template-columns:40px minmax(0,1.5fr) minmax(0,1.5fr) 130px 70px 150px 120px 90px 40px';
+  const headRow=club?'<span></span><span>Name</span><span>Email</span><span>Phone</span><span>Hcp</span><span>Member #</span><span>GHIN</span><span>Status</span><span></span>'
+                    :`<span></span><span>Name</span><span>Email</span><span>Phone</span><span>Hcp</span><span>Board</span><span>${y} dues</span><span>Status</span><span></span>`;
+  const rowOf=x=>{ const br=boardOf(x.id), paid=memberDues(y,x.id);
+    const du=x.status==='Inactive'?['—','']:paid>=amt?['Paid '+fmt(paid),'ok']:paid>0?[fmt(paid)+' of '+fmt(amt),'gold']:s.duesPayments.length?['Unpaid','warn']:['Not recorded',''];
+    const mid=club?`<span class="muted">${esc(x.memberNo||'')}</span><span class="muted">${esc(x.ghin||'')}</span>`:`<span>${br.map(r=>`<span class="chip navy">${esc(r)}</span>`).join(' ')}</span><span><span class="chip ${du[1]}">${du[0]}</span></span>`;
+    return `<div class="tr num click" data-m="${x.id}" style="${cols}"><span class="av">${initials(x)}</span><div class="cell2"><b class="trunc">${esc(memberName(x))}</b>${!club&&(x.ghin||x.memberNo)?`<small>${x.ghin?'GHIN '+esc(x.ghin):'#'+esc(x.memberNo)}</small>`:''}</div><span class="trunc muted">${esc(x.email||'')}</span><span class="muted">${esc(x.phone||'')}</span><span>${esc(x.hcp??'')}</span>${mid}<span><span class="chip ${x.status==='Inactive'?'':'ok'}">${esc(x.status||'Active')}</span></span><span class="ib">${I.edit}</span></div>`; };
+  m.innerHTML=head(club?'Directory':'Members',club?`Every member of ${esc(CLUB.name||CLUB_META.name)}. Associations and small groups pick their members from this list.`:`Everyone in the ${esc(short)}. Board seats and tournament fields are picked from this list.`,
+      (club?'':btn('Dues settings','mDues',''))+btn(club?'Import club roster':'Import member list','mCsv','',I.down)+btn('Add member','mAdd','pri',I.plus))+`
+  <div class="toolbar"><div class="search">${I.search}<input class="inp" id="mq" placeholder="Search name, email, phone, member # or GHIN" value="${esc(view.mq)}" aria-label="Search members"></div>
+    <div class="seg">${filters.map(x=>`<button class="${f===x?'on':''}" data-mf="${x}">${x}</button>`).join('')}</div>
+    <span class="muted" style="margin-left:auto;font-size:13px">${active} active${club?` of ${total}`:` · ${y} dues ${fmt(amt)}${n0(s.dues.installments)>1?` (${s.dues.installments} × ${fmt(amt/s.dues.installments)})`:''}`}</span></div>
+  <div class="card" style="overflow:hidden">${list.length?`<div class="tw"><div class="t" style="min-width:980px"><div class="tr th" style="${cols}">${headRow}</div>
+  ${list.map(rowOf).join('')}</div></div>`
+  :`<div class="empty"><b>${total?'No members match':club?'The directory is empty':'No members yet'}</b><span>${total?'Try a different search or filter.':club?'Import the club software’s member export, or add members one at a time.':`Import the ${esc(short)} member list, add club members from the directory, or add people one at a time.`}</span></div>`}</div>`;
   const qi=$('mq'); qi.oninput=()=>{ view.mq=qi.value; const pos=qi.selectionStart; render(); const n=$('mq'); n.focus(); n.setSelectionRange(pos,pos); };
   m.querySelectorAll('[data-mf]').forEach(b=>b.onclick=()=>{view.mfilter=b.dataset.mf;render();});
-  m.querySelectorAll('[data-m]').forEach(r=>r.onclick=()=>editMember(db.members.find(x=>x.id===r.dataset.m)));
-  $('mAdd').onclick=()=>editMember(null); $('mDues').onclick=editDues; $('mCsv').onclick=importRoster;
+  m.querySelectorAll('[data-m]').forEach(r=>r.onclick=()=>editMember(memberById(r.dataset.m)));
+  $('mAdd').onclick=()=>editMember(null); const md=$('mDues'); if(md) md.onclick=editDues; $('mCsv').onclick=importRoster;
 }
+/* one form for the club directory and for an organization's members: person fields go to the directory,
+   status / joined / notes (and dues) belong to this organization */
 function editMember(mm){
-  const y=Y(), s=db.seasons[y]; const pays=mm?clone(s.duesPayments.filter(p=>p.memberId===mm.id)):[];
+  const y=Y(), s=db.seasons[y], club=isClub(), short=orgShort(); const pays=mm&&!club?clone(s.duesPayments.filter(p=>p.memberId===mm.id)):[];
+  let pickedId=mm?mm.id:'';
   const payHTML=()=>pays.map((p,i)=>`<div class="mr num" style="grid-template-columns:90px minmax(0,1fr) 28px"><input class="inp r" data-di="${i}" data-k="amount" inputmode="decimal" value="${esc(p.amount)}" aria-label="Dues amount"><input class="inp" data-di="${i}" data-k="date" value="${esc(p.date)}" placeholder="Date" aria-label="Dues date"><button class="ib" data-ddel="${i}" aria-label="Remove">${I.x}</button></div>`).join('')||'<div class="mr"><span class="muted">No dues recorded for '+y+'.</span></div>';
   const inT=mm?db.tournaments.filter(t=>t.field.some(p=>p.memberId===mm.id)):[];
-  openDrawer({kicker:'Member',title:mm?memberName(mm):'Add member',
-    body:pair(field('First name','mfF',mm?.first||''),field('Last name','mfL',mm?.last||''))+pair(field('Email','mfE',mm?.email||''),field('Phone','mfP',mm?.phone||''))+
-      pair(field('Handicap index','mfH',mm?.hcp??''),field('GHIN','mfG',mm?.ghin||''))+field('Address','mfA',mm?.address1||'')+`<div style="display:grid;grid-template-columns:minmax(0,2fr) 70px minmax(0,1fr);gap:12px">${field('City','mfC',mm?.city||'')}${field('State','mfSt',mm?.state||'')}${field('Zip','mfZ',mm?.zip||'')}</div>`+pair(field('Status','mfS',mm?.status||'Active',{type:'select',options:['Active','Inactive']}),field('Joined','mfJ',mm?.joined||'',{type:'date'}))+
-      `<div class="fld"><div style="display:flex;justify-content:space-between;align-items:center"><span class="lbl">${y} dues · ${fmt(s.dues.amount)}, not prorated</span><button class="btn sm" id="dAdd" type="button">${I.plus}Record payment</button></div><div class="mini"><div id="dRows">${payHTML()}</div></div></div>`+
+  const candidates=!mm&&!club?persons().filter(p=>!membershipOf(p.id)):[];   // club members who aren't in this organization yet
+  const candHTML=q=>{ q=q.toLowerCase().trim(); if(!q) return ''; return candidates.filter(p=>[memberName(p),p.email,p.memberNo].join(' ').toLowerCase().includes(q)).slice(0,8)
+    .map(p=>`<button type="button" data-pk="${p.id}"><span class="av">${initials(p)}</span><b>${esc(memberName(p))}</b><span class="muted" style="margin-left:auto;font-size:12.5px">${esc(p.email||(p.memberNo?'#'+p.memberNo:''))}</span></button>`).join('')||'<span class="muted" style="padding:10px 14px;display:block">Nobody in the directory matches — fill in the form to add a new person.</span>'; };
+  openDrawer({kicker:club?'Directory':short+' member',title:mm?memberName(mm):'Add member',
+    body:(candidates.length?`<div class="fld"><span class="lbl">Already a club member? Add them from the directory</span><input class="inp" id="mfPick" placeholder="Search the club directory" autocomplete="off" aria-label="Search the club directory"><div class="pick" id="mfPickL" style="max-height:230px"></div><p class="hint" id="mfPicked" style="margin:0"></p></div>`:'')+
+      pair(field('First name','mfF',mm?.first||''),field('Last name','mfL',mm?.last||''))+pair(field('Email','mfE',mm?.email||''),field('Phone','mfP',mm?.phone||''))+
+      pair(field('Handicap index','mfH',mm?.hcp??''),field('GHIN','mfG',mm?.ghin||''))+pair(field('Member #','mfNo',mm?.memberNo||''),field('Address','mfA',mm?.address1||''))+`<div style="display:grid;grid-template-columns:minmax(0,2fr) 70px minmax(0,1fr);gap:12px">${field('City','mfC',mm?.city||'')}${field('State','mfSt',mm?.state||'')}${field('Zip','mfZ',mm?.zip||'')}</div>`+
+      pair(field(club?'Club status':short+' status','mfS',mm?.status||'Active',{type:'select',options:['Active','Inactive']}),field('Joined','mfJ',mm?.joined||'',{type:'date'}))+
+      (club?'':`<div class="fld"><div style="display:flex;justify-content:space-between;align-items:center"><span class="lbl">${y} dues · ${fmt(s.dues.amount)}, not prorated</span><button class="btn sm" id="dAdd" type="button">${I.plus}Record payment</button></div><div class="mini"><div id="dRows">${payHTML()}</div></div></div>`)+
       (mm&&mm.ggId?`<p class="hint">Golf Genius ID ${esc(mm.ggId)}${mm.memberType?' · member type '+esc(mm.memberType):''}</p>`:'')+(inT.length?`<div class="fld"><span class="lbl">Tournaments</span><span>${inT.map(t=>esc(t.name)+' ('+t.season+')').join(', ')}</span></div>`:'')+field('Notes','mfNt',mm?.notes||'',{type:'textarea'}),
     wire:r=>{ const bind=()=>{ r.querySelectorAll('[data-di]').forEach(e=>e.oninput=()=>pays[+e.dataset.di][e.dataset.k]=e.value); r.querySelectorAll('[data-ddel]').forEach(b=>b.onclick=()=>{pays.splice(+b.dataset.ddel,1);r.querySelector('#dRows').innerHTML=payHTML();bind();}); };
-      bind(); r.querySelector('#dAdd').onclick=()=>{ const inst=n0(s.dues.amount)/Math.max(1,n0(s.dues.installments)); const d=new Date(); pays.push({id:uid(),amount:inst,date:(d.getMonth()+1)+'/'+d.getDate()}); r.querySelector('#dRows').innerHTML=payHTML(); bind(); }; },
+      bind(); const da=r.querySelector('#dAdd'); if(da) da.onclick=()=>{ const inst=n0(s.dues.amount)/Math.max(1,n0(s.dues.installments)); const d=new Date(); pays.push({id:uid(),amount:inst,date:(d.getMonth()+1)+'/'+d.getDate()}); r.querySelector('#dRows').innerHTML=payHTML(); bind(); };
+      const pk=r.querySelector('#mfPick'); if(pk){ const L=r.querySelector('#mfPickL'), who=r.querySelector('#mfPicked'); L.style.display='none';
+        pk.oninput=()=>{ L.innerHTML=candHTML(pk.value); L.style.display=L.innerHTML?'':'none'; L.querySelectorAll('[data-pk]').forEach(b=>b.onclick=()=>{ const p=personById(b.dataset.pk); pickedId=p.id;
+          [['mfF','first'],['mfL','last'],['mfE','email'],['mfP','phone'],['mfH','hcp'],['mfG','ghin'],['mfNo','memberNo'],['mfA','address1'],['mfC','city'],['mfSt','state'],['mfZ','zip']].forEach(([id,k])=>{ r.querySelector('#'+id).value=p[k]??''; });
+          who.innerHTML=`Adding <b>${esc(memberName(p))}</b> from the directory to the ${esc(short)}.`; L.style.display='none'; pk.value=''; }); }; } },
     save:()=>{ const first=fv('mfF'), last=fv('mfL'); if(!first&&!last){ toast('Enter a name'); return false; }
-      const data={first,last,email:fv('mfE'),phone:fv('mfP'),hcp:fv('mfH'),ghin:fv('mfG'),address1:fv('mfA'),city:fv('mfC'),state:fv('mfSt'),zip:fv('mfZ'),status:fv('mfS'),joined:fv('mfJ'),notes:fv('mfNt')};
-      let target=mm; if(mm) Object.assign(mm,data); else { target=Object.assign({id:uid()},data); db.members.push(target); }
-      s.duesPayments=s.duesPayments.filter(p=>p.memberId!==target.id).concat(pays.filter(p=>n0(p.amount)).map(p=>({id:p.id||uid(),memberId:target.id,amount:n0(p.amount),date:p.date||''}))); },
+      const data={first,last,email:fv('mfE'),phone:fv('mfP'),hcp:fv('mfH'),ghin:fv('mfG'),memberNo:fv('mfNo'),address1:fv('mfA'),city:fv('mfC'),state:fv('mfSt'),zip:fv('mfZ'),status:fv('mfS'),joined:fv('mfJ'),notes:fv('mfNt')};
+      const p=upsertMember(pickedId||null,data);
+      if(!club) s.duesPayments=s.duesPayments.filter(x=>x.memberId!==p.id).concat(pays.filter(x=>n0(x.amount)).map(x=>({id:x.id||uid(),memberId:p.id,amount:n0(x.amount),date:x.date||''}))); },
     del:mm?()=>{ if(inT.length&&!confirm(`${memberName(mm)} is in ${inT.length} tournament field(s). Remove anyway?`)) return false;
-      db.members=db.members.filter(x=>x!==mm); db.board.forEach(b=>{ if(b.memberId===mm.id) b.memberId=''; }); db.tournaments.forEach(t=>t.field=t.field.filter(p=>p.memberId!==mm.id));
-      for(const ss of Object.values(db.seasons)) ss.duesPayments=ss.duesPayments.filter(p=>p.memberId!==mm.id); toast('Member removed'); }:null,delLabel:'Remove member'});
+      removeMember(mm.id); toast(club?'Removed from the directory':`Removed from the ${short} — still in the club directory`); }:null,delLabel:club?'Remove from directory':'Remove from '+short});
 }
 function editDues(){
   const s=db.seasons[Y()];
@@ -1177,17 +1422,17 @@ function previewField(t,res,fname){
       <p class="hint">${rows.length-newMembers.length} matched to existing members${rows.filter(r=>r.m&&r.m.status==='Inactive').length?` (${rows.filter(r=>r.m&&r.m.status==='Inactive').length} Inactive)`:''}${newMembers.length?` · <b>${newMembers.length} not in Members</b>`:''}${moved.length?` · ${moved.length} changing teams`:''}${res.skippedGuests?` · ${res.skippedGuests} guests skipped`:''}.</p>
       ${qs.length?`<div class="fld"><span class="lbl">RSVP questions found</span><span style="font-size:13.5px">${tally}</span></div>`:''}
       ${odd.length?`<div class="banner">${odd.length} team${odd.length>1?'s don’t':' doesn’t'} have ${size} players: ${odd.slice(0,6).map(([n,c])=>'Team '+n+' ('+c+')').join(', ')}${odd.length>6?'…':''}. They’ll import as-is so you can fix them on the Field tab.</div>`:''}
-      ${newMembers.length?`<div class="fld"><span class="lbl">Not on the MGA member list — will play as Not Active</span><div class="mini">${newMembers.slice(0,6).map(r=>`<div class="mr"><div class="cell2"><b>${pn(r)}</b><small>${esc([r.p.email,r.p.ghin&&'GHIN '+r.p.ghin].filter(Boolean).join(' · '))}</small></div></div>`).join('')}${newMembers.length>6?`<div class="mr"><span class="muted">+ ${newMembers.length-6} more</span></div>`:''}</div></div>`:''}
+      ${newMembers.length?`<div class="fld"><span class="lbl">Not on the ${esc(orgShort())} member list — will play as Not Active</span><div class="mini">${newMembers.slice(0,6).map(r=>`<div class="mr"><div class="cell2"><b>${pn(r)}</b><small>${esc([r.p.email,r.p.ghin&&'GHIN '+r.p.ghin].filter(Boolean).join(' · '))}</small></div></div>`).join('')}${newMembers.length>6?`<div class="mr"><span class="muted">+ ${newMembers.length-6} more</span></div>`:''}</div></div>`:''}
       ${removed.length?`<div class="fld"><span class="lbl">In the field now but not in this roster</span><div class="mini">${removed.slice(0,6).map(x=>`<div class="mr"><b>${esc(memberName(memberById(x.memberId))||'Unknown')}</b></div>`).join('')}${removed.length>6?`<div class="mr"><span class="muted">+ ${removed.length-6} more</span></div>`:''}</div></div>`:''}
       <div class="fld" style="gap:10px">
-        ${newMembers.length?`<label class="check"><input type="checkbox" id="fiAdd" checked>Add the ${newMembers.length} player${newMembers.length>1?'s':''} who aren’t on the MGA member list to Members as <b>Inactive</b> (they still play, marked Not Active)</label>`:''}
+        ${newMembers.length?`<label class="check"><input type="checkbox" id="fiAdd" checked>Add the ${newMembers.length} player${newMembers.length>1?'s':''} who aren’t on the ${esc(orgShort())} member list as <b>Inactive</b> (they still play, marked Not Active)</label>`:''}
         ${hcpChanges||fills?`<label class="check" style="align-items:flex-start"><input type="checkbox" id="fiUpd" checked><span>Update members from this roster <span class="muted">(${hcpChanges} handicap index${hcpChanges===1?'':'es'}${fills?`, fill in ${fills} missing phone/email/GHIN`:''})</span></span></label>`:''}
         ${removed.length?`<label class="check"><input type="checkbox" id="fiRem" checked>Remove the ${removed.length} player${removed.length>1?'s':''} not in this roster from the field</label>`:''}
         <label class="check"><input type="checkbox" id="fiPaid">Mark every imported player’s entry fee as paid</label>
         ${t.budgetBasis!=='field'?`<label class="check" style="align-items:flex-start"><input type="checkbox" id="fiBasis"><span>Use the field for the budget player count <span class="muted">(now ${n0(t.plannedPlayers)} planned → ${rows.length} in the field)</span></span></label>`:''}
       </div>`,
     save:()=>{
-      const chk=id=>$(id)&&$(id).checked, before={field:clone(t.field),members:clone(db.members),q:clone(t.fieldQuestions||[]),basis:t.budgetBasis};
+      const chk=id=>$(id)&&$(id).checked, before={field:clone(t.field),members:memberSnapshot(),q:clone(t.fieldQuestions||[]),basis:t.budgetBasis};
       if(newMembers.length&&!chk('fiAdd')&&!confirm(`${newMembers.length} player(s) aren’t in Members and will be left out of the field. Continue?`)) return false;
       // questions
       const qmap=new Map((t.fieldQuestions||[]).map(q=>[q.label,q]));
@@ -1198,7 +1443,7 @@ function previewField(t,res,fname){
       const next=[];
       for(const r of rows){
         let m=r.m;
-        if(!m){ if(!chk('fiAdd')) continue; m={id:uid(),status:'Inactive',joined:'',notes:'Added from the '+t.name+' roster',source:'field-roster'}; ROSTER_FIELDS.forEach(([k])=>{ if(k!=='ggId') m[k]=r.p[k]||''; }); if(r.p.hcp) m.hcpAt=res.fileDate; db.members.push(m); }
+        if(!m){ if(!chk('fiAdd')) continue; const d={status:'Inactive',joined:'',notes:'Added from the '+t.name+' roster',source:'field-roster'}; ROSTER_FIELDS.forEach(([k])=>{ if(k!=='ggId') d[k]=r.p[k]||''; }); if(r.p.hcp) d.hcpAt=res.fileDate; m=upsertMember(null,d); }
         else if(upd){ if(newerHcp(r)){ m.hcp=r.p.hcp; m.hcpAt=res.fileDate; } ['phone','email','ghin','address1','city','state','zip'].forEach(k=>{ if(r.p[k]&&!m[k]) m[k]=r.p[k]; }); }
         const prev=inField.get(m.id)||{};
         const answers=Object.assign({},prev.answers||{}); qs.forEach(l=>{ answers[keyOf(l)]=r.p.answers[l]||''; });
@@ -1208,7 +1453,7 @@ function previewField(t,res,fname){
       t.field=next.concat(keep);
       if(chk('fiBasis')) t.budgetBasis='field';
       t.rosterFile=fname; t.rosterImportedAt=new Date().toISOString();
-      toast(`${next.length} players imported into ${new Set(next.map(x=>x.team)).size} teams`,()=>{ t.field=before.field; db.members=before.members; t.fieldQuestions=before.q; t.budgetBasis=before.basis; persist(); render(); });
+      toast(`${next.length} players imported into ${new Set(next.map(x=>x.team)).size} teams`,()=>{ t.field=before.field; memberRestore(before.members); t.fieldQuestions=before.q; t.budgetBasis=before.basis; persist(); render(); });
     }});
 }
 
@@ -1257,55 +1502,71 @@ function mapRoster(rows){
 }
 const ROSTER_FIELDS=[['first','First name'],['last','Last name'],['email','Email'],['phone','Phone'],['hcp','Handicap'],['ghin','GHIN'],['memberNo','Member #'],['ggId','Golf Genius ID'],
   ['address1','Address'],['address2','Address 2'],['city','City'],['state','State'],['zip','Zip'],['dob','Date of birth'],['memberType','Member type']];
-function matchMember(p,used,noGG){
-  const key=s=>(s||'').toLowerCase().replace(/[^a-z]/g,'');
-  const tries=[x=>!noGG&&p.ggId&&x.ggId===p.ggId, x=>p.ghin&&x.ghin===p.ghin, x=>p.email&&(x.email||'').toLowerCase()===p.email, x=>key(x.first)===key(p.first)&&key(x.last)===key(p.last)];
-  for(const t of tries){ const m=db.members.find(x=>!used.has(x.id)&&t(x)); if(m) return m; }
+/* match a row from a file to someone already in the club directory: member number → Golf Genius ID → GHIN → email → name */
+function matchPerson(p,used,noGG){
+  const key=x=>(x||'').toLowerCase().replace(/[^a-z]/g,'');
+  const tries=[['memberNo',x=>p.memberNo&&x.memberNo===p.memberNo],['ggId',x=>!noGG&&p.ggId&&x.ggId===p.ggId],['ghin',x=>p.ghin&&x.ghin===p.ghin],
+               ['email',x=>p.email&&(x.email||'').toLowerCase()===p.email],['name',x=>key(x.first)===key(p.first)&&key(x.last)===key(p.last)]];
+  for(const [how,t] of tries){ const m=persons().find(x=>!used.has(x.id)&&t(x)); if(m) return {m,how}; }
   return null;
 }
+function matchMember(p,used,noGG){ const r=matchPerson(p,used,noGG); return r?r.m:null; }
 function planRoster(people,fileDate){
-  const used=new Set(), plan={add:[],update:[],same:[]};
+  const used=new Set(), plan={add:[],join:[],update:[],same:[],conflict:[]}, club=isClub();
+  const changesFor=(m,p)=>ROSTER_FIELDS.filter(([k])=>p[k]&&String(m[k]??'')!==p[k]&&!(k==='hcp'&&m.hcpAt&&fileDate<m.hcpAt)).map(([k,l])=>({k,l,from:m[k]??'',to:p[k]}));
   for(const p of people){
-    const m=matchMember(p,used);
-    if(!m){ plan.add.push(p); continue; }
-    used.add(m.id);
-    const changes=ROSTER_FIELDS.filter(([k])=>p[k]&&String(m[k]??'')!==p[k]&&!(k==='hcp'&&m.hcpAt&&fileDate<m.hcpAt)).map(([k,l])=>({k,l,from:m[k]??'',to:p[k]}));
-    if(m.status==='Inactive') changes.push({k:'status',l:'Status',from:'Inactive',to:'Active'});
+    const r=matchPerson(p,used);
+    if(!r){ plan.add.push(p); continue; }
+    const m=r.m; used.add(m.id);
+    // a match on name alone that disagrees on an identifier is a decision for a person, not a guess
+    const clash=r.how==='name'?['memberNo','ghin','email'].filter(k=>p[k]&&m[k]&&String(m[k]).toLowerCase()!==String(p[k]).toLowerCase()):[];
+    if(clash.length){ plan.conflict.push({m,p,clash,changes:changesFor(m,p)}); continue; }
+    const changes=changesFor(m,p), ms=club?null:membershipOf(m.id);
+    if(!club&&!ms){ plan.join.push({m,p,changes}); continue; }
+    if((club?m.status:ms.status)==='Inactive') changes.push({k:'status',l:'Status',from:'Inactive',to:'Active'});
     (changes.length?plan.update:plan.same).push({m,p,changes});
   }
-  plan.missing=db.members.filter(x=>!used.has(x.id)&&x.status!=='Inactive');
+  plan.missing=members().filter(x=>!used.has(x.id)&&x.status!=='Inactive');
   return plan;
 }
 function importRoster(){
-  openDrawer({kicker:'Members',title:'Import member list',
-    body:`<p style="margin:0">Upload the Golf Genius contact list export (<b>.xlsx</b>) or any spreadsheet or CSV with first and last name columns.</p>
-      <p class="hint">Picks up email, handicap index, GHIN, Golf Genius ID, phone and address. People already in the hub are matched by Golf Genius ID, GHIN, email, then name, so uploading a newer export updates them instead of adding duplicates. You’ll see a preview before anything is saved.</p>
+  const club=isClub(), short=orgShort();
+  openDrawer({kicker:club?'Directory':'Members',title:club?'Import club roster':'Import member list',
+    body:`<p style="margin:0">${club?'Upload the club software’s member export (<b>.xlsx</b> or <b>.csv</b>) or any spreadsheet with first and last name columns.':`Upload the ${esc(short)} member list — the Golf Genius contact list export (<b>.xlsx</b>) or any spreadsheet or CSV with first and last name columns.`}</p>
+      <p class="hint">Picks up email, phone, handicap index, GHIN, member number, Golf Genius ID and address. People already in the club directory are matched by member number, Golf Genius ID, GHIN, email, then name, so a newer export updates them instead of adding duplicates${club?'':`, and club members who aren’t in the ${esc(short)} yet are added to it`}. A match on name alone that disagrees on an identifier is left for you to decide. You’ll see a preview before anything is saved.</p>
       <input type="file" id="rosterF" accept=".xlsx,.xls,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv" class="inp" style="padding-top:8px"><p class="hint" id="rosterMsg" aria-live="polite"></p>`,
     wire:r=>{ r.querySelector('#rosterF').onchange=async e=>{ const f=e.target.files[0]; if(!f) return; const msg=r.querySelector('#rosterMsg'); msg.style.color=''; msg.textContent='Reading '+f.name+'…';
       try{ const res=mapRoster(await readRosterFile(f)); if(!res.people.length) throw new Error('No people found under the header row');
         closeDrawer(); previewRoster(res,f.name); }
       catch(err){ msg.style.color='var(--neg)'; msg.textContent=err.message||'Couldn’t read that file'; } }; }});
 }
-function previewRoster(res,fname,eventFile){
-  const plan=planRoster(res.people,res.fileDate);
+function previewRoster(res,fname){
+  const plan=planRoster(res.people,res.fileDate), club=isClub(), short=orgShort();
   const li=(t,sub)=>`<div class="mr" style="grid-template-columns:minmax(0,1fr)"><div class="cell2"><b>${t}</b>${sub?`<small>${sub}</small>`:''}</div></div>`;
   const more=(n,shown)=>n>shown?`<div class="mr"><span class="muted">+ ${n-shown} more</span></div>`:'';
-  const SHOW=8;
-  openDrawer({kicker:'Import · '+fname,title:'Review import',saveLabel:`Import ${plan.add.length+plan.update.length} change${plan.add.length+plan.update.length===1?'':'s'}`,
-    body:`<div class="grid g3" style="gap:10px">${[['New',plan.add.length],['Updated',plan.update.length],['No change',plan.same.length]].map(([l,v])=>`<div class="card pad kpi" style="padding:14px"><span class="lbl">${l}</span><span class="v num" style="font-size:30px">${v}</span></div>`).join('')}</div>
-      <p class="hint">Everyone in this file is imported as an <b>Active</b> MGA member. ${res.people.length} people read from the file${res.skippedGuests?` · ${res.skippedGuests} guests skipped`:''}${res.skippedBlank?` · ${res.skippedBlank} rows without a name skipped`:''}.</p>
-      ${plan.add.length?`<div class="fld"><span class="lbl">New members</span><div class="mini">${plan.add.slice(0,SHOW).map(p=>li(esc(p.first+' '+p.last),esc([p.email,p.hcp&&'Index '+p.hcp,p.ghin&&'GHIN '+p.ghin].filter(Boolean).join(' · ')))).join('')}${more(plan.add.length,SHOW)}</div></div>`:''}
-      ${plan.update.length?`<div class="fld"><span class="lbl">Updates to existing members</span><div class="mini">${plan.update.slice(0,SHOW).map(u=>li(esc(memberName(u.m)),u.changes.map(c=>esc(c.l)+': '+(c.from?esc(c.from)+' → ':'')+esc(c.to)).join(' · '))).join('')}${more(plan.update.length,SHOW)}</div><p class="hint">Blank cells in the file never erase what’s already in the hub.</p></div>`:''}
-      ${plan.missing.length?`<label class="check" style="align-items:flex-start;font-weight:400"><input type="checkbox" id="rosterInact"${(plan.update.length+plan.same.length)>=0.6*(plan.update.length+plan.same.length+plan.missing.length)?' checked':''}><span>Mark the ${plan.missing.length} active member${plan.missing.length===1?'':'s'} not on this MGA roster as Inactive <span class="muted">(${esc(plan.missing.slice(0,4).map(memberName).join(', '))}${plan.missing.length>4?'…':''})</span></span></label>`:''}`,
+  const SHOW=8, who=p=>esc([p.email,p.memberNo&&'#'+p.memberNo,p.hcp&&'Index '+p.hcp,p.ghin&&'GHIN '+p.ghin].filter(Boolean).join(' · '));
+  const chg=u=>u.changes.map(c=>esc(c.l)+': '+(c.from?esc(c.from)+' → ':'')+esc(c.to)).join(' · ');
+  const nChanges=plan.add.length+plan.join.length+plan.update.length+plan.conflict.length;
+  const kp=[['New',plan.add.length]].concat(club?[]:[['Joining',plan.join.length]]).concat([['Updated',plan.update.length],['No change',plan.same.length]]).concat(plan.conflict.length?[['To decide',plan.conflict.length]]:[]);
+  openDrawer({kicker:'Import · '+fname,title:'Review import',saveLabel:`Import ${nChanges} change${nChanges===1?'':'s'}`,wide:plan.conflict.length>0,
+    body:`<div class="grid g3" style="gap:10px">${kp.map(([l,v])=>`<div class="card pad kpi" style="padding:14px"><span class="lbl">${l}</span><span class="v num" style="font-size:30px">${v}</span></div>`).join('')}</div>
+      <p class="hint">${club?'Everyone in this file is imported as an <b>Active</b> club member.':`Everyone in this file is imported as an <b>Active</b> ${esc(short)} member (new people are added to the club directory too).`} ${res.people.length} people read from the file${res.skippedGuests?` · ${res.skippedGuests} guests skipped`:''}${res.skippedBlank?` · ${res.skippedBlank} rows without a name skipped`:''}.</p>
+      ${plan.conflict.length?`<div class="fld"><span class="lbl">Same person or not? These match an existing name but disagree on an identifier</span><div class="mini">${plan.conflict.map((c,i)=>`<div class="mr" style="grid-template-columns:minmax(0,1fr) auto;align-items:start"><div class="cell2"><b>${esc(c.p.first+' '+c.p.last)}</b><small>In the file: ${who(c.p)||'—'}<br>In the directory: ${who(c.m)||'—'}</small></div><div style="display:flex;flex-direction:column;gap:6px;font-size:13px"><label class="check" style="font-weight:400"><input type="radio" name="cf${i}" value="same" checked>Same person — update</label><label class="check" style="font-weight:400"><input type="radio" name="cf${i}" value="new">Different person — add as new</label></div></div>`).join('')}</div></div>`:''}
+      ${plan.add.length?`<div class="fld"><span class="lbl">New ${club?'members':'to the club'}</span><div class="mini">${plan.add.slice(0,SHOW).map(p=>li(esc(p.first+' '+p.last),who(p))).join('')}${more(plan.add.length,SHOW)}</div></div>`:''}
+      ${plan.join.length?`<div class="fld"><span class="lbl">Club members joining the ${esc(short)}</span><div class="mini">${plan.join.slice(0,SHOW).map(u=>li(esc(memberName(u.m)),chg(u)||who(u.m))).join('')}${more(plan.join.length,SHOW)}</div></div>`:''}
+      ${plan.update.length?`<div class="fld"><span class="lbl">Updates to existing members</span><div class="mini">${plan.update.slice(0,SHOW).map(u=>li(esc(memberName(u.m)),chg(u))).join('')}${more(plan.update.length,SHOW)}</div><p class="hint">Blank cells in the file never erase what’s already in the hub.</p></div>`:''}
+      ${plan.missing.length?`<label class="check" style="align-items:flex-start;font-weight:400"><input type="checkbox" id="rosterInact"${(plan.update.length+plan.same.length)>=0.6*(plan.update.length+plan.same.length+plan.missing.length)?' checked':''}><span>Mark the ${plan.missing.length} active ${esc(club?'club':short)} member${plan.missing.length===1?'':'s'} not in this file as Inactive <span class="muted">(${esc(plan.missing.slice(0,4).map(memberName).join(', '))}${plan.missing.length>4?'…':''})</span></span></label>`:''}`,
     save:()=>{
       const inact=$('rosterInact')&&$('rosterInact').checked;
-      if(!plan.add.length&&!plan.update.length&&!inact){ toast('Nothing to change — the hub already matches this file'); return; }
-      const before=clone(db.members);
-      for(const p of plan.add){ const m={id:uid(),status:'Active',joined:'',notes:''}; ROSTER_FIELDS.forEach(([k])=>{ m[k]=p[k]||''; }); m.source='roster'; if(p.hcp) m.hcpAt=res.fileDate; db.members.push(m); }
-      for(const u of plan.update){ u.changes.forEach(c=>{ u.m[c.k]=c.to; if(c.k==='hcp') u.m.hcpAt=res.fileDate; }); if(u.m.status==='Inactive') u.m.status='Active'; }
-      if(inact) plan.missing.forEach(m=>m.status='Inactive');
+      if(!nChanges&&!inact){ toast('Nothing to change — the hub already matches this file'); return; }
+      const before=memberSnapshot();
+      const addPerson=p=>{ const d={status:'Active',joined:'',notes:'',source:'roster'}; ROSTER_FIELDS.forEach(([k])=>{ d[k]=p[k]||''; }); if(p.hcp) d.hcpAt=res.fileDate; upsertMember(null,d); };
+      const apply=u=>{ u.changes.forEach(c=>{ if(c.k==='status') return; u.m[c.k]=c.to; if(c.k==='hcp') u.m.hcpAt=res.fileDate; }); upsertMember(u.m.id,{status:'Active'}); };
+      plan.add.forEach(addPerson); plan.join.forEach(apply); plan.update.forEach(apply);
+      let asNew=0; plan.conflict.forEach((c,i)=>{ const v=(document.querySelector(`input[name=cf${i}]:checked`)||{}).value; if(v==='new'){ addPerson(c.p); asNew++; } else apply(c); });
+      if(inact) plan.missing.forEach(x=>upsertMember(x.id,{status:'Inactive'}));
       db.rosterImportedAt=new Date().toISOString(); db.rosterFile=fname;
-      toast(`${plan.add.length} added · ${plan.update.length} updated${inact?` · ${plan.missing.length} marked inactive`:''}`,()=>{ db.members=before; persist(); render(); });
+      toast(`${plan.add.length+asNew} added${plan.join.length?` · ${plan.join.length} joined`:''} · ${plan.update.length+plan.conflict.length-asNew} updated${inact?` · ${plan.missing.length} marked inactive`:''}`,()=>{ memberRestore(before); persist(); render(); });
     }});
 }
 function parseCSV(txt){ const rows=[]; let row=[],cur='',q=false;
@@ -1315,7 +1576,7 @@ function parseCSV(txt){ const rows=[]; let row=[],cur='',q=false;
   if(cur||row.length){ row.push(cur); rows.push(row); } return rows.filter(r=>r.some(c=>c.trim())); }
 /* ---------- Board ---------- */
 function vBoard(m){
-  m.innerHTML=head('Board',`${Y()} MGA board. Each seat is filled from the member list.`,btn('Add seat','bAdd','',I.plus))+`
+  m.innerHTML=head('Board',`${Y()} ${esc(orgShort())} board. Each seat is filled from the member list.`,btn('Add seat','bAdd','',I.plus))+`
   <div class="grid g4 board">${db.board.map(b=>{const mm=memberById(b.memberId);const sub=b.term?'Term through '+b.term:(mm&&mm.email)||'';return `<div class="card seat">
     <div class="seat-top"><span class="lbl trunc">${esc(b.role)}</span><button class="ib" data-bs="${b.id}" aria-label="Edit ${esc(b.role)} seat">${I.edit}</button></div>
     ${mm?`<div class="seat-who"><span class="av">${initials(mm)}</span><div class="cell2"><b class="trunc" title="${esc(memberName(mm))}">${esc(memberName(mm))}</b><small class="trunc" title="${esc(sub)}">${esc(sub)}</small></div></div>
@@ -1327,9 +1588,9 @@ function vBoard(m){
   $('bAdd').onclick=()=>editSeat(null);
 }
 function pickMember(seat){
-  if(!db.members.length){ toast('Add members first'); go('members'); return; }
+  if(!members().length){ toast('Add members first'); go('members'); return; }
   let chosen=seat.memberId;
-  const list=db.members.filter(x=>x.status!=='Inactive').sort((a,b)=>memberName(a).localeCompare(memberName(b)));
+  const list=members().filter(x=>x.status!=='Inactive').sort((a,b)=>memberName(a).localeCompare(memberName(b)));
   const html=q=>list.filter(x=>memberName(x).toLowerCase().includes(q.toLowerCase())).map(x=>{const on=db.board.filter(b=>b.memberId===x.id&&b.id!==seat.id).map(b=>b.role);
     return `<button type="button" data-pk="${x.id}" class="${x.id===chosen?'on':''}"><span class="av">${initials(x)}</span><b>${esc(memberName(x))}</b><span class="muted" style="margin-left:auto;font-size:12.5px">${on.length?esc(on.join(', ')):''}</span></button>`;}).join('')||'<span class="muted" style="padding:14px">No matches.</span>';
   openDrawer({kicker:seat.role,title:'Choose a member',saveLabel:'Add to board',
@@ -1349,14 +1610,14 @@ function vBudget(m){
   const y=Y(), sc=scalc(y), s=sc.s;
   const cols='grid-template-columns:minmax(160px,2fr) 140px 130px 130px 120px 120px';
   const r=(n,d,rv,ex,nt,act,cls='',attr='')=>`<div class="tr num ${cls}" ${attr} style="${cols}"><span style="font-weight:600;color:var(--navy)">${n}</span><span class="muted">${d}</span><span class="r">${rv}</span><span class="r">${ex}</span><b class="r ${typeof nt==='number'?netCls(nt):''}">${typeof nt==='number'?fmtS(nt):nt}</b><span class="r muted">${act}</span></div>`;
-  m.innerHTML=head('Season budget','Tournaments are self-sustaining; dues are the MGA’s own income. Everything rolls up here.',btn('Add MGA line','sbAdd','',I.plus))+`
-  <div class="grid g3">${kpi('Budgeted revenue',fmt(sc.revenue),'tournaments + dues + MGA lines')}${kpi('Budgeted expenses',fmt(sc.expenses),'tournaments + MGA lines')}${kpi('Season net (projected)',fmtS(sc.projected),`Actuals for ${sc.past.length} completed, budget for ${sc.upcoming.length} upcoming · all-budget net ${fmtS(sc.net)}`,netCls(sc.projected))}</div>
+  m.innerHTML=head('Season budget',`Tournaments are self-sustaining; dues are the ${esc(orgShort())}’s own income. Everything rolls up here.`,btn('Add '+orgShort()+' line','sbAdd','',I.plus))+`
+  <div class="grid g3">${kpi('Budgeted revenue',fmt(sc.revenue),'tournaments + dues + '+orgShort()+' lines')}${kpi('Budgeted expenses',fmt(sc.expenses),'tournaments + MGA lines')}${kpi('Season net (projected)',fmtS(sc.projected),`Actuals for ${sc.past.length} completed, budget for ${sc.upcoming.length} upcoming · all-budget net ${fmtS(sc.net)}`,netCls(sc.projected))}</div>
   <div class="card" style="overflow:hidden"><div class="cardhead"><h2 class="h2">Tournaments</h2></div><div class="tw"><div class="t" style="min-width:820px">
     <div class="tr th" style="${cols}"><span>Tournament</span><span>Dates</span><span class="r">Revenue</span><span class="r">Expenses</span><span class="r">Net</span><span class="r">Actual net</span></div>
     ${sc.ts.map(({t,c})=>r(esc(t.name)+(isPast(t)?' <span class="chip ok" style="height:20px;font-size:11px;margin-left:6px">Actual counts</span>':''),dateRange(t).replace(/, \d{4}$/,''),fmt(c.revenue),fmt(c.expenses),c.net,fmtS(c.netA),'click',`data-open="${t.id}"`)).join('')||'<div class="tr"><span class="muted">No tournaments this season.</span></div>'}
     ${r('Tournaments subtotal','',fmt(sc.tRev),fmt(sc.tExp),sc.tRev-sc.tExp,'','tot')}
   </div></div></div>
-  <div class="card" style="overflow:hidden"><div class="cardhead"><h2 class="h2">MGA-level money</h2></div><div class="tw"><div class="t" style="min-width:820px">
+  <div class="card" style="overflow:hidden"><div class="cardhead"><h2 class="h2">${esc(orgShort())}-level money</h2></div><div class="tw"><div class="t" style="min-width:820px">
     <div class="tr th" style="${cols}"><span>Line</span><span>Basis</span><span class="r">Budget</span><span class="r"></span><span class="r"></span><span class="r">Actual</span></div>
     ${r('Annual dues',`${sc.active} × ${fmt(s.dues.amount)}`,fmt(sc.duesBudget),'','','<span>'+fmt(sc.duesActual)+'</span>','click','id="sbDues"')}
     <div class="tr" style="${cols};border-top:none;min-height:0;padding-bottom:12px"><span class="muted" style="font-size:12.5px;grid-column:1/-1">${n0(s.dues.installments)>1?`Charged as ${s.dues.installments} × ${fmt(n0(s.dues.amount)/s.dues.installments)}, `:''}not prorated. Actual comes from dues recorded on each member.</span></div>
@@ -1390,12 +1651,14 @@ function wireChrome(){
   $('dClose').onclick=closeDrawer; $('scrim').onclick=closeDrawer;
   document.addEventListener('keydown',e=>{ if(e.key==='Escape'&&drawerOpen()) closeDrawer(); });
   $('seasonSel').onchange=e=>{ if(e.target.value==='__new'){ e.target.value=Y(); newSeasonPrompt(); return; } db.activeSeason=e.target.value; persist(); go(view.page==='tournament'?'tournaments':view.page); };
-  $('btnBackup').onclick=()=>{ dl(JSON.stringify(db,null,2),'application/json','mga_hub_backup_'+new Date().toISOString().slice(0,10)+'.json'); toast('Backup downloaded'); };
+  $('btnBackup').onclick=()=>{ if(!db) return; dl(JSON.stringify(db,null,2),'application/json',ORG_ID+'_hub_backup_'+new Date().toISOString().slice(0,10)+'.json'); toast('Backup downloaded'); };
+  $('btnSwitch').onclick=()=>{ view.page='pick'; render(); window.scrollTo(0,0); };
   $('btnRestore').onclick=()=>$('fileRestore').click();
   $('fileRestore').onchange=e=>{ const f=e.target.files[0]; if(!f) return; const r=new FileReader();
-    r.onload=()=>{ try{ const d=JSON.parse(r.result); if(!d.tournaments||!d.seasons) throw 0; if(!confirm('Replace everything in the hub with this backup?')) return; db=normalize(d); persist(); go('dash'); toast('Backup restored'); }catch(_){ toast('That isn’t an MGA Hub backup'); } };
+    r.onload=()=>{ try{ const d=JSON.parse(r.result); if(!db||!d.tournaments||!d.seasons) throw 0; if((d.kind||'association')!==db.kind) throw 0; if(!confirm(`Replace everything in the ${orgShort()} hub with this backup?`)) return;
+      const D=DOCS[ORG_ID]; syncTo(D.db,normalize(d,D.meta)); persist(); go('dash'); toast('Backup restored'); }catch(_){ toast('That isn’t a backup of this hub'); } };
     r.readAsText(f); e.target.value=''; };
-  $('syncBtn').onclick=()=>{ if(!CLOUD||!sessionOK) return; if(!cloudReady) startCloud(); else { setSync('saving'); pushCloud(); } };
+  $('syncBtn').onclick=()=>{ if(!CLOUD||!sessionOK) return; if(!cloudReady) startCloud(); else pushAll(); };
   $('btnSignOut').onclick=async()=>{ await sb.auth.signOut(); location.reload(); };
 }
 async function doLogin(){
@@ -1569,7 +1832,7 @@ function xBva(el){
   card('MGA-level',`Dues and anything not tied to a tournament`,sc.duesBudget+sum(sc.s.lines,l=>(l.type==='Income'?1:-1)*n0(l.budget)),sc.duesActual+sum(sc.s.lines,l=>(l.type==='Income'?1:-1)*actualOf(IX,'',l.type==='Income'?'mgaInc':'mgaExp',l.id,l.actual)),
     row('Annual dues',`${sc.active} active × ${fmt(sc.s.dues.amount)} · recorded on each member`,sc.duesBudget,sc.duesActual,true,'',0)+
     sc.s.lines.map(l=>{ const k=l.type==='Income'?'mgaInc':'mgaExp'; return row(l.desc,l.type,l.budget,actualOf(IX,'',k,l.id,l.actual),l.type==='Income',`|${k}|${l.id}`,cnt('',k,l.id)); }).join('')+
-    `<div class="tr"><button class="btn sm" id="bvaMga">${I.plus}Add MGA-level line</button></div>`);
+    `<div class="tr"><button class="btn sm" id="bvaMga">${I.plus}Add ${esc(orgShort())}-level line</button></div>`);
   el.querySelectorAll('[data-bx]').forEach(b=>b.onclick=()=>{ const [t,k,id]=b.dataset.bx.split('|'); editTxn(null,{dir:b.dataset.bd,link:{t,k,id}}); });
   $('bvaMga').onclick=()=>editSeasonLine(null);
 }
@@ -2070,7 +2333,7 @@ const GEV=()=>golfData().events.find(e=>e.id===view.geid);
 const CODE_CHARS='ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 function newCode(ev){ let c; do{ c=Array.from({length:5},()=>CODE_CHARS[Math.floor(Math.random()*CODE_CHARS.length)]).join(''); }while(ev.groups.some(g=>g.code===c)); return c; }
 const slugify=s=>String(s||'').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'').slice(0,40)||'event';
-function scoringLink(ev){ const base=location.href.split('#')[0].split('?')[0].replace(/[^/]*$/,''); return base+'score.html?e='+encodeURIComponent(ev.slug); }
+function scoringLink(ev){ return SITE_BASE+'score.html?e='+encodeURIComponent(ev.slug); }
 function playerIndex(p){ const own=p.index!=null&&String(p.index).trim()!==''?p.index:null; const m=p.memberId?memberById(p.memberId):null; return parseIndex(own!=null?own:(m?m.hcp:null)); }
 function playerHcp(ev,grp,p){ const c=courseById(grp.course); const idx=playerIndex(p); const ch=c?courseHcp(idx,c,p.tee||ev.defaultTee||'White',p.set||'M'):null;
   const A=Object.assign({},USGA_ALLOW,ev.allow||{}), pct=+A[evPlayerFmt(ev)]||100;
@@ -2225,7 +2488,7 @@ function editGroup(ev,grp){
   const players=grp?clone(grp.players):[];
   const inOther=new Set(ev.groups.filter(x=>x!==grp).flatMap(x=>x.players.map(p=>p.memberId).filter(Boolean)));
   const fieldIds=new Set(t?t.field.map(p=>p.memberId):[]);
-  const pool=db.members.slice().sort((a,b)=>(fieldIds.has(b.id)-fieldIds.has(a.id))||memberName(a).localeCompare(memberName(b)));
+  const pool=members().sort((a,b)=>(fieldIds.has(b.id)-fieldIds.has(a.id))||memberName(a).localeCompare(memberName(b)));
   const opts=`<option value="">— Add a member —</option>`+(t?`<optgroup label="${esc(t.name)} field">${pool.filter(m=>fieldIds.has(m.id)).map(m=>`<option value="${m.id}">${esc(memberName(m))}${inOther.has(m.id)?' (in another group)':''}</option>`).join('')}</optgroup><optgroup label="All members">`:'')+pool.filter(m=>!t||!fieldIds.has(m.id)).map(m=>`<option value="${m.id}">${esc(memberName(m))}${inOther.has(m.id)?' (in another group)':''}</option>`).join('')+(t?'</optgroup>':'');
   const tees=c=>(courseById(c)||g.courses[0]).tees.map(x=>x.name);
   const chTxt=p=>{ const c=courseById(($('ggC')&&$('ggC').value)||grp?.course||'oak'); const idx=parseIndex(p.index!=null&&String(p.index).trim()!==''?p.index:(memberById(p.memberId)||{}).hcp); const ch=c?courseHcp(idx,c,p.tee||ev.defaultTee,p.set||'M'):null; return ch==null?(idx==null?'no index':'no rating'):'CH '+ch; };
@@ -2403,7 +2666,7 @@ function editFieldPlayer(ev,x){
   const p=x?x.p:{id:uid(),memberId:'',name:'',tee:ev.defaultTee||'White',set:'M',team:'',index:'',flight:''};
   const teams=[...new Set(evPlayers(ev).map(y=>y.p.team).filter(Boolean))];
   const m=p.memberId?memberById(p.memberId):null, c=courseById(courseFor(ev,p,x&&x.grp))||golfData().courses[0];
-  const memOpts=[['','— Guest (not a member) —']].concat(db.members.slice().sort((a,b)=>memberName(a).localeCompare(memberName(b))).map(mm=>[mm.id,memberName(mm)]));
+  const memOpts=[['','— Guest (not a member) —']].concat(members().sort((a,b)=>memberName(a).localeCompare(memberName(b))).map(mm=>[mm.id,memberName(mm)]));
   openDrawer({kicker:ev.name+' · Field',title:x?p.name:'Add player',
     body:(x?'':field('Member','fpM','',{type:'select',options:memOpts}))+field('Name','fpN',p.name,{ph:'Guest name'})+
       pair(field('Handicap Index','fpI',p.index||(m?m.hcp:'')||'',{hint:m?'From the member profile'+(m.hcp?' ('+esc(m.hcp)+')':'')+'. Type over it for this event only.':'Use + for plus handicaps, e.g. +1.2'}),field('Tee','fpT',p.tee||ev.defaultTee,{type:'select',options:c.tees.map(tt=>tt.name)}))+
@@ -2557,7 +2820,7 @@ const QR_SRC=['https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrc
 const groupLink=(ev,grp)=>scoringLink(ev)+'&g='+encodeURIComponent(grp.code);
 /* the crest embedded as data so the print page never depends on loading a file */
 let CREST_DATA='';
-function crestSrc(){ if(CREST_DATA) return CREST_DATA; const abs=location.href.split('#')[0].split('?')[0].replace(/[^/]*$/,'')+'crest.png?v=2';
+function crestSrc(){ if(CREST_DATA) return CREST_DATA; const abs=SITE_BASE+'crest.png?v=2';
   try{ const im=document.querySelector('.brand img'); if(im&&im.complete&&im.naturalWidth){ const c=document.createElement('canvas'); c.width=im.naturalWidth; c.height=im.naturalHeight; c.getContext('2d').drawImage(im,0,0); CREST_DATA=c.toDataURL('image/png'); return CREST_DATA; } }catch(_){}
   return abs; }
 function printCardHTML(ev,pub,grp,teamKeyOnly){
@@ -2678,7 +2941,7 @@ function printScorecards(ev){
       const fsel=$('pcF')?fv('pcF'):'', order=fv('pcO'), layout=fv('pcL'), pub=publicEvent(ev);
       let gs=ev.groups.filter(g=>!fsel||g.players.some(p=>p.flight===fsel));
       gs=gs.slice().sort(order==='code'?(a,b)=>a.code.localeCompare(b.code):order==='flight'?(a,b)=>((a.players[0]||{}).flight||'~').localeCompare((b.players[0]||{}).flight||'~')||(a.course+a.startHole).localeCompare(b.course+b.startHole,undefined,{numeric:true}):(a,b)=>a.course.localeCompare(b.course)||(+a.startHole-+b.startHole)||a.label.localeCompare(b.label));
-      const base=location.href.split('#')[0].split('?')[0].replace(/[^/]*$/,'');
+      const base=SITE_BASE;
       const team=isTeamEvent(pub)&&fv('pcU')!=='group';
       const cards=gs.flatMap(g=>{ const pg=pub.groups.find(x=>x.id===g.id); return team&&pg?groupTeams(pg).map(t=>printCardHTML(ev,pub,g,t.key)):[printCardHTML(ev,pub,g)]; });
       const html=(`<!doctype html><html><head><meta charset="utf-8"><base href="${base}"><title>${esc(ev.name)} · Scorecards</title>
@@ -2866,7 +3129,7 @@ function calc(t){ if(!t.calcutta) t.calcutta={lots:[],bidders:[],expenses:[],pay
 const calcTotals=t=>calcTotalsC(calc(t));
 /* link each lot's two players to member records, then pick the captain (lower Handicap Index) unless set by hand */
 function resolveCaptains(t,c){
-  const pool=((t.field||[]).map(p=>memberById(p.memberId)).filter(Boolean)).concat(db.members);
+  const pool=((t.field||[]).map(p=>memberById(p.memberId)).filter(Boolean)).concat(members());
   const byKey=new Map(); for(const m of pool){ const k=nameKey(memberName(m)); if(k&&!byKey.has(k)) byKey.set(k,m); }
   const idx=(given,m)=>{ if(given!=null&&given!=='') return +given; const v=m&&typeof parseIndex==='function'?parseIndex(m.hcp):null; return v==null?null:v; };
   for(const l of c.lots){
@@ -2943,7 +3206,7 @@ function memberMatches(t,q,limit){
   const lev=(a,b)=>{ const d=Array.from({length:a.length+1},(_,i)=>[i]); for(let j=1;j<=b.length;j++) d[0][j]=j;
     for(let i=1;i<=a.length;i++) for(let j=1;j<=b.length;j++) d[i][j]=Math.min(d[i-1][j]+1,d[i][j-1]+1,d[i-1][j-1]+(a[i-1]===b[j-1]?0:1)); return d[a.length][b.length]; };
   const qt=q.split(' ');
-  return db.members.map(m=>{ const name=tidyName(memberName(m)), n=name.toLowerCase(), toks=n.split(/[\s-]+/);
+  return members().map(m=>{ const name=tidyName(memberName(m)), n=name.toLowerCase(), toks=n.split(/[\s-]+/);
       let sc=0;
       if(n.startsWith(q)) sc=100;
       else if(qt.every(w=>toks.some(x=>x.startsWith(w)))) sc=90;
@@ -3257,7 +3520,7 @@ async function exportCalcutta(t){
 }
 
 /* ============ Cashier link: share this Calcutta with the cashiers' laptops ============ */
-const cashierLink=t=>location.href.split('#')[0].split('?')[0].replace(/[^/]*$/,'')+'cashier.html?k='+encodeURIComponent(calc(t).share.token);
+const cashierLink=t=>SITE_BASE+'cashier.html?k='+encodeURIComponent(calc(t).share.token);
 const newToken=()=>Array.from(crypto.getRandomValues(new Uint8Array(24)),b=>'abcdefghijkmnpqrstuvwxyz23456789'[b%32]).join('');
 function calcPeople(t){ return (t.field||[]).map(p=>{ const m=memberById(p.memberId); return m?{id:m.id,name:tidyName(memberName(m))}:null; }).filter(Boolean).sort((a,b)=>a.name.localeCompare(b.name)); }
 const SHARE_ST={};
@@ -3385,7 +3648,7 @@ async function exportOrder(t){
 function loadJsPDF(){ if(window.jspdf) return Promise.resolve();
   return new Promise((res,rej)=>{ const sc=document.createElement('script'); sc.src='https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js'; sc.onload=()=>res(); sc.onerror=()=>rej(new Error('Couldn’t load the PDF maker — check the connection')); document.head.appendChild(sc); }); }
 async function crestPNG(){ const s=typeof crestSrc==='function'?crestSrc():''; if(s&&s.startsWith('data:')) return s;
-  const r=await fetch(new URL('crest.png',location.href)); const b=await r.blob(); return await new Promise(ok=>{ const fr=new FileReader(); fr.onload=()=>ok(fr.result); fr.readAsDataURL(b); }); }
+  const r=await fetch(SITE_BASE+'crest.png'); const b=await r.blob(); return await new Promise(ok=>{ const fr=new FileReader(); fr.onload=()=>ok(fr.result); fr.readAsDataURL(b); }); }
 async function downloadBidSheet(t){
   const c=calc(t);
   try{ await loadJsPDF(); }catch(e){ toast(e.message); return; }
@@ -3754,7 +4017,7 @@ function tCheckin(el,t){
 }
 /* ---------- registration link ---------- */
 const CKI_ST={};
-const checkinLink=t=>location.href.split('#')[0].split('?')[0].replace(/[^/]*$/,'')+'checkin.html?k='+encodeURIComponent(t.checkinShare.token);
+const checkinLink=t=>SITE_BASE+'checkin.html?k='+encodeURIComponent(t.checkinShare.token);
 const ckBase={ get(t){ try{ return JSON.parse(localStorage.getItem('mga_ckibase_'+t.id)||'null'); }catch(_){ return null; } }, set(t,doc){ try{ localStorage.setItem('mga_ckibase_'+t.id,JSON.stringify(doc)); }catch(_){} } };
 function ckDocFromField(t){ const prev=ckBase.get(t), um=new Map(((prev&&prev.players)||[]).map(p=>[p.id,p]));
   const doc={name:t.name,players:ckPlayers(t).map(r=>{ const o={id:r.id,last:r.last,first:r.first,partner:r.partner,team:r.team,par3:r.par3,in:!!r.p.checkin,at:r.p.checkin?r.p.checkin.at:''}; const b=um.get(r.id); if(b&&b.u) o.u=b.u; return o; })};
@@ -4116,7 +4379,7 @@ function wirePayouts(el,t){
 /* Keeps every open device on the latest version: checks version.json about once a minute and, when a
    newer build is live, reloads at a safe moment (nothing unsaved, no editor open, not mid-typing). */
 (function(){
-  const ME='20261008191436'; let ready=false, lastCheck=0;
+  const ME='20261008193604'; let ready=false, lastCheck=0;
   const typing=()=>{ const a=document.activeElement; return a&&/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)&&a.value&&a.type!=='search'; };
   const safe=()=>!typing()&&(typeof window.__canReload!=='function'||window.__canReload());
   async function check(){ lastCheck=Date.now(); if(location.protocol==='file:') return;
