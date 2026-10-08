@@ -25,12 +25,11 @@ Read this file first. Then read `README.md` (user-facing feature guide) as neede
 ```
 src/
   head.html            <head>, all CSS, the app shell markup (sidebar, drawer, toast)
-  core.js              data model, normalize(), storage, cloud save/merge (see §3), import/verify
+  core.js              data model, normalize(), storage, cloud save/merge (see §3)
   ui.js                every screen + the single edit drawer (openDrawer), render(), TT (tournament tabs)
   treasury.js          season ledger, budget vs actual, bank import
   golfcore.js          courses (WCCC Oak/Pecan ratings), WHS math, scoring engine, scorecard renderer  [shared]
   golf.js              Golf page: events, field, flights, groups, live scoring, printed cards
-  push.js / sync.js    legacy two-way sync with the retired Member-Member app (§6)
   calccore.js          Calcutta pure logic                                                            [shared]
   pdffonts.js          PDF_FONTS: base64 TTFs for jsPDF (Public Sans 400/700/800, Cormorant 700 w/ lining digits)
   calcutta.js          Calcutta tab: lots, bidders, buyers & shares, money, setup, cashier link, bidder sheet PDF
@@ -38,7 +37,6 @@ src/
   ckcore.js            check-in merge logic                                                            [shared]
   checkin.js           Check-in tab + registration link
   raffle.js            50/50 Drawing tab, drawing screen, official record PDF
-  retire.js            one-time "Retire the current app"
   payouts.js           Calcutta payouts math (calcPayouts, ties) + Results / Payouts sub-tabs
   autoupdate.js        version.json polling + safe reload (__BUILD__ placeholder)                     [shared]
   cashier_src.html     cashier page   (markers /*CALCCORE*/ /*AUTOUPDATE*/)
@@ -77,15 +75,14 @@ before shipping. See §3 for what must hold.
 One JSONB document, `db`, normalized by `normalize()` in core.js. Top level (abridged):
 ```
 db = { seasons:{[year]:{...}}, members:[{id,first,last,hcp,email,...}], board:[{role,memberId}],
-       tournaments:[ Tournament ], ledger/treasury..., legacy:{retired,at}, _rev, _w, _at }
+       tournaments:[ Tournament ], ledger/treasury..., _rev, _w, _at }
 Tournament = { id, name, season, days, startDate, field:[{id,memberId,team,paid,skins,answers,checkin?}],
                fieldQuestions:[...], sponsors, tiers, income, perPlayer, lines, dayItems, actuals, schedule,
-               decisions, calcutta?, checklist?, raffle?, checkinShare?, source?, sync? }
+               decisions, calcutta?, checklist?, raffle?, checkinShare? }
 ```
 - Arrays of objects carry stable `id`s — the merge (§3) matches by id. Keep it that way for anything new.
 - `_rev` (revision), `_w` (writer/client id), `_at` are bookkeeping, excluded from comparisons.
-- **Device-local, never in the shared doc:** sync status (`SYNC_ST`), cashier/check-in link status (`SHARE_ST`,
-  `CKI_ST`), the cashier-link merge base (`localStorage mga_cbase_<tid>`), check-in base (`mga_ckibase_<tid>`).
+- **Device-local, never in the shared doc:** cashier/check-in link status (`SHARE_ST`, `CKI_ST`), the cashier-link merge base (`localStorage mga_cbase_<tid>`), check-in base (`mga_ckibase_<tid>`).
   Putting status/timestamps in `db` causes background saves that ping every device — don't.
 
 ### Supabase objects
@@ -94,7 +91,7 @@ Tournament = { id, name, season, days, startDate, field:[{id,memberId,team,paid,
 | `mga_hub` (id 'main', data jsonb) | the whole hub document (`hub-setup.sql`, `hub-fix-permissions.sql`) |
 | `calcutta_share` (tid, token, name, doc, version) + RPC `calcutta_get(p_token)`, `calcutta_put(p_token,p_doc,p_version)` | token links for people without the board login: the **cashier** page (tid = tournament id) and the **registration/check-in** page (tid = tournament id + `:checkin`). `calcutta_put` is version-checked (conflict → retry). `calcutta-setup.sql` |
 | `golf_events`, `golf_scores` + RPC `golf_event`, `golf_join`, `golf_submit` | public live scoring (`golf-setup.sql`). Built but **not used** this season — don't advertise it. |
-| `mm_tournament` | the retired Member-Member app's row (`supabase-setup.sql`). Kept as an archive; hub never writes it after retirement. |
+| `mm_tournament` | the retired Member-Member app's row (`supabase-setup.sql`). Archive only — no hub code reads or writes it. |
 
 ---
 
@@ -126,7 +123,7 @@ idempotent (`calcStamp`/`ckStamp` only stamp an item once per change).
 ## 4. Features (where to look)
 
 **Member-Member is the main tournament.** Tournament tabs (TT): Overview · Meals & events · Field · Check-in ·
-Sponsors · Budget · Checklist · Calcutta · 50/50 Drawing (+ Verify while the legacy app was linked).
+Sponsors · Budget · Checklist · Calcutta · 50/50 Drawing.
 
 ### Calcutta (`calccore.js`, `calcutta.js`, `payouts.js`)
 Sub-tabs: Lots · Bidders · Buyers & shares · Money · Results · Payouts · Setup.
@@ -187,10 +184,10 @@ groups, printed scorecards — the printed cards include a live-scoring QR that 
 
 ## 6. Status / history
 
-- **Legacy app (out of scope):** the original Member-Member app lives on the `main` branch at app.wcccmga.org and is
-  being retired — leave that branch alone. Inside the hub, `push.js`/`sync.js` are the old two-way sync with it and
-  the one-time **Retire current app** button (`retire.js`) switches that off for good. Check `db.legacy.retired`;
-  once true, those files are inert. Don't remove them without asking — retirement may not have been run yet.
+- **Legacy app (retired, out of scope):** the original Member-Member app lives on the `main` branch at app.wcccmga.org
+  and is no longer used — leave that branch alone. The hub's import / Verify / two-way sync / "Retire current app"
+  code was removed in Oct 2026. Stored documents may still carry `db.legacy`, `t.source` (`kind:'mm-app'`) and
+  `t.sync` from that era; nothing reads them and `normalize()` leaves them alone.
 - 2026 Member-Member: Oct 2–4. 150 players / 75 teams (Team 84, Regina & Cagle, added late as Lot 75).
 - Not built / ideas: individual Microsoft 365 sign-in for board members; Golf Genius API sync; GHIN integration;
   real bank-statement format test for Treasury.

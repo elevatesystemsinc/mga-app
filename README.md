@@ -2,11 +2,9 @@
 
 The season-wide hub for the Walnut Creek CC MGA: members, board, every tournament
 (1–3 days, meals, events, field, sponsors, budget) and the season budget.
-Same stack as the Member-Member app: one static `index.html`, Supabase, Render.
-
-**It runs alongside the current Member-Member app and never changes it.**
-The hub keeps its own table (`mga_hub`). It only *reads* `mm_tournament`, to import
-Member-Member and to cross-check the numbers.
+One static `index.html` (plus the cashier, check-in and scoring pages), Supabase, Render.
+The hub keeps its own table (`mga_hub`). It replaced the original Member-Member app
+(app.wcccmga.org), which is retired; its `mm_tournament` table is left in Supabase as an archive.
 
 ## Set up the branch (once)
 
@@ -18,7 +16,7 @@ Member-Member and to cross-check the numbers.
 ## Supabase (same project)
 
 SQL Editor → run `hub-setup.sql`. It creates `public.mga_hub` with RLS and realtime.
-It does not touch `mm_tournament`. The hub signs in with the same shared board login.
+The hub signs in with the shared board login.
 
 ## Render (a second static site)
 
@@ -27,44 +25,6 @@ Copy the current site's build command and environment variables
 (`SUPABASE_URL`, `SUPABASE_ANON_KEY`, `BOARD_EMAIL`) if it generates `config.js`.
 Optional: give it its own subdomain (e.g. `hub.wcccmga.org`). The current site on
 `main` keeps serving `app.wcccmga.org` untouched.
-
-## Load and cross-verify Member-Member
-
-1. Sign in → Dashboard → **Import Member-Member** (or Tournaments → Import).
-2. Pick 2026 → Import. The hub reads the live Member-Member row and builds the
-   tournament: sponsors + payments, all three days of F&B with the Saturday dinner
-   menu, income, per-player pro shop credit, flight prizes, misc, actuals, schedule
-   and open decisions.
-3. The **Verify** tab lists every budget and actual total, recomputed exactly the
-   way the current app calculates it, next to the hub's number. All should say Match.
-4. **Compare with the live app now** re-checks against the current app at any time.
-   **Re-import** replaces the hub copy with a fresh one (use it while the board keeps
-   working in the current app this week).
-
-**Staying in sync:** imported tournaments sync both ways automatically. Hub edits reach the current
-app a couple of seconds later; edits made there appear in the hub live (or when the tab comes back into
-view, and every minute). Hub-only data — the field, flights, ledger links, extra lines — stays in the
-hub. If both sides change before a sync, the tournament shows **Conflict** and nothing is overwritten
-until you pick a version. The chip in the tournament header shows the state; click it to turn sync off
-for that tournament.
-
-**Push back to the current app:** on an imported tournament, **Push to current app** (header or
-Verify tab) sends the hub's edits to the Member-Member app so the board can keep using it. It shows
-every total before and after, checks the result matches the hub, downloads a backup of the current
-app's data first, and only replaces that year (other years, outreach and event info stay). If someone
-edited that year in the current app since the hub's copy was taken, it warns and names the changes —
-re-import first to keep both. The current app holds one catered menu and three income lines, so
-anything beyond that is listed in the preview before you push.
-
-No Supabase access? Download a backup from the current app (⋯ → Backup all data)
-and choose it when the import asks.
-
-## Retiring the current app
-
-**Retire current app** (tournament header, or the sync panel) moves the board to the hub for good: a last
-sync from app.wcccmga.org, an archive download of its data, then the hub stops all contact with it — the
-sync chip, Push, Verify tab and import buttons disappear on every device. The old app's `mm_tournament`
-table in Supabase is left untouched. Put the forwarding page on the old site so bookmarks land in the hub.
 
 ## Staying up to date
 
@@ -178,7 +138,6 @@ each have a search box: names, paddle numbers (101 or #101), lot numbers, flight
   on its own and appears everywhere within a few seconds (the hub included). Edits to different teams or
   bidders never overwrite each other; on the same one, the latest wins. A laptop that drops offline keeps
   its changes and saves them when it reconnects. **Turn off** locks the link immediately; the data stays.
-- The Calcutta lives in the hub only; syncing with the current Member-Member app never touches it.
 
 ## Live scoring (Golf)
 

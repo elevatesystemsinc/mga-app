@@ -95,7 +95,6 @@ function vDash(m){
   for(const {t,c} of sc.ts){
     const owed=t.sponsors.filter(s=>n0(s.pledged)>spPaid(s)+0.004);
     if(owed.length) attention.push([fmt(sum(owed,s=>n0(s.pledged)-spPaid(s))),`${esc(t.name)}: ${owed.length} sponsor${owed.length>1?'s':''} still owe money`,'warn',t.id]);
-    if(t.source&&t.source.kind==='mm-app') attention.push(['Verify',`${esc(t.name)} was imported from the current app — check the Verify tab`,'gold',t.id]);
   }
   const unpaid=db.members.filter(x=>x.status!=='Inactive'&&memberDues(Y(),x.id)<n0(sc.s.dues.amount)).length;
   if(db.members.length&&unpaid&&sc.s.duesPayments.length) attention.push([String(unpaid),`member${unpaid>1?'s have':' has'} not paid full ${Y()} dues`,'warn',null]);
@@ -113,7 +112,7 @@ function vDash(m){
       <div class="tr th" style="${cols}"><span>Tournament</span><span>Dates</span><span class="r">Revenue</span><span class="r">Expenses</span><span class="r">Net</span></div>
       ${sc.ts.map(({t,c})=>`<div class="tr num click" data-open="${t.id}" style="${cols}"><div class="cell2"><b class="trunc" style="color:var(--navy)">${esc(t.name)}</b><small>${t.days} day${t.days>1?'s':''} · ${esc(t.status||'Planning')}</small></div><span>${dateRange(t).replace(/, \d{4}$/,'')}</span><span class="r">${fmt(c.revenue)}</span><span class="r">${fmt(c.expenses)}</span><b class="r ${netCls(c.net)}">${fmtS(c.net)}</b></div>`).join('')}
       <div class="tr tot num" style="${cols}"><span>Tournaments total</span><span></span><span class="r">${fmt(sc.tRev)}</span><span class="r">${fmt(sc.tExp)}</span><span class="r ${netCls(sc.tRev-sc.tExp)}">${fmtS(sc.tRev-sc.tExp)}</span></div>
-      </div></div>`:`<div class="empty"><b>No tournaments yet</b><span>Add the season’s first event${legacyRetired()?'':', or import Member-Member from the current app'}.</span><div class="actions"><button class="btn pri" id="dNew2">${I.plus}New tournament</button>${legacyRetired()?'':`<button class="btn" id="dImp">${I.down}Import Member-Member</button>`}</div></div>`}
+      </div></div>`:`<div class="empty"><b>No tournaments yet</b><span>Add the season’s first event.</span><div class="actions"><button class="btn pri" id="dNew2">${I.plus}New tournament</button></div></div>`}
     </div>
     <div style="display:flex;flex-direction:column;gap:20px">
       ${typeof liveBoardCard==='function'?liveBoardCard():''}
@@ -126,7 +125,7 @@ function vDash(m){
     </div>
   </div>`;
   wireCommon(m);
-  const n1=$('dNew'),n2=$('dNew2'),im=$('dImp'); if(n1) n1.onclick=editNewTournament; if(n2) n2.onclick=editNewTournament; if(im) im.onclick=importMM;
+  const n1=$('dNew'),n2=$('dNew2'); if(n1) n1.onclick=editNewTournament; if(n2) n2.onclick=editNewTournament;
 }
 function wireCommon(root){
   root.querySelectorAll('[data-open]').forEach(e=>e.onclick=ev=>{ev.preventDefault(); go('tournament',{tid:e.dataset.open,ttab:'budget'});});
@@ -137,14 +136,14 @@ function wireCommon(root){
 function vTournaments(m){
   const all=seasonTournaments(Y()), now=all.filter(t=>{const d=daysOut(t);return view.tfilter==='All'||(view.tfilter==='Upcoming'?(d===null||d>=0)&&t.status!=='Complete':t.status==='Complete'||(d!==null&&d<0));});
   const cols='grid-template-columns:minmax(160px,2fr) 150px 80px 110px 150px 110px 40px';
-  m.innerHTML=head('Tournaments',`Every event on the ${Y()} calendar. Each budget rolls up into the season.`,(legacyRetired()?'':btn('Import Member-Member','tImp','',I.down))+btn('New tournament','tNew','pri',I.plus))+`
+  m.innerHTML=head('Tournaments',`Every event on the ${Y()} calendar. Each budget rolls up into the season.`,btn('New tournament','tNew','pri',I.plus))+`
   <div class="tabs">${['All','Upcoming','Completed'].map(f=>`<button class="tab${view.tfilter===f?' on':''}" data-f="${f}">${f}${f==='All'?' · '+all.length:''}</button>`).join('')}</div>
   <div class="card" style="overflow:hidden">${now.length?`<div class="tw"><div class="t">
     <div class="tr th" style="${cols}"><span>Tournament</span><span>Dates</span><span>Length</span><span>Field</span><span>Sponsors</span><span class="r">Net</span><span></span></div>
     ${now.map(t=>{const c=tcalc(t);return `<div class="tr num click" data-open="${t.id}" style="${cols}"><div class="cell2"><b class="trunc" style="color:var(--navy)">${esc(t.name)}</b><small>${esc(t.venue||'')}</small></div><span>${dateRange(t)}</span><span class="muted">${t.days} day${t.days>1?'s':''}</span><span>${t.field.length?t.field.length+' signed up':c.players?c.players+' planned':'—'}</span><span>${t.sponsors.length?fmt(c.received)+' of '+fmt(c.pledged):'—'}</span><b class="r ${netCls(c.net)}">${fmtS(c.net)}</b><span class="ib">${I.chev}</span></div>`;}).join('')}
   </div></div>`:`<div class="empty"><b>Nothing here yet</b><span>Create a tournament to start its schedule, field and budget.</span></div>`}</div>`;
   m.querySelectorAll('[data-f]').forEach(b=>b.onclick=()=>{view.tfilter=b.dataset.f;render();});
-  $('tNew').onclick=editNewTournament; const ti=$('tImp'); if(ti) ti.onclick=importMM; wireCommon(m);
+  $('tNew').onclick=editNewTournament; wireCommon(m);
 }
 function editNewTournament(){
   const prev=db.tournaments.filter(t=>t.season!==Y()||true).sort((a,b)=>(b.startDate||'').localeCompare(a.startDate||''));
@@ -175,54 +174,22 @@ function copyStructure(src,t){
   if(!t.entryFee) t.entryFee=src.entryFee; if(!t.skinsFee) t.skinsFee=src.skinsFee;
 }
 
-/* ---------- Import from the current app ---------- */
-async function importMM(){
-  let state;
-  try{ state=await fetchMMState(); }
-  catch(e){ return importMMFromFile(e.message); }
-  chooseMMYear(state,'the current app');
-}
-function importMMFromFile(reason){
-  openDrawer({kicker:'Import',title:'Import Member-Member',
-    body:`<p class="hint">${esc(reason)}.</p><p class="muted" style="margin:0">Choose a backup file downloaded from the current app (⋯ → Backup all data).</p><input type="file" id="impFile" accept="application/json" class="inp" style="padding-top:8px">`,
-    wire:r=>{ r.querySelector('#impFile').onchange=e=>{ const f=e.target.files[0]; if(!f) return; const rd=new FileReader();
-      rd.onload=()=>{ try{ const d=JSON.parse(rd.result); if(!d.years) throw 0; closeDrawer(); chooseMMYear(d,'the backup file'); }catch(_){ toast('That isn’t a backup from the Member-Member app'); } }; rd.readAsText(f); }; }});
-}
-function chooseMMYear(state,from){
-  const years=Object.keys(state.years||{}).sort((a,b)=>b-a);
-  if(!years.length){ toast('No years found in '+from); return; }
-  const existing=db.tournaments.find(t=>t.source&&t.source.kind==='mm-app'&&t.source.year===(state.activeYear||years[0]));
-  openDrawer({kicker:'Import from '+from,title:'Import Member-Member',saveLabel:existing?'Replace with fresh import':'Import',
-    body:field('Year','impYear',state.activeYear||years[0],{type:'select',options:years})+
-      `<p class="hint">Brings over sponsors and payments, all three days of food &amp; beverage (the Saturday dinner menu included), income, misc expenses, actuals, the schedule and open decisions. The current app is only read — nothing there changes.</p>`+
-      (existing?`<div class="banner">This year is already imported. Importing again replaces that tournament with a fresh copy, so any edits made to it in the hub are lost.</div>`:''),
-    save:()=>{
-      const yr=fv('impYear'), t=convertMM(state.years[yr],yr);
-      if(!db.seasons[yr]) db.seasons[yr]=newSeason();
-      const old=db.tournaments.find(x=>x.source&&x.source.kind==='mm-app'&&x.source.year===yr);
-      if(old){ t.id=old.id; t.field=old.field; db.tournaments[db.tournaments.indexOf(old)]=t; } else db.tournaments.push(t);
-      db.activeSeason=yr; view.page='tournament'; view.tid=t.id; view.ttab='verify'; toast('Imported — checking against the current app');
-    }});
-}
-
 /* ---------- Tournament detail ---------- */
 const TT=[['overview','Overview'],['meals','Meals & events'],['field','Field'],['sponsors','Sponsors'],['budget','Budget']];
 function vTournament(m){
   const t=T(); if(!t){ go('tournaments'); return; }
-  const tabs=TT.concat(t.source&&!legacyRetired()?[['verify','Verify']]:[]);
-  if(view.ttab==='verify'&&legacyRetired()) view.ttab='overview';
+  const tabs=TT;
   if(!tabs.some(x=>x[0]===view.ttab)) view.ttab='budget';
   m.innerHTML=`<div class="crumb"><button data-go="tournaments">Tournaments</button><span class="muted">/</span><span class="muted">${esc(t.name)}</span></div>
   <div class="phead"><div><h1 class="h1">${esc(t.name)}</h1>
-    <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap"><span class="chip navy">${t.days} day${t.days>1?'s':''}</span><span class="chip">${dateRange(t)}</span><span class="chip">${tcalc(t).players} players ${t.budgetBasis==='field'?'in field':'planned'}</span>${statusChip(t)}${typeof syncChip==='function'?syncChip(t):''}</div></div>
-    <div class="actions">${t.source&&t.source.kind==='mm-app'&&!legacyRetired()?`<button class="btn" id="tRetire" title="Move to the hub for good">Retire current app</button><button class="btn" id="tPush" title="Send this tournament’s edits to the Member-Member app">${I.refresh}Push to current app</button>`:''}<button class="btn" id="tEdit">${I.edit}Tournament details</button></div></div>
+    <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap"><span class="chip navy">${t.days} day${t.days>1?'s':''}</span><span class="chip">${dateRange(t)}</span><span class="chip">${tcalc(t).players} players ${t.budgetBasis==='field'?'in field':'planned'}</span>${statusChip(t)}</div></div>
+    <div class="actions"><button class="btn" id="tEdit">${I.edit}Tournament details</button></div></div>
   <div class="tabs">${tabs.map(([k,l])=>`<button class="tab${view.ttab===k?' on':''}" data-tab="${k}">${l}</button>`).join('')}</div>
   <div id="tbody" style="display:flex;flex-direction:column;gap:20px"></div>`;
   wireCommon(m);
   m.querySelectorAll('[data-tab]').forEach(b=>b.onclick=()=>{view.ttab=b.dataset.tab;render();});
   $('tEdit').onclick=()=>editTournament(t);
-  const tp=$('tPush'); if(tp) tp.onclick=()=>pushToMM(t); const tr=$('tRetire'); if(tr) tr.onclick=retireLegacy;
-  ({overview:tOverview,meals:tMeals,field:tField,sponsors:tSponsors,budget:tBudget,verify:tVerify,calcutta:tCalcutta,checklist:tChecklist,checkin:tCheckin,raffle:tRaffle}[view.ttab])($('tbody'),t);
+  ({overview:tOverview,meals:tMeals,field:tField,sponsors:tSponsors,budget:tBudget,calcutta:tCalcutta,checklist:tChecklist,checkin:tCheckin,raffle:tRaffle}[view.ttab])($('tbody'),t);
 }
 function editTournament(t){
   openDrawer({kicker:'Tournament',title:'Tournament details',
@@ -497,26 +464,6 @@ function editPerPlayer(t,p){
     del:p?()=>{ t.perPlayer=t.perPlayer.filter(x=>x!==p); }:null});
 }
 
-/* Verify: hub numbers vs the current app, recomputed the old app's way */
-function tVerify(el,t){
-  const render2=(raw,label)=>{
-    const rows=verifyRows(t,raw); let bad=0;
-    const body=rows.map(r=>{ if(r[1]===null) return `<div class="gh"><b>${r[0]}</b><span></span></div>`;
-      const d=n0(r[2])-n0(r[1]), ok=Math.abs(d)<0.005; if(!ok) bad++;
-      return `<div class="tr num" style="grid-template-columns:minmax(0,1fr) 130px 130px 110px 100px;${r[3]?'font-weight:700':''}"><span>${r[0]}</span><span class="r">${fmt2(r[1])}</span><span class="r">${fmt2(r[2])}</span><span class="r ${ok?'muted':'neg'}">${ok?'—':(d>0?'+':'')+fmt2(d)}</span><span class="r">${ok?'<span class="chip ok">Match</span>':'<span class="chip warn">Differs</span>'}</span></div>`; }).join('');
-    const o=oldCalc(raw);
-    const notes=[];
-    if(Math.abs(o.deposited-o.paymentsLogged)>0.005) notes.push(`In the current app, the stored “deposited” total (${fmt2(o.deposited)}) doesn’t equal the payments logged (${fmt2(o.paymentsLogged)}). The hub uses the payments.`);
-    el.innerHTML=`<div class="banner" style="${bad?'background:#F8E6DF;border-color:#EBC2B3;color:#6E2A1B':'background:#E3F0E8;border-color:#BCD9C7;color:#174F37'}"><b>${bad?bad+' line'+(bad>1?'s differ':' differs'):'Every line matches'}</b><span>Compared with ${esc(label)}. Numbers for the current app are recomputed exactly the way that app does it.</span></div>
-    ${notes.map(n=>`<div class="banner">${esc(n)}</div>`).join('')}
-    <div class="toolbar"><div class="actions"><button class="btn pri" id="vLive">${I.refresh}Compare with the live app now</button><button class="btn" id="vRe">${I.down}Re-import from the current app</button><button class="btn" id="vPush">${I.refresh}Push hub changes to the current app</button></div><span class="muted" style="margin-left:auto;font-size:13px">${t.source.pushedAt?'Last pushed '+new Date(t.source.pushedAt).toLocaleString():'Imported '+new Date(t.source.importedAt).toLocaleString()}</span></div>
-    <div class="card" style="overflow:hidden"><div class="tw"><div class="t" style="min-width:640px"><div class="tr th" style="grid-template-columns:minmax(0,1fr) 130px 130px 110px 100px"><span>Line</span><span class="r">Current app</span><span class="r">Hub</span><span class="r">Difference</span><span class="r"></span></div>${body}</div></div></div>
-    <p class="hint">If you edit this tournament in the hub, differences are expected — they show what changed. “Re-import” replaces the hub copy with a fresh one from the current app.</p>`;
-    $('vLive').onclick=async()=>{ try{ const st=await fetchMMState(); const y=st.years&&st.years[t.source.year]; if(!y) throw new Error('Year '+t.source.year+' not found in the current app'); render2(y,'the live current app ('+new Date().toLocaleTimeString()+')'); toast('Compared with the live app'); }catch(e){ toast(e.message); } };
-    $('vRe').onclick=importMM; $('vPush').onclick=()=>pushToMM(t);
-  };
-  render2(t.source.raw,'the snapshot taken at import');
-}
 
 /* ---------- Members ---------- */
 function vMembers(m){

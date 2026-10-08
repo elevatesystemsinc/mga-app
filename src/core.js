@@ -1,8 +1,6 @@
 /* =====================================================================
-   MGA Hub — core: data model, calculations, storage + sync, import, verify
+   MGA Hub — core: data model, calculations, storage + collaborative cloud save
    Data lives in ONE jsonb row: public.mga_hub (id 'main').
-   The current Member-Member app's row (public.mm_tournament) is only ever
-   READ here, for importing and cross-verifying. Nothing writes to it.
    ===================================================================== */
 const $=id=>document.getElementById(id);
 const uid=()=>(crypto.randomUUID?crypto.randomUUID():Date.now().toString(36)+Math.random().toString(36).slice(2));
@@ -59,7 +57,6 @@ function normalize(d){
     for(const k of ['field','sponsors','tiers','income','perPlayer','lines','schedule','decisions','fieldQuestions']) t[k]=t[k]||[];
     t.actuals=Object.assign({entryFees:0,skins:0,skinsPaid:0},t.actuals||{}); if(!t.budgetBasis) t.budgetBasis='planned';
     (t.dayItems||[]).forEach(d=>(d||[]).forEach(it=>{ if(it.menu) it.menu.svcPct=0; }));
-    if(t.source&&t.source.raw) t.source.raw.dinnerSvc=0;
     if(!d.seasons[t.season]) d.seasons[t.season]=newSeason();
   }
   return d;
@@ -134,79 +131,6 @@ const memberName=m=>m?[m.first,m.last].filter(Boolean).join(' ')||'(no name)':''
 const initials=m=>m?((m.first||'?')[0]+((m.last||'')[0]||'')).toUpperCase():'—';
 const memberById=id=>db.members.find(m=>m.id===id);
 
-/* ---------- import from the current Member-Member app (read-only) ----------
-   Converts one year of the old app's state into a hub tournament. Every number
-   is carried across unchanged so the Verify tab can prove the budgets match. */
-function guessKind(name){ return /dinner|lunch|buffet|snack|hors|breakfast|meal/i.test(name)?'Meal':/keg|bar\b|beer|margarita|bloody|cocktail|drink/i.test(name)?'Drinks':'Event'; }
-function oldResQty(y,i){ return i.qtyLink?n0((y.inputs||{})[i.qtyLink]):n0(i.qty); }
-function convertMM(y,year){
-  const inp=y.inputs||{}, rev=y.rev||{}, act=y.actuals||{};
-  const m=/([A-Za-z]+)\s+(\d{1,2})/.exec((y.info&&y.info.dates)||'');
-  let start=''; if(m){ const mi=MONTHS.findIndex(x=>m[1].toLowerCase().startsWith(x.toLowerCase())); if(mi>=0) start=`${year}-${String(mi+1).padStart(2,'0')}-${String(m[2]).padStart(2,'0')}`; }
-  const t=newTournament({season:String(year),name:'Member-Member',startDate:start,days:3,venue:(y.info&&y.info.venue)||'Walnut Creek Country Club',
-    entryFee:inp.entryFee,skinsFee:inp.skins,plannedPlayers:inp.golfers,teamSize:2});
-  t.goal=n0(y.goal);
-  t.tiers=(y.tiers||[]).map(x=>({id:x.id||uid(),name:x.name,amt:n0(x.amt)}));
-  t.sponsors=(y.sponsors||[]).map(s=>({id:s.id||uid(),company:s.company||'',contact:s.contact||'',phone:s.phone||'',email:s.email||'',tier:s.tier||'',
-    pledged:n0(s.pledged),committee:s.committee||'',notes:s.notes||'',payments:(s.payments||[]).map(p=>({id:p.id||uid(),amount:n0(p.amount),method:p.method||'',date:p.date||''}))}));
-  const dinnerMenu={items:(y.dinner||[]).map(d=>({id:d.id||uid(),item:d.item||'',qty:n0(d.qty),unitCost:n0(d.unitCost),notes:d.notes||''})),svcPct:0,guests:n0(inp.satHeadcount)};
-  ['Friday','Saturday','Sunday'].forEach((day,di)=>{
-    t.dayItems[di]=((y.fb||{})[day]||[]).map(i=>{
-      const it={id:i.id||uid(),item:i.item||'',kind:guessKind(i.item||''),qty:oldResQty(y,i),unitCost:n0(i.unitCost),actual:n0(i.actual),notes:i.notes||'',qtyLink:''};
-      if(i.costLink==='dinner'){ it.menu=clone(dinnerMenu); it.kind='Meal'; it.qty=dinnerMenu.guests; it.unitCost=0; }
-      else if(i.qtyLink){ it.notes=(it.notes?it.notes+' · ':'')+'Quantity was linked to '+i.qtyLink+' in the old app'; }
-      return it; });
-  });
-  t.income=[{id:'mm-carry',desc:'Carry forward',budget:n0(rev.carry),actual:n0(act.carry),notes:''},
-            {id:'mm-mga',desc:'MGA donation',budget:n0(rev.mga),actual:n0(act.mga),notes:''},
-            {id:'mm-raffle',desc:'50/50 raffle',budget:n0(rev.raffles),actual:n0(act.raffles),notes:'Season raffle proceeds assigned to Member-Member',source:'raffle'}];
-  t.perPlayer=[{id:'mm-proshop',desc:'Pro shop spree',perPlayer:n0(inp.proCredit),actual:n0(act.proShop),notes:''}];
-  t.lines=[{id:'mm-flight',group:'Prizes',desc:'Flight prize money',budget:n0(y.flightPrizeBudget),actual:n0(act.flight),notes:''}]
-    .concat((y.misc||[]).map(x=>({id:x.id||uid(),group:'Misc',desc:x.desc||'',budget:n0(x.budget),actual:n0(x.actual),notes:x.notes||''})));
-  t.actuals={entryFees:n0(act.entryFees),skins:n0(act.skins),skinsPaid:n0(act.skinsPay)};
-  t.schedule=(y.schedule||[]).map((d,di)=>({day:di,label:d.day||'',items:(d.items||[]).map(i=>({id:i.id||uid(),time:i.time||'',event:i.event||'',notes:i.notes||''}))}));
-  t.decisions=(y.decisions||[]).map(d=>({id:d.id||uid(),text:d.text||'',done:!!d.done}));
-  t.source={kind:'mm-app',year:String(year),importedAt:new Date().toISOString(),raw:clone(y)};
-  return t;
-}
-/* The old app's calc(), ported line for line (including its use of the STORED
-   deposited figure), so the comparison is against what the old app shows. */
-function oldCalc(y){
-  const n=y.inputs||{}, rev=y.rev||{}, a=y.actuals||{};
-  const dinnerSub=sum(y.dinner,i=>n0(i.qty)*n0(i.unitCost)), dinnerTot=dinnerSub;
-  const lt=i=>i.costLink==='dinner'?dinnerTot:oldResQty(y,i)*n0(i.unitCost);
-  const fb=d=>sum((y.fb||{})[d],lt), fbA=d=>sum((y.fb||{})[d],i=>i.actual);
-  const pledged=sum(y.sponsors,s=>s.pledged), deposited=sum(y.sponsors,s=>s.deposited);
-  const entryFees=n0(n.golfers)*n0(n.entryFee), skinsC=n0(n.golfers)*n0(n.skins);
-  const totalRev=entryFees+skinsC+pledged+n0(rev.carry)+n0(rev.mga)+n0(rev.raffles);
-  const proShop=n0(n.golfers)*n0(n.proCredit), miscT=sum(y.misc,m=>m.budget), flight=n0(y.flightPrizeBudget);
-  const fbF=fb('Friday'),fbS=fb('Saturday'),fbU=fb('Sunday');
-  const totalExp=fbF+fbS+fbU+flight+proShop+skinsC+miscT;
-  const totalRevA=n0(a.entryFees)+n0(a.skins)+deposited+n0(a.carry)+n0(a.mga)+n0(a.raffles);
-  const totalExpA=fbA('Friday')+fbA('Saturday')+fbA('Sunday')+n0(a.flight)+n0(a.proShop)+n0(a.skinsPay)+sum(y.misc,m=>m.actual);
-  return {entryFees,skinsC,pledged,carry:n0(rev.carry),mga:n0(rev.mga),raffles:n0(rev.raffles),totalRev,fbF,fbS,fbU,flight,proShop,miscT,totalExp,
-          net:totalRev-totalExp,deposited,paymentsLogged:sum(y.sponsors,s=>sum(s.payments,p=>p.amount)),totalRevA,totalExpA,netA:totalRevA-totalExpA,dinnerTot,sponsors:(y.sponsors||[]).length};
-}
-function verifyRows(t,raw){
-  const o=oldCalc(raw), c=tcalc(t);
-  const inc=d=>sum(t.income.filter(i=>i.desc===d),i=>i.budget);
-  const lg=g=>sum(t.lines.filter(l=>l.group===g),l=>l.budget);
-  const dinner=t.dayItems.flat().filter(i=>i.menu).reduce((a,i)=>a+menuTotal(i.menu),0);
-  return [
-    ['Revenue',null],
-    ['Entry fees',o.entryFees,c.entryFees],['Day / skins collected',o.skinsC,c.skins],['Sponsor pledges',o.pledged,c.pledged],
-    ['Carry forward',o.carry,inc('Carry forward')],['MGA donation',o.mga,inc('MGA donation')],['50/50 raffle',o.raffles,inc('50/50 raffle')],
-    ['Total revenue',o.totalRev,c.revenue,true],
-    ['Expenses',null],
-    ['Food & Bev — Day 1',o.fbF,c.dayTot[0]],['Food & Bev — Day 2',o.fbS,c.dayTot[1]],['Food & Bev — Day 3',o.fbU,c.dayTot[2]],
-    ['Saturday dinner (in Day 2)',o.dinnerTot,dinner],['Flight prizes',o.flight,lg('Prizes')],['Pro shop spree',o.proShop,c.perPlayer],
-    ['Day / skins payout',o.skinsC,c.skinsPayout],['Misc & event',o.miscT,lg('Misc')],
-    ['Total expenses',o.totalExp,c.expenses,true],['Net profit / (loss)',o.net,c.net,true],
-    ['Actuals',null],
-    ['Sponsor money received',o.deposited,c.received],['Actual revenue',o.totalRevA,c.revenueA],['Actual expenses',o.totalExpA,c.expensesA],['Actual net',o.netA,c.netA,true],
-  ];
-}
-
 /* ---------- storage + cloud sync ---------- */
 const LS_KEY='mga_hub_v1';
 const store={ load(){ try{ return JSON.parse(localStorage.getItem(LS_KEY)); }catch(_){ return null; } },
@@ -278,6 +202,8 @@ function syncArr(ta,sa){
     const out=sa.map(e=>{ const o=m.get(e.id); return o?syncTo(o,e):e; }); ta.splice(0,ta.length,...out); return ta; }
   if(!sameJ(ta,sa)) ta.splice(0,ta.length,...sa); return ta;
 }
+/* runs after every local save; the Calcutta cashier link and check-in link modules chain onto it */
+function afterPersist(){ if(typeof calcAfterPersist==='function') calcAfterPersist(); }
 let lastRemoteAt=0;
 function persist(){
   if(typeof calcStampNow==='function') calcStampNow();   // mark what changed in shared Calcuttas before this save goes out
@@ -344,19 +270,12 @@ async function startCloud(){
     if(local&&local._w===CLIENT&&local._rev===row.data._rev&&stable(local)!==stable(db)){ db=normalize(merge3(row.data,local,row.data)); }
     store.save(db); setSync('synced'); }
   else { base=null; await pushCloud(); }
-  render(); if(typeof startSyncWatch==='function') startSyncWatch();
+  render();
   sb.channel('mga-hub').on('postgres_changes',{event:'*',schema:'public',table:'mga_hub',filter:'id=eq.main'},p=>{
     const r=p.new&&p.new.data; if(!r||r._w===CLIENT&&base&&r._rev===base._rev) return; applyRemote(r);
   }).subscribe();
   const check=async()=>{ try{ const r=await fetchHub(); if(r&&(!base||r._rev!==base._rev)) applyRemote(r); }catch(_){} };
   document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='visible') check(); });
   setInterval(()=>{ if(document.visibilityState==='visible'&&!pushing) check(); },15000);   // a safety net if a live update is missed
-}
-/* Read-only fetch of the current app's state, for import + verify. */
-async function fetchMMState(){
-  if(!CLOUD||!sessionOK) throw new Error('Sign in to the cloud first, or import from a backup file');
-  const {data:row,error}=await sb.from('mm_tournament').select('data').eq('id','main').maybeSingle();
-  if(error) throw error; if(!row||!row.data) throw new Error('No data found in the current app');
-  return row.data;
 }
 
