@@ -3550,7 +3550,7 @@ function tCalcutta(el,t){
   <div class="toolbar"><div class="actions"><button class="btn pri" id="ccRun">Run the auction</button><button class="btn" id="ccExp">${I.down}Export results</button></div>
     <span class="muted" style="margin-left:auto;font-size:13px">${c.file?esc(c.file)+' · ':''}${c.bidders.length} bidders</span></div>
   ${(()=>{ const n=(k,l,x)=>`<button class="${view.ccTab===k?'on':''}" data-cctab="${k}">${l}${x!=null&&x!==''?` <span class="cnt">${x}</span>`:''}</button>`;
-    return `<div class="subtabs" role="tablist">${n('lots','Lots',c.lots.length)}${n('bidders','Bidders',c.bidders.length)}${n('buyers','Buyers &amp; shares',calcHoldings(c).length)}${n('money','Money','')}${n('payouts','Payouts',c.lots.some(l=>c0(l.place)>0)?'✓':'')}${n('setup','Setup','')}</div>`; })()}
+    return `<div class="subtabs" role="tablist">${n('lots','Lots',c.lots.length)}${n('bidders','Bidders',c.bidders.length)}${n('buyers','Buyers &amp; shares',calcHoldings(c).length)}${n('money','Money','')}${n('results','Results',c.lots.some(l=>c0(l.place)>0)?'✓':'')}${n('payouts','Payouts',(()=>{ const PP=calcPayouts(c), owe=PP.people.filter(p=>!((c.paidOut||{})[p.key]||{}).paid).length; return PP.people.length?(owe?owe+' to pay':'✓'):''; })())}${n('setup','Setup','')}</div>`; })()}
   <div class="cc-pane" data-pane="lots"${view.ccTab!=='lots'?' hidden':''}>
   ${missingTeamsBanner(t)}
   <div class="actions" style="justify-content:flex-end"><button class="btn" id="ccOrd">${I.down}Download order (Excel)</button><button class="btn" id="ccSheet">${I.down}Bidder sheet (PDF)</button></div>
@@ -3587,9 +3587,7 @@ function tCalcutta(el,t){
         :'<div class="empty" style="padding:22px"><span>No expenses yet — for example, the auction dinner.</span></div>'}</div></div>
   </div>
   </div>
-  <div class="cc-pane" data-pane="payouts"${view.ccTab!=='payouts'?' hidden':''}>
-${payoutsPane(t)}
-  </div>
+  ${(()=>{ const PP=payoutsPane(t); return `<div class="cc-pane" data-pane="results"${view.ccTab!=='results'?' hidden':''}>\n${PP.results}\n  </div>\n  <div class="cc-pane" data-pane="payouts"${view.ccTab!=='payouts'?' hidden':''}>\n${PP.payouts}\n  </div>`; })()}
   <div class="cc-pane" data-pane="setup"${view.ccTab!=='setup'?' hidden':''}>
   ${cashierCard(t)}
   <div class="card pad" style="display:flex;gap:14px 24px;align-items:center;flex-wrap:wrap"><div class="cell2" style="flex:1 1 320px"><span class="lbl">Minimum bid</span><b style="font-size:18px">${c.minBid?fmt(c.minBid):'None'}</b><small class="muted">${c.minBid?`Teams that don’t reach it go into the pool, auctioned together as Lot ${T2.poolLot||poolLotNum(c)}.`:'Every team sells for whatever it brings.'}${T2.pooled?` <b>${T2.pooled} team${T2.pooled===1?'':'s'} in the pool${T2.poolPrice?` · sold ${fmt(T2.poolPrice)}`:''}.</b>`:''}</small></div><div class="actions">${T2.pooled?`<button class="btn sm" id="ccPool">The pool</button>`:''}<button class="btn sm" id="ccMin">Change minimum</button></div>
@@ -4467,7 +4465,7 @@ function payoutsPane(t){
       ${teams.map(l=>{ const r=rowOf.get(l.id); return `<div class="tr po-row${r&&r.amount>0?' win':''}" style="grid-template-columns:52px minmax(0,1fr) 92px 70px 110px"><b class="num">${l.lot}</b><span class="trunc">${esc(teamName(l))}</span>
         <select class="inp po-sel" data-po="${l.id}" aria-label="Finish for lot ${l.lot}">${placeOpts(f.teams.length).replace(`value="${c0(l.place)||''}"`,`value="${c0(l.place)||''}" selected`)}</select>
         <span class="r"><b>${r?esc(r.label):''}</b></span><b class="r num">${r&&r.amount>0?fmt(r.amount):''}</b></div>`; }).join('')}
-      ${f.rows.some(r=>r.tie>1&&r.amount>0)?`<div class="po-note">${[...new Set(f.rows.filter(r=>r.tie>1&&r.amount>0).map(r=>r.pos))].map(pos=>{ const g=f.rows.filter(r=>r.pos===pos); const cov=g[0].covers; return `${g.length} teams tied for ${ordinal(pos)} split ${cov[0]===cov[1]?ordinal(cov[0]):ordinal(cov[0])+'–'+ordinal(cov[1])} money (${fmt(f.money.slice(cov[0]-1,cov[1]).reduce((a,v)=>a+v,0))}) — ${fmt(g[0].amount)} each`; }).join('<br>')}</div>`:''}
+      ${f.rows.some(r=>r.tie>1&&r.amount>0)?`<div class="po-note">${[...new Set(f.rows.filter(r=>r.tie>1&&r.amount>0).map(r=>r.pos))].map(pos=>{ const g=f.rows.filter(r=>r.pos===pos); const cov=g[0].covers; return `${g.length} teams tied for ${ordinal(pos)} split ${cov[0]===cov[1]?ordinal(cov[0]):ordinal(cov[0])+'–'+ordinal(cov[1])} money (${fmt(f.money.slice(cov[0]-1,cov[1]).reduce((a,v)=>a+v,0))}) — ${(()=>{ const a=g.map(r=>r.amount), lo=Math.min(...a), hi=Math.max(...a); return lo===hi?`${fmt(lo)} each`:`${fmt(hi)} to ${g.filter(r=>r.amount===hi).map(r=>'Lot '+r.lot.lot).join(', ')} and ${fmt(lo)} to the others (the odd cent goes to the lowest lot)`; })()}`; }).join('<br>')}</div>`:''}
     </div>`; }).join('');
   const due=P.people.filter(p=>!(paid[p.key]&&paid[p.key].paid)), outstanding=due.reduce((a,p)=>a+p.total,0);
   const peopleHTML=P.people.length?P.people.map(p=>{ const po=paid[p.key]||{}, isOpen=!!open[p.key];
@@ -4477,23 +4475,28 @@ function payoutsPane(t){
         ${isOpen?`<div class="bid-detail">${p.items.map(i=>`<div class="bl-row"><span class="bl-n">${i.lot.lot}</span><span class="bl-t">${esc(teamName(i.lot))}<small>${esc(i.flight)} · ${esc(i.label)} · team paid ${fmt(i.teamPays)} · ${i.pct}% ${i.kind==='prebuy'?'(pre-bought, captain)':i.kind==='team'?'(captain’s team share)':i.kind==='pool'?'(bought the pool)':'(bought at auction)'}</small></span><span class="bl-f"></span><b class="bl-p">${fmt(i.amount)}</b></div>`).join('')}
           <div class="bl-row tot"><span class="bl-n"></span><span class="bl-t"><b>Total to ${esc(p.name)}</b><small>${po.paid?`Paid out by ${esc(po.method)}${po.at?' · '+new Date(po.at).toLocaleString([], {month:'short',day:'numeric',hour:'numeric',minute:'2-digit'}):''}`:'Not paid out yet'}</small></span><span class="bl-f"></span><b class="bl-p">${fmt(p.total)}</b></div></div>`:''}</div>`; }).join('')
     :'<div class="empty" style="padding:22px"><span>Enter finishes above — the people to pay show up here.</span></div>';
-  return `<div class="card pad" style="display:flex;gap:10px 24px;flex-wrap:wrap;align-items:center"><div class="cell2" style="flex:1 1 360px"><span class="lbl">How payouts work</span><b>Enter each team’s finish in its flight. Tied teams get the same number.</b><small class="muted">No tie-breaker: tied teams share the money for every place they cover — two tied for 1st split 1st + 2nd money, and the next team is 3rd. Each team’s money goes to its owners: ${buyInOf(c).on?`the buyer ${100-c0(buyInOf(c).pct)}% and the captain ${c0(buyInOf(c).pct)}% (100% if pre-bought)`:'the buyer'}.</small></div>
+  const results=`<div class="card pad" style="display:flex;gap:10px 24px;flex-wrap:wrap;align-items:center"><div class="cell2" style="flex:1 1 360px"><span class="lbl">How payouts work</span><b>Enter each team’s finish in its flight. Tied teams get the same number.</b><small class="muted">No tie-breaker: tied teams share the money for every place they cover — two tied for 1st split 1st + 2nd money, and the next team is 3rd. Each team’s money goes to its owners: ${buyInOf(c).on?`the buyer ${100-c0(buyInOf(c).pct)}% and the captain ${c0(buyInOf(c).pct)}% (100% if pre-bought)`:'the buyer'}.</small></div>
       <div class="actions"><button class="btn sm" id="poClear">Clear finishes</button></div></div>
-    ${flightsHTML}
+    ${flightsHTML}`;
+  const entered=P.flights.filter(f=>!f.unplaced.length||f.allPlaced).length;
+  const payouts=`<div class="grid g4">${kpi('Paying out',fmt(P.total),`${P.people.length} ${P.people.length===1?'person':'people'}`)}${kpi('Still to pay out',fmt(outstanding),`${due.length} ${due.length===1?'person':'people'}`)}${kpi('Paid out',fmt(P.total-outstanding),`${P.people.length-due.length} done`)}${kpi('Results entered',`${entered} / ${P.flights.length}`,'flights')}</div>
+    ${entered<P.flights.length?`<div class="banner" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap"><span style="flex:1 1 260px">Results aren’t complete for ${P.flights.filter(f=>f.unplaced.length&&!f.allPlaced).map(f=>esc(f.flight)).join(', ')} — these payouts will change as finishes are entered.</span><button class="btn sm" data-cctab-go="results">Enter results</button></div>`:''}
     <div class="card cc-card" style="overflow:hidden"><div class="cardhead"><div><h2 class="h2">Payouts by person</h2><span class="muted">${fmt(P.total)} to ${P.people.length} ${P.people.length===1?'person':'people'} · ${due.length?`${fmt(outstanding)} still to pay out`:'all paid out'} · click a name for the teams behind it</span></div></div>${peopleHTML}</div>`;
+  return {results,payouts};
 }
 function wirePayouts(el,t){
   const c=calc(t);
   el.querySelectorAll('[data-po]').forEach(s=>s.onchange=()=>{ const l=c.lots.find(x=>x.id===s.dataset.po); const v=parseInt(s.value,10); if(v>0) l.place=v; else delete l.place; persist(); render(); });
   el.querySelectorAll('[data-pox]').forEach(r=>r.onclick=e=>{ if(e.target.closest('select')) return; view.poOpen=view.poOpen||{}; view.poOpen[r.dataset.pox]=!view.poOpen[r.dataset.pox]; render(); });
   el.querySelectorAll('[data-pop]').forEach(s=>s.onchange=()=>{ c.paidOut=Object.assign({},c.paidOut||{}); const k=s.dataset.pop; if(s.value) c.paidOut[k]={paid:true,method:s.value,at:new Date().toISOString()}; else delete c.paidOut[k]; persist(); render(); });
+  el.querySelectorAll('[data-cctab-go]').forEach(b=>b.onclick=()=>{ const tb=el.querySelector(`[data-cctab="${b.dataset.cctabGo}"]`); if(tb) tb.click(); });
   const cl=$('poClear'); if(cl) cl.onclick=()=>{ if(!confirm('Clear every finish in every flight?')) return; c.lots.forEach(l=>{ delete l.place; }); persist(); render(); };
 }
 
 /* Keeps every open device on the latest version: checks version.json about once a minute and, when a
    newer build is live, reloads at a safe moment (nothing unsaved, no editor open, not mid-typing). */
 (function(){
-  const ME='20261008144010'; let ready=false, lastCheck=0;
+  const ME='20261008160420'; let ready=false, lastCheck=0;
   const typing=()=>{ const a=document.activeElement; return a&&/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)&&a.value&&a.type!=='search'; };
   const safe=()=>!typing()&&(typeof window.__canReload!=='function'||window.__canReload());
   async function check(){ lastCheck=Date.now(); if(location.protocol==='file:') return;
