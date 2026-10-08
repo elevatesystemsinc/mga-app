@@ -15,6 +15,11 @@ own table (`mga_hub`), one row per organization.
   own address: `/mga`, `/lga`, `/smga`, and `/<id>` for a small group. (Render: one Rewrite rule, `/*` → `/index.html`.)
 - `Hub` → **hub.wcccmga.org** — the MGA Hub as the board is using it for the 2026 season (bug fixes only).
 
+The MGA's hub on app.wcccmga.org and hub.wcccmga.org show the **same data**: the two are kept in two-way sync while
+anyone has the club hub or the MGA hub open (every half minute, and right after a save). An edit on either site
+reaches the other, edits to different things never collide, and when the very same field is changed in both places
+the later save wins. The sidebar shows "MGA Hub in sync" with the time of the last pass and a *Sync now* link.
+
 ## Organizations and members
 
 The **club hub** keeps the **Directory** (every club member, one record each — import the club software's export, or

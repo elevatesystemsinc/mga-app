@@ -14,8 +14,9 @@ Read this file first. Then read `README.md` (user-facing feature guide) as neede
 > `Hub` is the frozen MGA Hub the board is using for the 2026 season at **hub.wcccmga.org**; it gets bug fixes
 > only, and any fix made there is cherry-picked to `main`. Both branches share one Supabase project and the
 > `mga_hub` table: `Hub` owns the row with id `main`; this branch owns the rows `club`, `mga`, `lga`, `smga`
-> and one per small group, and **never writes the `main` row** (the migration only reads it). When the club hub
-> is live and the MGA has moved over, `Hub` is deprecated.
+> and one per small group. The MGA's row and the Hub's `main` row are kept in **two-way sync** (`hubSync()` in
+> core.js, §3) — the only writes this branch makes to `main`, always a compare-and-swap merge, never a replace.
+> When the club hub is live and the MGA has moved over, `Hub` is deprecated and the link switched off.
 
 ---
 
@@ -156,7 +157,7 @@ Tournament = { id, name, season, days, startDate, field:[{id,memberId,team,paid,
 ### Supabase objects
 | object | purpose |
 |---|---|
-| `mga_hub` (id, data jsonb) | one row per organization: `club`, `mga`, `lga`, `smga`, `<group id>` — and `main`, the frozen MGA Hub's row (read by the migration only). `hub-setup.sql`, `hub-fix-permissions.sql` |
+| `mga_hub` (id, data jsonb) | one row per organization: `club`, `mga`, `lga`, `smga`, `<group id>` — plus `main`, the MGA Hub's row (two-way synced with `mga`), and `sync:<org>`, the sync base. `hub-setup.sql`, `hub-fix-permissions.sql` |
 | `calcutta_share` (tid, token, name, doc, version) + RPC `calcutta_get(p_token)`, `calcutta_put(p_token,p_doc,p_version)` | token links for people without the board login: the **cashier** page (tid = tournament id) and the **registration/check-in** page (tid = tournament id + `:checkin`). `calcutta_put` is version-checked (conflict → retry). `calcutta-setup.sql` |
 | `golf_events`, `golf_scores` + RPC `golf_event`, `golf_join`, `golf_submit` | public live scoring (`golf-setup.sql`). `public.org` names the owning organization. |
 | `hub_keys` (org_id, key_hash, label, revoked_at) + RPC `hub_key_org/read/write/people/golf_event/golf_delete/score/share` | admin links (`admin-links-setup.sql`): security-definer functions that act for exactly one organization. |
@@ -186,6 +187,22 @@ counts): browsing = **0 writes**; one tournament edit = 1 write to the org row a
 an association = 1 write to the club row only; 40 overlapping sponsor adds + 20 new people from two devices all kept,
 both devices and the server identical. Also covered there: first-run set-up from the `main` row and its re-run.
 (Cashier-link writes add 1 per edit when a Calcutta link is live.)
+
+### Two-way sync with the MGA Hub (`hubSync`, core.js)
+The organization whose club record carries `hubRow:'main'` (the MGA; toggle in Organizations → edit → "Keep in
+two-way sync") is kept in step with the Hub's row while any device has the club hub or the MGA hub open: every 30 s
+from `startPoll`, 2.5 s after a local save (`hubSyncSoon` from `persist`), and from "Sync now" (sidebar line,
+Organizations page). A pass runs only when both documents are open, loaded and fully saved (`docChanged` false, no
+pending push — a server copy that lags a local save would read as a revert). It is a three-way merge per side:
+base = row `sync:mga` `{base, persons, mainRev, at}` (the last merged copy), local = the saved MGA document
+(`D.base`) + the saved directory entries of its members, remote = `hubToOrg(main)` + `hubPersons(main)`; the result
+goes onto the live documents (`syncTo` with a three-way apply so unsaved edits survive, persons by id into
+`CLUB.members`) and, when the Hub's row would change, to `main` via `casWrite` (CAS on `_rev`, `_w` = this client,
+so Hub devices merge it like any other save) — `orgToHub` turns memberships + persons back into the Hub's
+`members` shape. Nothing is written when nothing moved; the first pass (no base) is the union of both sides with the
+Hub winning on org data and the directory winning on a person's details; `migrateFromHub` resets the base. The Hub's
+`normalize()` keeps unknown keys, so new-site fields (`features`, `rounds`, `duesCharges`, pots…) round-trip.
+`tests/test_sync.py` covers Hub→site, site→Hub, no-churn, membership removal and the pending-save guard.
 
 The cashier and check-in pages use their own per-item merge (`calcMerge` / `ckMerge`): each item carries `u`
 (updated-at); newest wins per item; deletes are tombstones; settings merge as a unit (`_su`). Stamping is
@@ -293,6 +310,7 @@ groups, printed scorecards — the printed cards include a live-scoring QR that 
   hub's import / Verify / two-way sync / "Retire current app" code was removed in Oct 2026. Stored documents may still carry `db.legacy`, `t.source` (`kind:'mm-app'`) and
   `t.sync` from that era; nothing reads them and `normalize()` leaves them alone.
 - 2026 Member-Member: Oct 2–4. 150 players / 75 teams (Team 84, Regina & Cagle, added late as Lot 75).
+- **Built Oct 2026 (Hub sync):** `hubSync()` keeps the MGA's row and the Hub's `main` row in two-way sync (§3).
 - **Built Oct 2026 (always-on live scoring, phone layout):** every tournament round and every game has an open scoring
   event from creation (see Rounds & results); `head.html` ≤640px rules stack every `.t` table (name block on top, cells
   wrap, header row = legend) except `.t.keep` / `.t.bt`, and shrink titles, KPIs and buttons.

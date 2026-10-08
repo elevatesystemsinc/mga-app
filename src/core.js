@@ -40,7 +40,7 @@ function daysOut(t){ const d=parseD(t.startDate); if(!d) return null; const now=
 const HUB_VERSION=2;
 const ORG_KINDS={club:'Club',association:'Association',group:'Small group'};
 const CLUB_META={id:'club',kind:'club',name:'Walnut Creek Country Club',short:'Club',crest:'club-mark.png'};
-const DEFAULT_ORGS=[{id:'mga',kind:'association',name:'Men’s Golf Association',short:'MGA',crest:'mga-crest.png'},
+const DEFAULT_ORGS=[{id:'mga',kind:'association',name:'Men’s Golf Association',short:'MGA',crest:'mga-crest.png',hubRow:'main'},
                     {id:'lga',kind:'association',name:'Ladies’ Golf Association',short:'LGA'},
                     {id:'smga',kind:'association',name:'Senior Men’s Golf Association',short:'SMGA'}];
 const DEFAULT_ROLES=['President','Vice President','Treasurer','Secretary','Tournament Chair','Member at Large','Member at Large'];
@@ -68,7 +68,7 @@ function normalize(d,meta){
   if(!d||typeof d!=='object') return emptyOrg(meta);
   d.v=d.v||HUB_VERSION; if(meta){ d.id=d.id||meta.id; d.kind=d.kind||meta.kind; if(!d.name) d.name=meta.name||''; if(!d.short) d.short=meta.short||''; }
   d.kind=d.kind||'association'; d.memberships=d.memberships||[]; d.board=d.board||[]; d.seasons=d.seasons||{}; d.tournaments=d.tournaments||[];
-  if(d.kind==='club'){ d.members=d.members||[]; d.orgs=d.orgs||[]; d.members.forEach(p=>{ if(!p.status) p.status='Active'; }); }
+  if(d.kind==='club'){ d.members=d.members||[]; d.orgs=d.orgs||[]; d.members.forEach(p=>{ if(!p.status) p.status='Active'; }); d.orgs.forEach(o=>{ if(o.id==='mga'&&o.hubRow===undefined) o.hubRow='main'; }); }
   if(!d.activeSeason) d.activeSeason=String(new Date().getFullYear());
   if(!d.seasons[d.activeSeason]) d.seasons[d.activeSeason]=newSeason();
   for(const s of Object.values(d.seasons)){ s.dues=s.dues||{amount:90,installments:2}; s.duesPayments=s.duesPayments||[]; s.duesCharges=s.duesCharges||[]; s.lines=s.lines||[]; s.txns=s.txns||[]; s.bank=s.bank||[]; s.bankBatches=s.bankBatches||[]; s.bankOpening=s.bankOpening||{amount:0,date:''}; }
@@ -326,7 +326,8 @@ function persist(){
   for(const D of openDocs()){ D.db._w=CLIENT; D.db._at=Date.now(); store.save(D.id,D.db); }
   if(typeof afterPersist==='function') afterPersist();
   if(!CLOUD||!sessionOK){ setSync('local'); return; }
-  for(const D of openDocs()){ if(!docChanged(D)) continue; setSyncD(D,'saving'); clearTimeout(D.saveT); D.saveT=setTimeout(()=>pushCloud(D),300); }
+  hubSyncSoon();
+  for(const D of openDocs()){ if(!docChanged(D)) continue; setSyncD(D,'saving'); clearTimeout(D.saveT); D.saveT=setTimeout(()=>{ D.saveT=null; pushCloud(D); },300); }
 }
 function pushAll(){ openDocs().forEach(D=>pushCloud(D)); }
 /* safe to reload for an update: nothing unsaved, not mid-save, no editor open */
@@ -411,6 +412,8 @@ function startPoll(){
   const check=async()=>{ for(const D of openDocs()){ if(D.pushing||!(D.chan||KEYMODE)) continue; try{ const r=await fetchRow(D.id); if(r&&(!D.base||r._rev!==D.base._rev)) applyRemote(D,r); }catch(_){} } };
   document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='visible') check(); });
   setInterval(()=>{ if(document.visibilityState==='visible') check(); },15000);   // a safety net if a live update is missed
+  setInterval(()=>{ if(document.visibilityState==='visible') hubSync(); },30000);  // two-way sync with the MGA Hub's row
+  setTimeout(hubSync,1500);
 }
 async function startCloud(){
   paintSync('saving');
@@ -444,6 +447,76 @@ async function putDoc(id,data){
   }
   throw new Error('Could not save '+id+' — try again');
 }
+/* ---------- two-way sync with the MGA Hub (hub.wcccmga.org, row `main`) ----------
+   The organization whose record carries hubRow (the MGA) is kept in step with the Hub's row while any device has the
+   club hub or that organization's hub open: every 30 s, shortly after a local save, and on demand. Each pass is a
+   three-way merge — the last synced copy (row `sync:<org>`), what this site has (the org document + the directory
+   entries of its members) and what the Hub has (its row turned into the org shape) — written back to both sides:
+   the org row and the club directory through the normal save, the Hub's row with a compare-and-swap on its _rev
+   (Hub devices merge it in like any other save). The first pass has no base: the Hub wins where the two differ and
+   anything only this site knows (rounds, features, dues charges…) is kept. Nothing is written when nothing moved. */
+const SYNC_ROW=o=>'sync:'+o.id;
+const linkedOrg=()=>(CLUB&&CLUB.orgs||[]).find(o=>o.hubRow&&!o.archived)||null;
+let HUB_SYNC={state:'idle'}, hubSyncBusy=false, hubSyncT=null;   // device-local status, shown in the sidebar
+const PERSON_STRIP={status:1,joined:1,notes:1};
+const hubPerson=m=>{ const p={}; for(const k of Object.keys(m)) if(!PERSON_STRIP[k]) p[k]=m[k]; return p; };
+const hubPersons=M=>(M.members||[]).map(hubPerson);
+/* the org document + directory → the Hub's shape (members carry the membership's status / joined / notes) */
+function orgToHub(M,org,persons){
+  const by=new Map(persons.map(p=>[p.id,p])), out=Object.assign({},M);
+  for(const k of Object.keys(org)) if(!['memberships','id','kind','name','short','_rev','_w','_at'].includes(k)) out[k]=org[k];
+  out.members=(org.memberships||[]).map(ms=>{ const p=by.get(ms.id); return p?Object.assign({},p,{status:ms.status||'Active',joined:ms.joined||'',notes:ms.notes||''}):null; }).filter(Boolean);
+  return out;
+}
+function hubSyncSoon(){ clearTimeout(hubSyncT); hubSyncT=setTimeout(hubSync,2500); }
+function paintHubSync(){ const el=$('hubSync'); if(!el) return; const o=linkedOrg(), on=CLOUD&&sessionOK&&!KEYMODE&&o&&DOCS[o.id]&&DOCS[o.id].base; el.style.display=on?'flex':'none'; if(!on) return;
+  const s=HUB_SYNC, when=s.at?new Date(s.at).toLocaleTimeString([],{hour:'numeric',minute:'2-digit'}):'';
+  el.innerHTML=`<span class="dot ${s.state==='error'?'offline':s.state==='busy'?'saving':s.state==='ok'?'':'local'}"></span><span>MGA Hub ${s.state==='ok'?'in sync · '+when:s.state==='busy'?'syncing…':s.state==='error'?'sync failed — '+esc(s.msg||''):'not synced yet'}</span><button class="linkbtn" id="hubSyncNow" type="button">Sync now</button>`;
+  $('hubSyncNow').onclick=()=>hubSync({force:true}); }
+async function casWrite(id,data,rev){
+  const next=Object.assign({},data,{_rev:(rev||0)+1,_w:CLIENT,_at:Date.now()});
+  let q=sb.from('mga_hub').update({data:next,updated_at:new Date().toISOString()}).eq('id',id); q=rev==null?q.is('data->>_rev',null):q.eq('data->>_rev',String(rev));
+  const {data:rows,error}=await q.select('id'); if(error) throw error; return rows&&rows.length?next:null;
+}
+async function hubSync(opt){
+  if(!CLOUD||!sessionOK||KEYMODE||hubSyncBusy||typeof CLUB==='undefined'||!CLUB) return false;
+  const org=linkedOrg(); if(!org) return false;
+  const D=DOCS[org.id], C=DOCS.club; if(!D||!D.db||!D.base||!C||!C.base||D.pushing||C.pushing) return false;   // both documents open and loaded
+  if(docChanged(D)||docChanged(C)||D.saveT||C.saveT){ hubSyncSoon(); return false; }   // a local save is on its way: the server copies would read as a revert — wait for it
+  hubSyncBusy=true; HUB_SYNC=Object.assign({},HUB_SYNC,{state:'busy'}); paintHubSync();
+  let changed=false;
+  try{
+    for(let n=0;n<4;n++){
+      const M=await fetchRow(org.hubRow); if(!M||!M.tournaments){ HUB_SYNC={state:'error',msg:'the Hub’s row was not found'}; return false; }
+      const baseRow=await fetchRow(SYNC_ROW(org));
+      const remoteOrg=hubToOrg(M,org), remoteP=hubPersons(M);
+      // this site's side is what has been SAVED (the server copies): unsaved edits follow once they land
+      const localOrg=normalize(JSON.parse(JSON.stringify(D.base)),org);
+      const ids=new Set((localOrg.memberships||[]).map(m=>m.id).concat(remoteP.map(p=>p.id)));
+      const localP=(C.base.members||[]).filter(p=>ids.has(p.id)).map(hubPerson);
+      const first=!(baseRow&&baseRow.base);
+      if(!first&&!(opt&&opt.force)&&baseRow.mainRev===M._rev&&bare(localOrg)===bare(baseRow.base)&&stable(localP)===stable(baseRow.persons||[])){ HUB_SYNC={state:'ok',at:Date.now()}; return false; }   // nothing moved on either side
+      // with a base: a true three-way merge. First pass: the union of both sides — the Hub wins where the org data
+      // differs (it has been the MGA's working copy), the club directory wins on a person's details.
+      const merged=normalize(JSON.parse(JSON.stringify(first?merge3({},remoteOrg,localOrg):merge3(baseRow.base,localOrg,remoteOrg))),org);
+      const mergedP=JSON.parse(JSON.stringify(first?merge3({},localP,remoteP):merge3(baseRow.persons||[],localP,remoteP)));
+      // this site: the org document in place (unsaved local edits survive — a three-way apply), the directory by person
+      const before=stable(D.db)+stable(CLUB.members);
+      syncTo(D.db,normalize(JSON.parse(JSON.stringify(merge3(localOrg,JSON.parse(JSON.stringify(D.db)),merged))),org));
+      const byId=new Map(CLUB.members.map(p=>[p.id,p]));
+      for(const p of mergedP){ const cur=byId.get(p.id); if(cur){ for(const k of Object.keys(p)) if(!sameJ(cur[k],p[k])) cur[k]=p[k]; } else CLUB.members.push(Object.assign({status:'Active'},p)); }
+      changed=stable(D.db)+stable(CLUB.members)!==before;
+      // the Hub: only when its row would actually change
+      const M2=orgToHub(M,merged,mergedP); let mainRev=M._rev!=null?+M._rev:null;
+      if(bare(M2)!==bare(M)){ const w=await casWrite(org.hubRow,M2,mainRev); if(!w) continue; mainRev=w._rev; }
+      await putDoc(SYNC_ROW(org),{base:merged,persons:mergedP,mainRev,at:new Date().toISOString()});
+      if(changed){ persist(); if(!(typeof drawerOpen==='function'&&drawerOpen())) render(); }
+      HUB_SYNC={state:'ok',at:Date.now()}; return changed;
+    }
+    HUB_SYNC={state:'error',msg:'the Hub kept changing — will retry'}; return false;
+  }catch(e){ HUB_SYNC={state:'error',msg:e.message||String(e)}; return false; }
+  finally{ hubSyncBusy=false; paintHubSync(); }
+}
 function hubToClub(main,club){
   const by=new Map(club.members.map(p=>[p.id,p]));
   for(const m of main.members||[]){ const person={}; for(const k of Object.keys(m)) if(!['status','joined','notes'].includes(k)) person[k]=m[k];
@@ -464,6 +537,7 @@ async function migrateFromHub(){
   hubToClub(main,C.db); CLUB=C.db; if(ORG_ID==='club') db=CLUB;
   await putDoc('club',JSON.parse(JSON.stringify(C.db)));
   await putDoc('mga',hubToOrg(main,DEFAULT_ORGS[0]));
+  await putDoc(SYNC_ROW(DEFAULT_ORGS[0]),{base:hubToOrg(main,DEFAULT_ORGS[0]),persons:hubPersons(main),mainRev:main._rev!=null?+main._rev:null,at:new Date().toISOString()});   // the sync starts from this copy
   setupNeeded=false; watchDoc(C); startPoll();
   return {people:main.members.length,tournaments:main.tournaments.length};
 }

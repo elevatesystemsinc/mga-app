@@ -115,7 +115,29 @@ async def main():
     rej=await k.evaluate("()=>({login:document.getElementById('login').classList.contains('show'),msg:document.getElementById('loginErr').textContent,key:KEYMODE,stored:localStorage.getItem('club_hub_key')})")
     check('revoked link: sign-in shown, key forgotten',rej['login'] and 'no longer valid' in rej['msg'] and not rej['key'] and rej['stored'] is None,rej)
     check('no page errors on the key device',not ek,ek)
+    # --- 1b. two-way sync with the Hub's row: Hub edits reach the MGA hub + directory, local edits reach the Hub row
+    await a.close(); await bpg.close(); await k.close()   # only one device from here, so write counts are exact
+    pg,errs=await open_hub(A,'club'); await pg.evaluate("()=>hubSync({force:true})")
+    hub=fdb.rows[('mga_hub','main')]['data']; hub['tournaments'][0]['name']='Member-Member 2026'; hub['tournaments'][0]['venue']='Oak'; hub['members'][1]['status']='Inactive'
+    hub['members'].append({'id':'hub-new','first':'Hank','last':'Hub','email':'hank@x.org','hcp':'9.9','status':'Active','joined':'2026-03-01','notes':'from the Hub'}); hub['_rev']=hub['_rev']+1; hub['_w']='hub-device'
+    await pg.evaluate("()=>{ DOCS.mga.db.tournaments[0].plannedPlayers=160; const p=upsertMember(null,{first:'Zed',last:'Zulu',email:'zed@x.org',status:'Active'}); DOCS.mga.db.memberships.push({id:p.id,status:'Active',joined:'2026-04-01',notes:'joined on the new site'}); persist(); }")
+    await pg.wait_for_timeout(600); w0=fdb.writes['main']
+    r=await pg.evaluate("()=>hubSync({force:true}).then(ch=>({ch,state:HUB_SYNC.state,msg:HUB_SYNC.msg||'',t:DOCS.mga.db.tournaments[0],ms:DOCS.mga.db.memberships.map(m=>[m.id,m.status]),dir:CLUB.members.map(p=>p.first)}))")
+    main2=fdb.get('mga_hub','main'); mm=lambda f:[m for m in main2['members'] if m['first']==f]
+    check('sync: Hub edits landed here (name, venue, status, new member)',r['state']=='ok' and r['t']['name']=='Member-Member 2026' and r['t']['venue']=='Oak' and ['hub-new','Active'] in r['ms'] and 'Hank' in r['dir'] and [x for x in r['ms'] if x[0]==club['members'][1]['id']]==[[club['members'][1]['id'],'Inactive']],(r['state'],r['msg'],r['t']['name'],r['ms']))
+    check('sync: local edits landed on the Hub row, in the Hub’s shape',main2['tournaments'][0]['plannedPlayers']==160 and main2['tournaments'][0]['name']=='Member-Member 2026' and mm('Zed') and mm('Zed')[0]['status']=='Active' and mm('Zed')[0]['notes']=='joined on the new site' and 'memberships' not in main2 and main2['_w']!='hub-device' and main2['_rev']==hub['_rev']+1,(main2['tournaments'][0].get('plannedPlayers'),mm('Zed'),main2['_rev'],hub['_rev']))
+    w1=fdb.writes['main']; await pg.wait_for_timeout(900); r2=await pg.evaluate("()=>hubSync({force:true}).then(ch=>[ch,HUB_SYNC.state])")
+    check('sync: a second pass writes nothing',r2==[False,'ok'] and fdb.writes['main']==w1 and w1==w0+1,(r2,w0,w1,fdb.writes['main']))
+    # a member removed from the MGA here leaves the Hub's list; the person stays in the directory
+    await pg.evaluate("()=>{ DOCS.mga.db.memberships=DOCS.mga.db.memberships.filter(m=>m.id!=='hub-new'); persist(); }"); await pg.wait_for_timeout(900)
+    # a pass with a save still pending is skipped, never a revert
+    r4=await pg.evaluate("async()=>{ DOCS.mga.db.tournaments[0].venue='Pecan'; persist(); const skipped=await hubSync({force:true}); await new Promise(r=>setTimeout(r,900)); const ran=await hubSync({force:true}); return [skipped,ran,HUB_SYNC.state]; }")
+    check('sync: waits for a pending save, then carries it',r4[0]==False and r4[2]=='ok' and fdb.get('mga_hub','main')['tournaments'][0]['venue']=='Pecan',r4)
+    r3=await pg.evaluate("()=>hubSync({force:true}).then(()=>CLUB.members.some(p=>p.id==='hub-new'))")
+    main3=fdb.get('mga_hub','main')
+    check('sync: removing an MGA member removes them from the Hub, keeps the person',r3 and not [m for m in main3['members'] if m['id']=='hub-new'])
+    check('no page errors on the club page',not errs,errs)
     await b.close()
   print('writes per row',dict(fdb.writes),'reads',fdb.reads)
   sys.exit(1 if bad else 0)
-asyncio.run(main())
+if __name__=="__main__": asyncio.run(main())

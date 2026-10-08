@@ -92,7 +92,7 @@ function renderInner(){
   const lock=!o||isClub();   // the club hub (and the picker) wear the club's lockup; an organization shows its crest + name
   $('brandCrest').innerHTML=lock?'<img class="lockup" src="club-logo-light.png" alt="'+esc(clubName)+'">':crestHTML(o); $('brandText').hidden=lock; $('brandName').textContent=title; $('brandSub').textContent=clubName;
   $('topCrest').innerHTML=crestHTML(o||CLUB_META,'sm'); $('topName').textContent=title; document.title=title+' · '+clubName;
-  $('btnSwitch').hidden=!CLUB||(!db&&!setupNeeded)||KEYMODE;
+  $('btnSwitch').hidden=!CLUB||(!db&&!setupNeeded)||KEYMODE; if(typeof paintHubSync==='function') paintHubSync();
   if(!db){ $('nav').innerHTML=''; $('seasonBox').hidden=true; (setupNeeded?vSetup:vPicker)($('main')); return; }
   $('seasonBox').hidden=false;
   const ys=Object.keys(db.seasons).sort((a,b)=>b-a);
@@ -141,8 +141,9 @@ function vOrgs(m){
   <div class="card" style="overflow:hidden"><div class="cardhead"><h2 class="h2">Associations</h2></div><div class="t">${grp('association')}</div></div>
   <div class="card" style="overflow:hidden"><div class="cardhead"><h2 class="h2">Small groups</h2></div><div class="t">${grp('group')}</div></div>
   ${CLOUD?`<div class="card pad" style="display:flex;flex-direction:column;gap:10px"><h2 class="h2">MGA Hub (hub.wcccmga.org)</h2>
-    <p class="hint" style="margin:0">${CLUB.migratedAt?'Last imported '+new Date(CLUB.migratedAt).toLocaleString()+'.':'Not imported yet.'} Re-importing updates the directory from the MGA’s member list and <b>replaces</b> the MGA’s hub here with the MGA Hub’s current data.</p>
-    <div class="actions"><button class="btn" id="oMig">Re-import from the MGA Hub</button></div></div>`:''}`;
+    <p class="hint" style="margin:0">${linkedOrg()?`The ${esc(linkedOrg().short||linkedOrg().name)} hub here and hub.wcccmga.org are kept in two-way sync (status in the sidebar). `:''}${CLUB.migratedAt?'Last imported '+new Date(CLUB.migratedAt).toLocaleString()+'.':'Not imported yet.'} Re-importing updates the directory from the MGA’s member list and <b>replaces</b> the MGA’s hub here with the MGA Hub’s current data${linkedOrg()?' — with the sync on you should not need it':''}.</p>
+    <div class="actions">${linkedOrg()?'<button class="btn" id="oSync">Sync now</button>':''}<button class="btn" id="oMig">Re-import from the MGA Hub</button></div></div>`:''}`;
+  const os=$('oSync'); if(os) os.onclick=async()=>{ os.disabled=true; await hubSync({force:true}); os.disabled=false; render(); toast(HUB_SYNC.state==='ok'?'In sync with the MGA Hub':'Sync failed: '+(HUB_SYNC.msg||'')); };
   m.querySelectorAll('[data-o]').forEach(r=>r.onclick=()=>editOrg(CLUB.orgs.find(x=>x.id===r.dataset.o)));
   $('oGrp').onclick=()=>editOrg(null,'group'); $('oAssoc').onclick=()=>editOrg(null,'association');
   const mg=$('oMig'); if(mg) mg.onclick=async()=>{ if(!confirm('Replace the MGA’s hub here with the MGA Hub’s current data, and update the directory from its member list?')) return; mg.disabled=true;
@@ -165,12 +166,13 @@ function editOrg(o,kind){
     body:field('Name','ogN',o?.name||'',{ph:kind==='group'?'e.g. The Misfits':'e.g. Ladies’ Golf Association'})+pair(field('Short name','ogS',o?.short||'',{ph:kind==='group'?'e.g. Misfits':'e.g. LGA'}),o?field('Address id','ogI',o.id,{disabled:true}):field('Address id','ogI','',{ph:'letters and digits, e.g. misfits'}))+
       (o?'':`<p class="hint">The id becomes the address (${esc(orgURL('misfits'))}) and can’t change later. Leave it blank to use the short name.</p>`)+field('Crest image','ogC',o?.crest||'',{ph:'file name in the site, e.g. mga-crest.png (optional)'})+
       (o?`<label class="check"><input type="checkbox" id="ogA"${o.archived?' checked':''}>Archived — hidden from the picker; its data is kept</label>`:'')+
+      (o&&kind==='association'?`<label class="check"><input type="checkbox" id="ogH"${o.hubRow?' checked':''}>Keep in two-way sync with the MGA Hub (hub.wcccmga.org)</label><p class="hint">Edits on either site reach the other within about half a minute while someone has this hub or the club hub open.</p>`:'')+
       (o&&CLOUD&&sessionOK&&!KEYMODE?`<div class="fld" style="margin-top:6px"><span class="lbl">Admin links</span><div class="mini" id="ogKeys"><div class="mr"><span class="muted">Loading…</span></div></div>
         <div style="display:flex;gap:8px;align-items:center;margin-top:8px"><input class="inp" id="ogKL" placeholder="Who it’s for, e.g. Dave (organizer)" aria-label="Link label" style="flex:1"><button class="btn sm" type="button" id="ogNewKey">${I.plus}New admin link</button></div>
         <div id="ogKeyNew"></div><p class="hint">Whoever opens an admin link runs the ${esc(o.short||o.name)} hub without the board password — and can reach nothing else in the club (they see the directory and can add people to it). Revoke a link here at any time.</p></div>`:''),
     wire:r=>{ if(o&&CLOUD&&sessionOK&&!KEYMODE) adminLinks(r,o); },
     save:()=>{ const name=fv('ogN'); if(!name){ toast('Give it a name'); return false; }
-      if(o){ Object.assign(o,{name,short:fv('ogS'),crest:fv('ogC'),archived:$('ogA').checked}); return; }
+      if(o){ Object.assign(o,{name,short:fv('ogS'),crest:fv('ogC'),archived:$('ogA').checked}); if($('ogH')) o.hubRow=$('ogH').checked?'main':''; return; }
       let id=(fv('ogI')||fv('ogS')||name).toLowerCase().replace(/[^a-z0-9-]/g,'').slice(0,24);
       if(!id||id==='club'||id==='main'||CLUB.orgs.some(x=>x.id===id)){ toast('That address id is taken — choose another'); return false; }
       CLUB.orgs.push({id,kind,name,short:fv('ogS'),crest:fv('ogC')}); toast(name+' created — open it from the organization picker'); }});
