@@ -87,7 +87,7 @@ function editGame(g){
     save:()=>{ const C=catalogById(fv('gmF'))||catalogById('stroke'), E=engineFrom(C,C.sizes?C.sizes[0]:1,1);
       const data=Object.assign({name:fv('gmN'),date:fv('gmD'),time:fv('gmT'),course:fv('gmC'),net:fv('gmNet')==='net',notes:fv('gmNt')},E);
       if(g){ Object.assign(g,data); if(mp) mp.entry=fnum('gmE'); const ev=gameEvent(g); if(ev){ ev.date=g.date; ev.scoring=g.net?'net':'gross'; EV_GAME_KEYS.forEach(k=>{ ev[k]=g[k]; }); golfSave(ev); } }
-      else { const n=Object.assign({id:uid(),season:Y(),status:'open',players:[],pots:[],golfEventId:''},data); n.pots.push(newPot('finish','Main game',fnum('gmE'),n)); if(fnum('gmS')>0) n.pots.push(newPot('skins','Skins',fnum('gmS'),n)); gamesData().push(n); view.gameId=n.id;
+      else { const n=Object.assign({id:uid(),season:Y(),status:'open',players:[],pots:[],golfEventId:''},data); n.pots.push(newPot('finish','Main game',fnum('gmE'),n)); if(fnum('gmS')>0) n.pots.push(newPot('skins','Skins',fnum('gmS'),n)); gamesData().push(n); view.gameId=n.id; publishEvent(ensureGameEvent(n));
         if(last&&last.players.length) setTimeout(()=>{ if(confirm(`Start with the ${last.players.length} players from ${gameTitle(last)} on ${shortDate(last.date)}?`)){ last.players.forEach(p=>addPlayer(n,{memberId:p.memberId,name:p.name})); persist(); render(); } },50); } },
     del:g?()=>{ if(!confirm(`Delete ${gameTitle(g)} on ${shortDate(g.date)}? Its money record goes with it.`)) return false; const ev=gameEvent(g); if(ev&&confirm('Also delete its scoring event and scores?')){ golfData().events=golfData().events.filter(e=>e!==ev); if(CLOUD&&sessionOK) deleteEventRow(ev.id); }
       db.games=db.games.filter(x=>x!==g); view.gameId=null; }:null,delLabel:'Delete game'});
@@ -96,7 +96,8 @@ function addPlayer(g,o){ const p={id:uid(),memberId:o.memberId||'',name:o.name||
 
 /* ---------- one game ---------- */
 function vGame(m,g){
-  const mo=gameMoney(g), ev=gameEvent(g), live=ev&&ev.status==='live';
+  let ev=gameEvent(g); if(!ev){ ev=ensureGameEvent(g); golfSave(ev); }
+  const mo=gameMoney(g), live=ev.status==='live';
   if(ev&&CLOUD&&sessionOK&&!golfScores[ev.id]) setTimeout(()=>loadScores(ev),0);
   const lb=ev?eventBoard(publicEvent(ev),scoresFor(ev),{sort:g.net?'net':'gross'}):[];
   const byG=new Map(); lb.forEach(r=>{ if(r.team) (r.members||[]).forEach(id=>byG.set(id,r)); else byG.set(r.id,r); });
@@ -154,7 +155,7 @@ function addGamePlayers(g){
       r.querySelector('#apGAdd').onclick=()=>{ const n=r.querySelector('#apG').value.trim(); if(!n) return; guests.push(n); r.querySelector('#apG').value=''; r.querySelector('#apGList').textContent='Guests: '+guests.join(', '); }; },
     save:()=>{ if(!picked.size&&!guests.length){ toast('Pick someone'); return false; }
       [...picked].forEach(id=>addPlayer(g,{memberId:id})); guests.forEach(n=>addPlayer(g,{name:n}));
-      const ev=gameEvent(g); if(ev){ syncGameEvent(g,ev); golfSave(ev); }
+      publishEvent(ensureGameEvent(g));
       toast(`${picked.size+guests.length} added`); }});
 }
 function editGamePlayer(g,p){
@@ -301,14 +302,15 @@ function payManual(g,pot,x){
 }
 
 /* ---------- live scoring through the Golf module ---------- */
-function openScoring(g){
-  if(!g.players.length){ toast('Add players first'); return; }
+/* every game has live scoring: its event exists from the moment the game does, open, and follows the players */
+function ensureGameEvent(g){
   const G=golfData(); let ev=gameEvent(g);
   if(!ev){ let slug=slugify(orgShort()+'-'+(g.date||'game')), n=2; while(G.events.some(e=>e.slug===slug)) slug=slugify(orgShort()+'-'+(g.date||'game'))+'-'+(n++);
-    ev=Object.assign({id:uid(),status:'draft',name:gameTitle(g)+(g.date?' · '+shortDate(g.date):''),date:g.date,defaultTee:'White',defaultCourse:g.course||'oak',slug,tournamentId:'',front:'scramble',back:'shamble',scoring:g.net?'net':'gross',allow:{},groups:[],pool:[],flights:{count:0,names:[]},createdAt:new Date().toISOString(),gameId:g.id},engineFrom(catalogById(g.game||g.format||'stroke')||catalogById('stroke'),g.teamSize||1,g.count||1));
+    ev=Object.assign({id:uid(),status:'live',name:gameTitle(g)+(g.date?' · '+shortDate(g.date):''),date:g.date,defaultTee:'White',defaultCourse:g.course||'oak',slug,tournamentId:'',front:'scramble',back:'shamble',scoring:g.net?'net':'gross',allow:{},groups:[],pool:[],flights:{count:0,names:[]},createdAt:new Date().toISOString(),gameId:g.id},engineFrom(catalogById(g.game||g.format||'stroke')||catalogById('stroke'),g.teamSize||1,g.count||1));
     G.events.push(ev); g.golfEventId=ev.id; }
-  syncGameEvent(g,ev); ev.status='live'; golfSave(ev); render(); toast('Scoring is open — share the link');
+  syncGameEvent(g,ev); return ev;
 }
+function openScoring(g){ const ev=ensureGameEvent(g); ev.status='live'; golfSave(ev); render(); toast('Scoring is open — share the link'); }
 /* every game player has a player in the event; newcomers fill groups of four */
 function syncGameEvent(g,ev){
   const have=new Set(evPlayers(ev).map(x=>x.p.id));

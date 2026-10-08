@@ -23,6 +23,13 @@ own hub. An organization's **Members** page is the club members who belong to it
 the organization's own list (club members are matched and joined; new people are added to the directory too), and keep
 status, join date, notes and dues per organization. Editing a person's details anywhere updates the directory.
 
+## Live scoring, always
+
+Every tournament round and every small-group game has an open scoring event the moment it exists — nothing to switch
+on. A tournament's rounds are suggested from its length and team size (change them under Rounds & results), the field
+flows into each round's event as players sign up, and the Golf page, the scoring link and the leaderboard are ready
+from day one. The sidebar and dashboards show the leaderboards of events happening today.
+
 ## Rounds & results
 
 Each tournament declares its rounds — one or more per day, each with a format (a day can be scramble on the front
@@ -63,8 +70,8 @@ with its own entry money and players: the main game paid by finish, **skins** (g
 carry-overs, validation on the next hole), **dots / doodah** (birdies and eagles counted from the scores, sandies and
 greenies tallied by hand), side pots scored as another game on the same scores (low net, **blind-draw partners after
 the round**), and winners entered by hand (closest to the pin, long drive). Add the regulars from the member list (or a
-guest), tick who is in which pot and who has paid. **Open live scoring** puts everyone in groups of four with a group ID
-for the scoring page on their phones; scores can also be entered in the hub. The **Ledger** shows who is up or down for
+guest), tick who is in which pot and who has paid. Every game has **live scoring** from the moment it is created: players land in groups of four, each with a
+group ID for the scoring page on their phones; scores can also be entered in the hub. The **Ledger** shows who is up or down for
 the season or any quarter (paid out − paid in across every pot, plus side bets or settle-ups recorded as adjustments),
 with a one-click settle-up.
 

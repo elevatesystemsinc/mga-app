@@ -95,7 +95,9 @@ async function setScore(ev,pid,hole,strokes){
   }
   const L=golfData().localScores, m=(L[ev.id]=L[ev.id]||{}); m[pid]=m[pid]||{}; if(strokes) m[pid][hole]=strokes; else delete m[pid][hole]; persist(); return true;
 }
-const liveEvents=()=>golfData().events.filter(e=>e.status==='live');
+/* open events on the day (yesterday → tomorrow, or undated): what the nav and dashboards call live */
+const isLiveNow=e=>{ if(e.status!=='live') return false; if(!e.date) return true; const d=parseD(e.date); if(!d) return true; const now=new Date(); now.setHours(0,0,0,0); const diff=Math.round((d-now)/864e5); return diff>=-1&&diff<=1; };
+const liveEvents=()=>golfData().events.filter(isLiveNow);
 
 /* ---------- page ---------- */
 function vGolf(m){
@@ -183,7 +185,7 @@ function editEvent(ev){
       const C=catalogById(fv('geF'))||catalogById('stroke'), E=engineFrom(C,+fv('geTS'),+fv('geCnt')); if(E.format==='split'&&fv('geFr')===fv('geBk')){ toast('Front and back use the same format — pick it as the game instead'); return false; }
       if(E.format==='split') E.teamSize=+fv('geTS')||2;
       const data=Object.assign({name,date:fv('geD'),defaultTee:fv('geT'),slug,tournamentId:fv('geTour'),front:fv('geFr'),back:fv('geBk'),scoring:fv('geSc'),allow:clone($('dBody')._allow||{})},E);
-      if(ev) Object.assign(ev,data); else { const e=Object.assign({id:uid(),status:'draft',groups:[],pool:[],flights:{count:0,names:[]},createdAt:new Date().toISOString()},data); g.events.push(e); view.geid=e.id; view.getab='field'; ev=e; }
+      if(ev) Object.assign(ev,data); else { const e=Object.assign({id:uid(),status:'live',groups:[],pool:[],flights:{count:0,names:[]},createdAt:new Date().toISOString()},data); g.events.push(e); view.geid=e.id; view.getab='field'; ev=e; }
       golfSave(ev); toast('Saved'); return undefined; },
     del:ev?()=>{ if(!confirm(`Delete ${ev.name}? Its groups and scores are removed.`)) return false; g.events=g.events.filter(x=>x!==ev); view.geid=null;
       if(CLOUD&&sessionOK) deleteEventRow(ev.id); }:null,delLabel:'Delete event'});

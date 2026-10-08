@@ -319,6 +319,7 @@ const featuresHTML=(pre,cur)=>`<div class="fld"><span class="lbl">What this tour
 const readFeatures=pre=>Object.fromEntries(TOURNEY_FEATURES.map(([k])=>[k,!!($(pre+k)&&$(pre+k).checked)]));
 function vTournament(m){
   const t=T(); if(!t){ go('tournaments'); return; }
+  if(typeof ensureTournamentScoring==='function'&&ensureTournamentScoring(t)) persist();   // live scoring exists for every tournament
   const tabs=tournamentTabs(t);
   if(!tabs.some(x=>x[0]===view.ttab)) view.ttab='overview';
   m.innerHTML=`<div class="crumb"><button data-go="tournaments">Tournaments</button><span class="muted">/</span><span class="muted">${esc(t.name)}</span></div>

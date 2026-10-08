@@ -202,8 +202,14 @@ Overview, Field, Check-in and Rounds & results are always on; tournaments from b
 
 ### Rounds & results (`rounds.js`)
 `t.rounds` = one or more rounds per day, each with the full format fields (e.g. Saturday split scramble/shamble,
-Sunday best ball). **Create scoring events** builds one golf event per round from the field (teams → `T<n>`, later
-days copy the first day's flights; groups copy on request). `tournamentResults(t, basis)` totals the rounds per team
+Sunday best ball). **Live scoring is never optional:** `ensureTournamentScoring(t)` runs on every render of a
+tournament (vTournament) — it creates default rounds for a tournament that has none (unless it is already past),
+builds the missing round events (`buildRoundEvent`, status `live`) and syncs the field into every event
+(`syncRoundEvent`: new field players join the pool with their team code, codes follow the field, players who left
+the field leave the event unless they have scores). Small-group games do the same through `ensureGameEvent(g)`
+(games.js: created with the game, synced when players are added/removed, lazily on vGame). New Golf events start
+`live` too. `liveEvents()` (nav links, dashboard leaderboard) = open events dated yesterday → tomorrow or undated
+(`isLiveNow`). Teams → `T<n>`; later days copy the first day's flights; groups copy on request. `tournamentResults(t, basis)` totals the rounds per team
 (or player) in the rounds' unit — strokes to par (gross/net basis), points, holes, match points — ranked overall and
 per flight, marked Final when every event is closed. **Send finishes to Calcutta** writes each lot's `place` from the
 flight positions (lots matched by member id or name). **Results sheet (PDF)** = branded jsPDF sheet per flight + overall.
@@ -272,7 +278,8 @@ groups, printed scorecards — the printed cards include a live-scoring QR that 
   "1" reads as "I"; the PDF font in `pdffonts.js` has lining digits baked in.
 - **UI pattern:** screens are read-only; edits happen in the drawer (`openDrawer({title, body, wire, save, del})`),
   `save` returns `false` to keep it open. After mutating `db`: `persist(); render();`.
-- **Mobile matters** (phones at registration, cashier, auction). Check 390 px width; no horizontal overflow.
+- **Mobile matters** (phones at registration, cashier, auction). Check 390 px width; no horizontal overflow. Tables
+  stack on phones automatically (≤640px, see head.html); give a table `keep` only when it has its own phone layout.
 - **Printed/PDF output must look as polished as the rest of the brand** — the user rejected a plain browser
   print view as "lazy". PDFs are generated files the user downloads (jsPDF), not print-preview windows.
 - **Privacy on public-facing sheets:** no emails, GHIN numbers or handicap indexes on anything left on a table.
@@ -286,6 +293,9 @@ groups, printed scorecards — the printed cards include a live-scoring QR that 
   hub's import / Verify / two-way sync / "Retire current app" code was removed in Oct 2026. Stored documents may still carry `db.legacy`, `t.source` (`kind:'mm-app'`) and
   `t.sync` from that era; nothing reads them and `normalize()` leaves them alone.
 - 2026 Member-Member: Oct 2–4. 150 players / 75 teams (Team 84, Regina & Cagle, added late as Lot 75).
+- **Built Oct 2026 (always-on live scoring, phone layout):** every tournament round and every game has an open scoring
+  event from creation (see Rounds & results); `head.html` ≤640px rules stack every `.t` table (name block on top, cells
+  wrap, header row = legend) except `.t.keep` / `.t.bt`, and shrink titles, KPIs and buttons.
 - **Built Oct 2026 (admin links, dues collection, club calendar):** `admin-links-setup.sql` + key mode in core.js
   (see §2); associations bill dues (`duesCharges`) and the club's **Dues collection** page charges/collects them; the
   club hub opens every organization's document and shows their tournaments (calendar + fields, never their money);

@@ -26,7 +26,7 @@ function tRounds(el,t){
   rs.forEach(r=>{ const ev=roundEvent(r); if(ev&&CLOUD&&sessionOK&&!golfScores[ev.id]) setTimeout(()=>loadScores(ev),0); });
   const rrow=r=>{ const ev=roundEvent(r), n=ev?evPlayers(ev).length:0;
     return `<div class="tr click" data-rnd="${r.id}" style="grid-template-columns:110px minmax(0,1.6fr) minmax(0,1fr) 120px 40px"><span><b>${esc(dayLabel(t,r.day).split(' · ')[0])}</b><br><small class="muted">${esc(dayShort(t,r.day))}</small></span><div class="cell2"><b class="trunc">${esc(roundLabel(t,r))}</b><small>${esc(formatSummary(r))} · ${r.scoring==='net'?'net':'gross'}</small></div>
-      <span class="muted" style="font-size:13px">${ev?`${n} players · ${ev.groups.length} groups${ev.flights&&ev.flights.count?' · '+ev.flights.count+' flights':''}`:'No scoring event yet'}</span><span>${ev?evStatusChip(ev):'<span class="chip">Not built</span>'}</span><span class="ib">${I.edit}</span></div>`; };
+      <span class="muted" style="font-size:13px">${ev?`${n} players · ${ev.groups.length} groups${ev.flights&&ev.flights.count?' · '+ev.flights.count+' flights':''}`:'Building the scoring event…'}</span><span>${ev?evStatusChip(ev):'<span class="chip">Building…</span>'}</span><span class="ib">${I.edit}</span></div>`; };
   const firstDay=rs.length?Math.min(...rs.map(x=>x.day)):0;
   const act=r=>{ const ev=roundEvent(r); if(!ev) return ''; const first=rs.find(x=>roundEvent(x)&&x!==r), earlier=rs.some(x=>x.day<r.day&&roundEvent(x)), hasF=t.flights&&t.flights.count;
     return `<div class="tr" style="grid-template-columns:110px minmax(0,1fr)"><span></span><div class="actions"><button class="btn sm" data-rgo="${r.id}">Open event</button>
@@ -40,8 +40,8 @@ function tRounds(el,t){
   const cell=(u,r)=>{ const x=u.rounds[r.id]; if(!x||!x.n) return '<span class="r muted">—</span>'; return `<span class="r">${esc(x.txt)}${x.complete?'':`<br><small class="muted">thru ${esc(x.thru)}</small>`}</span>`; };
   el.innerHTML=`<div class="card" style="overflow:hidden"><div class="cardhead"><div><h2 class="h2">Rounds</h2><span class="muted">${t.days} day${t.days>1?'s':''} · ${t.teamSize>1?t.teamSize+'-player teams':'individual'} · the field’s ${t.field.length} players</span></div>
       <div class="actions">${rs.length?'':`<button class="btn" id="rndSuggest">Suggest rounds</button>`}<button class="btn" id="rndAdd">${I.plus}Add round</button>${missing.length?`<button class="btn pri" id="rndBuild"${t.field.length?'':' disabled'}>Create scoring event${missing.length>1?'s':''} (${missing.length})</button>`:''}</div></div>
-    ${rs.length?`<div class="tw"><div class="t" style="min-width:680px">${rs.map(r=>rrow(r)+act(r)).join('')}</div></div>`:`<div class="empty"><b>No rounds yet</b><span>Declare each day’s format — for example Saturday front nine scramble / back nine shamble, Sunday best ball — then create the scoring events in one click. Results below total the rounds.</span></div>`}
-    ${!t.field.length&&rs.length?'<div class="banner">Import or add the field first — the scoring events are built from it.</div>':''}</div>
+    ${rs.length?`<div class="tw"><div class="t" style="min-width:680px">${rs.map(r=>rrow(r)+act(r)).join('')}</div></div>`:`<div class="empty"><b>No rounds yet</b><span>Declare each day’s format — for example Saturday front nine scramble / back nine shamble, Sunday best ball — each gets a live scoring event the moment it exists. Results below total the rounds.</span></div>`}
+    ${!t.field.length&&rs.length?'<div class="banner">Every round has its scoring event, open now. Add the field and the players flow into it as they sign up.</div>':''}</div>
   ${flightsCard(t)}
   <div class="card" style="overflow:hidden"><div class="cardhead"><div><h2 class="h2">Results</h2><span class="muted">${R.rounds.length?`${R.rounds.length} round${R.rounds.length>1?'s':''} totalled${R.unit==='strokes'?' by '+(t.resultsBasis||'net')+' score to par':R.unit==='points'?' by points':R.unit==='holes'?' by holes up':R.unit==='match'?' by match points':''}${R.final?' · <b>Final</b>':R.rounds.length?' · live':''}`:'Results appear once scoring events exist.'}</span></div>
       <div class="actions">${R.unit==='strokes'?`<div class="seg">${['gross','net'].map(b=>`<button class="${(t.resultsBasis||'net')===b?'on':''}" data-rb="${b}">${b==='net'?'Net':'Gross'}</button>`).join('')}</div>`:''}${flights.length?`<div class="seg">${['',...flights].map(f=>`<button class="${view.rflight===f?'on':''}" data-rf="${f}">${f?'Flight '+f:'All'}</button>`).join('')}</div>`:''}${R.list.length?`<button class="btn sm" id="rndPdf">Results sheet (PDF)</button>`:''}${R.list.length&&t.calcutta&&(t.calcutta.lots||[]).length?`<button class="btn sm" id="rndCalc">Send finishes to Calcutta</button>`:''}</div></div>
@@ -85,19 +85,42 @@ function editRound(t,r){
     del:r?()=>{ const e=roundEvent(r); if(e&&!confirm(`Remove this round? Its scoring event (${e.name}) stays in Golf.`)) return false; t.rounds=t.rounds.filter(x=>x!==r); }:null,delLabel:'Remove round'});
 }
 /* build the scoring events: one per round without one, field imported with its teams, later days copying the first day's flights */
+/* Every tournament has live scoring from the start: rounds exist as soon as the tournament does, each round has its
+   scoring event (open), and the field flows into the events as it changes. ensureTournamentScoring runs on every
+   render of a tournament and returns true when it changed something (the caller persists). */
+function buildRoundEvent(t,r,rs){
+  const G=golfData();
+  let slug=slugify(`${t.name}-${t.season}-d${r.day+1}`), n=2; while(G.events.some(e=>e.slug===slug)) slug=slugify(`${t.name}-${t.season}-d${r.day+1}`)+'-'+(n++);
+  const ev={id:uid(),status:'live',name:`${t.name} · ${dayLabel(t,r.day).split(' · ')[0]}${rs.filter(x=>x.day===r.day).length>1?' · '+formatSummary(r):''}`,date:roundDate(t,r.day),defaultTee:'White',defaultCourse:'oak',slug,tournamentId:t.id,allow:{},groups:[],pool:[],flights:{count:0,names:[]},createdAt:new Date().toISOString(),roundId:r.id};
+  roundToEvent(r,ev);
+  G.events.push(ev); r.eventId=ev.id;
+  if(t.flights&&t.flights.count) applyFlights(t,ev); else { const first=rs.map(roundEvent).find(e=>e&&e!==ev&&e.flights&&e.flights.count); if(first) copyFlightsInto(first,ev); }
+  return ev;
+}
+/* field → event: new players join the pool with their team; team codes follow the field; players who left the field
+   leave the event unless they already have scores */
+function syncRoundEvent(t,ev){
+  const inField=new Map(t.field.map(fp=>[fp.memberId,fp])), sc=scoresFor(ev), team=fp=>(t.teamSize||1)>1?'T'+(fp.team||0):''; let changed=false;
+  const have=new Set(evPlayers(ev).map(x=>x.p.memberId).filter(Boolean));
+  for(const fp of t.field){ if(!fp.memberId||have.has(fp.memberId)) continue; const m=memberById(fp.memberId);
+    ev.pool.push({id:uid(),memberId:fp.memberId,name:m?memberName(m):(fp.name||'Player'),tee:ev.defaultTee||'White',set:'M',team:team(fp),index:'',flight:''}); have.add(fp.memberId); changed=true; }
+  for(const {p,grp} of evPlayers(ev)){ if(!p.memberId) continue; const fp=inField.get(p.memberId);
+    if(fp){ if(p.team!==team(fp)){ p.team=team(fp); changed=true; } }
+    else if(!Object.keys(sc[p.id]||{}).length){ if(grp) grp.players=grp.players.filter(x=>x!==p); else ev.pool=ev.pool.filter(x=>x!==p); changed=true; } }
+  if(changed) ev.groups=ev.groups.filter(g=>g.players.length||!ev.groups.some(o=>o!==g&&o.players.length));
+  return changed;
+}
+function ensureTournamentScoring(t){
+  if(!t.rounds||!t.rounds.length){ if(isPast(t)) return false; t.rounds=defaultRounds(t); }   // finished tournaments without rounds stay as they are
+  const rs=tournamentRounds(t).slice().sort((a,b)=>a.day-b.day); let changed=false;
+  for(const r of rs){ let ev=roundEvent(r); if(!ev){ ev=buildRoundEvent(t,r,rs); changed=true; }
+    if(syncRoundEvent(t,ev)||!ev._pub){ publishEvent(ev); changed=changed||!ev._pub; } }
+  return changed;
+}
 function createRoundEvents(t){
-  const G=golfData(), rs=tournamentRounds(t).slice().sort((a,b)=>a.day-b.day), made=[];
-  if(!t.field.length){ toast('Import or add the field first'); return; }
-  for(const r of rs){ if(roundEvent(r)) continue;
-    let slug=slugify(`${t.name}-${t.season}-d${r.day+1}`), n=2; while(G.events.some(e=>e.slug===slug)) slug=slugify(`${t.name}-${t.season}-d${r.day+1}`)+'-'+(n++);
-    const ev={id:uid(),status:'draft',name:`${t.name} · ${dayLabel(t,r.day).split(' · ')[0]}${rs.filter(x=>x.day===r.day).length>1?' · '+formatSummary(r):''}`,date:roundDate(t,r.day),defaultTee:'White',defaultCourse:'oak',slug,tournamentId:t.id,allow:{},groups:[],pool:[],flights:{count:0,names:[]},createdAt:new Date().toISOString(),roundId:r.id};
-    roundToEvent(r,ev);
-    ev.pool=t.field.map(fp=>{ const m=memberById(fp.memberId); return {id:uid(),memberId:fp.memberId,name:m?memberName(m):(fp.name||'Player'),tee:ev.defaultTee,set:'M',team:(t.teamSize||1)>1?'T'+(fp.team||0):'',index:'',flight:''}; });
-    G.events.push(ev); r.eventId=ev.id; made.push(ev);
-    if(t.flights&&t.flights.count) applyFlights(t,ev); else { const first=rs.map(roundEvent).find(e=>e&&e!==ev&&e.flights&&e.flights.count); if(first) copyFlightsInto(first,ev); }
-    publishEvent(ev); }
-  persist(); render();
-  toast(made.length?`${made.length} scoring event${made.length===1?'':'s'} created — set flights and groups in Golf`:'Every round already has its event');
+  const before=tournamentRounds(t).filter(r=>roundEvent(r)).length, ch=ensureTournamentScoring(t), made=tournamentRounds(t).filter(r=>roundEvent(r)).length-before;
+  if(ch) persist(); render();
+  toast(made?`${made} scoring event${made===1?'':'s'} created — set flights and groups in Golf`:'Every round already has its event'+(ch?' · field updated':''));
 }
 function copyFlightsInto(from,to){
   to.flights=clone(from.flights); const fl=new Map(evPlayers(from).map(x=>[x.p.memberId,x.p.flight])); evPlayers(to).forEach(x=>{ if(x.p.memberId&&fl.has(x.p.memberId)) x.p.flight=fl.get(x.p.memberId)||''; });
