@@ -5,8 +5,6 @@
 -- (c) publish that organization's scoring events, scores, cashier and check-in links. Nothing else.
 -- Only a SHA-256 hash of the key is stored; revoking a link in the club hub stops it immediately.
 
-create extension if not exists pgcrypto;
-
 create table if not exists public.hub_keys (
   id         uuid primary key default gen_random_uuid(),
   org_id     text not null,
@@ -24,7 +22,7 @@ create or replace function public.hub_key_org(p_key text) returns text
 language sql stable security definer set search_path = public as $$
   select org_id from hub_keys
    where p_key is not null and length(p_key) >= 16
-     and key_hash = encode(digest(p_key, 'sha256'), 'hex') and revoked_at is null
+     and key_hash = encode(sha256(convert_to(p_key, 'UTF8')), 'hex') and revoked_at is null
    limit 1;
 $$;
 
