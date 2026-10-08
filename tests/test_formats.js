@@ -51,4 +51,69 @@ sc={A:Object.assign(fill(4),{18:3,1:5}),B:Object.assign(fill(4),{1:5})};
 r=skinsResult(pub([P('A',0),P('B',0)],10),sc,{net:false,carry:false,validate:'gross'});   // starts on 10: after 18 comes 1
 const w18=r.wins.find(w=>w.hole===18);
 check('shotgun start: the next hole after 18 is hole 1, where A bogeyed → void',w18&&w18.status==='void'&&w18.checkHole===1,r.wins);
+
+
+// ---------- formats ----------
+const ev=(o,players,extraGroups)=>Object.assign({courses:{t:course},groups:[{id:'g',course:'t',startHole:1,players}].concat(extraGroups||[]),scoring:'net',format:'stroke'},o);
+const R=x=>Math.sign(x)*Math.floor(Math.abs(x)+0.5);
+const PC=(id,ch,team)=>({id,name:id,set:'M',ch,ph:null,team:team||''});
+// allowances & playing handicaps
+check('USGA defaults by key',[pctFor({},'stroke'),pctFor({},'bestball1of2'),pctFor({},'bestball2of4'),pctFor({},'bestball3of4'),pctFor({},'bestball1of5'),pctFor({},'bestball4of6'),pctFor({},'match4'),JSON.stringify(pctFor({},'scramble5'))].join()==='95,85,85,100,75,100,90,[20,15,10,5,5]');
+check('allow key follows team size and count',[allowKey({format:'bestball',teamSize:4,count:2},'bestball'),allowKey({format:'scramble',teamSize:3},'scramble'),allowKey({format:'match',teamSize:2},'match'),allowKey({format:'stroke'},'stroke')].join()==='bestball2of4,scramble3,match4,stroke');
+check('older events: allow.bestball still applies to best 1 of 2',pctFor({format:'bestball',allow:{bestball:80}},'bestball1of2')===80);
+check('scramble team PH 4/9/15/22 at 25/20/15/10 = 7',teamPH({format:'scramble',teamSize:4},'scramble',[PC('a',4),PC('b',9),PC('c',15),PC('d',22)])===7);
+check('scramble 5-player club default',teamPH({format:'scramble',teamSize:5},'scramble',[PC('a',4),PC('b',9),PC('c',15),PC('d',22),PC('e',30)])===R(4*.2+9*.15+15*.1+22*.05+30*.05));
+check('foursomes 8+14 → 11; greensome 60/40 → 10',teamPH({},'foursomes',[PC('a',8),PC('b',14)])===11&&teamPH({},'greensome',[PC('a',14),PC('b',8)])===10);
+check('segPH: four-ball 85% of CH 20 = 17; stroke 95% of 6 = 6',segPH({format:'bestball',teamSize:2,count:1},PC('a',20),'bestball')===17&&segPH({format:'stroke'},PC('a',6),'stroke')===6);
+// stableford / modified / quota / par-bogey
+const net1=p=>Object.assign({},p,{ph:p.ch});   // play with PH = CH for simplicity
+const scA={A:fill(4)}; scA.A[1]=3; scA.A[2]=2; scA.A[3]=5; scA.A[4]=7;   // birdie, eagle, bogey, triple on stroke indexes 1-4
+let lb=leaderboard(ev({format:'stableford',scoring:'gross'},[net1(PC('A',0))]),scA,{});
+check('stableford gross: 14 pars·2 + birdie 3 + eagle 4 + bogey 1 + 0 = 36',lb[0].pts===36&&lb[0].unit==='points',lb[0].pts);
+lb=leaderboard(ev({format:'stableford'},[net1(PC('A',2))]),scA,{});
+check('stableford net with 2 strokes (holes 1–2): 3→2 = 4 pts, 2→1 = 5 pts → 38',lb[0].pts===38,lb[0].pts);
+lb=leaderboard(ev({format:'modstable',scoring:'gross'},[net1(PC('A',0))]),scA,{});
+check('modified stableford: pars 0, birdie 2, eagle 5, bogey −1, triple −3 = 3',lb[0].pts===3,lb[0].pts);
+lb=leaderboard(ev({format:'quota'},[net1(PC('A',10))]),scA,{});
+check('quota: points 28+4+8+1+0 = 41 vs quota 26 → +15',lb[0].pts===15,lb[0].pts);
+lb=leaderboard(ev({format:'parbogey'},[net1(PC('A',0))]),scA,{});
+check('par/bogey: 2 holes won, 2 lost, 14 halved → 0; ranked by holes',lb[0].holesUp===0&&lb[0].unit==='holes');
+lb=leaderboard(ev({format:'stableford'},[net1(PC('A',0)),net1(PC('B',0))]),{A:fill(4),B:Object.assign(fill(4),{1:3})},{});
+check('points rank descending: B (37) ahead of A (36)',lb[0].id==='B'&&lb[1].id==='A'&&lb[0].posTxt==='1');
+// best ball 2 of 4, aggregate, 1-2-3
+const four=[PC('a',0,'T'),PC('b',0,'T'),PC('c',0,'T'),PC('d',0,'T')].map(net1);
+const sc4={a:fill(4),b:fill(5),c:fill(3),d:fill(6)};
+let tb=teamBoard(ev({format:'bestball',teamSize:4,count:2,scoring:'gross'},four),sc4,{sort:'gross'});
+check('best 2 of 4: 3+4 per hole → 126, to par −18',tb[0].gross===126&&tb[0].toPar===-18,tb[0]);
+tb=teamBoard(ev({format:'aggregate',teamSize:4,scoring:'gross'},four),sc4,{sort:'gross'});
+check('aggregate: 18 per hole → 324',tb[0].gross===324);
+tb=teamBoard(ev({format:'bestball',teamSize:4,countPattern:'123',scoring:'gross'},four),sc4,{sort:'gross'});
+check('1-2-3: 6×3 + 6×7 + 6×12 = 132',tb[0].gross===132,tb[0].gross);
+tb=teamBoard(ev({format:'teamstable',teamSize:4,count:2,scoring:'gross'},four),sc4,{sort:'gross'});
+check('team stableford best 2 of 4: (3 + 2) × 18 = 90 points',tb[0].pts===90&&tb[0].unit==='points',tb[0].pts);
+// scramble / foursomes: one score per team, team strokes
+const two=[Object.assign(PC('a',8,'T'),{ph:null}),Object.assign(PC('b',14,'T'),{ph:null})];
+tb=teamBoard(ev({format:'foursomes',teamSize:2,scoring:'net'},two),{a:fill(4)},{sort:'net'});
+check('foursomes: captain’s 18 × 4 = 72 gross, team PH 11 → net 61',tb[0].gross===72&&tb[0].net===61,tb[0]);
+// match play: singles, A (PH 5) v B (PH 12): B gets 7 strokes on indexes 1–7
+const mA=Object.assign(PC('A',5,'S1'),{ch:5}), mB=Object.assign(PC('B',12,'S2'),{ch:12});
+let scm={A:fill(4),B:fill(4)};
+let mb=matchBoard(ev({format:'match',teamSize:1,scoring:'net'},[mA,mB]),scm,{});
+let rowB=mb.find(r=>r.id==='S2');
+check('singles: B wins holes 1–7 with strokes → 7 up with 11 to play = 7&6... decided: 7 up after 7, 11 left → not yet; after hole 11 B is 7 up with 7 left → dormie; wins 8&7? no—stays 7 up: match ends 7&6 when up > left',rowB.over===true&&rowB.status==='7&6'&&rowB.pts===1,rowB.status);
+scm={A:fill(4),B:fill(4)}; for(let h=1;h<=18;h++) scm.A[h]=h%2?3:4;   // A birdies odd holes: wins 11 odd holes... with B's strokes on 1–7 (odd 1,3,5,7 halved) → A wins 9,11,13,15,17 (5), B wins 2,4,6 (3): A 2 up
+mb=matchBoard(ev({format:'match',teamSize:1,scoring:'net'},[mA,mB]),scm,{});
+check('singles: A closes it out 2&1 (2 up with one to play after 17)',mb.find(r=>r.id==='S1').status==='2&1'&&mb.find(r=>r.id==='S2').status==='lost 2&1'&&mb.find(r=>r.id==='S1').pts===1,mb.map(r=>[r.id,r.status]));
+scm={A:fill(4),B:fill(4)}; delete scm.A[13]; delete scm.B[13];
+mb=matchBoard(ev({format:'match',teamSize:1,scoring:'net'},[mA,mB]),scm,{});
+check('in progress: 7 up thru 12 is decided (7 up, 6 to play → 7&6)',mb.find(r=>r.id==='S2').status==='7&6',mb.find(r=>r.id==='S2').status);
+scm={A:fill(4),B:fill(4)}; mb=matchBoard(ev({format:'match',teamSize:1,scoring:'net'},[Object.assign(PC('A',5,'S1'),{ch:5}),Object.assign(PC('B',5,'S2'),{ch:5})]),scm,{});
+check('all square after 18 → AS, half a point each',mb.every(r=>r.status==='AS'&&r.pts===0.5));
+// four-ball match: sides of two
+const fb=[Object.assign(PC('A',4,'X'),{}),Object.assign(PC('B',10,'X'),{}),Object.assign(PC('C',6,'Y'),{}),Object.assign(PC('D',20,'Y'),{})];
+scm={A:fill(4),B:fill(5),C:fill(4),D:fill(6)}; scm.A[18]=3;
+mb=matchBoard(ev({format:'match',teamSize:2,scoring:'net'},fb),scm,{});
+check('four-ball: 90% then off the low man (A 4, B 9, C 5, D 18 → C gets 1, D 14): C’s stroke wins hole 1 for Y, A’s birdie on 18 squares it → AS',mb.every(r=>r.status==='AS'&&r.pts===0.5),mb.map(r=>[r.id,r.status]));
+check('format summary text',[formatSummary({format:'bestball',teamSize:4,count:2}),formatSummary({format:'scramble',teamSize:5}),formatSummary({format:'match',teamSize:2}),formatSummary({format:'split',front:'scramble',back:'shamble',teamSize:2,count:1})].join(' | '),null);
+check('unitOf / isTeamEvent / isMatchEvent',[unitOf({format:'quota'}),unitOf({format:'parbogey'}),unitOf({format:'match'}),unitOf({format:'teamstable',teamSize:2}),isTeamEvent({format:'split',front:'scramble',back:'shamble'}),isMatchEvent({format:'match'})].join()==='points,holes,match,points,true,true');
 process.exit(bad?1:0);

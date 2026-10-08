@@ -2079,23 +2079,37 @@ const G_SUM=a=>a.reduce((x,y)=>x+(+y||0),0);
 function playOrder(start){ const s=Math.min(18,Math.max(1,+start||1)); return Array.from({length:18},(_,i)=>((s-1+i)%18)+1); }
 function toParTxt(v){ return v===0?'E':(v>0?'+'+v:'−'+Math.abs(v)); }
 /* stroke-play leaderboard. pub = public event, scores = {playerId:{hole:strokes}} */
+/* individual leaderboard: strokes (stroke play), points (Stableford / modified / quota) or holes up (par-bogey) */
 function leaderboard(pub,scores,opt){ opt=opt||{};
-  const rows=[];
+  const rows=[], fmt=playerFormatOf(pub), unit=unitOf(pub);
   for(const g of pub.groups||[]){ const c=pub.courses[g.course]; if(!c) continue;
     for(const p of g.players||[]){ const par=c.par[p.set||'M']||c.par.M, sc=scores[p.id]||{};
       const hc=c.hcp[p.set||'M']||c.hcp.M, ph=typeof p.ph==='number'?p.ph:null;
-      let n=0,gross=0,parPlayed=0,out=0,inn=0,got=0;
-      for(let h=1;h<=18;h++){ const s=+sc[h]; if(!s) continue; n++; gross+=s; parPlayed+=par[h-1]; if(h<=9) out+=s; else inn+=s; if(ph!=null) got+=strokesOn(ph,hc[h-1]); }
-      rows.push({id:p.id,name:p.name,group:g.label||'',groupId:g.id,course:g.course,courseName:c.name,tee:p.tee,n,gross,toPar:gross-parPlayed,out,inn,thru:n===18?'F':String(n),par,ph,flight:p.flight||'',net:ph==null?null:gross-got,netToPar:ph==null?null:gross-got-parPlayed});
+      let n=0,gross=0,parPlayed=0,out=0,inn=0,got=0,pts=0,holesUp=0;
+      for(let h=1;h<=18;h++){ const s=+sc[h]; if(!s) continue; n++; gross+=s; parPlayed+=par[h-1]; if(h<=9) out+=s; else inn+=s; const k=ph!=null?strokesOn(ph,hc[h-1]):0; got+=k;
+        const v=holeValue(pub,fmt,s,s-k,par[h-1]); pts+=v.pts; holesUp+=v.up; }
+      if(fmt==='quota') pts-=n?Math.round((36-(ph||0))*n/18*100)/100:0;   // quota is pro-rated while the round is live; whole at 18
+      if(fmt==='quota'&&n===18) pts=Math.round(pts);
+      rows.push({id:p.id,name:p.name,group:g.label||'',groupId:g.id,course:g.course,courseName:c.name,tee:p.tee,n,gross,toPar:gross-parPlayed,out,inn,thru:n===18?'F':String(n),par,ph,flight:p.flight||'',net:ph==null?null:gross-got,netToPar:ph==null?null:gross-got-parPlayed,pts,holesUp,unit});
     } }
+  return rankRows(rows,unit,opt);
+}
+/* one hole for one player in an individual format → {pts, up} (points formats; par-bogey holes) */
+function holeValue(pub,fmt,gross,net,par){
+  if(fmt==='teamstable') fmt='stableford';   // a player's own points inside a team Stableford
+  const useNet=pub.scoring!=='gross'||fmt==='stableford'||fmt==='modstable'||fmt==='parbogey'; const d=(fmt==='quota'?gross:(useNet?net:gross))-par;
+  if(fmt==='stableford'||fmt==='modstable'||fmt==='quota') return {pts:holePoints(fmt,d,pub.points),up:0};
+  if(fmt==='parbogey') return {pts:0,up:d<0?1:d>0?-1:0};
+  return {pts:0,up:0};
+}
+function rankRows(rows,unit,opt){
   const byNet=opt.sort==='net';
-  const key=r=>byNet?(r.netToPar==null?9999:r.netToPar):r.toPar;
+  const key=unit==='points'?r=>-r.pts:unit==='holes'?r=>-r.holesUp:r=>byNet?(r.netToPar==null?9999:r.netToPar):r.toPar;
   const pool=opt.flight?rows.filter(r=>r.flight===opt.flight):rows;
   const played=pool.filter(r=>r.n>0).sort((a,b)=>key(a)-key(b)||b.n-a.n||a.gross-b.gross||a.name.localeCompare(b.name));
   const idle=pool.filter(r=>!r.n).sort((a,b)=>a.name.localeCompare(b.name));
   let pos=0,prev=null; played.forEach((r,i)=>{ const k=key(r); if(prev===null||k!==prev){ pos=i+1; prev=k; } r.pos=pos; });
-  played.forEach(r=>{ r.posTxt=(played.filter(x=>x.pos===r.pos).length>1?'T':'')+r.pos; });
-  idle.forEach(r=>{ r.posTxt='—'; });
+  played.forEach(r=>{ r.posTxt=(played.filter(x=>x.pos===r.pos).length>1?'T':'')+r.pos; }); idle.forEach(r=>{ r.posTxt='—'; });
   return played.concat(idle);
 }
 
@@ -2111,37 +2125,6 @@ function courseHcp(index,course,teeName,set){ if(index==null) return null; const
 /* strokes a player gets on one hole from a playing handicap (plus handicaps give strokes back, from hcp 18 up) */
 function strokesOn(ph,holeHcp){ if(!ph) return 0; if(ph>0) return Math.floor(ph/18)+(holeHcp<=ph%18?1:0); const g=-ph; return -(Math.floor(g/18)+(holeHcp>18-(g%18)?1:0)); }
 
-/* ---------- best ball ----------
-   Each player plays their own ball; the team's score on a hole is the best (lowest) score among
-   its players who've posted that hole — gross, or net after each player's strokes. */
-function teamKey(p){ return p.team||('solo:'+p.id); }
-function bestBallBoard(pub,scores,opt){
-  opt=opt||{}; const teams=new Map();
-  for(const g of pub.groups||[]){ const c=pub.courses[g.course]; if(!c) continue;
-    for(const p of g.players||[]){ const k=teamKey(p); if(!teams.has(k)) teams.set(k,{id:k,members:[],group:g.label||'',groupId:g.id,course:g.course,courseName:c.name}); teams.get(k).members.push({p,c}); } }
-  const rows=[];
-  for(const t of teams.values()){
-    let n=0,gross=0,toPar=0,net=0,netToPar=0,netOK=t.members.every(m=>typeof m.p.ph==='number');
-    for(let h=1;h<=18;h++){ let bg=null,bgp=null,bn=null,bnp=null;
-      for(const {p,c} of t.members){ const s=+((scores[p.id]||{})[h]); if(!s) continue; const par=(c.par[p.set||'M']||c.par.M)[h-1];
-        if(bg===null||s-par<bgp){ bg=s; bgp=s-par; }
-        if(netOK){ const k=strokesOn(p.ph,(c.hcp[p.set||'M']||c.hcp.M)[h-1]); if(bn===null||s-k-par<bnp){ bn=s-k; bnp=s-k-par; } } }
-      if(bg===null) continue; n++; gross+=bg; toPar+=bgp; if(netOK){ net+=bn; netToPar+=bnp; } }
-    const flights=[...new Set(t.members.map(m=>m.p.flight).filter(Boolean))];
-    rows.push({id:t.id,name:t.members.map(m=>m.p.name).join(' / '),members:t.members.map(m=>m.p.id),group:t.group,groupId:t.groupId,course:t.course,courseName:t.courseName,
-      n,gross,toPar,thru:n===18?'F':String(n),net:netOK?net:null,netToPar:netOK?netToPar:null,flight:flights.length===1?flights[0]:flights.join('/'),team:true});
-  }
-  const byNet=opt.sort==='net', key=r=>byNet?(r.netToPar==null?9999:r.netToPar):r.toPar;
-  const pool=opt.flight?rows.filter(r=>r.flight===opt.flight):rows;
-  const played=pool.filter(r=>r.n>0).sort((a,b)=>key(a)-key(b)||b.n-a.n||a.gross-b.gross||a.name.localeCompare(b.name));
-  const idle=pool.filter(r=>!r.n).sort((a,b)=>a.name.localeCompare(b.name));
-  let pos=0,prev=null; played.forEach((r,i)=>{ const k=key(r); if(prev===null||k!==prev){ pos=i+1; prev=k; } r.pos=pos; });
-  played.forEach(r=>{ r.posTxt=(played.filter(x=>x.pos===r.pos).length>1?'T':'')+r.pos; }); idle.forEach(r=>{ r.posTxt='—'; });
-  return played.concat(idle);
-}
-/* the board for an event: teams for best ball (unless players are asked for), players for stroke play */
-function eventBoard(pub,scores,opt){ opt=opt||{}; return pub.format==='bestball'&&opt.view!=='players'?bestBallBoard(pub,scores,opt):leaderboard(pub,scores,opt); }
-const FORMAT_LABEL={stroke:'Stroke play',bestball:'Best ball'};
 
 /* ---------- skins ----------
    skinsResult(pub, scores, rules, playerIds) → {wins:[{hole,pid,name,score,net,count,status:'won'|'void'|'pending',checkHole}],
@@ -2240,7 +2223,9 @@ function scorecardHTML(pub,g,scores,opt){
   const ps=g.players, TEAM=isTeamEvent(pub), basisNet=(pub.scoring==='net'), split=pub.format==='split';
   const par=p=>c.par[p.set||'M']||c.par.M, hc=p=>c.hcp[p.set||'M']||c.hcp.M;
   const sc=p=>scores[p.id]||{};
-  const phFor=(p,h)=>{ const f=holeFormat(pub,h); if(f==='scramble') return null; return f==='stroke'?p.ph:segPH(pub,p,f); };
+  const oneBallH=h=>(FORMATS[holeFormat(pub,h)]||{}).entry==='team', ptsMode=unitOf(pub)==='points', unit=unitOf(pub);
+  const LB=!TEAM&&unit!=='strokes'&&unit!=='match'?leaderboard(pub,scores,{}):[];
+  const phFor=(p,h)=>{ const f=holeFormat(pub,h); if(oneBallH(h)) return null; return segPH(pub,p,f); };
   const k=(p,h)=>{ const ph=phFor(p,h); return typeof ph==='number'?strokesOn(ph,hc(p)[h-1]):0; };
   const teesUsed=[...new Set(ps.map(p=>p.tee))].filter(t=>c.tees&&t in c.tees);
   const anyW=ps.some(p=>p.set==='W');
@@ -2252,38 +2237,40 @@ function scorecardHTML(pub,g,scores,opt){
   const range=(a,b)=>Array.from({length:b-a+1},(_,i)=>a+i);
   const sumH=(fn,a,b)=>{ let t=0,n=0; for(let h=a;h<=b;h++){ const v=fn(h); if(v!=null){ t+=v; n++; } } return n?t:''; };
   const phTxt=v=>typeof v==='number'?(v<0?'+'+(-v):v):'';
-  const plFmt=eventFormats(pub).find(f=>f!=='scramble');
+  const plFmt=eventFormats(pub).find(f=>(FORMATS[f]||{}).entry==='player');
   const tables=halves.map(([a,b])=>{
     const nines=a===1&&b===18?[[1,9,'Out'],[10,18,'In']]:[[a,b,a===1?'Out':'In']];
     const endCols=(a===1&&b===18)||b===18;
-    const fmtRow=split?`<tr class="wc-fmt"><th>Format</th>${nines.map(([x,y])=>`<td colspan="${y-x+2}">${E(FORMAT_LABEL[holeFormat(pub,x)])}${holeFormat(pub,x)==='scramble'?' · team score':''}</td>`).join('')}${endCols?'<td colspan="3"></td>':''}</tr>`:'';
-    const head=`<tr class="wc-h"><th>Hole</th>${nines.map(([x,y,l])=>range(x,y).map(h=>`<th>${h}</th>`).join('')+`<th class="wc-tot">${l}</th>`).join('')}${endCols?'<th class="wc-tot">Tot</th><th class="wc-tot">Hcp</th><th class="wc-tot">Net</th>':''}</tr>`;
+    const fmtRow=split?`<tr class="wc-fmt"><th>Format</th>${nines.map(([x,y])=>`<td colspan="${y-x+2}">${E(FORMAT_LABEL[holeFormat(pub,x)])}${oneBallH(x)?' · team score':''}</td>`).join('')}${endCols?'<td colspan="3"></td>':''}</tr>`:'';
+    const lastCol=ptsMode?'Pts':unit==='holes'?'+/−':'Net';
+    const head=`<tr class="wc-h"><th>Hole</th>${nines.map(([x,y,l])=>range(x,y).map(h=>`<th>${h}</th>`).join('')+`<th class="wc-tot">${l}</th>`).join('')}${endCols?`<th class="wc-tot">Tot</th><th class="wc-tot">Hcp</th><th class="wc-tot">${lastCol}</th>`:''}</tr>`;
     const lineRow=(cls,label,valFn,totFn)=>`<tr class="${cls}"><th>${label}</th>${nines.map(([x,y])=>range(x,y).map(h=>`<td>${valFn(h)??''}</td>`).join('')+`<td class="wc-tot">${totFn?totFn(x,y):''}</td>`).join('')}${endCols?`<td class="wc-tot">${totFn?totFn(1,18):''}</td><td class="wc-tot"></td><td class="wc-tot"></td>`:''}</tr>`;
     const tees=teesUsed.map(t=>{ const y=c.tees[t]; return lineRow('t-'+t.toLowerCase().replace('/','-'),E(t),h=>y?y[h-1]:'·',(x,z)=>y?sumH(h=>y[h-1],x,z):''); }).join('');
     const hcpM=lineRow('wc-hc','Men’s Handicap',h=>c.hcp.M[h-1]);
     const parRow=lineRow('wc-par','Par',h=>(anyW&&c.par.W[h-1]!==c.par.M[h-1])?c.par.M[h-1]+'/'+c.par.W[h-1]:c.par.M[h-1],(x,z)=>sumH(h=>c.par.M[h-1],x,z));
     const hcpW=anyW?lineRow('wc-hc','Women’s Handicap',h=>c.hcp.W[h-1]):'';
-    const pRow=p=>{ const S=sc(p), own=h=>holeFormat(pub,h)!=='scramble'&&S[h]?+S[h]:null;
+    const pRow=p=>{ const S=sc(p), own=h=>!oneBallH(h)&&S[h]?+S[h]:null;
       const gT=(x,z)=>sumH(own,x,z), nT=(x,z)=>sumH(h=>own(h)!=null?own(h)-k(p,h):null,x,z);
-      const cells=nines.map(([x,y])=>range(x,y).map(h=>{ if(holeFormat(pub,h)==='scramble') return '<td class="wc-x"></td>';
+      const me=LB.find(r=>r.id===p.id), lastVal=ptsMode?(me&&me.n?me.pts:''):unit==='holes'?(me&&me.n?(me.holesUp>0?'+':'')+me.holesUp:''):null;
+      const cells=nines.map(([x,y])=>range(x,y).map(h=>{ if(oneBallH(h)) return '<td class="wc-x"></td>';
         const s=+S[h], kk=k(p,h);
         if(!s) return `<td>${kk>0?'<span class="wc-dot"></span>'.repeat(Math.min(kk,2)):''}</td>`;
         return `<td class="${TEAM&&counted.has(p.id+'|'+h)?'wc-c':''}"><span class="wc-s ${shape(s,par(p)[h-1])}">${s}</span>${kk?`<span class="wc-n" title="Net ${s-kk}">${s-kk}</span>`:''}</td>`; }).join('')+`<td class="wc-tot">${gT(x,y)}</td>`).join('');
-      const ph=plFmt?(plFmt==='stroke'?p.ph:segPH(pub,p,plFmt)):null; const allOwn=range(1,18).every(h=>holeFormat(pub,h)==='scramble'||S[h]);
-      return `<tr class="wc-p${opt.highlight&&(opt.highlight===p.id||opt.highlight===p.team)?' wc-me':''}"><th title="${E(p.name)}">${E(short(p.name))}<small>${E(p.tee)}${p.flight?' · Flight '+E(p.flight):''}${typeof ph==='number'?' · plays '+phTxt(ph):''}</small></th>${cells}${endCols?`<td class="wc-tot">${gT(1,18)}</td><td class="wc-tot">${phTxt(ph)}</td><td class="wc-tot wc-net">${allOwn&&typeof ph==='number'?nT(1,18):''}</td>`:''}</tr>`; };
-    const tRow=t=>{ const T=TH[t.key]; const main=h=>T[h]?(basisNet&&T[h].net!=null?T[h].net:T[h].gross):null, other=h=>T[h]?(basisNet?T[h].gross:T[h].net):null;
-      const cells=nines.map(([x,y])=>range(x,y).map(h=>{ const v=main(h); const scr=holeFormat(pub,h)==='scramble';
-        if(v==null){ const tph=scr?scrambleTeamPH(pub,t.members):null, kk=tph==null?0:strokesOn(tph,hc(t.captain)[h-1]); return `<td>${kk>0?'<span class="wc-dot"></span>'.repeat(Math.min(kk,2)):''}</td>`; }
-        const o=other(h); return `<td><span class="wc-s ${shape(v,T[h].par)}">${v}</span>${o!=null&&o!==v?`<span class="wc-n" title="${basisNet?'Gross':'Net'} ${o}">${o}</span>`:''}</td>`; }).join('')+`<td class="wc-tot">${sumH(main,x,y)}</td>`).join('');
-      const gross=sumH(h=>T[h]?T[h].gross:null,1,18), net=sumH(h=>T[h]&&T[h].net!=null?T[h].net:null,1,18);
-      const tph=eventFormats(pub).includes('scramble')?scrambleTeamPH(pub,t.members):null;
-      const lab=split?'Team':FORMAT_LABEL[holeFormat(pub,1)]==='Scramble'?'Team score':'Best ball';
-      return `<tr class="wc-t"><th>${opt.split?'Team':lab}${basisNet?' net':''}<small>${E(t.members.map(p=>p.name.split(' ').slice(-1)[0]).join(' & '))}</small></th>${cells}${endCols?`<td class="wc-tot">${basisNet?net:gross}</td><td class="wc-tot">${tph!=null?phTxt(tph):''}</td><td class="wc-tot wc-net">${net}</td>`:''}</tr>`; };
+      const ph=plFmt?segPH(pub,p,plFmt):null; const allOwn=range(1,18).every(h=>oneBallH(h)||S[h]);
+      return `<tr class="wc-p${opt.highlight&&(opt.highlight===p.id||opt.highlight===p.team)?' wc-me':''}"><th title="${E(p.name)}">${E(short(p.name))}<small>${E(p.tee)}${p.flight?' · Flight '+E(p.flight):''}${typeof ph==='number'?' · plays '+phTxt(ph):''}</small></th>${cells}${endCols?`<td class="wc-tot">${gT(1,18)}</td><td class="wc-tot">${phTxt(ph)}</td><td class="wc-tot wc-net">${lastVal!=null?lastVal:(allOwn&&typeof ph==='number'?nT(1,18):'')}</td>`:''}</tr>`; };
+    const tRow=t=>{ const T=TH[t.key]; const main=h=>T[h]?(ptsMode?T[h].pts:(basisNet&&T[h].net!=null?T[h].net:T[h].gross)):null, other=h=>T[h]&&!ptsMode?(basisNet?T[h].gross:T[h].net):null;
+      const cells=nines.map(([x,y])=>range(x,y).map(h=>{ const v=main(h); const scr=oneBallH(h);
+        if(v==null){ const tph=scr?teamPH(pub,holeFormat(pub,h),t.members):null, kk=tph==null?0:strokesOn(tph,hc(t.captain)[h-1]); return `<td>${kk>0?'<span class="wc-dot"></span>'.repeat(Math.min(kk,2)):''}</td>`; }
+        const o=other(h); return `<td><span class="wc-s ${ptsMode?'':shape(v,T[h].par)}">${v}</span>${o!=null&&o!==v?`<span class="wc-n" title="${basisNet?'Gross':'Net'} ${o}">${o}</span>`:''}</td>`; }).join('')+`<td class="wc-tot">${sumH(main,x,y)}</td>`).join('');
+      const gross=sumH(h=>T[h]?T[h].gross:null,1,18), net=sumH(h=>T[h]&&T[h].net!=null?T[h].net:null,1,18), pts=sumH(h=>T[h]?T[h].pts:null,1,18);
+      const oneFmt=eventFormats(pub).find(f=>(FORMATS[f]||{}).entry==='team'), tph=oneFmt?teamPH(pub,oneFmt,t.members):null;
+      const lab=split?'Team':oneFmt?'Team score':ptsMode?'Team points':'Team';
+      return `<tr class="wc-t"><th>${opt.split?'Team':lab}${basisNet&&!ptsMode?' net':''}<small>${E(t.members.map(p=>p.name.split(' ').slice(-1)[0]).join(' & '))}</small></th>${cells}${endCols?`<td class="wc-tot">${ptsMode?pts:(basisNet?net:gross)}</td><td class="wc-tot">${tph!=null?phTxt(tph):''}</td><td class="wc-tot wc-net">${ptsMode?'':net}</td>`:''}</tr>`; };
     const body=TEAM?teams.map(t=>t.members.map(pRow).join('')+tRow(t)).join(''):ps.map(pRow).join('');
     return `<div class="wc-wrap"><table>${fmtRow}${head}${tees}${hcpM}${parRow}${body}${hcpW}</table></div>`;
   }).join(opt.split?'<div style="height:8px"></div>':'');
   const status=pub.status==='final'?'<span class="wc-final">FINAL</span>':'';
-  const key=`<div class="wc-key"><span><span class="wc-s b">3</span>Birdie</span><span><span class="wc-s e">2</span>Eagle</span><span><span class="wc-s o">5</span>Bogey</span><span><span class="wc-s d">6</span>Double+</span><span><em>3</em>Net where a stroke is given</span>${TEAM&&eventFormats(pub).some(f=>f!=='scramble')?`<span><i></i>Ball that counted</span>`:''}${eventFormats(pub).includes('scramble')?'<span><b class="wc-xk"></b>Team plays one ball (scramble)</span>':''}</div>`;
+  const key=`<div class="wc-key"><span><span class="wc-s b">3</span>Birdie</span><span><span class="wc-s e">2</span>Eagle</span><span><span class="wc-s o">5</span>Bogey</span><span><span class="wc-s d">6</span>Double+</span><span><em>3</em>Net where a stroke is given</span>${TEAM&&eventFormats(pub).some(f=>(FORMATS[f]||{}).entry==='player')?`<span><i></i>Ball that counted</span>`:''}${eventFormats(pub).some(f=>(FORMATS[f]||{}).entry==='team')?'<span><b class="wc-xk"></b>Team plays one ball</span>':''}</div>`;
   return `<div class="wc" style="--wc-accent:${accent}"><div class="wc-top"><div><div class="nm">${E(c.name)}</div><small>Walnut Creek Country Club · Mansfield, Texas</small></div><div class="ev"><b>${E(pub.name)}</b>${E([pub.date?new Date(pub.date+'T12:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}):'',g.label,formatSummary(pub)].filter(Boolean).join(' · '))}<br>${status}</div></div>${tables}${key}<div class="wc-sign"><span>Scorer ________________</span><span>Attest ________________</span></div></div>`;
 }
 
@@ -2291,48 +2278,125 @@ function scorecardHTML(pub,g,scores,opt){
    WHS Appendix C recommendations: individual stroke play 95%; four-ball stroke play 85%;
    2-player scramble 35% low / 15% high; 4-player scramble 25/20/15/10%. Shamble isn't in
    Appendix C — defaulted to 85% (it plays as four-ball after the drive); set it per event. */
-const TEAM_FORMATS=['bestball','scramble','shamble'];
-const USGA_ALLOW={stroke:95,bestball:85,shamble:85,scramble2:[35,15],scramble3:[30,20,10],scramble4:[25,20,15,10]};
-FORMAT_LABEL.scramble='Scramble'; FORMAT_LABEL.shamble='Shamble'; FORMAT_LABEL.split='Split format';
+/* ---------- formats ----------
+   See docs/formats.md. An event has format (id below, or 'split' with front/back), teamSize (1–6), count (balls that
+   count, for best ball / shamble / team Stableford), countPattern ('123' = 1 ball holes 1–6, 2 on 7–12, 3 on 13–18),
+   scoring ('gross' | 'net') and allow (allowance overrides by key, see allowKey). */
+const FORMATS={
+  stroke:{label:'Stroke play',team:false,unit:'strokes',entry:'player'},
+  stableford:{label:'Stableford',team:false,unit:'points',entry:'player'},
+  modstable:{label:'Modified Stableford',team:false,unit:'points',entry:'player'},
+  quota:{label:'Quota',team:false,unit:'points',entry:'player'},
+  parbogey:{label:'Par / Bogey',team:false,unit:'holes',entry:'player'},
+  match:{label:'Match play',team:'match',unit:'match',entry:'player'},
+  bestball:{label:'Best ball',team:true,unit:'strokes',entry:'player',count:true},
+  aggregate:{label:'Aggregate',team:true,unit:'strokes',entry:'player'},
+  scramble:{label:'Scramble',team:true,unit:'strokes',entry:'team'},
+  shamble:{label:'Shamble',team:true,unit:'strokes',entry:'player',count:true},
+  foursomes:{label:'Foursomes (alternate shot)',team:true,unit:'strokes',entry:'team',size:2},
+  greensome:{label:'Greensome / Chapman',team:true,unit:'strokes',entry:'team',size:2},
+  teamstable:{label:'Team Stableford',team:true,unit:'points',entry:'player',count:true},
+  split:{label:'Front & back differ',team:true,unit:'strokes',entry:'player'}
+};
+const FORMAT_LABEL=Object.fromEntries(Object.entries(FORMATS).map(([k,v])=>[k,v.label]));
+const TEAM_FORMATS=Object.keys(FORMATS).filter(k=>FORMATS[k].team===true);
+/* points per hole by score to par (d): standard Stableford, the modified (pro-tour) table, and quota points (gross) */
+const PTS={stableford:{'-3':5,'-2':4,'-1':3,'0':2,'1':1},modstable:{'-3':8,'-2':5,'-1':2,'0':0,'1':-1,'2':-3},quota:{'-3':16,'-2':8,'-1':4,'0':2,'1':1}};
+function holePoints(fmt,d,custom){ const t=(custom&&custom[fmt])||PTS[fmt]; if(!t) return 0; const k=Math.min(2,Math.max(-3,d)); return t[String(k)]!=null?+t[String(k)]:(k>=2&&fmt==='modstable'?-3:0); }
+/* default allowances (USGA Appendix C where it has one; otherwise club defaults — docs/formats.md) */
+const USGA_ALLOW={stroke:95,stableford:95,modstable:95,quota:100,parbogey:95,match:100,match4:90,aggregate:100,foursomes:50,greensome:[60,40],
+  scramble2:[35,15],scramble3:[30,20,10],scramble4:[25,20,15,10],scramble5:[20,15,10,5,5],scramble6:[15,12,9,6,3,3],
+  bestball1of2:85,bestball1of3:80,bestball2of3:90,bestball1of4:75,bestball2of4:85,bestball3of4:100,shamble1of2:85,teamstable1of2:85,teamstable2of4:85,
+  bestball:85,shamble:85};   // the last two: keys older events saved
+function defaultAllow(key){ if(USGA_ALLOW[key]!=null) return USGA_ALLOW[key];
+  const m=/^(bestball|shamble|teamstable)(\d)of(\d)$/.exec(key); if(m){ const k=+m[2], n=+m[3], bb=USGA_ALLOW['bestball'+k+'of'+n]; if(bb!=null) return bb; return k>=n?100:k===1?75:k===2?85:100; }
+  const sc=/^scramble(\d)$/.exec(key); if(sc) return USGA_ALLOW.scramble4.slice(0,+sc[1]);
+  return 100; }
+const teamSizeOf=pub=>Math.max(1,Math.min(6,+pub.teamSize||(FORMATS[pub.format]&&FORMATS[pub.format].team?2:1)));
+const countOf=pub=>Math.max(1,Math.min(teamSizeOf(pub)-1,+pub.count||1));
+/* the allowance key for a format in this event (team size and balls counting are part of it) */
+function allowKey(pub,fmt){ const n=teamSizeOf(pub);
+  if(fmt==='scramble') return 'scramble'+n; if(fmt==='match') return n>=2?'match4':'match';
+  if(FORMATS[fmt]&&FORMATS[fmt].count) return fmt+countOf(pub)+'of'+n; return fmt; }
+function allowOf(pub){ return Object.assign({},USGA_ALLOW,pub.allow||{}); }
+function pctFor(pub,key){ const A=pub.allow||{}; if(A[key]!=null) return A[key]; const base=key.replace(/\dof\d$/,''); if(A[base]!=null&&base!==key) return A[base]; return defaultAllow(key); }
 function holeFormat(pub,h){ return pub.format==='split'?(h<=9?pub.front:pub.back):(pub.format||'stroke'); }
 function eventFormats(pub){ return pub.format==='split'?[pub.front,pub.back]:[pub.format||'stroke']; }
-function isTeamEvent(pub){ return eventFormats(pub).some(f=>TEAM_FORMATS.includes(f)); }
-function formatSummary(pub){ return pub.format==='split'?`Front: ${FORMAT_LABEL[pub.front]} · Back: ${FORMAT_LABEL[pub.back]}`:(FORMAT_LABEL[pub.format]||'Stroke play'); }
-function allowOf(pub){ return Object.assign({},USGA_ALLOW,pub.allow||{}); }
-/* a player's playing handicap for a per-player format (stroke / best ball / shamble) */
-function segPH(pub,p,fmt){ if(typeof p.ch!=='number') return typeof p.ph==='number'?p.ph:null; const a=allowOf(pub)[fmt==='stroke'?'stroke':fmt]; return whsRound(p.ch*(+a||100)/100); }
-/* a scramble team's handicap: course handicaps low→high, weighted by the scramble percentages */
-function scrambleTeamPH(pub,members){ const chs=members.map(p=>p.ch).filter(v=>typeof v==='number').sort((a,b)=>a-b); if(chs.length!==members.length||!chs.length) return null;
-  const A=allowOf(pub), pct=A['scramble'+chs.length]||A.scramble4.slice(0,chs.length); return whsRound(chs.reduce((t,ch,i)=>t+ch*(+pct[i]||0)/100,0)); }
-/* teams in playing order; the first player listed carries the team's score on scramble holes */
+function isTeamEvent(pub){ return eventFormats(pub).some(f=>FORMATS[f]&&FORMATS[f].team===true); }
+function isMatchEvent(pub){ return eventFormats(pub).includes('match'); }
+function unitOf(pub){ const fs=eventFormats(pub); return fs.includes('match')?'match':fs.some(f=>FORMATS[f]&&FORMATS[f].unit==='points')?'points':fs.some(f=>f==='parbogey')?'holes':'strokes'; }
+function playerFormatOf(pub){ return eventFormats(pub).find(f=>FORMATS[f]&&FORMATS[f].entry==='player')||'stroke'; }
+/* an individual's unit on their own row (team Stableford players still count points) */
+function formatSummary(pub){ const n=teamSizeOf(pub), k=countOf(pub), one=f=>{ const F=FORMATS[f]||FORMATS.stroke; let l=F.label; if(F.count) l+=pub.countPattern==='123'&&n===4?' 1-2-3':` (best ${k} of ${n})`; else if(F.team===true&&!F.size) l+=` (${n}-player)`; if(f==='match') l=n>=2?'Four-ball match play':'Singles match play'; return l; };
+  return pub.format==='split'?`Front: ${one(pub.front)} · Back: ${one(pub.back)}`:one(pub.format||'stroke'); }
+/* a player's playing handicap for a per-player format in this event (from their course handicap) */
+function segPH(pub,p,fmt){ if(typeof p.ch!=='number') return typeof p.ph==='number'?p.ph:null; const a=pctFor(pub,allowKey(pub,fmt)); return whsRound(p.ch*(+a||100)/100); }
+const phFromCH=(pub,ch)=>ch==null?null:whsRound(ch*(+pctFor(pub,allowKey(pub,playerFormatOf(pub)))||100)/100);
+/* one playing handicap for a team that plays one ball: scramble (weighted CHs low → high), foursomes (50% of the
+   combined CH), greensome / Chapman (60% low + 40% high) */
+function teamPH(pub,fmt,members){ const chs=members.map(p=>p.ch).filter(v=>typeof v==='number').sort((a,b)=>a-b); if(chs.length!==members.length||!chs.length) return null;
+  if(fmt==='foursomes') return whsRound(chs.reduce((a,b)=>a+b,0)*(+pctFor(pub,'foursomes')||50)/100);
+  if(fmt==='greensome'){ const w=pctFor(pub,'greensome'); return whsRound(chs[0]*(+w[0]||60)/100+chs[chs.length-1]*(+w[1]||40)/100); }
+  const pct=pctFor(pub,'scramble'+chs.length); return whsRound(chs.reduce((t,ch,i)=>t+ch*(+pct[i]||0)/100,0)); }
+const scrambleTeamPH=(pub,members)=>teamPH(pub,'scramble',members);
+/* balls that count on a hole for a best-ball style format */
+function countOn(pub,fmt,h,size){ if(fmt==='aggregate') return size; if(!(FORMATS[fmt]&&FORMATS[fmt].count)) return 1; if(pub.countPattern==='123') return Math.min(size,h<=6?1:h<=12?2:3); return Math.min(size,countOf(pub)); }
+function teamKey(p){ return p.team||('solo:'+p.id); }
+/* teams in playing order; the first player listed carries the team's score on one-ball holes */
 function groupTeams(g){ const m=new Map(); for(const p of g.players||[]){ const k=teamKey(p); if(!m.has(k)) m.set(k,[]); m.get(k).push(p); } return [...m.entries()].map(([k,ms])=>({key:k,members:ms,captain:ms[0]})); }
-/* one team's result on one hole: {gross, net, par, by} (by = player whose ball counted, if any) */
+/* one team's result on one hole: {gross, net, par, pts, by, bys, fmt}; by/bys = the ball(s) that counted */
 function teamHole(pub,c,t,h,scores){
-  const fmt=holeFormat(pub,h), hcpOf=p=>(c.hcp[p.set||'M']||c.hcp.M)[h-1], parOf=p=>(c.par[p.set||'M']||c.par.M)[h-1];
-  if(fmt==='scramble'){ const s=+((scores[t.captain.id]||{})[h]); if(!s) return null; const tph=scrambleTeamPH(pub,t.members);
-    return {gross:s,net:tph==null?null:s-strokesOn(tph,hcpOf(t.captain)),par:parOf(t.captain),by:null,fmt}; }
-  let best=null; for(const p of t.members){ const s=+((scores[p.id]||{})[h]); if(!s) continue; const ph=segPH(pub,p,fmt), k=ph==null?0:strokesOn(ph,hcpOf(p)), par=parOf(p);
-    const cand={gross:s,net:ph==null?null:s-k,par,by:p.id,fmt}; const key=pub.scoring==='net'&&cand.net!=null?cand.net-par:s-par;
-    if(!best||key<best.key) best=Object.assign(cand,{key}); }
-  return best;
+  const fmt=holeFormat(pub,h), F=FORMATS[fmt]||FORMATS.stroke, hcpOf=p=>(c.hcp[p.set||'M']||c.hcp.M)[h-1], parOf=p=>(c.par[p.set||'M']||c.par.M)[h-1];
+  if(F.entry==='team'){ const s=+((scores[t.captain.id]||{})[h]); if(!s) return null; const tph=teamPH(pub,fmt,t.members);
+    return {gross:s,net:tph==null?null:s-strokesOn(tph,hcpOf(t.captain)),par:parOf(t.captain),pts:0,by:null,bys:[],fmt}; }
+  const balls=[]; for(const p of t.members){ const s=+((scores[p.id]||{})[h]); if(!s) continue; const ph=segPH(pub,p,fmt), k=ph==null?0:strokesOn(ph,hcpOf(p)), par=parOf(p);
+    const net=ph==null?null:s-k, pts=fmt==='teamstable'?holePoints('stableford',(net==null?s:net)-par,pub.points):0;
+    balls.push({id:p.id,gross:s,net,par,pts,key:fmt==='teamstable'?-pts:(pub.scoring==='net'&&net!=null?net-par:s-par)}); }
+  if(!balls.length) return null;
+  balls.sort((a,b)=>a.key-b.key); const use=balls.slice(0,countOn(pub,fmt,h,t.members.length));
+  return {gross:use.reduce((a,b)=>a+b.gross,0),net:use.every(b=>b.net!=null)?use.reduce((a,b)=>a+b.net,0):null,par:use.reduce((a,b)=>a+b.par,0),pts:use.reduce((a,b)=>a+b.pts,0),by:use[0].id,bys:use.map(b=>b.id),fmt};
 }
 function teamBoard(pub,scores,opt){
-  opt=opt||{}; const rows=[];
+  opt=opt||{}; const rows=[], unit=unitOf(pub);
   for(const g of pub.groups||[]){ const c=pub.courses[g.course]; if(!c) continue;
-    for(const t of groupTeams(g)){ let n=0,gross=0,toPar=0,net=0,netToPar=0,netOK=true;
-      for(let h=1;h<=18;h++){ const r=teamHole(pub,c,t,h,scores); if(!r) continue; n++; gross+=r.gross; toPar+=r.gross-r.par; if(r.net==null) netOK=false; else { net+=r.net; netToPar+=r.net-r.par; } }
+    for(const t of groupTeams(g)){ let n=0,gross=0,toPar=0,net=0,netToPar=0,netOK=true,pts=0;
+      for(let h=1;h<=18;h++){ const r=teamHole(pub,c,t,h,scores); if(!r) continue; n++; gross+=r.gross; toPar+=r.gross-r.par; pts+=r.pts; if(r.net==null) netOK=false; else { net+=r.net; netToPar+=r.net-r.par; } }
       const fl=[...new Set(t.members.map(p=>p.flight).filter(Boolean))];
       rows.push({id:t.key,name:t.members.map(p=>p.name).join(' / '),members:t.members.map(p=>p.id),group:g.label||'',groupId:g.id,course:g.course,courseName:c.name,
-        n,gross,toPar,thru:n===18?'F':String(n),net:netOK?net:null,netToPar:netOK?netToPar:null,flight:fl.join('/'),team:true}); } }
-  const byNet=opt.sort==='net', key=r=>byNet?(r.netToPar==null?9999:r.netToPar):r.toPar;
+        n,gross,toPar,thru:n===18?'F':String(n),net:netOK?net:null,netToPar:netOK?netToPar:null,pts,holesUp:0,flight:fl.join('/'),team:true,unit}); } }
+  return rankRows(rows,unit,opt);
+}
+/* ---------- match play ----------
+   The two sides in a group (teams, or the two players in singles) play hole by hole: the better net ball wins the
+   hole. Everyone in a match plays off the lowest playing handicap in it (strokes = PH − lowest). A side's row carries
+   the match status; standings give a win 1 point and a halve ½. */
+function matchStatus(up,played,finished){ const left=18-played, by=Math.abs(up);
+  if(finished||by>left||played===18){ if(up===0) return {txt:'AS',over:true,won:0}; return {txt:left>0&&by>left?`${by}&${left}`:`${by} up`,over:true,won:up>0?1:-1}; }
+  if(!played) return {txt:'—',over:false,won:0};
+  return {txt:(up===0?'AS':Math.abs(up)+' '+(up>0?'up':'dn'))+(up!==0&&Math.abs(up)===left?' · dormie':'')+' thru '+played,over:false,won:0}; }
+function matchBoard(pub,scores,opt){
+  opt=opt||{}; const rows=[];
+  for(const g of pub.groups||[]){ const c=pub.courses[g.course]; if(!c) continue; const sides=groupTeams(g); if(sides.length<2) continue;
+    for(let i=0;i+1<sides.length;i+=2){ const A=sides[i], B=sides[i+1], all=A.members.concat(B.members);
+      const phs=all.map(p=>segPH(pub,p,'match')), low=phs.some(v=>v==null)?null:Math.min(...phs), rel=p=>{ const v=segPH(pub,p,'match'); return v==null||low==null?0:v-low; };
+      const side=(S,h)=>{ let best=null; for(const p of S.members){ const s=+((scores[p.id]||{})[h]); if(!s) continue; const net=s-strokesOn(rel(p),(c.hcp[p.set||'M']||c.hcp.M)[h-1]); if(best==null||net<best) best=net; } return best; };
+      let up=0,played=0,wA=0,wB=0; const order=playOrder(g.startHole), holes=[];
+      for(const h of order){ const a=side(A,h), b=side(B,h); if(a==null||b==null) break; played++; if(a<b){ up++; wA++; } else if(b<a){ up--; wB++; } holes.push({h,a,b}); if(Math.abs(up)>18-played) break; }
+      const st=matchStatus(up,played,false);
+      const mk=(S,O,sign,won,lost)=>({id:S.key,name:S.members.map(p=>p.name).join(' / '),members:S.members.map(p=>p.id),opp:O.members.map(p=>p.name).join(' / '),group:g.label||'',groupId:g.id,course:g.course,courseName:c.name,
+        n:played,thru:played===18||st.over?'F':String(played),status:st.over?(sign*up>0?st.txt:sign*up<0?'lost '+st.txt:'AS'):(up===0?st.txt:(sign*up>0?Math.abs(up)+' up':Math.abs(up)+' dn')+(st.txt.includes('dormie')?' · dormie':'')+' thru '+played),
+        pts:st.over?(sign*up>0?1:sign*up<0?0:0.5):0,holesWon:won,holesLost:lost,gross:0,toPar:0,net:null,netToPar:null,holesUp:sign*up,flight:[...new Set(S.members.map(p=>p.flight).filter(Boolean))].join('/'),team:S.members.length>1,unit:'match',over:st.over,holes});
+      rows.push(mk(A,B,1,wA,wB),mk(B,A,-1,wB,wA)); } }
   const pool=opt.flight?rows.filter(r=>r.flight===opt.flight):rows;
-  const played=pool.filter(r=>r.n>0).sort((a,b)=>key(a)-key(b)||b.n-a.n||a.gross-b.gross||a.name.localeCompare(b.name)), idle=pool.filter(r=>!r.n).sort((a,b)=>a.name.localeCompare(b.name));
-  let pos=0,prev=null; played.forEach((r,i)=>{ const k=key(r); if(prev===null||k!==prev){ pos=i+1; prev=k; } r.pos=pos; });
+  const played=pool.filter(r=>r.n>0).sort((a,b)=>b.pts-a.pts||b.holesUp-a.holesUp||a.name.localeCompare(b.name)), idle=pool.filter(r=>!r.n).sort((a,b)=>a.name.localeCompare(b.name));
+  let pos=0,prev=null; played.forEach((r,i)=>{ const k=r.pts*100+r.holesUp; if(prev===null||k!==prev){ pos=i+1; prev=k; } r.pos=pos; });
   played.forEach(r=>{ r.posTxt=(played.filter(x=>x.pos===r.pos).length>1?'T':'')+r.pos; }); idle.forEach(r=>{ r.posTxt='—'; });
   return played.concat(idle);
 }
-/* team events rank teams (players view only makes sense without scramble holes) */
-function eventBoard(pub,scores,opt){ opt=opt||{}; const noPlayers=eventFormats(pub).includes('scramble');
+/* the board for an event: match rows, team rows (players view only when every hole has a ball per player), or players */
+function eventBoard(pub,scores,opt){ opt=opt||{};
+  if(isMatchEvent(pub)) return matchBoard(pub,scores,opt);
+  const noPlayers=eventFormats(pub).some(f=>FORMATS[f]&&FORMATS[f].entry==='team');
   return isTeamEvent(pub)&&(opt.view!=='players'||noPlayers)?teamBoard(pub,scores,opt):leaderboard(pub,scores,opt); }
 function bestBallBoard(pub,scores,opt){ return teamBoard(pub,scores,opt); }
 
@@ -2359,21 +2423,23 @@ function golfData(){
 }
 const courseById=id=>golfData().courses.find(c=>c.id===id);
 /* formats + allowances per event (USGA defaults; an older single allowance carries over to its format) */
-function migrateAllow(e){ if(!e.allow){ e.allow=clone(USGA_ALLOW); if(e.allowance!=null&&e.allowance!==100&&(e.format==='stroke'||e.format==='bestball')) e.allow[e.format]=+e.allowance; }
-  e.allow=Object.assign(clone(USGA_ALLOW),e.allow); if(!e.front) e.front='scramble'; if(!e.back) e.back='shamble'; }
-const evFormats=ev=>ev.format==='split'?[ev.front,ev.back]:[ev.format||'stroke'];
-const evTeam=ev=>evFormats(ev).some(f=>TEAM_FORMATS.includes(f));
-const evPlayerFmt=ev=>evFormats(ev).find(f=>f!=='scramble')||'stroke';
-const evSummary=ev=>ev.format==='split'?`Front ${FORMAT_LABEL[ev.front]} · Back ${FORMAT_LABEL[ev.back]}`:(FORMAT_LABEL[ev.format]||'Stroke play');
+function migrateAllow(e){ if(!e.allow){ e.allow={}; if(e.allowance!=null&&e.allowance!==100&&(e.format==='stroke'||e.format==='bestball')) e.allow[e.format]=+e.allowance; }
+  for(const k of Object.keys(e.allow)){ const d=USGA_ALLOW[k]; if(d!=null&&JSON.stringify(d)===JSON.stringify(e.allow[k])) delete e.allow[k]; }   // older events saved every default
+  if(!e.front) e.front='scramble'; if(!e.back) e.back='shamble'; if(!e.teamSize) e.teamSize=isTeamEvent(e)?Math.max(2,...e.groups.map(g=>Math.max(0,...groupTeams(g).map(t=>t.members.length)))):1; if(!e.count) e.count=1; }
+const evFormats=ev=>eventFormats(ev);
+const evTeam=ev=>isTeamEvent(ev)||(ev.format==='match'&&teamSizeOf(ev)>=2);
+const evPlayerFmt=ev=>playerFormatOf(ev);
+const evSummary=ev=>formatSummary(ev);
+const evOneBall=ev=>evFormats(ev).some(f=>FORMATS[f]&&FORMATS[f].entry==='team');   // scramble / foursomes / greensome: one score per team
 const GEV=()=>golfData().events.find(e=>e.id===view.geid);
+const FORMAT_GROUPS=[['Individual',['stroke','stableford','modstable','quota','parbogey','match']],['Team — everyone plays their own ball',['bestball','aggregate','shamble','teamstable']],['Team — one ball',['scramble','foursomes','greensome']],['Mixed',['split']]];
 const CODE_CHARS='ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 function newCode(ev){ let c; do{ c=Array.from({length:5},()=>CODE_CHARS[Math.floor(Math.random()*CODE_CHARS.length)]).join(''); }while(ev.groups.some(g=>g.code===c)); return c; }
 const slugify=s=>String(s||'').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'').slice(0,40)||'event';
 function scoringLink(ev){ return SITE_BASE+'score.html?e='+encodeURIComponent(ev.slug); }
 function playerIndex(p){ const own=p.index!=null&&String(p.index).trim()!==''?p.index:null; const m=p.memberId?memberById(p.memberId):null; return parseIndex(own!=null?own:(m?m.hcp:null)); }
 function playerHcp(ev,grp,p){ const c=courseById(grp.course); const idx=playerIndex(p); const ch=c?courseHcp(idx,c,p.tee||ev.defaultTee||'White',p.set||'M'):null;
-  const A=Object.assign({},USGA_ALLOW,ev.allow||{}), pct=+A[evPlayerFmt(ev)]||100;
-  return {idx,ch,ph:ch==null?null:whsRound(ch*pct/100),missing:idx==null?'index':ch==null?'rating':''}; }
+  return {idx,ch,ph:phFromCH(ev,ch),missing:idx==null?'index':ch==null?'rating':''}; }
 /* every player in the event: in a group, or on the roster waiting for one */
 function evPlayers(ev){ return ev.groups.flatMap(grp=>grp.players.map(p=>({p,grp}))).concat((ev.pool||[]).map(p=>({p,grp:null}))); }
 function courseFor(ev,p,grp){ if(grp) return grp.course; const F=ev.flights||{}; return (F.courseOf&&F.courseOf[p.flight])||(F.courses&&F.courses!=='split'?F.courses:'')||ev.defaultCourse||'oak'; }
@@ -2383,7 +2449,7 @@ function publicEvent(ev){
   for(const g of ev.groups){ if(!courses[g.course]){ const c=courseById(g.course); if(c) courses[g.course]={name:c.name,par:c.par,hcp:c.hcp,tees:Object.fromEntries(c.tees.map(t=>[t.name,t.yards||null]))}; } }
   return {slug:ev.slug,name:ev.name,date:ev.date,status:ev.status,club:'Walnut Creek Country Club',courses,
     groups:ev.groups.map(g=>({id:g.id,label:g.label||'',course:g.course,startHole:+g.startHole||1,teeTime:g.teeTime||'',players:g.players.map(p=>{ const h=playerHcp(ev,g,p); return {id:p.id,name:p.name,tee:p.tee||ev.defaultTee||'White',set:p.set||'M',ch:h.ch,ph:h.ph,flight:p.flight||'',team:evTeam(ev)?(p.team||ftm.get(p.memberId)||''):''}; })})),
-    format:ev.format||'stroke',front:ev.front,back:ev.back,allow:Object.assign({},USGA_ALLOW,ev.allow||{}),scoring:ev.scoring||'gross',flights:(ev.flights&&ev.flights.names)||[]};
+    format:ev.format||'stroke',front:ev.front,back:ev.back,teamSize:ev.teamSize||(isTeamEvent(ev)||ev.format==='match'&&ev.teamSize>=2?2:1),count:ev.count||1,countPattern:ev.countPattern||'',allow:Object.assign({},ev.allow||{}),scoring:ev.scoring||'gross',flights:(ev.flights&&ev.flights.names)||[]};
 }
 
 /* ---------- publishing + scores ---------- */
@@ -2469,31 +2535,41 @@ function editEvent(ev){
   const g=golfData(), ts=seasonTournaments(Y());
   openDrawer({kicker:'Golf · Scoring event',title:ev?'Event details':'New scoring event',saveLabel:ev?'Save':'Create event',
     body:field('Name','geN',ev?.name||'',{ph:'e.g. Member-Member · Saturday'})+pair(field('Date','geD',ev?.date||'',{type:'date'}),field('Default tee','geT',ev?.defaultTee||'White',{type:'select',options:['Gold','Blue','White','Red','Green']}))+
-      `<div class="fld"><span class="lbl">Round type</span>${seg('geF',[['stroke','Stroke play'],['bestball','Best ball'],['scramble','Scramble'],['shamble','Shamble'],['split','Front & back differ']],ev?.format||'stroke')}</div>
+      `<div class="fld"><span class="lbl">Format</span><select class="inp" id="geF">${FORMAT_GROUPS.map(([g,fs])=>`<optgroup label="${g}">${fs.map(f=>`<option value="${f}"${(ev?.format||'stroke')===f?' selected':''}>${FORMAT_LABEL[f]}</option>`).join('')}</optgroup>`).join('')}</select></div>
+       <div id="geTeamRow" style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px">${field('Team size','geTS',ev?.teamSize||2,{type:'select',options:[2,3,4,5,6].map(n=>[n,n+' players'])})}${field('Balls that count','geCnt',ev?.count||1,{type:'select',options:[1,2,3,4,5].map(n=>[n,'Best '+n])})}${field('Counting pattern','geCP',ev?.countPattern||'',{type:'select',options:[['','Same all holes'],['123','1-2-3 by six holes']]})}</div>
        <div id="geSplit" style="display:${(ev?.format)==='split'?'grid':'none'};grid-template-columns:repeat(2,minmax(0,1fr));gap:12px">${field('Front nine (1–9)','geFr',ev?.front||'scramble',{type:'select',options:TEAM_FORMATS.map(f=>[f,FORMAT_LABEL[f]])})}${field('Back nine (10–18)','geBk',ev?.back||'shamble',{type:'select',options:TEAM_FORMATS.map(f=>[f,FORMAT_LABEL[f]])})}</div>
        <p class="hint" id="geFmtHint"></p>`+
       field('Leaderboard ranks by','geSc',ev?.scoring||'gross',{type:'select',options:[['gross','Gross'],['net','Net']]})+
-      `<div class="fld"><div style="display:flex;justify-content:space-between;align-items:center"><span class="lbl">Handicap allowances</span><button class="btn sm" type="button" id="geUsga">Reset to USGA</button></div><div class="mini" id="geAllow"></div><p class="hint">Defaults are the USGA’s World Handicap System recommendations. Shamble isn’t in the USGA table — 85% (as four-ball) is the default; change it if your committee uses something else.</p></div>`+
+      `<div class="fld"><div style="display:flex;justify-content:space-between;align-items:center"><span class="lbl">Handicap allowances</span><button class="btn sm" type="button" id="geUsga">Reset to defaults</button></div><div class="mini" id="geAllow"></div><p class="hint">Defaults follow the USGA Rules of Handicapping (Appendix C); where the USGA publishes none (5- and 6-player scrambles, 3-player best ball, shamble, quota) a common club setting is used. See docs/formats.md for every format’s math.</p></div>`+
       field('Custom link','geS',ev?.slug||'',{ph:'e.g. mm2026-sat',hint:'Players open <b>…/score.html?e=</b><i>this</i>. Letters, numbers and dashes.'})+
       field('Tournament (optional)','geTour',ev?.tournamentId||'',{type:'select',options:[['','— Not linked —']].concat(ts.map(t=>[t.id,t.name+' · '+dateRange(t)])),hint:'Linking lets you build groups straight from that tournament’s field.'}),
     wire:r=>{ const n=r.querySelector('#geN'), s=r.querySelector('#geS'); let touched=!!ev; s.oninput=()=>touched=true; n.oninput=()=>{ if(!touched) s.value=slugify(n.value); };
-      const A=clone(Object.assign({},USGA_ALLOW,ev?.allow||{}));
-      const fmts=()=>{ const f=r.querySelector('#geF').dataset.val; return f==='split'?[r.querySelector('#geFr').value,r.querySelector('#geBk').value]:[f]; };
-      const drawAllow=()=>{ const fs=[...new Set(fmts())]; const rows=[];
-        fs.forEach(f=>{ if(f==='scramble'){ [2,4].forEach(n=>rows.push(`<div class="mr num" style="grid-template-columns:minmax(0,1fr) auto"><span>${n}-player scramble <span class="muted">(low → high)</span></span><span style="display:flex;gap:6px">${A['scramble'+n].map((v,i)=>`<input class="inp r" style="width:56px;height:32px" data-al="scramble${n}|${i}" value="${v}" inputmode="decimal" aria-label="${n}-player scramble player ${i+1} %">`).join('')}<span class="muted" style="align-self:center">%</span></span></div>`)); }
-          else rows.push(`<div class="mr num" style="grid-template-columns:minmax(0,1fr) auto"><span>${f==='stroke'?'Individual stroke play':FORMAT_LABEL[f]}${f==='shamble'?' <span class="muted">(club setting)</span>':''}</span><span style="display:flex;gap:6px"><input class="inp r" style="width:64px;height:32px" data-al="${f}" value="${A[f]}" inputmode="decimal" aria-label="${FORMAT_LABEL[f]||f} allowance %"><span class="muted" style="align-self:center">%</span></span></div>`); });
+      const A=clone(ev?.allow||{});   // overrides only; anything not set falls back to the default for its key
+      const cur=()=>({format:r.querySelector('#geF').value,front:r.querySelector('#geFr').value,back:r.querySelector('#geBk').value,teamSize:+r.querySelector('#geTS').value,count:+r.querySelector('#geCnt').value,countPattern:r.querySelector('#geCP').value,allow:A});
+      const drawAllow=()=>{ const P=cur(), F=FORMATS[P.format]||FORMATS.stroke, team=F.team===true||P.format==='split'||(P.format==='match'); const fixed=F.size;
+        r.querySelector('#geTeamRow').style.display=team?'grid':'none'; r.querySelector('#geTS').disabled=!!fixed; if(fixed) r.querySelector('#geTS').value=fixed;
+        const ts=fixed||P.teamSize; r.querySelector('#geCnt').parentElement.style.display=F.count||P.format==='split'?'':'none'; r.querySelector('#geCP').parentElement.style.display=(F.count&&ts===4)?'':'none';
+        [...r.querySelector('#geCnt').options].forEach(o=>{ o.disabled=+o.value>=ts; }); if(+r.querySelector('#geCnt').value>=ts) r.querySelector('#geCnt').value=1;
+        if(P.format==='match') [...r.querySelector('#geTS').options].forEach(o=>{ o.hidden=+o.value>2; });
+        const P2=cur(); const rows=[]; const fs=[...new Set(eventFormats(P2))];
+        fs.forEach(f=>{ const key=allowKey(P2,f), v=pctFor(P2,key), usga=USGA_ALLOW[key]!=null&&!/^(scramble[56]|bestball[12]of3|shamble|teamstable|quota|match)$/.test(key.replace(/\dof\d$/,'')) , custom=A[key]!=null;
+          const label=`${f==='match'?(teamSizeOf(P2)>=2?'Four-ball match play':'Singles match play'):FORMAT_LABEL[f]}${/of/.test(key)?' · '+key.replace(/^\D+/,'best ').replace('of',' of '):f==='scramble'?' · '+teamSizeOf(P2)+' players (low → high)':''} <span class="muted">${custom?'(set for this event)':usga?'(USGA)':'(club default)'}</span>`;
+          if(Array.isArray(v)) rows.push(`<div class="mr num" style="grid-template-columns:minmax(0,1fr) auto"><span>${label}</span><span style="display:flex;gap:6px;flex-wrap:wrap">${v.map((x,i)=>`<input class="inp r" style="width:52px;height:32px" data-al="${key}|${i}" value="${x}" inputmode="decimal" aria-label="${key} ${i+1} %">`).join('')}<span class="muted" style="align-self:center">%</span></span></div>`);
+          else rows.push(`<div class="mr num" style="grid-template-columns:minmax(0,1fr) auto"><span>${label}</span><span style="display:flex;gap:6px"><input class="inp r" style="width:64px;height:32px" data-al="${key}" value="${v}" inputmode="decimal" aria-label="${key} allowance %"><span class="muted" style="align-self:center">%</span></span></div>`); });
         r.querySelector('#geAllow').innerHTML=rows.join('');
-        r.querySelectorAll('[data-al]').forEach(inp=>inp.oninput=()=>{ const [k,i]=inp.dataset.al.split('|'); const v=parseFloat(inp.value); if(!isFinite(v)) return; if(i!=null) A[k][+i]=v; else A[k]=v; });
-        const f=r.querySelector('#geF').dataset.val; r.querySelector('#geSplit').style.display=f==='split'?'grid':'none';
-        r.querySelector('#geFmtHint').textContent=fmts().includes('scramble')?'Scramble holes take one team score; the team gets strokes from its scramble handicap.':fmts().some(x=>x==='bestball'||x==='shamble')?'Every player records their own score; the team’s best net ball counts on each hole.':''; };
-      wireSeg(r,'geF',drawAllow); r.querySelector('#geFr').onchange=drawAllow; r.querySelector('#geBk').onchange=drawAllow;
-      r.querySelector('#geUsga').onclick=()=>{ Object.assign(A,clone(USGA_ALLOW)); drawAllow(); toast('USGA allowances restored'); };
+        r.querySelectorAll('[data-al]').forEach(inp=>inp.oninput=()=>{ const [k,i]=inp.dataset.al.split('|'); const v=parseFloat(inp.value); if(!isFinite(v)) return; if(i!=null){ if(!Array.isArray(A[k])) A[k]=clone(pctFor(P2,k)); A[k][+i]=v; } else A[k]=v; });
+        r.querySelector('#geSplit').style.display=P.format==='split'?'grid':'none';
+        const hints={scramble:'One team score per hole; the team plays off a handicap built from everyone’s course handicaps.',foursomes:'Partners alternate shots on one ball; team handicap is 50% of the combined course handicaps.',greensome:'Both drive, pick one, then alternate; team handicap 60% of the low course handicap + 40% of the high.',bestball:'Everyone plays their own ball; the best balls that count are added each hole.',shamble:'Team drive, then own ball in; the best balls that count are added each hole.',aggregate:'Every player’s net score counts each hole.',teamstable:'Each player’s Stableford points; the best that count are added each hole.',stableford:'Points per hole: albatross 5, eagle 4, birdie 3, par 2, bogey 1.',modstable:'Points per hole: albatross 8, eagle 5, birdie 2, par 0, bogey −1, double or worse −3.',quota:'Gross points (eagle 8, birdie 4, par 2, bogey 1) against a quota of 36 − playing handicap.',parbogey:'Each hole won, halved or lost against net par.',match:'The two sides in a group play hole by hole; everyone plays off the lowest handicap in the match.',stroke:''};
+        r.querySelector('#geFmtHint').textContent=P.format==='split'?(hints[P.front]||'')+' Back: '+(hints[P.back]||''):(hints[P.format]||''); };
+      ['#geF','#geFr','#geBk','#geTS','#geCnt','#geCP'].forEach(id=>{ r.querySelector(id).onchange=drawAllow; });
+      r.querySelector('#geUsga').onclick=()=>{ Object.keys(A).forEach(k=>delete A[k]); drawAllow(); toast('Default allowances restored'); };
       r._allow=A; drawAllow(); },
     save:()=>{ const name=fv('geN'); if(!name){ toast('Name the event'); return false; }
       const slug=slugify(fv('geS')||name);
       if(g.events.some(e=>e!==ev&&e.slug===slug)){ toast('Another event already uses that link'); return false; }
-      const fmt=$('geF').dataset.val; if(fmt==='split'&&fv('geFr')===fv('geBk')){ toast('Front and back use the same format — pick it as the round type instead'); return false; }
-      const data={name,date:fv('geD'),defaultTee:fv('geT'),slug,tournamentId:fv('geTour'),format:fmt,front:fv('geFr'),back:fv('geBk'),scoring:fv('geSc'),allow:clone($('dBody')._allow||USGA_ALLOW)};
+      const fmt=fv('geF'); if(fmt==='split'&&fv('geFr')===fv('geBk')){ toast('Front and back use the same format — pick it as the format instead'); return false; }
+      const F=FORMATS[fmt]||FORMATS.stroke, ts=F.size||(F.team===true||fmt==='split'||fmt==='match'?+fv('geTS')||2:1);
+      const data={name,date:fv('geD'),defaultTee:fv('geT'),slug,tournamentId:fv('geTour'),format:fmt,front:fv('geFr'),back:fv('geBk'),scoring:fv('geSc'),teamSize:ts,count:Math.min(ts-1,+fv('geCnt')||1)||1,countPattern:ts===4?fv('geCP'):'',allow:clone($('dBody')._allow||{})};
       if(ev) Object.assign(ev,data); else { const e=Object.assign({id:uid(),status:'draft',groups:[],pool:[],flights:{count:0,names:[]},createdAt:new Date().toISOString()},data); g.events.push(e); view.geid=e.id; view.getab='field'; ev=e; }
       golfSave(ev); toast('Saved'); return undefined; },
     del:ev?()=>{ if(!confirm(`Delete ${ev.name}? Its groups and scores are removed.`)) return false; g.events=g.events.filter(x=>x!==ev); view.geid=null;
@@ -2531,10 +2607,11 @@ function editGroup(ev,grp){
   const rows=()=>players.map((p,i)=>`<div class="mr" style="grid-template-columns:minmax(0,1fr) 64px 84px 66px 64px 28px"><input class="inp" data-pi="${i}" data-k="name" value="${esc(p.name)}" aria-label="Player name"><input class="inp r" data-pi="${i}" data-k="index" value="${esc(p.index!=null&&p.index!==''?p.index:((memberById(p.memberId)||{}).hcp||''))}" placeholder="Index" aria-label="${esc(p.name)} handicap index" inputmode="decimal"><span class="muted" style="font-size:12px" data-ch="${i}">${chTxt(p)}</span><select class="inp" data-pi="${i}" data-k="tee" aria-label="Tee">${tees(fv('ggC')||grp?.course||'oak').map(x=>`<option${x===(p.tee||ev.defaultTee)?' selected':''}>${x}</option>`).join('')}</select><select class="inp" data-pi="${i}" data-k="set" aria-label="Par set"><option value="M"${p.set!=='W'?' selected':''}>Men</option><option value="W"${p.set==='W'?' selected':''}>Women</option></select><button class="ib" type="button" data-pdel="${i}" aria-label="Remove ${esc(p.name)}">${I.x}</button></div>`).join('')||'<div class="mr"><span class="muted">No players yet.</span></div>';
   const rowsHead='<div class="mr h" style="grid-template-columns:minmax(0,1fr) 64px 84px 66px 64px 28px"><span>Player</span><span class="r">Index</span><span>Course hcp</span><span>Tee</span><span>Par</span><span></span></div>';
   const BB=evTeam(ev), fieldTeam=new Map(t?t.field.map(p=>[p.memberId,'T'+(p.team||0)]):[]);
-  const teamOpts=()=>{ const ks=[...new Set(players.map(p=>p.team).filter(Boolean))]; while(ks.length<Math.max(2,Math.ceil(players.length/2))) ks.push('G'+(ks.length+1)+'-'+uid().slice(0,4)); return ks; };
+  const tsz=ev.format==='match'?Math.max(1,teamSizeOf(ev)):teamSizeOf(ev);
+  const teamOpts=()=>{ const ks=[...new Set(players.map(p=>p.team).filter(Boolean))]; while(ks.length<Math.max(ev.format==='match'?2:1,Math.ceil(players.length/Math.max(1,tsz)))) ks.push('G'+(ks.length+1)+'-'+uid().slice(0,4)); return ks; };
   const teamLabel=(k,ks)=>'Team '+(ks.indexOf(k)+1)+(k.startsWith('T')&&t?' (field team '+k.slice(1)+')':'');
-  const teamsHTML=()=>{ if(!BB) return ''; players.forEach((p,i)=>{ if(!p.team) p.team=fieldTeam.get(p.memberId)||teamOpts()[Math.floor(i/2)]; }); const ks=teamOpts();
-    return `<div class="fld"><span class="lbl">Best-ball teams</span><div class="mini">${players.map((p,i)=>`<div class="mr" style="grid-template-columns:minmax(0,1fr) 200px"><span class="trunc">${esc(p.name||'(new player)')}</span><select class="inp" data-team="${i}" aria-label="${esc(p.name)} team">${ks.map(k=>`<option value="${esc(k)}"${k===p.team?' selected':''}>${esc(teamLabel(k,ks))}</option>`).join('')}</select></div>`).join('')||'<div class="mr"><span class="muted">Add players first.</span></div>'}</div></div>`; };
+  const teamsHTML=()=>{ if(!BB) return ''; players.forEach((p,i)=>{ if(!p.team) p.team=fieldTeam.get(p.memberId)||teamOpts()[Math.floor(i/Math.max(1,tsz))]; }); const ks=teamOpts();
+    return `<div class="fld"><span class="lbl">${ev.format==='match'?'Sides (first two teams play each other)':`Teams of ${tsz} · ${esc(evSummary(ev))}`}</span><div class="mini">${players.map((p,i)=>`<div class="mr" style="grid-template-columns:minmax(0,1fr) 200px"><span class="trunc">${esc(p.name||'(new player)')}</span><select class="inp" data-team="${i}" aria-label="${esc(p.name)} team">${ks.map(k=>`<option value="${esc(k)}"${k===p.team?' selected':''}>${esc(teamLabel(k,ks))}</option>`).join('')}</select></div>`).join('')||'<div class="mr"><span class="muted">Add players first.</span></div>'}</div></div>`; };
   openDrawer({kicker:ev.name+' · Group',title:grp?'Group '+grp.code:'Add group',wide:true,
     body:pair(field('Group ID','ggCode',grp?.code||newCode(ev),{hint:'What players type on the scoring page. Make it anything unique — a tee time, a cart number, or leave the random one.'}),field('Label (optional)','ggL',grp?.label||'',{ph:'e.g. 8:10 · Oak 1'}))+
       pair(field('Course','ggC',grp?.course||'oak',{type:'select',options:g.courses.map(c=>[c.id,c.name])}),field('Starting hole','ggS',grp?.startHole||1,{type:'select',options:Array.from({length:18},(_,i)=>[i+1,'Hole '+(i+1)])}))+
@@ -2579,14 +2656,17 @@ function gBoard(el,ev){
   view.gflight=view.gflight||''; view.gsort=view.gsort||ev.scoring||'gross';
   const names=(ev.flights&&ev.flights.names)||[], net=view.gsort==='net';
   const BB=evTeam(ev), noPl=evFormats(ev).includes('scramble'); view.gview=BB?(noPl?'teams':(view.gview||'teams')):'players';
-  const lb=eventBoard(publicEvent(ev),scoresFor(ev),{flight:view.gflight,sort:view.gsort,view:view.gview});
+  const pubB=publicEvent(ev), unit=unitOf(pubB), MATCH=unit==='match', lb=eventBoard(pubB,scoresFor(ev),{flight:view.gflight,sort:view.gsort,view:view.gview});
   const cols='grid-template-columns:52px minmax(0,1.5fr) minmax(0,1fr) 44px 60px 60px 64px 64px 40px';
+  const valCols=r=>MATCH?`<span class="r"></span><b class="r" style="font-size:14px;grid-column:span 2;white-space:nowrap">${esc(r.status)}</b>`
+    :unit==='points'?`<span class="r">${r.n?r.gross:'—'}</span><b class="r" style="font-size:15px">${r.n?r.pts:'—'}</b><span></span>`
+    :unit==='holes'?`<span class="r">${r.n?r.gross:'—'}</span><b class="r ${r.n&&r.holesUp>0?'pos':''}" style="font-size:15px">${r.n?(r.holesUp>0?'+':'')+r.holesUp:'—'}</b><span class="r muted">holes</span>`:null;
   const courses=[...new Set(ev.groups.map(g=>g.course))];
-  el.innerHTML=`<div class="toolbar">${BB&&!noPl?`<div class="seg">${[['teams','Teams'],['players','Players']].map(([k,l])=>`<button class="${view.gview===k?'on':''}" data-gvw="${k}">${l}</button>`).join('')}</div>`:''}<div class="seg">${['gross','net'].map(s=>`<button class="${view.gsort===s?'on':''}" data-gs="${s}">${s==='net'?'Net':'Gross'}</button>`).join('')}</div>
+  el.innerHTML=`<div class="toolbar">${BB&&!noPl&&!MATCH?`<div class="seg">${[['teams','Teams'],['players','Players']].map(([k,l])=>`<button class="${view.gview===k?'on':''}" data-gvw="${k}">${l}</button>`).join('')}</div>`:''}${MATCH||unit==='points'||unit==='holes'?'':`<div class="seg">${['gross','net'].map(s=>`<button class="${view.gsort===s?'on':''}" data-gs="${s}">${s==='net'?'Net':'Gross'}</button>`).join('')}</div>`}
     ${names.length?`<div class="seg">${['',...names].map(n=>`<button class="${view.gflight===n?'on':''}" data-gf="${n}">${n?'Flight '+n:'All flights'}</button>`).join('')}</div>`:''}
-    <span class="muted" style="font-size:13px">${ev.status==='final'?'Final · click any row for the scorecard':'To par for holes played'+(courses.length>1?' · both courses':'')+' · live · click a row for the scorecard'}</span><button class="btn sm" id="gbRef" style="margin-left:auto">${I.refresh}Refresh</button></div>
-  <div class="card" style="overflow:hidden">${lb.length?`<div class="tw"><div class="t" style="min-width:860px"><div class="tr th" style="${cols}"><span>Pos</span><span>${BB&&view.gview==='teams'?'Team':'Player'}</span><span>Group</span><span class="r">Flt</span><span class="r">Thru</span><span class="r">Gross</span><span class="r">${net?'Net':'To par'}</span><span class="r">${net?'Net to par':'Net'}</span><span></span></div>
-    ${lb.map(r=>`<div class="tr num click" data-lbg="${r.groupId}" data-lbp="${esc(r.team?(r.members||[])[0]:r.id)}" style="${cols}"><b>${r.posTxt}</b><b class="trunc">${esc(r.name)}</b><span class="trunc muted">${esc(r.group||'')} · ${esc(r.courseName.replace(' Course',''))}</span><span class="r muted">${esc(r.flight||'')}</span><span class="r">${r.n?r.thru:'—'}</span><span class="r">${r.n?r.gross+' <small class="muted">('+toParTxt(r.toPar)+')</small>':'—'}</span>${net?`<span class="r">${r.n&&r.net!=null?r.net:'—'}</span><b class="r ${r.n&&r.netToPar<0?'pos':''}" style="font-size:15px">${r.n&&r.netToPar!=null?toParTxt(r.netToPar):'—'}</b>`:`<b class="r ${r.n&&r.toPar<0?'pos':''}" style="font-size:15px">${r.n?toParTxt(r.toPar):'—'}</b><span class="r muted">${r.n&&r.netToPar!=null?toParTxt(r.netToPar):'—'}</span>`}<span class="ib">${I.edit}</span></div>`).join('')}</div></div>`
+    <span class="muted" style="font-size:13px">${ev.status==='final'?'Final · click any row for the scorecard':(MATCH?'Match status':unit==='points'?'Points for holes played':unit==='holes'?'Holes up or down':'To par for holes played')+(courses.length>1?' · both courses':'')+' · live · click a row for the scorecard'}</span><button class="btn sm" id="gbRef" style="margin-left:auto">${I.refresh}Refresh</button></div>
+  <div class="card" style="overflow:hidden">${lb.length?`<div class="tw"><div class="t" style="min-width:860px"><div class="tr th" style="${cols}"><span>Pos</span><span>${BB&&view.gview==='teams'?'Team':'Player'}</span><span>Group</span><span class="r">Flt</span><span class="r">Thru</span>${MATCH?'<span class="r"></span><span class="r" style="grid-column:span 2">Match</span>':unit!=='strokes'?`<span class="r">Gross</span><span class="r">${unit==='points'?'Points':'Holes'}</span><span></span>`:`<span class="r">Gross</span><span class="r">${net?'Net':'To par'}</span><span class="r">${net?'Net to par':'Net'}</span>`}<span></span></div>
+    ${lb.map(r=>`<div class="tr num click" data-lbg="${r.groupId}" data-lbp="${esc(r.team?(r.members||[])[0]:r.id)}" style="${cols}"><b>${r.posTxt}</b><b class="trunc">${esc(r.name)}</b><span class="trunc muted">${esc(r.group||'')} · ${esc(r.courseName.replace(' Course',''))}</span><span class="r muted">${esc(r.flight||'')}</span><span class="r">${r.n?r.thru:'—'}</span>${valCols(r)!==null?valCols(r):`<span class="r">${r.n?r.gross+' <small class="muted">('+toParTxt(r.toPar)+')</small>':'—'}</span>`+(net?`<span class="r">${r.n&&r.net!=null?r.net:'—'}</span><b class="r ${r.n&&r.netToPar<0?'pos':''}" style="font-size:15px">${r.n&&r.netToPar!=null?toParTxt(r.netToPar):'—'}</b>`:`<b class="r ${r.n&&r.toPar<0?'pos':''}" style="font-size:15px">${r.n?toParTxt(r.toPar):'—'}</b><span class="r muted">${r.n&&r.netToPar!=null?toParTxt(r.netToPar):'—'}</span>`)}<span class="ib">${I.edit}</span></div>`).join('')}</div></div>`
     :'<div class="empty"><b>No players yet</b><span>Add groups to see the leaderboard.</span></div>'}</div>`;
   $('gbRef').onclick=()=>loadScores(ev);
   el.querySelectorAll('[data-gs]').forEach(b=>b.onclick=()=>{ view.gsort=b.dataset.gs; render(); });
@@ -2831,7 +2911,7 @@ function buildGroupsFromField(ev){
   const units=[], seen=new Map(); all.forEach(({p})=>{ const k=p.team||('p'+p.id); if(!seen.has(k)){ seen.set(k,[]); units.push(seen.get(k)); } seen.get(k).push(p); });
   openDrawer({kicker:ev.name+' · Groups',title:'Build groups from the field',saveLabel:'Build groups',
     body:`<p style="margin:0">${all.length} players${units.some(u=>u.length>1)?` in ${units.length} teams — teams stay together`:''}. No flights are set, so groups follow field order.</p>`+
-      pair(field('Players per group','bgN',4,{type:'select',options:[[2,'2'],[3,'3'],[4,'4'],[5,'5']]}),field('Courses','bgC','split',{type:'select',options:[['oak','All on Oak'],['pecan','All on Pecan'],['split','Split between Oak and Pecan']]}))+
+      pair(field('Players per group','bgN',Math.max(2,Math.min(6,teamSizeOf(ev)>=3?teamSizeOf(ev):4)),{type:'select',options:[[2,'2'],[3,'3'],[4,'4'],[5,'5'],[6,'6']]}),field('Courses','bgC','split',{type:'select',options:[['oak','All on Oak'],['pecan','All on Pecan'],['split','Split between Oak and Pecan']]}))+
       field('Start','bgS','shotgun',{type:'select',options:[['shotgun','Shotgun — groups spread across holes 1–18'],['one','Everyone off hole 1']]})+groupsConfirmNote(ev),
     save:()=>{ const size=+fv('bgN'), mode=fv('bgC'), start=fv('bgS'); const groups=[]; let cur=[];
       for(const u of units){ if(cur.length&&cur.length+u.length>size){ groups.push(cur); cur=[]; } cur=cur.concat(u); } if(cur.length) groups.push(cur);
@@ -2863,26 +2943,27 @@ function printCardHTML(ev,pub,grp,teamKeyOnly){
   const pg0=pub.groups.find(x=>x.id===grp.id), c=pub.courses[grp.course]; if(!pg0||!c) return '';
   const allTeams=isTeamEvent(pub)?groupTeams(pg0):[], mine=teamKeyOnly?allTeams.find(t=>t.key===teamKeyOnly):null;
   const pg=mine?{...pg0,players:mine.members}:pg0, markers=mine?allTeams.filter(t=>t!==mine):[];
-  const TEAM=isTeamEvent(pub), net=pub.scoring==='net', start=+grp.startHole||1, split=pub.format==='split', A=allowOf(pub);
+  const TEAM=isTeamEvent(pub)||isMatchEvent(pub)&&teamSizeOf(pub)>=2, net=pub.scoring==='net', start=+grp.startHole||1, split=pub.format==='split';
   const hc=p=>c.hcp[p.set||'M']||c.hcp.M;
   const tees=[...new Set(pg.players.map(p=>p.tee))].filter(t=>c.tees&&c.tees[t]);
-  const holes=Array.from({length:18},(_,i)=>i+1), scr=h=>holeFormat(pub,h)==='scramble';
+  const holes=Array.from({length:18},(_,i)=>i+1), scr=h=>(FORMATS[holeFormat(pub,h)]||{}).entry==='team';
   const cells=(fn,cls='')=>holes.slice(0,9).map(h=>`<td class="${cls}${h===start?' st':''}${typeof cls==='function'?'':''}">${fn(h)}</td>`).join('')+`<td class="sum">${fn('out')}</td>`+holes.slice(9).map(h=>`<td class="${cls}${h===start?' st':''}">${fn(h)}</td>`).join('')+`<td class="sum">${fn('in')}</td><td class="sum">${fn('tot')}</td>`;
   const cellsX=fn=>holes.slice(0,9).map(h=>fn(h,h===start)).join('')+'<td class="sum"></td>'+holes.slice(9).map(h=>fn(h,h===start)).join('')+'<td class="sum"></td><td class="sum"></td>';
   const sumP=(arr,k)=>k==='out'?arr.slice(0,9).reduce((a,b)=>a+b,0):k==='in'?arr.slice(9).reduce((a,b)=>a+b,0):arr.reduce((a,b)=>a+b,0);
   const phTxt=v=>typeof v==='number'?(v<0?'+'+(-v):v):'';
-  const plFmt=eventFormats(pub).find(f=>f!=='scramble');
-  const plPH=p=>plFmt?(plFmt==='stroke'?p.ph:segPH(pub,p,plFmt)):null;
+  const plFmt=eventFormats(pub).find(f=>(FORMATS[f]||{}).entry==='player');
+  const plPH=p=>plFmt?segPH(pub,p,plFmt):null;
   const anyW=pg.players.some(p=>p.set==='W');
   const dots=k=>k>0?'<i></i>'.repeat(Math.min(k,2)):k<0?'<i class="plus">+</i>':'';
   const pRow=p=>`<tr class="pr"><th><b>${esc(p.name)}</b><span>${esc(p.tee)}${p.flight?' · Flight '+esc(p.flight):''}</span></th>${cellsX((h,st)=>{ if(scr(h)) return `<td class="x${st?' st':''}"></td>`;
-      const f=holeFormat(pub,h), ph=f==='stroke'?p.ph:segPH(pub,p,f); return `<td class="${st?'st':''}">${typeof ph==='number'?dots(strokesOn(ph,hc(p)[h-1])):''}</td>`; })}<td class="sum hc">${phTxt(plPH(p))}</td><td class="sum"></td></tr>`;
+      const f=holeFormat(pub,h), ph=segPH(pub,p,f); return `<td class="${st?'st':''}">${typeof ph==='number'?dots(strokesOn(ph,hc(p)[h-1])):''}</td>`; })}<td class="sum hc">${phTxt(plPH(p))}</td><td class="sum"></td></tr>`;
   const teams=TEAM?groupTeams(pg):[];
-  const tRow=(t,i)=>{ const tph=eventFormats(pub).includes('scramble')?scrambleTeamPH(pub,t.members):null;
-    const what=split?`${FORMAT_LABEL[pub.front]} score front · ${pub.back==='scramble'?'team':'best'} ${net?'net':''} ball back`:(pub.format==='scramble'?'One team score each hole':(net?'Lowest net score each hole':'Lowest score each hole'));
-    return `<tr class="tb"><th><b>${mine?'Team':'Team '+(i+1)}${split?'':' '+FORMAT_LABEL[pub.format].toLowerCase()}</b><span>${esc(what)}</span></th>${cellsX((h,st)=>`<td class="${st?'st':''}">${scr(h)&&tph!=null?dots(strokesOn(tph,hc(t.captain)[h-1])):''}</td>`)}<td class="sum hc">${tph!=null?phTxt(tph):''}</td><td class="sum"></td></tr>`; };
-  const fmtRow=split?`<tr class="fm"><th>Format</th><td colspan="10">${esc(FORMAT_LABEL[pub.front])}${pub.front==='scramble'?' — one team score':''}</td><td colspan="11">${esc(FORMAT_LABEL[pub.back])}${pub.back==='scramble'?' — one team score':' — everyone plays their own ball'}</td><td colspan="2"></td></tr>`:'';
-  const allowTxt=eventFormats(pub).map(f=>f==='scramble'?`scramble ${(A['scramble'+(teams[0]?teams[0].members.length:2)]||A.scramble2).join('/')}%`:`${f==='stroke'?'stroke play':FORMAT_LABEL[f].toLowerCase()} ${A[f]}%`).join(' · ');
+  const oneBallFmt=eventFormats(pub).find(f=>(FORMATS[f]||{}).entry==='team');
+  const tRow=(t,i)=>{ const tph=oneBallFmt?teamPH(pub,oneBallFmt,t.members):null;
+    const what=split?`${FORMAT_LABEL[pub.front]} front · ${FORMAT_LABEL[pub.back]} back`:(oneBallFmt?'One team score each hole':unitOf(pub)==='points'?'Best points each hole':(net?'Lowest net score each hole':'Lowest score each hole'));
+    return `<tr class="tb"><th><b>${mine?'Team':'Team '+(i+1)}</b><span>${esc(split?what:formatSummary(pub)+' · '+what)}</span></th>${cellsX((h,st)=>`<td class="${st?'st':''}">${scr(h)&&tph!=null?dots(strokesOn(tph,hc(t.captain)[h-1])):''}</td>`)}<td class="sum hc">${tph!=null?phTxt(tph):''}</td><td class="sum"></td></tr>`; };
+  const fmtRow=split?`<tr class="fm"><th>Format</th><td colspan="10">${esc(FORMAT_LABEL[pub.front])}${(FORMATS[pub.front]||{}).entry==='team'?' — one team score':''}</td><td colspan="11">${esc(FORMAT_LABEL[pub.back])}${(FORMATS[pub.back]||{}).entry==='team'?' — one team score':' — everyone plays their own ball'}</td><td colspan="2"></td></tr>`:'';
+  const allowTxt=eventFormats(pub).map(f=>{ const k=allowKey(pub,f), v=pctFor(pub,k); return `${FORMAT_LABEL[f].toLowerCase()} ${Array.isArray(v)?v.join('/'):v}%`; }).join(' · ');
   const startBig=grp.teeTime?fmtTime(grp.teeTime):'Hole '+start+(grp.label&&/ B /.test(grp.label)?'B':'');
   const startSub=grp.teeTime?(start!==1?'Tee time · off hole '+start:'Tee time'):'Shotgun start';
   return `<section class="pc${mine?' team':''}">
@@ -2895,10 +2976,10 @@ function printCardHTML(ev,pub,grp,teamKeyOnly){
     ${tees.map(t=>`<tr class="yd"><th>${esc(t)}</th>${cells(h=>typeof h==='number'?c.tees[t][h-1]:sumP(c.tees[t],h))}<td class="sum"></td><td class="sum"></td></tr>`).join('')}
     <tr class="pa"><th>Par</th>${cells(h=>typeof h==='number'?(anyW&&c.par.W[h-1]!==c.par.M[h-1]?c.par.M[h-1]+'/'+c.par.W[h-1]:c.par.M[h-1]):sumP(c.par.M,h))}<td class="sum"></td><td class="sum"></td></tr>
     <tr class="si"><th>Handicap</th>${cells(h=>typeof h==='number'?c.hcp.M[h-1]:'')}<td class="sum"></td><td class="sum"></td></tr>
-    ${TEAM?teams.map((t,i)=>t.members.map(pRow).join('')+tRow(t,i)).join(''):pg.players.map(pRow).join('')}
+    ${TEAM&&!isMatchEvent(pub)?teams.map((t,i)=>t.members.map(pRow).join('')+tRow(t,i)).join(''):pg.players.map(pRow).join('')}
     ${anyW?`<tr class="si"><th>Women’s hcp</th>${cells(h=>typeof h==='number'?c.hcp.W[h-1]:'')}<td class="sum"></td><td class="sum"></td></tr>`:''}
   </table>
-  <footer><div class="notes"><span><i></i> Stroke received${pg.players.some(p=>typeof p.ph==='number'&&p.ph<0)?' · <i class="plus">+</i> stroke given back':''}${eventFormats(pub).includes('scramble')?' · <b class="xk"></b> scramble hole — team score only':''} · <b class="stk">▌</b> first hole${net?` · Allowances: ${esc(allowTxt)}`:''}</span>
+  <footer><div class="notes"><span><i></i> Stroke received${pg.players.some(p=>typeof p.ph==='number'&&p.ph<0)?' · <i class="plus">+</i> stroke given back':''}${oneBallFmt?' · <b class="xk"></b> team-score hole — one score per team':''} · <b class="stk">▌</b> first hole${net?` · Allowances: ${esc(allowTxt)}`:''}</span>
       <div class="sig">${mine?mine.members.map(p=>`<span>${esc(p.name)}</span>`).join('')+'<span>Marker</span>':'<span>Scorer</span><span>Attest</span>'}</div></div>
     <div class="qr"><div class="qrc" data-qr="${esc(groupLink(ev,grp))}"></div><div><b>Live scoring</b><span>Scan with your phone camera — opens group ${esc(grp.code)} ready to score.</span></div></div></footer>
 </section>`;
@@ -3064,11 +3145,12 @@ function editGame(g){
   openDrawer({kicker:orgShort()+' · Game',title:g?'Game details':'New game',saveLabel:g?'Save':'Create game',
     body:field('Name','gmN',g?g.name:(last?last.name:''),{ph:'e.g. Friday game'})+pair(field('Date','gmD',g?g.date:today,{type:'date'}),field('Tee time','gmT',g?g.time:(last?last.time||'':''),{type:'time'}))+
       pair(field('Course','gmC',g?g.course:(last?last.course:'oak'),{type:'select',options:courses.map(c=>[c.id,c.name])}),field('Scored','gmNet',g?(g.net?'net':'gross'):(last&&last.net?'net':'gross'),{type:'select',options:[['gross','Gross'],['net','Net (handicaps)']]}))+
+      field('Format','gmF',g?(g.format||'stroke'):(last?last.format||'stroke':'stroke'),{type:'select',options:['stroke','stableford','modstable','quota','parbogey'].map(f=>[f,FORMAT_LABEL[f]]),hint:'Payouts by finish follow the leaderboard for this format; skins always come from the hole scores.'})+
       pair(field('Entry per player $','gmE',g?g.entry:(last?last.entry:20),{type:'number'}),field('Skins per player $ (0 = no skins)','gmS',g?g.skinsEntry:(last?last.skinsEntry:0),{type:'number'}))+
       '<p class="hint">Entries make the pot, paid out by finish. Skins money is a separate pot paid out per skin. Both are recorded per player, so the season ledger knows who is up or down.</p>'+
       field('Notes','gmNt',g?.notes||'',{type:'textarea'}),
-    save:()=>{ const data={name:fv('gmN'),date:fv('gmD'),time:fv('gmT'),course:fv('gmC'),net:fv('gmNet')==='net',entry:fnum('gmE'),skinsEntry:fnum('gmS'),notes:fv('gmNt')};
-      if(g){ Object.assign(g,data); const ev=gameEvent(g); if(ev){ ev.date=g.date; ev.scoring=g.net?'net':'gross'; golfSave(ev); } }
+    save:()=>{ const data={name:fv('gmN'),date:fv('gmD'),time:fv('gmT'),course:fv('gmC'),net:fv('gmNet')==='net',format:fv('gmF')||'stroke',entry:fnum('gmE'),skinsEntry:fnum('gmS'),notes:fv('gmNt')};
+      if(g){ Object.assign(g,data); const ev=gameEvent(g); if(ev){ ev.date=g.date; ev.scoring=g.net?'net':'gross'; ev.format=g.format||'stroke'; golfSave(ev); } }
       else { const n=Object.assign({id:uid(),season:Y(),status:'open',players:[],payouts:[],golfEventId:''},data); gamesData().push(n); view.gameId=n.id;
         if(last&&last.players.length) setTimeout(()=>{ if(confirm(`Start with the ${last.players.length} players from ${gameTitle(last)} on ${shortDate(last.date)}?`)){ last.players.forEach(p=>n.players.push({id:uid(),memberId:p.memberId,name:p.name,paid:false,inSkins:!!n.skinsEntry&&p.inSkins!==false,extraIn:0,gpid:''})); persist(); render(); } },50); } },
     del:g?()=>{ if(!confirm(`Delete ${gameTitle(g)} on ${shortDate(g.date)}? Its money record goes with it.`)) return false; const ev=gameEvent(g); if(ev&&confirm('Also delete its scoring event and scores?')){ golfData().events=golfData().events.filter(e=>e!==ev); if(CLOUD&&sessionOK) sb.from('golf_events').delete().eq('id',ev.id); }
@@ -3082,11 +3164,11 @@ function vGame(m,g){
   const lb=ev?eventBoard(publicEvent(ev),scoresFor(ev),{sort:g.net?'net':'gross'}):[];
   const byG=new Map(lb.map(r=>[r.id,r]));
   const pcols='grid-template-columns:minmax(0,1.6fr) 70px 80px 90px 90px 90px 40px';
-  const prow=p=>{ const r=byG.get(p.gpid), inn=gpIn(g,p), out=gpOut(g,p); return `<div class="tr num click" data-gp="${p.id}" style="${pcols}"><div class="cell2"><b class="trunc">${esc(gpName(p))}</b><small>${p.memberId?'':'Guest · '}${p.inSkins&&n0(g.skinsEntry)?'in skins':''}</small></div><span>${r&&r.n?`<b>${r.posTxt}</b> <small class="muted">${r.thru==='F'?'F':'thru '+r.thru}</small>`:'<span class="muted">—</span>'}</span><span class="r">${r&&r.n?(g.net&&r.net!=null?r.net+' <small class="muted">net</small>':r.gross):'<span class="muted">—</span>'}</span><span>${p.paid?'<span class="chip ok">Paid</span>':`<span class="chip warn">Owes ${gMoney(inn)}</span>`}</span><span class="r">${gMoney(inn)}</span><span class="r ${out>0?'pos':''}">${out?gMoney(out):'—'}</span><span class="ib">${I.edit}</span></div>`; };
+  const prow=p=>{ const r=byG.get(p.gpid), inn=gpIn(g,p), out=gpOut(g,p); return `<div class="tr num click" data-gp="${p.id}" style="${pcols}"><div class="cell2"><b class="trunc">${esc(gpName(p))}</b><small>${p.memberId?'':'Guest · '}${p.inSkins&&n0(g.skinsEntry)?'in skins':''}</small></div><span>${r&&r.n?`<b>${r.posTxt}</b> <small class="muted">${r.thru==='F'?'F':'thru '+r.thru}</small>`:'<span class="muted">—</span>'}</span><span class="r">${r&&r.n?(r.unit==='points'?r.pts+' <small class="muted">pts</small>':r.unit==='holes'?(r.holesUp>0?'+':'')+r.holesUp:(g.net&&r.net!=null?r.net+' <small class="muted">net</small>':r.gross)):'<span class="muted">—</span>'}</span><span>${p.paid?'<span class="chip ok">Paid</span>':`<span class="chip warn">Owes ${gMoney(inn)}</span>`}</span><span class="r">${gMoney(inn)}</span><span class="r ${out>0?'pos':''}">${out?gMoney(out):'—'}</span><span class="ib">${I.edit}</span></div>`; };
   const payRows=g.payouts.slice().sort((a,b)=>b.amount-a.amount).map(x=>{ const p=g.players.find(y=>y.id===x.pid); return `<div class="mr num" style="grid-template-columns:minmax(0,1fr) 90px 90px"><div class="cell2"><b>${esc(p?gpName(p):'—')}</b><small>${esc(x.note||x.kind)}</small></div><span class="muted">${x.kind==='places'?'Finish':x.kind==='skins'?'Skins':'Manual'}</span><b class="r">${gMoney(x.amount)}</b></div>`; }).join('');
   const link=ev?scoringLink(ev):'';
   m.innerHTML=`<div class="crumb"><button id="gmBack">Games</button><span class="muted">/</span><span class="muted">${esc(gameTitle(g))}</span></div>
-  <div class="phead"><div><h1 class="h1">${esc(gameTitle(g))}</h1><div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap"><span class="chip navy">${esc(gameWhen(g))}</span><span class="chip">${esc(courseById(g.course)?.name||'Course TBD')}</span><span class="chip">${g.net?'Net':'Gross'}</span><span class="chip">${gMoney(g.entry)} entry${n0(g.skinsEntry)?' · '+gMoney(g.skinsEntry)+' skins':''}</span>${g.status==='settled'?'<span class="chip navy">Settled</span>':''}${live?'<span class="chip ok">● Live scoring</span>':''}</div></div>
+  <div class="phead"><div><h1 class="h1">${esc(gameTitle(g))}</h1><div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap"><span class="chip navy">${esc(gameWhen(g))}</span><span class="chip">${esc(courseById(g.course)?.name||'Course TBD')}</span><span class="chip">${esc(FORMAT_LABEL[g.format||'stroke'])} · ${g.net?'net':'gross'}</span><span class="chip">${gMoney(g.entry)} entry${n0(g.skinsEntry)?' · '+gMoney(g.skinsEntry)+' skins':''}</span>${g.status==='settled'?'<span class="chip navy">Settled</span>':''}${live?'<span class="chip ok">● Live scoring</span>':''}</div></div>
     <div class="actions">${g.status==='settled'?'<button class="btn" id="gmReopen">Reopen</button>':'<button class="btn" id="gmSettle" title="Everything is paid out and recorded">Mark settled</button>'}<button class="btn" id="gmEdit">${I.edit}Details</button></div></div>
   <div class="grid g4">${kpi('Players',String(g.players.length),mo.unpaid?`<span class="neg">${mo.unpaid} still owe entry</span>`:g.players.length?'all paid in':'add who’s playing')}${kpi('Pot',gMoney(mo.pot),`${g.players.length} × ${gMoney(g.entry)}${sum(g.players,p=>p.extraIn)?' + extras':''}`)}${n0(g.skinsEntry)?kpi('Skins pot',gMoney(mo.skins),`${g.players.filter(p=>p.inSkins).length} in × ${gMoney(g.skinsEntry)}`):kpi('Skins','—','no skins game')}${kpi(mo.left>0.004?'Still to pay out':mo.left<-0.004?'Paid out over the pot':'Paid out',gMoney(Math.abs(mo.left>0.004||mo.left<-0.004?mo.left:mo.paid)),mo.left>0.004?`${gMoney(mo.paid)} paid so far`:mo.left<-0.004?'check the payouts':'pot fully paid out',mo.left<-0.004?'neg':mo.left>0.004?'':'pos')}</div>
   <div class="card" style="overflow:hidden"><div class="cardhead"><h2 class="h2">Players</h2><div class="actions"><button class="btn sm" id="gmAllPaid">Mark all paid</button><button class="btn sm pri" id="gmAdd">${I.plus}Add players</button></div></div>
@@ -3146,7 +3228,7 @@ function openScoring(g){
   if(!g.players.length){ toast('Add players first'); return; }
   const G=golfData(); let ev=gameEvent(g);
   if(!ev){ let slug=slugify(orgShort()+'-'+(g.date||'game')), n=2; while(G.events.some(e=>e.slug===slug)) slug=slugify(orgShort()+'-'+(g.date||'game'))+'-'+(n++);
-    ev={id:uid(),status:'draft',name:gameTitle(g)+(g.date?' · '+shortDate(g.date):''),date:g.date,defaultTee:'White',defaultCourse:g.course||'oak',slug,tournamentId:'',format:'stroke',front:'scramble',back:'shamble',scoring:g.net?'net':'gross',allow:clone(USGA_ALLOW),groups:[],pool:[],flights:{count:0,names:[]},createdAt:new Date().toISOString(),gameId:g.id};
+    ev={id:uid(),status:'draft',name:gameTitle(g)+(g.date?' · '+shortDate(g.date):''),date:g.date,defaultTee:'White',defaultCourse:g.course||'oak',slug,tournamentId:'',format:g.format||'stroke',front:'scramble',back:'shamble',scoring:g.net?'net':'gross',teamSize:1,count:1,allow:{},groups:[],pool:[],flights:{count:0,names:[]},createdAt:new Date().toISOString(),gameId:g.id};
     G.events.push(ev); g.golfEventId=ev.id; }
   syncGameEvent(g,ev); ev.status='live'; golfSave(ev); render(); toast('Scoring is open — share the link');
 }
@@ -4701,7 +4783,7 @@ function wirePayouts(el,t){
 /* Keeps every open device on the latest version: checks version.json about once a minute and, when a
    newer build is live, reloads at a safe moment (nothing unsaved, no editor open, not mid-typing). */
 (function(){
-  const ME='20261008200137'; let ready=false, lastCheck=0;
+  const ME='20261008201515'; let ready=false, lastCheck=0;
   const typing=()=>{ const a=document.activeElement; return a&&/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)&&a.value&&a.type!=='search'; };
   const safe=()=>!typing()&&(typeof window.__canReload!=='function'||window.__canReload());
   async function check(){ lastCheck=Date.now(); if(location.protocol==='file:') return;

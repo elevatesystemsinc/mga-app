@@ -41,7 +41,8 @@ src/
   core.js              data model, normalize(), storage, cloud save/merge (see §3)
   ui.js                every screen + the single edit drawer (openDrawer), render(), TT (tournament tabs)
   treasury.js          season ledger, budget vs actual, bank import
-  golfcore.js          courses (WCCC Oak/Pecan ratings), WHS math, scoring engine, scorecard renderer  [shared]
+  golfcore.js          courses (WCCC Oak/Pecan ratings), WHS math, format engine (FORMATS registry, team handicaps,
+                       leaderboards, match play, skins), scorecard renderer — see docs/formats.md       [shared]
   golf.js              Golf page: events, field, flights, groups, live scoring, printed cards
   games.js             small groups: Games (entry money, payouts by finish / skins, live scoring via golf events), Ledger
   calccore.js          Calcutta pure logic                                                            [shared]
@@ -231,6 +232,11 @@ groups, printed scorecards — the printed cards include a live-scoring QR that 
   hub's import / Verify / two-way sync / "Retire current app" code was removed in Oct 2026. Stored documents may still carry `db.legacy`, `t.source` (`kind:'mm-app'`) and
   `t.sync` from that era; nothing reads them and `normalize()` leaves them alone.
 - 2026 Member-Member: Oct 2–4. 150 players / 75 teams (Team 84, Regina & Cagle, added late as Lot 75).
+- **Built Oct 2026 (formats):** `docs/formats.md` is the reference. Event fields: `format` (stroke, stableford, modstable,
+  quota, parbogey, match, bestball, aggregate, scramble, shamble, foursomes, greensome, teamstable, split), `teamSize`
+  1–6, `count` (balls that count), `countPattern` ('123'), `scoring`, `allow` (overrides by `allowKey`; defaults in
+  `USGA_ALLOW` + `defaultAllow`). `unitOf(pub)` = strokes | points | holes | match drives every leaderboard column.
+  Skins (`skinsResult`): gross/net, carry, gross-beats-net, validation by par / net par on the next hole in play order.
 - **Built Oct 2026 (step 3, small groups):** Games, payouts by finish and skins, live scoring through golf events,
   season/quarter Ledger with settle-ups, a group dashboard; the Members page without dues for groups.
 - **Built Oct 2026 (step 1):** per-organization rows, the club directory + memberships, path routing, the picker,

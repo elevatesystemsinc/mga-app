@@ -23,6 +23,14 @@ own hub. An organization's **Members** page is the club members who belong to it
 the organization's own list (club members are matched and joined; new people are added to the directory too), and keep
 status, join date, notes and dues per organization. Editing a person's details anywhere updates the directory.
 
+## Formats
+
+Scoring events (and small-group games) support stroke play, Stableford, modified Stableford, quota, par/bogey, singles
+and four-ball match play, best ball (any 1 to size−1 balls of a 2- to 6-player team, or 1-2-3), aggregate, scramble
+(2–6 players), shamble, foursomes, greensome/Chapman, team Stableford, and a front/back split. Allowances default to
+the USGA tables (club defaults where the USGA has none) and are editable per event. `docs/formats.md` spells out every
+format's team score and handicap math, with worked examples.
+
 ## Small groups
 
 A small group's hub is the regular game. **Games**: date, course, entry money and an optional skins entry; add the
