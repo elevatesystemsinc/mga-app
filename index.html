@@ -3768,7 +3768,7 @@ function vGame(m,g){
   <div class="phead"><div><h1 class="h1">${esc(gameTitle(g))}</h1><div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap"><span class="chip navy">${esc(gameWhen(g))}</span><span class="chip">${esc(courseById(g.course)?.name||'Course TBD')}</span>${pots.map(p=>`<span class="chip gold">${esc(p.name)} ${gMoney(p.entry)}</span>`).join('')}<span class="chip">${after?'paid after the round':'paid before the round'} · ${g.settle==='net'?'net':'pot'}</span>${g.status==='settled'?'<span class="chip navy">Settled</span>':''}${live?'<span class="chip ok">● Live scoring</span>':''}</div></div>
     <div class="actions"><button class="btn" id="gmDesign">${I.edit}Design</button></div></div>
   <div class="grid g4">${kpi('Players',String(g.players.length),mo.unpaid?`<span class="neg">${mo.unpaid} still owe</span>`:g.players.length?'all paid in':'add who’s playing')}${kpi('In the pots',gMoney(mo.total),pots.map(p=>`${esc(p.name)} ${gMoney(potTotal(g,p))}`).join(' · ')||'no competitions')}${kpi('Paid out',gMoney(mo.paid),`${sum(g.pots,p=>p.payouts.length)} payout${sum(g.pots,p=>p.payouts.length)===1?'':'s'}`)}${kpi(mo.left>0.004?'Still to pay out':mo.left<-0.004?'Paid out over the pots':'Balance',gMoney(Math.abs(mo.left)),mo.left>0.004?'allocate it below':mo.left<-0.004?'check the payouts':'pots fully paid out',mo.left<-0.004?'neg':mo.left>0.004?'':'pos')}</div>
-  ${after?first.join('')+grid:first.join('')}${liveCard}
+  ${after?first.join('')+grid:first.join('')}${gameGroupsCard(g,ev)}${liveCard}
   ${g.notes?`<div class="card pad"><span class="lbl">Notes</span><p style="margin:6px 0 0;white-space:pre-wrap">${esc(g.notes)}</p></div>`:''}`;
   $('gmBack').onclick=()=>{ view.gameId=null; render(); }; $('gmDesign').onclick=()=>designGame(g);
   $('gmAdd').onclick=()=>addGamePlayers(g); $('gmAllPaid').onclick=()=>{ g.players.forEach(p=>p.paid=true); persist(); render(); toast('Everyone marked paid'); };
@@ -3778,6 +3778,7 @@ function vGame(m,g){
   const cl=$('gmClose'); if(cl) cl.onclick=()=>{ ev.status='final'; golfSave(ev); render(); toast('Scoring closed'); };
   const cp=$('gmCopy'); if(cp) cp.onclick=async()=>{ try{ await navigator.clipboard.writeText(link); toast('Link copied'); }catch(_){ prompt('Copy this link:',link); } };
   $('gmGroups').onclick=()=>{ view.geid=ev.id; view.getab='groups'; go('golf'); };
+  wireGameGroups(m,g,ev);
   $('gmSheet').onclick=()=>gameSheetPDF(g);
   m.querySelectorAll('[data-gsheet]').forEach(b=>b.onclick=()=>scoreSheet(ev,ev.groups.find(x=>x.id===b.dataset.gsheet)));
   m.querySelectorAll('[data-gp]').forEach(r=>r.onclick=()=>editGamePlayer(g,g.players.find(p=>p.id===r.dataset.gp)));
@@ -3787,6 +3788,41 @@ function vGame(m,g){
   m.querySelectorAll('[data-callout]').forEach(b=>b.onclick=()=>skinsCallout(g,g.pots.find(p=>p.id===b.dataset.callout)));
   m.querySelectorAll('[data-teams]').forEach(b=>b.onclick=()=>{ const pot=g.pots.find(p=>p.id===b.dataset.teams); if((pot.rules.teamsBy||'hand')==='hand') pickTeams(g,pot); else drawStage(g,pot); });
   m.querySelectorAll('[data-pay]').forEach(b=>b.onclick=()=>{ const pot=g.pots.find(p=>p.id===b.dataset.pay); ({skins:paySkins,dots:payDots,format:payFormat,manual:(g,pot)=>payManual(g,pot,null)})[pot.kind](g,pot); });
+}
+/* ---------- groups & handicaps on the game page ----------
+   Who plays with whom, from which tees, and what each player's course and playing handicap come to — settled before
+   the first tee. An index typed here is for this game only; blank means the member's index from the directory. */
+function gameGroupsCard(g,ev){
+  const courses=golfData().courses, tees=c=>(c?c.tees:[]).map(t=>t.name);
+  const cols='grid-template-columns:minmax(150px,1fr) 88px 110px 54px 54px 150px';
+  const row=(grp,p)=>{ const h=playerHcp(ev,grp,p), c=courseById(grp.course), m=p.memberId?memberById(p.memberId):null, dir=m&&m.hcp!=null&&String(m.hcp).trim()!==''?String(m.hcp):'';
+    return `<div class="tr num" style="${cols}"><div class="cell2"><b class="trunc">${esc(p.name)}</b>${h.missing?`<small class="neg">no ${h.missing}</small>`:p.index!=null&&String(p.index).trim()!==''&&dir&&String(p.index)!==dir?`<small>directory ${esc(dir)}</small>`:''}</div>
+      <input class="inp r" data-gidx="${p.id}" value="${esc(p.index!=null?p.index:'')}" placeholder="${esc(dir||'—')}" inputmode="decimal" aria-label="Index for ${esc(p.name)}">
+      <select class="inp" data-gtee="${p.id}" aria-label="Tee for ${esc(p.name)}">${tees(c).map(t=>`<option${(p.tee||ev.defaultTee)===t?' selected':''}>${esc(t)}</option>`).join('')}</select>
+      <span class="r">${h.ch!=null?h.ch:'—'}</span><b class="r">${h.ph!=null?h.ph:'—'}</b>
+      <select class="inp" data-gmove="${p.id}" aria-label="Group for ${esc(p.name)}">${ev.groups.map((x,i)=>`<option value="${x.id}"${x===grp?' selected':''}>Group ${i+1} · ${esc(x.code)}</option>`).join('')}<option value="__new">+ New group</option></select></div>`; };
+  const groupHead=(grp,i)=>`<div class="tr" style="grid-template-columns:minmax(0,1fr) 150px 120px 110px;background:var(--ivory)"><div class="cell2"><b>Group ${i+1} · ${esc(grp.code)}</b><small>${grp.players.length} player${grp.players.length===1?'':'s'}</small></div>
+      <select class="inp" data-gcourse="${grp.id}" aria-label="Course">${courses.map(c=>`<option value="${c.id}"${c.id===grp.course?' selected':''}>${esc(c.name)}</option>`).join('')}</select>
+      <select class="inp" data-ghole="${grp.id}" aria-label="Starting hole">${Array.from({length:18},(_,k)=>`<option value="${k+1}"${(+grp.startHole||1)===k+1?' selected':''}>Hole ${k+1}</option>`).join('')}</select>
+      <input class="inp" type="time" data-gtime="${grp.id}" value="${esc(grp.teeTime||'')}" aria-label="Tee time"></div>`;
+  return `<div class="card" style="overflow:hidden"><div class="cardhead"><div><h2 class="h2">Groups &amp; handicaps</h2><span class="muted">Who plays with whom, their tees, and each player’s course (CH) and playing (PH) handicap for today. An index typed here is for this game only.</span></div><div class="actions"><button class="btn sm" id="ggAddGroup">${I.plus}New group</button></div></div>
+    ${ev.groups.length?`<div class="tw"><div class="t" style="min-width:720px"><div class="tr th" style="${cols}"><span>Player</span><span class="r">Index</span><span>Tee</span><span class="r">CH</span><span class="r">PH</span><span>Group</span></div>
+      ${ev.groups.map((grp,i)=>groupHead(grp,i)+grp.players.map(p=>row(grp,p)).join('')).join('')}</div></div>`:'<div class="empty"><b>No groups yet</b><span>Groups appear as players are added.</span></div>'}</div>`;
+}
+function wireGameGroups(m,g,ev){
+  const save=()=>{ golfSave(ev); render(); };
+  const find=id=>{ for(const grp of ev.groups){ const p=grp.players.find(x=>x.id===id); if(p) return {grp,p}; } return null; };
+  m.querySelectorAll('[data-gidx]').forEach(i=>i.onchange=()=>{ const f=find(i.dataset.gidx); if(!f) return; const v=i.value.trim(); if(v&&parseIndex(v)==null){ toast('Enter an index like 12.4 or +1.2'); i.value=f.p.index||''; return; } f.p.index=v; save(); });
+  m.querySelectorAll('[data-gtee]').forEach(s=>s.onchange=()=>{ const f=find(s.dataset.gtee); if(f){ f.p.tee=s.value; save(); } });
+  m.querySelectorAll('[data-gmove]').forEach(s=>s.onchange=()=>{ const f=find(s.dataset.gmove); if(!f) return; let to=ev.groups.find(x=>x.id===s.value);
+    if(s.value==='__new'){ to={id:uid(),code:newCode(ev),label:'Group '+(ev.groups.length+1),course:f.grp.course,startHole:1,teeTime:f.grp.teeTime||'',players:[]}; ev.groups.push(to); }
+    if(!to||to===f.grp) return; f.grp.players=f.grp.players.filter(x=>x!==f.p); to.players.push(f.p); ev.groups=ev.groups.filter(x=>x.players.length); save(); });
+  m.querySelectorAll('[data-gcourse]').forEach(s=>s.onchange=()=>{ const grp=ev.groups.find(x=>x.id===s.dataset.gcourse); if(grp){ grp.course=s.value; save(); } });
+  m.querySelectorAll('[data-ghole]').forEach(s=>s.onchange=()=>{ const grp=ev.groups.find(x=>x.id===s.dataset.ghole); if(grp){ grp.startHole=+s.value; save(); } });
+  m.querySelectorAll('[data-gtime]').forEach(s=>s.onchange=()=>{ const grp=ev.groups.find(x=>x.id===s.dataset.gtime); if(grp){ grp.teeTime=s.value; save(); } });
+  const ng=$('ggAddGroup'); if(ng) ng.onclick=()=>{ ev.groups.push({id:uid(),code:newCode(ev),label:'Group '+(ev.groups.length+1),course:g.course||ev.defaultCourse||'oak',startHole:1,teeTime:g.time||'',players:[]}); toast('Move players into it with the Group column'); const grp=ev.groups[ev.groups.length-1];
+    // an empty group would be pruned on the next sync; keep it by rendering without one until a player lands in it
+    m.querySelector('#ggAddGroup').disabled=true; const card=m.querySelector('#ggAddGroup').closest('.card'); card.querySelectorAll('[data-gmove]').forEach(sel=>{ const o=document.createElement('option'); o.value=grp.id; o.textContent=`Group ${ev.groups.length} · ${grp.code}`; sel.insertBefore(o,sel.lastElementChild); }); };
 }
 /* live standings for one competition, from the day's scores */
 function potStandingsHTML(g,pot,ev){
@@ -4081,7 +4117,7 @@ function syncGameEvent(g,ev){
     grp.players.push(gp); }
   const ids=new Set(g.players.map(p=>p.gpid)), sc=scoresFor(ev);
   ev.groups.forEach(grp=>{ grp.players=grp.players.filter(p=>ids.has(p.id)||Object.keys(sc[p.id]||{}).length); });
-  ev.groups=ev.groups.filter(grp=>grp.players.length); ev.pool=(ev.pool||[]).filter(p=>ids.has(p.id));
+  ev.pool=(ev.pool||[]).filter(p=>ids.has(p.id));
   const E=gameEventEngine(g); EV_GAME_KEYS.forEach(k=>{ ev[k]=E[k]; });
   ev.scoring=g.pots.some(p=>p.kind==='format'&&(p.rules.scoring||'gross')==='net')||g.pots.some(p=>p.kind==='skins'&&skinsRulesOf(p).net)?'net':'gross';
   const teams=E._pot&&E._pot.teams||null; evPlayers(ev).forEach(({p})=>{ p.team=teams?(teams[p.id]||''):''; });
@@ -5952,7 +5988,7 @@ async function resultsPDF(t,opt){
 /* Keeps every open device on the latest version: checks version.json about once a minute and, when a
    newer build is live, reloads at a safe moment (nothing unsaved, no editor open, not mid-typing). */
 (function(){
-  const ME='20261009173204'; let ready=false, lastCheck=0;
+  const ME='20261009174438'; let ready=false, lastCheck=0;
   const typing=()=>{ const a=document.activeElement; return a&&/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)&&a.value&&a.type!=='search'; };
   const safe=()=>!typing()&&(typeof window.__canReload!=='function'||window.__canReload());
   async function check(){ lastCheck=Date.now(); if(location.protocol==='file:') return;

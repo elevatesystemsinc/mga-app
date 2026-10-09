@@ -118,9 +118,9 @@ async def main():
         and r['left']==0 and r['rows'][0]==['Bo Baker',1,32,97,65] and r['rows'][-1]==['Di Dunn',1,32,2,-30]
         and r['settle'][0]==['Bo Baker',65] and r['settle'][-1]==['Di Dunn',-30] and r['tSum']==sum(x for _,x in r['settle'] if x>0) and all(t['amount']>0 for t in r['transfers']))
     # quiet skins: nothing live on the game page until the call-out, which walks the cards hole by hole
-    r3=await pg.evaluate("""()=>{ const g=GAME(), pot=g.pots[1]; delete pot.calledOut; view.gameId=g.id; go('games'); const quiet=!!document.querySelector('[data-callout]')&&!document.body.textContent.includes('Hole 2'); skinsCallout(g,pot);
+    r3=await pg.evaluate("""()=>{ const g=GAME(), pot=g.pots[1]; delete pot.calledOut; view.gameId=g.id; go('games'); const skinsShown=()=>[...document.querySelectorAll('.mini .mr b')].some(b=>/^Hole \d/.test(b.textContent)); const quiet=!!document.querySelector('[data-callout]')&&!skinsShown(); skinsCallout(g,pot);
       const ov=document.querySelector('.rf-show'); let n=0; while(document.getElementById('skNext')){ document.getElementById('skNext').click(); n++; } const lines=ov.querySelectorAll('.sk-line').length, won=ov.querySelectorAll('.sk-line.won').length, txt=ov.textContent; document.getElementById('skFin').click();
-      const after=!!document.querySelector('[data-callout]')&&document.body.textContent.includes('Hole 2'); return {quiet, n, lines, won, after, called:pot.calledOut, sum:txt.includes('2 skins')}; }""")
+      const after=!!document.querySelector('[data-callout]')&&skinsShown(); return {quiet, n, lines, won, after, called:pot.calledOut, sum:txt.includes('2 skins')}; }""")
     ok=ok and r3['quiet'] and r3['n']==18 and r3['lines']==18 and r3['won']==2 and r3['after'] and r3['called'] and r3['sum']
     print('quiet skins + call-out', r3, 'OK' if r3['quiet'] and r3['lines']==18 and r3['won']==2 and r3['after'] else 'FAIL')
     # validation on the call-out: a won skin whose next hole fails flashes "Didn't validate" before that hole is shown
@@ -133,6 +133,15 @@ async def main():
       document.getElementById('skClose').click(); g.pots.pop(); await setScore(ev,gp('gp_p1'),3,4); return {pend, big, after, voidTxt}; }""")
     ok=ok and r4['pend'] and r4['big']=='Didn’t validate' and r4['after'][:3]==['muted','void','pending'] and r4['voidTxt']   # hole 3: Ann's 4 on the par 5 is a new skin, pending hole 4
     print('call-out validation flash', r4, 'OK' if r4['big']=='Didn’t validate' and r4['after'][:3]==['muted','void','pending'] else 'FAIL')
+    # groups & handicaps on the game page: move a player, change a tee, set an index for the day → CH/PH follow
+    r5=await pg.evaluate("""()=>{ const g=GAME(), ev=gameEvent(g); view.gameId=g.id; go('games'); const gp=id=>g.players.find(p=>p.id===id).gpid; const q=sel=>document.querySelector(sel);
+      const before=ev.groups.map(x=>x.players.length); const mv=q(`[data-gmove="${gp('gp_p4')}"]`); mv.value=ev.groups[0].id; mv.dispatchEvent(new Event('change'));
+      const after=gameEvent(g).groups.map(x=>x.players.length);
+      const ix=q(`[data-gidx="${gp('gp_p0')}"]`); ix.value='10.0'; ix.dispatchEvent(new Event('change')); const g1=gameEvent(g).groups.find(x=>x.players.some(p=>p.id===gp('gp_p0'))); const p0=g1.players.find(p=>p.id===gp('gp_p0')); const h1=playerHcp(gameEvent(g),g1,p0);
+      const te=q(`[data-gtee="${gp('gp_p0')}"]`); te.value='Gold'; te.dispatchEvent(new Event('change')); const h2=playerHcp(gameEvent(g),g1,g1.players.find(p=>p.id===gp('gp_p0')));
+      const shown=q(`[data-gidx="${gp('gp_p0')}"]`).value; return {before, after, idx:p0.index, ch1:h1.ch, ph1:h1.ph, tee:p0.tee, ch2:h2.ch, shown}; }""")
+    ok=ok and r5['before']==[4,2] and r5['after']==[5,1] and r5['idx']=='10.0' and r5['ch1'] is not None and r5['ph1'] is not None and r5['tee']=='Gold' and r5['ch2']>r5['ch1'] and r5['shown']=='10.0'
+    print('groups & handicaps', r5, 'OK' if r5['after']==[5,1] and r5['tee']=='Gold' and r5['ch2']>r5['ch1'] else 'FAIL')
     # the game sheet PDF and the designer round-trip
     r2=await pg.evaluate("""async()=>{ const g=GAME(); const doc=await gameSheetPDF(g,{returnDoc:true}); const n=doc.getNumberOfPages(); designGame(g); const names=GD.draft.pots.map(p=>p.name); const grid=document.querySelectorAll('[data-gdin]').length; document.getElementById('gdSave').click(); return {pages:n, names, grid, back:!!document.getElementById('gmSheet')}; }""")
     ok=ok and r2['pages']>=1 and len(r2['names'])==4 and r2['grid']==6*4 and r2['back']

@@ -89,7 +89,9 @@ they want, so nine can be in the skins while eight play the team game. A new gam
 
 **On the day.** Everyone plays their own ball; every competition is scored live from those cards. A team competition
 whose partners are not drawn yet shows individual standings until the **drawing**: a full-screen stage that draws
-with real randomness, saves the result first, then reveals the teams one at a time. The **settlement** shows what
+with real randomness, saves the result first, then reveals the teams one at a time. **Groups & handicaps** on the game page: move players between groups, set each group's starting hole or tee time,
+pick a player's tee box, and type an index for the day where it differs from the directory. Course and playing
+handicaps update on the spot, before anyone tees off. The **settlement** shows what
 each player put in, pulled out and nets, and for net settlement the fewest payments that square it. The **game sheet
 PDF** carries the competitions and denominations, the teams when they are known, and the groups as they play with
 each player's strokes. The **Ledger** shows who is up or down for the season or any quarter, with a one-click

@@ -176,6 +176,10 @@ Tournament = { id, name, season, days, startDate, field:[{id,memberId,team,paid,
   - Paying: `payFormat` (finish from `potPub` standings via `payByFinish`; `pot.rules.places` are the default splits;
     ties share places, cent-exact; hand-entered positions when there are no scores), `paySkins` (`skinsCalc` →
     `skinsResult`, one pot ÷ skins won; rules on the pot), `payDots`, `payManual`.
+  - **Groups & handicaps** (`gameGroupsCard`/`wireGameGroups` on the game page): per group the course, starting hole
+    and tee time; per player an index for the day (`p.index` on the event player, blank = the directory index), the
+    tee, and CH / PH from `playerHcp`; a Group select moves a player (or starts a new group). `syncGameEvent` no
+    longer prunes empty groups, so a group made on purpose survives until someone lands in it.
   - **Game sheet PDF** (`gameSheetPDF(g,{strokes,returnDoc})`): competitions and denominations, teams when known
     (an after-round draw says so), the groups as they play with each player's strokes.
 - Arrays of objects carry stable `id`s — the merge (§3) matches by id. Keep it that way for anything new.
