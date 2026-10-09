@@ -356,7 +356,7 @@ function drawStage(g,pot){
     const pool=ps.map(p=>gpName(p)); const slots=k=>ov.querySelector('#dwS'+k), done=ov.querySelector('#dwDone');
     for(let i=0;i<teams.length;i++){ const t=teams[i]; ov.querySelector('#dwLbl').textContent=`Team ${i+1} of ${teams.length}`;
       for(let k=0;k<Math.max(...teams.map(x=>x.length));k++){ const s=slots(k); if(s){ s.textContent=k<t.length?'?':''; s.className='dw-slot'+(k<t.length?'':' empty'); } }
-      for(let k=0;k<t.length;k++){ const s=slots(k); s.classList.add('rolling'); const steps=[]; for(let z=0;z<22;z++) steps.push(45+Math.round(z*z*1.6));
+      for(let k=0;k<t.length;k++){ const s=slots(k); s.classList.add('rolling'); const steps=[]; for(let z=0;z<16;z++) steps.push(40+Math.round(z*z*1.2));
         for(const ms of steps){ s.textContent=pool[secureInt(pool.length)]; await wait(ms); }
         s.textContent=first(t[k]); s.classList.remove('rolling'); s.classList.add('won'); await wait(i===teams.length-1&&k===t.length-1?1400:800); }
       done.insertAdjacentHTML('beforeend',`<div class="rf-sum"><span>Team ${i+1}</span><b>${esc(t.map(first).join(' & '))}</b></div>`);
