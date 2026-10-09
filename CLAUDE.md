@@ -209,7 +209,10 @@ Tournament = { id, name, season, days, startDate, field:[{id,memberId,team,paid,
     balls up (count pattern, count>1 or total score) **100%** ('match'), four-ball match play 90% ('match4') — a 90%
     waltz once mis-scored a live game by two strokes. A Nassau by total score plays **full handicaps** (`rel` = the
     player's PH, not PH − low man; the owner: "it should not be relative to the low"); by-holes matches stay off the
-    low man. Each side's row carries **its
+    low man. **Only true match play waits**: a by-holes match counts a hole once both sides have it (and stops at the
+    first hole either side is missing); a Nassau by total score posts each side as its own holes come in (`nSide`,
+    per-side `thru`, `startedA/B`), and a bet is settled once both sides have every hole of it (the owner: "I don't
+    want any format to wait unless it is a true match play"). Each side's row carries **its
     own** `groupId` (its scorecard), not the match's first group. The phone board gives a match row the 18 in its value column and
     the front/back under the names (`.lb.m`). `matchPairs()`
     in golfcore pairs sides within a group as before, or — when teams span groups or no group holds two teams —

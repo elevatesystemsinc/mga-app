@@ -455,26 +455,41 @@ function matchBoard(pub,scores,opt){
       const sc=pub.matchScoring||'holes';
       // a Nassau is decided by holes won (match play) or, matchBy 'strokes', by the total of the sides' counted balls
       const by=sc==='nassau'&&matchByOf(pub)==='strokes'?'strokes':'holes';
-      let up=0,played=0,wA=0,wB=0,ptsA=0,ptsB=0,upF=0,upB=0,sF=0,sB=0,pAF=0,pAB=0,pBF=0,pBB=0; const holes=[];   // pXF/pXB: a side's counted balls to par, front/back
-      for(const h of order){ const a=side(A,h), b=side(B,h); if(a==null||b==null) break; played++;
+      let up=0,played=0,wA=0,wB=0,ptsA=0,ptsB=0,upF=0,upB=0,sF=0,sB=0,pAF=0,pAB=0,pBF=0,pBB=0; const holes=[]; let nSide=null, segsA=null, lead=0;   // pXF/pXB: a side's counted balls to par, front/back
+      if(totalScore){
+        // total score never waits for the other side: each side posts the holes it has in, like any stroke-play board;
+        // a bet is settled once both sides have every hole of it
+        let nA=0,nB=0; const c9={AF:0,AB:0,BF:0,BB:0};
+        for(const h of order){ const a=side(A,h), b=side(B,h); if(a==null&&b==null) continue; const f=h<=9;
+          if(a!=null){ nA++; const r=a-kOf(A,h)*parOf(A,h); if(f){ pAF+=r; c9.AF++; } else { pAB+=r; c9.AB++; } }
+          if(b!=null){ nB++; const r=b-kOf(B,h)*parOf(B,h); if(f){ pBF+=r; c9.BF++; } else { pBB+=r; c9.BB++; } }
+          holes.push({h,a,b}); }
+        played=Math.max(nA,nB); nSide={A:nA,B:nB};
+        const fin=c9.AF>=9&&c9.BF>=9, done=fin&&c9.AB>=9&&c9.BB>=9, vF=pBF-pAF, vB=pBB-pAB, vT=vF+vB; lead=vT;
+        segsA=[{k:'F',label:'Front',v:vF,done:fin,started:c9.AF+c9.BF>0,startedA:c9.AF>0,startedB:c9.BF>0,relA:pAF,relB:pBF},
+               {k:'B',label:'Back',v:vB,done,started:c9.AB+c9.BB>0,startedA:c9.AB>0,startedB:c9.BB>0,relA:pAB,relB:pBB},
+               {k:'18',label:'18',v:vT,done,started:nA+nB>0,startedA:nA>0,startedB:nB>0,relA:pAF+pAB,relB:pBF+pBB}];
+      }
+      else for(const h of order){ const a=side(A,h), b=side(B,h); if(a==null||b==null) break; played++;
         const ra=a-kOf(A,h)*parOf(A,h), rb=b-kOf(B,h)*parOf(B,h); if(h<=9){ sF+=b-a; pAF+=ra; pBF+=rb; } else { sB+=b-a; pAB+=ra; pBB+=rb; }
         if(sc==='hilo'){ const na=nets(A,h), nb=nets(B,h); const la=Math.min(...na), lb=Math.min(...nb), ha=Math.max(...na), hb=Math.max(...nb); if(la<lb) ptsA++; else if(lb<la) ptsB++; if(ha<hb) ptsA++; else if(hb<ha) ptsB++; up=ptsA-ptsB; if(la<lb||ha<hb) wA++; if(lb<la||hb<ha) wB++; }
         else { if(a<b){ up++; wA++; if(h<=9) upF++; else upB++; } else if(b<a){ up--; wB++; if(h<=9) upF--; else upB--; } }
         holes.push({h,a,b}); if(sc==='holes'&&Math.abs(up)>18-played) break; }
+      if(!totalScore) lead=up;
       let st=matchStatus(up,played,false);
       if(sc==='hilo'){ const over=played===18; st={txt:(up===0?'AS':Math.abs(up)+' '+(up>0?'up':'dn'))+(over?'':' thru '+played),over,won:up>0?1:up<0?-1:0}; }
-      let segsA=null, lead=up;
-      if(sc==='nassau'){ const nF=holes.filter(x=>x.h<=9).length, nB=holes.length-nF, fin=nF>=9, done=fin&&nB>=9;
+      if(totalScore){ const t=segsA[2]; st={txt:'',over:t.done,won:t.v>0?1:t.v<0?-1:0}; }
+      else if(sc==='nassau'){ const nF=holes.filter(x=>x.h<=9).length, nB=holes.length-nF, fin=nF>=9, done=fin&&nB>=9;
         const vF=by==='strokes'?sF:upF, vB=by==='strokes'?sB:upB, vT=by==='strokes'?sF+sB:up; lead=vT;
         segsA=[{k:'F',label:'Front',v:vF,done:fin,started:nF>0,relA:pAF,relB:pBF},{k:'B',label:'Back',v:vB,done,started:nB>0,relA:pAB,relB:pBB},{k:'18',label:'18',v:vT,done,started:played>0,relA:pAF+pAB,relB:pBF+pBB}];
         st={txt:'',over:done,won:vT>0?1:vT<0?-1:0}; }
       // by total score a side's figure is its own counted balls to par (what the group reads on the wall); by holes, up/down
       const segTxt=(v,started,rel)=>!started?'—':by==='strokes'?toParTxt(rel):(v>0?v+' up':v<0?(-v)+' dn':'AS');
       const nassauPts=sign=>{ if(sc!=='nassau') return null; return segsA.reduce((t,s)=>t+(!s.done?0:(sign*s.v>0?1:sign*s.v<0?0:0.5)),0); };
-      const sideSegs=sign=>segsA&&segsA.map(s=>{ const rel=sign>0?s.relA:s.relB; return {k:s.k,label:s.label,v:sign*s.v,rel,done:s.done,started:s.started,txt:segTxt(sign*s.v,s.started,rel)}; });
+      const sideSegs=sign=>segsA&&segsA.map(s=>{ const rel=sign>0?s.relA:s.relB, started=sign>0?(s.startedA??s.started):(s.startedB??s.started); return {k:s.k,label:s.label,v:sign*s.v,rel,done:s.done,started,txt:segTxt(sign*s.v,started,rel)}; });
       // each side's row points at its own group (its scorecard), not the match's first group — two foursomes playing each other are in different carts
       const mk=(S,O,sign,won,lost)=>{ const sg=(S.groups&&S.groups[0])||g, scs=pub.courses[sg.course]||c; return {id:S.key,name:S.members.map(p=>p.name).join(' / '),members:S.members.map(p=>p.id),opp:O.members.map(p=>p.name).join(' / '),group:sg.label||'',groupId:sg.id,course:sg.course,courseName:scs.name,
-        n:played,thru:played===18||st.over?'F':String(played),
+        n:nSide?nSide[S===A?'A':'B']:played,thru:(nSide?nSide[S===A?'A':'B']:played)===18||st.over?'F':String(nSide?nSide[S===A?'A':'B']:played),
         status:sc==='nassau'?sideSegs(sign).map(s=>s.k+' '+s.txt).join(' · '):sc==='hilo'?(up===0?'AS':(sign*up>0?Math.abs(up)+' up':Math.abs(up)+' dn'))+(st.over?'':' thru '+played):st.over?(sign*up>0?st.txt:sign*up<0?'lost '+st.txt:'AS'):(up===0?st.txt:(sign*up>0?Math.abs(up)+' up':Math.abs(up)+' dn')+(st.txt.includes('dormie')?' · dormie':'')+' thru '+played),
         pts:sc==='nassau'?nassauPts(sign):sc==='hilo'?(st.over?(sign*up>0?1:sign*up<0?0:0.5):0):(st.over?(sign*up>0?1:sign*up<0?0:0.5):0),holesWon:won,holesLost:lost,gross:0,toPar:0,net:null,netToPar:null,holesUp:sign*lead,segs:sideSegs(sign),by,flight:[...new Set(S.members.map(p=>p.flight).filter(Boolean))].join('/'),team:S.members.length>1,unit:'match',over:st.over,holes}; };
       rows.push(mk(A,B,1,wA,wB),mk(B,A,-1,wB,wA)); } }
