@@ -204,7 +204,11 @@ Tournament = { id, name, season, days, startDate, field:[{id,memberId,team,paid,
     events/comps (designer: "Each segment goes to"); `matchBoard` rows carry `segs:[{k:'F'|'B'|'18',v (the side's lead),
     rel (its own counted balls to par), done, started, txt}]` and `by`; by total score a side's figures are **its own
     to par** per segment — `status` "F −3 · B — · 18 −3" (the owner: "how many under par we are on the front, the back
-    and total"), by holes "F 1 up · B AS · 18 1 up"; `nassauSegments`/`payNassau` settle from `segs[].v`. The phone board gives a match row the 18 in its value column and
+    and total"), by holes "F 1 up · B AS · 18 1 up"; `nassauSegments`/`payNassau` settle from `segs[].v`. `matchByOf(pub)` falls back to 'strokes' for a Nassau with
+    the 321 pattern (copies published before the field existed). Allowance: `allowKey` gives a team match that adds
+    balls up (count pattern, count>1 or total score) **100%** of the difference off the low man ('match'), four-ball
+    match play 90% ('match4') — a 90% waltz once mis-scored a live game by two strokes. Each side's row carries **its
+    own** `groupId` (its scorecard), not the match's first group. The phone board gives a match row the 18 in its value column and
     the front/back under the names (`.lb.m`). `matchPairs()`
     in golfcore pairs sides within a group as before, or — when teams span groups or no group holds two teams —
     pairs teams in code order (S1 v S2…) so two foursomes can play each other; a side's hole score sums its k best

@@ -334,7 +334,9 @@ const teamSizeOf=pub=>Math.max(1,Math.min(6,+pub.teamSize||(FORMATS[pub.format]&
 const countOf=pub=>Math.max(1,Math.min(teamSizeOf(pub)-1,+pub.count||1));
 /* the allowance key for a format in this event (team size and balls counting are part of it) */
 function allowKey(pub,fmt){ const n=teamSizeOf(pub);
-  if(fmt==='scramble') return 'scramble'+n; if(fmt==='match') return n>=2?'match4':'match';
+  if(fmt==='scramble') return 'scramble'+n;
+  // four-ball match play is 90%; a team match that adds balls up (3-2-1, total score) is 100% of the difference off the low man
+  if(fmt==='match') return n>=2&&!pub.countPattern&&!(+pub.count>1)&&matchByOf(pub)!=='strokes'?'match4':'match';
   if(FORMATS[fmt]&&FORMATS[fmt].count) return fmt+countOf(pub)+'of'+n; return fmt; }
 function allowOf(pub){ return Object.assign({},USGA_ALLOW,pub.allow||{}); }
 function pctFor(pub,key){ const A=pub.allow||{}; if(A[key]!=null) return A[key]; const base=key.replace(/\dof\d$/,''); if(A[base]!=null&&base!==key) return A[base]; return defaultAllow(key); }
@@ -466,10 +468,11 @@ function matchBoard(pub,scores,opt){
       const segTxt=(v,started,rel)=>!started?'—':by==='strokes'?toParTxt(rel):(v>0?v+' up':v<0?(-v)+' dn':'AS');
       const nassauPts=sign=>{ if(sc!=='nassau') return null; return segsA.reduce((t,s)=>t+(!s.done?0:(sign*s.v>0?1:sign*s.v<0?0:0.5)),0); };
       const sideSegs=sign=>segsA&&segsA.map(s=>{ const rel=sign>0?s.relA:s.relB; return {k:s.k,label:s.label,v:sign*s.v,rel,done:s.done,started:s.started,txt:segTxt(sign*s.v,s.started,rel)}; });
-      const mk=(S,O,sign,won,lost)=>({id:S.key,name:S.members.map(p=>p.name).join(' / '),members:S.members.map(p=>p.id),opp:O.members.map(p=>p.name).join(' / '),group:g.label||'',groupId:g.id,course:g.course,courseName:c.name,
+      // each side's row points at its own group (its scorecard), not the match's first group — two foursomes playing each other are in different carts
+      const mk=(S,O,sign,won,lost)=>{ const sg=(S.groups&&S.groups[0])||g, scs=pub.courses[sg.course]||c; return {id:S.key,name:S.members.map(p=>p.name).join(' / '),members:S.members.map(p=>p.id),opp:O.members.map(p=>p.name).join(' / '),group:sg.label||'',groupId:sg.id,course:sg.course,courseName:scs.name,
         n:played,thru:played===18||st.over?'F':String(played),
         status:sc==='nassau'?sideSegs(sign).map(s=>s.k+' '+s.txt).join(' · '):sc==='hilo'?(up===0?'AS':(sign*up>0?Math.abs(up)+' up':Math.abs(up)+' dn'))+(st.over?'':' thru '+played):st.over?(sign*up>0?st.txt:sign*up<0?'lost '+st.txt:'AS'):(up===0?st.txt:(sign*up>0?Math.abs(up)+' up':Math.abs(up)+' dn')+(st.txt.includes('dormie')?' · dormie':'')+' thru '+played),
-        pts:sc==='nassau'?nassauPts(sign):sc==='hilo'?(st.over?(sign*up>0?1:sign*up<0?0:0.5):0):(st.over?(sign*up>0?1:sign*up<0?0:0.5):0),holesWon:won,holesLost:lost,gross:0,toPar:0,net:null,netToPar:null,holesUp:sign*lead,segs:sideSegs(sign),by,flight:[...new Set(S.members.map(p=>p.flight).filter(Boolean))].join('/'),team:S.members.length>1,unit:'match',over:st.over,holes});
+        pts:sc==='nassau'?nassauPts(sign):sc==='hilo'?(st.over?(sign*up>0?1:sign*up<0?0:0.5):0):(st.over?(sign*up>0?1:sign*up<0?0:0.5):0),holesWon:won,holesLost:lost,gross:0,toPar:0,net:null,netToPar:null,holesUp:sign*lead,segs:sideSegs(sign),by,flight:[...new Set(S.members.map(p=>p.flight).filter(Boolean))].join('/'),team:S.members.length>1,unit:'match',over:st.over,holes}; };
       rows.push(mk(A,B,1,wA,wB),mk(B,A,-1,wB,wA)); } }
   const pool=opt.flight?rows.filter(r=>r.flight===opt.flight):rows;
   const played=pool.filter(r=>r.n>0).sort((a,b)=>b.pts-a.pts||b.holesUp-a.holesUp||a.name.localeCompare(b.name)), idle=pool.filter(r=>!r.n).sort((a,b)=>a.name.localeCompare(b.name));
