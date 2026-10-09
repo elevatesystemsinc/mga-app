@@ -221,11 +221,13 @@ function renderHole(){
   document.querySelectorAll('[data-m]').forEach(b=>b.onclick=()=>bump(b.dataset.m,-1));
   document.querySelectorAll('[data-p]').forEach(b=>b.onclick=()=>bump(b.dataset.p,1));
   $('parAll').onclick=()=>{ rows.forEach(r=>{ if(!(scores[r.id]||{})[h]) setStroke(r.id,h,par(r.p)); }); renderHole(); };
+  // a hole left behind defaults to par for anyone whose score was not touched — whichever way the scorer moves on
+  const parUp=()=>{ if(live) rows.forEach(r=>{ if(!(scores[r.id]||{})[h]) setStroke(r.id,h,par(r.p)); }); };
   $('prev').onclick=()=>{ holeIdx=Math.max(0,holeIdx-1); renderHole(); };
-  $('next').onclick=()=>{ holeIdx=Math.min(17,holeIdx+1); renderHole(); };
-  $('nextBtn').onclick=()=>{ if(live) rows.forEach(r=>{ if(!(scores[r.id]||{})[h]) setStroke(r.id,h,par(r.p)); });
+  $('next').onclick=()=>{ parUp(); holeIdx=Math.min(17,holeIdx+1); renderHole(); };
+  $('nextBtn').onclick=()=>{ parUp();
     if(holeIdx===17){ tab='card'; render(); } else { holeIdx++; renderHole(); } window.scrollTo(0,0); };
-  document.querySelectorAll('.strip [data-go]').forEach(b=>b.onclick=()=>{ holeIdx=+b.dataset.go; renderHole(); });
+  document.querySelectorAll('.strip [data-go]').forEach(b=>b.onclick=()=>{ if(+b.dataset.go>holeIdx) parUp(); holeIdx=+b.dataset.go; renderHole(); });
   $('leave').onclick=()=>{ if(queue.length&&!confirm('Some scores haven’t reached the server yet. Switch anyway? They’ll keep trying in the background.')) return; groupId=null; code=''; localStorage.removeItem(KEY); render(); };
 }
 function renderCard(){
@@ -246,7 +248,7 @@ function compChips(){ const cs=pub.comps||[]; if(cs.length<2) return ''; return 
 const multiCourse=()=>Object.keys(pub.courses||{}).length>1;
 /* the small line under a name: the course only when the field is split across courses, then the other basis — always
    to par, never a total, because groups further along would always carry the higher total */
-function matchCell(r){ if(r.segs){ const t=r.segs.find(s=>s.k==='18'); return `<span class="tp ${r.over&&r.pts>1.5?'pos':''}" style="font-size:15px;white-space:nowrap">${esc(t?t.txt:r.status)}</span>`; } return `<span class="tp ${r.over&&r.pts===1?'pos':''}" style="font-size:14px;line-height:1.2">${esc(r.status)}</span>`; }
+function matchCell(r){ if(r.segs){ const t=r.segs.find(s=>s.k==='18'); return `<span class="tp ${t&&t.started&&(r.by==='strokes'?t.rel<0:t.v>0)?'pos':''}" style="font-size:15px;white-space:nowrap">${esc(t?t.txt:r.status)}</span>`; } return `<span class="tp ${r.over&&r.pts===1?'pos':''}" style="font-size:14px;line-height:1.2">${esc(r.status)}</span>`; }
 function subLine(r,net){ if(r.unit==='match') return r.segs?`<div class="muted" style="font-size:12px">${r.segs.filter(s=>s.k!=='18').map(s=>esc(s.label+' '+s.txt)).join(' · ')}</div>`:''; const bits=[]; if(multiCourse()&&r.courseName) bits.push(r.courseName.replace(' Course','')); if(r.flight&&!lbFlight) bits.push('Flt '+r.flight);
   if(r.n){ if(net) bits.push('Gross '+toParTxt(r.toPar)); else if(r.netToPar!=null) bits.push('Net '+toParTxt(r.netToPar)); }
   return bits.length?`<div class="muted" style="font-size:12px">${esc(bits.join(' · '))}</div>`:''; }

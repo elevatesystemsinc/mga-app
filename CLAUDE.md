@@ -196,9 +196,10 @@ Tournament = { id, name, season, days, startDate, field:[{id,memberId,team,paid,
     pattern `321`: 3, 2, 1 balls by hole number, every ball on 9 and 18, **`matchBy:'strokes'`** — each of the three
     bets goes to the side with the lower total of its counted balls; the owner was clear this is total score, not
     holes won) and `teamnassau` (best ball, by holes). `matchBy` ('holes' default | 'strokes') is an engine field on
-    events/comps (designer: "Each segment goes to"); `matchBoard` rows carry `segs:[{k:'F'|'B'|'18',v,done,started,txt}]`
-    and `by`, `status` reads "F 4 ahead · B — · 18 4 ahead" (strokes) or "F 1 up · B AS · 18 1 up" (holes), and
-    `nassauSegments`/`payNassau` settle from `segs`. The phone board gives a match row the 18 in its value column and
+    events/comps (designer: "Each segment goes to"); `matchBoard` rows carry `segs:[{k:'F'|'B'|'18',v (the side's lead),
+    rel (its own counted balls to par), done, started, txt}]` and `by`; by total score a side's figures are **its own
+    to par** per segment — `status` "F −3 · B — · 18 −3" (the owner: "how many under par we are on the front, the back
+    and total"), by holes "F 1 up · B AS · 18 1 up"; `nassauSegments`/`payNassau` settle from `segs[].v`. The phone board gives a match row the 18 in its value column and
     the front/back under the names (`.lb.m`). `matchPairs()`
     in golfcore pairs sides within a group as before, or — when teams span groups or no group holds two teams —
     pairs teams in code order (S1 v S2…) so two foursomes can play each other; a side's hole score sums its k best

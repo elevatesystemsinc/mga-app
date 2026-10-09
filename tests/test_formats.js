@@ -69,8 +69,9 @@ check('321 pattern clamps to the team size',countOn({countPattern:'321'},'bestba
   const rowsH=matchBoard(pubM,scS,{}), rowsS=matchBoard(Object.assign({},pubM,{matchBy:'strokes'}),scS,{});
   const aH=rowsH.find(r=>r.name.startsWith('a1')), bS=rowsS.find(r=>r.name.startsWith('b1')), aS=rowsS.find(r=>r.name.startsWith('a1'));
   check('Nassau by holes: A wins the front and the 18 (2 holes to 1)',aH.pts===2.5&&/F 1 up/.test(aH.status),rowsH.map(r=>[r.name,r.status,r.pts]));
-  check('Nassau by total score: B wins the front and the 18 by four strokes, back tied',bS.pts===2.5&&aS.pts===0.5&&bS.status==='F 4 ahead · B even · 18 4 ahead'&&aS.status==='F 4 behind · B even · 18 4 behind'&&bS.segs[0].v===4&&bS.by==='strokes',rowsS.map(r=>[r.name,r.status,r.pts]));
-  check('Nassau by total score: segments not yet started read —',(()=>{ const sc9={}; Object.keys(scS).forEach(id=>{ sc9[id]={}; for(let h=1;h<=6;h++) sc9[id][h]=scS[id][h]; }); const r=matchBoard(Object.assign({},pubM,{matchBy:'strokes'}),sc9,{}).find(x=>x.name.startsWith('b1')); return r.status==='F 4 ahead · B — · 18 4 ahead'&&r.thru==='6'&&r.pts===0; })());
+  // each side reads its own counted balls to par: A −2 on the front (two birdies among 3- and 2-ball holes), B −6 (three 2s on a 3-ball hole); the lead (4 strokes) decides the bets
+  check('Nassau by total score: B wins the front and the 18 by four strokes, back tied; figures are to par',bS.pts===2.5&&aS.pts===0.5&&bS.status==='F −6 · B E · 18 −6'&&aS.status==='F −2 · B E · 18 −2'&&bS.segs[0].v===4&&bS.segs[0].rel===-6&&aS.segs[2].rel===-2&&bS.by==='strokes',rowsS.map(r=>[r.name,r.status,r.pts]));
+  check('Nassau by total score: segments not yet started read —',(()=>{ const sc9={}; Object.keys(scS).forEach(id=>{ sc9[id]={}; for(let h=1;h<=6;h++) sc9[id][h]=scS[id][h]; }); const r=matchBoard(Object.assign({},pubM,{matchBy:'strokes'}),sc9,{}).find(x=>x.name.startsWith('b1')); return r.status==='F −6 · B — · 18 −6'&&r.thru==='6'&&r.pts===0; })());
 }
 // 6e. compPub: a competition cut out of a published event — players, teams, and individual standings until partners exist
 { const mk=(ids,team)=>ids.map(id=>({id,name:id,set:'M',ph:0,team:''}));

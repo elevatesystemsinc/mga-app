@@ -521,13 +521,15 @@ function matchBoard(pub,scores,opt){
       const nets=(S,h)=>{ if(four){ const s=+((scores[S.captain.id]||{})[h]); if(!s) return null; const v=s-strokesOn((tph(S)??0)-lowT,hcpOf(S.captain)[h-1]); return [v]; }
         const out=[]; for(const p of S.members){ const s=+((scores[p.id]||{})[h]); if(!s) continue; out.push(s-strokesOn(rel(p),hcpOf(p)[h-1])); } return out.length?out:null; };
       // a side's score on a hole: its best ball, or the sum of the k best balls when the match counts more than one
-      const side=(S,h)=>{ const v=nets(S,h); if(!v) return null; const k=pub.countPattern||(+pub.count>1)?countOn(pub,'bestball',h,S.members.length,((c.par[S.captain.set||'M']||c.par.M)[h-1])):1;
-        if(k<=1) return Math.min(...v); if(v.length<Math.min(k,S.members.length)) return null; return v.slice().sort((x,y)=>x-y).slice(0,k).reduce((a,b)=>a+b,0); };
+      const parOf=(S,h)=>(c.par[S.captain.set||'M']||c.par.M)[h-1], kOf=(S,h)=>pub.countPattern||(+pub.count>1)?Math.min(S.members.length,countOn(pub,'bestball',h,S.members.length,parOf(S,h))):1;
+      const side=(S,h)=>{ const v=nets(S,h); if(!v) return null; const k=kOf(S,h);
+        if(k<=1) return Math.min(...v); if(v.length<k) return null; return v.slice().sort((x,y)=>x-y).slice(0,k).reduce((a,b)=>a+b,0); };
       const sc=pub.matchScoring||'holes';
       // a Nassau is decided by holes won (match play) or, matchBy 'strokes', by the total of the sides' counted balls
       const by=sc==='nassau'&&pub.matchBy==='strokes'?'strokes':'holes';
-      let up=0,played=0,wA=0,wB=0,ptsA=0,ptsB=0,upF=0,upB=0,sF=0,sB=0; const holes=[];
-      for(const h of order){ const a=side(A,h), b=side(B,h); if(a==null||b==null) break; played++; if(h<=9) sF+=b-a; else sB+=b-a;
+      let up=0,played=0,wA=0,wB=0,ptsA=0,ptsB=0,upF=0,upB=0,sF=0,sB=0,pAF=0,pAB=0,pBF=0,pBB=0; const holes=[];   // pXF/pXB: a side's counted balls to par, front/back
+      for(const h of order){ const a=side(A,h), b=side(B,h); if(a==null||b==null) break; played++;
+        const ra=a-kOf(A,h)*parOf(A,h), rb=b-kOf(B,h)*parOf(B,h); if(h<=9){ sF+=b-a; pAF+=ra; pBF+=rb; } else { sB+=b-a; pAB+=ra; pBB+=rb; }
         if(sc==='hilo'){ const na=nets(A,h), nb=nets(B,h); const la=Math.min(...na), lb=Math.min(...nb), ha=Math.max(...na), hb=Math.max(...nb); if(la<lb) ptsA++; else if(lb<la) ptsB++; if(ha<hb) ptsA++; else if(hb<ha) ptsB++; up=ptsA-ptsB; if(la<lb||ha<hb) wA++; if(lb<la||hb<ha) wB++; }
         else { if(a<b){ up++; wA++; if(h<=9) upF++; else upB++; } else if(b<a){ up--; wB++; if(h<=9) upF--; else upB--; } }
         holes.push({h,a,b}); if(sc==='holes'&&Math.abs(up)>18-played) break; }
@@ -536,11 +538,12 @@ function matchBoard(pub,scores,opt){
       let segsA=null, lead=up;
       if(sc==='nassau'){ const nF=holes.filter(x=>x.h<=9).length, nB=holes.length-nF, fin=nF>=9, done=fin&&nB>=9;
         const vF=by==='strokes'?sF:upF, vB=by==='strokes'?sB:upB, vT=by==='strokes'?sF+sB:up; lead=vT;
-        segsA=[{k:'F',label:'Front',v:vF,done:fin,started:nF>0},{k:'B',label:'Back',v:vB,done,started:nB>0},{k:'18',label:'18',v:vT,done,started:played>0}];
+        segsA=[{k:'F',label:'Front',v:vF,done:fin,started:nF>0,relA:pAF,relB:pBF},{k:'B',label:'Back',v:vB,done,started:nB>0,relA:pAB,relB:pBB},{k:'18',label:'18',v:vT,done,started:played>0,relA:pAF+pAB,relB:pBF+pBB}];
         st={txt:'',over:done,won:vT>0?1:vT<0?-1:0}; }
-      const segTxt=(v,started)=>!started?'—':by==='strokes'?(v>0?v+' ahead':v<0?(-v)+' behind':'even'):(v>0?v+' up':v<0?(-v)+' dn':'AS');
+      // by total score a side's figure is its own counted balls to par (what the group reads on the wall); by holes, up/down
+      const segTxt=(v,started,rel)=>!started?'—':by==='strokes'?toParTxt(rel):(v>0?v+' up':v<0?(-v)+' dn':'AS');
       const nassauPts=sign=>{ if(sc!=='nassau') return null; return segsA.reduce((t,s)=>t+(!s.done?0:(sign*s.v>0?1:sign*s.v<0?0:0.5)),0); };
-      const sideSegs=sign=>segsA&&segsA.map(s=>({k:s.k,label:s.label,v:sign*s.v,done:s.done,started:s.started,txt:segTxt(sign*s.v,s.started)}));
+      const sideSegs=sign=>segsA&&segsA.map(s=>{ const rel=sign>0?s.relA:s.relB; return {k:s.k,label:s.label,v:sign*s.v,rel,done:s.done,started:s.started,txt:segTxt(sign*s.v,s.started,rel)}; });
       const mk=(S,O,sign,won,lost)=>({id:S.key,name:S.members.map(p=>p.name).join(' / '),members:S.members.map(p=>p.id),opp:O.members.map(p=>p.name).join(' / '),group:g.label||'',groupId:g.id,course:g.course,courseName:c.name,
         n:played,thru:played===18||st.over?'F':String(played),
         status:sc==='nassau'?sideSegs(sign).map(s=>s.k+' '+s.txt).join(' · '):sc==='hilo'?(up===0?'AS':(sign*up>0?Math.abs(up)+' up':Math.abs(up)+' dn'))+(st.over?'':' thru '+played):st.over?(sign*up>0?st.txt:sign*up<0?'lost '+st.txt:'AS'):(up===0?st.txt:(sign*up>0?Math.abs(up)+' up':Math.abs(up)+' dn')+(st.txt.includes('dormie')?' · dormie':'')+' thru '+played),
@@ -699,11 +702,13 @@ function renderHole(){
   document.querySelectorAll('[data-m]').forEach(b=>b.onclick=()=>bump(b.dataset.m,-1));
   document.querySelectorAll('[data-p]').forEach(b=>b.onclick=()=>bump(b.dataset.p,1));
   $('parAll').onclick=()=>{ rows.forEach(r=>{ if(!(scores[r.id]||{})[h]) setStroke(r.id,h,par(r.p)); }); renderHole(); };
+  // a hole left behind defaults to par for anyone whose score was not touched — whichever way the scorer moves on
+  const parUp=()=>{ if(live) rows.forEach(r=>{ if(!(scores[r.id]||{})[h]) setStroke(r.id,h,par(r.p)); }); };
   $('prev').onclick=()=>{ holeIdx=Math.max(0,holeIdx-1); renderHole(); };
-  $('next').onclick=()=>{ holeIdx=Math.min(17,holeIdx+1); renderHole(); };
-  $('nextBtn').onclick=()=>{ if(live) rows.forEach(r=>{ if(!(scores[r.id]||{})[h]) setStroke(r.id,h,par(r.p)); });
+  $('next').onclick=()=>{ parUp(); holeIdx=Math.min(17,holeIdx+1); renderHole(); };
+  $('nextBtn').onclick=()=>{ parUp();
     if(holeIdx===17){ tab='card'; render(); } else { holeIdx++; renderHole(); } window.scrollTo(0,0); };
-  document.querySelectorAll('.strip [data-go]').forEach(b=>b.onclick=()=>{ holeIdx=+b.dataset.go; renderHole(); });
+  document.querySelectorAll('.strip [data-go]').forEach(b=>b.onclick=()=>{ if(+b.dataset.go>holeIdx) parUp(); holeIdx=+b.dataset.go; renderHole(); });
   $('leave').onclick=()=>{ if(queue.length&&!confirm('Some scores haven’t reached the server yet. Switch anyway? They’ll keep trying in the background.')) return; groupId=null; code=''; localStorage.removeItem(KEY); render(); };
 }
 function renderCard(){
@@ -724,7 +729,7 @@ function compChips(){ const cs=pub.comps||[]; if(cs.length<2) return ''; return 
 const multiCourse=()=>Object.keys(pub.courses||{}).length>1;
 /* the small line under a name: the course only when the field is split across courses, then the other basis — always
    to par, never a total, because groups further along would always carry the higher total */
-function matchCell(r){ if(r.segs){ const t=r.segs.find(s=>s.k==='18'); return `<span class="tp ${r.over&&r.pts>1.5?'pos':''}" style="font-size:15px;white-space:nowrap">${esc(t?t.txt:r.status)}</span>`; } return `<span class="tp ${r.over&&r.pts===1?'pos':''}" style="font-size:14px;line-height:1.2">${esc(r.status)}</span>`; }
+function matchCell(r){ if(r.segs){ const t=r.segs.find(s=>s.k==='18'); return `<span class="tp ${t&&t.started&&(r.by==='strokes'?t.rel<0:t.v>0)?'pos':''}" style="font-size:15px;white-space:nowrap">${esc(t?t.txt:r.status)}</span>`; } return `<span class="tp ${r.over&&r.pts===1?'pos':''}" style="font-size:14px;line-height:1.2">${esc(r.status)}</span>`; }
 function subLine(r,net){ if(r.unit==='match') return r.segs?`<div class="muted" style="font-size:12px">${r.segs.filter(s=>s.k!=='18').map(s=>esc(s.label+' '+s.txt)).join(' · ')}</div>`:''; const bits=[]; if(multiCourse()&&r.courseName) bits.push(r.courseName.replace(' Course','')); if(r.flight&&!lbFlight) bits.push('Flt '+r.flight);
   if(r.n){ if(net) bits.push('Gross '+toParTxt(r.toPar)); else if(r.netToPar!=null) bits.push('Net '+toParTxt(r.netToPar)); }
   return bits.length?`<div class="muted" style="font-size:12px">${esc(bits.join(' · '))}</div>`:''; }
@@ -785,7 +790,7 @@ window.__canReload=()=>!queue.length;
 /* Keeps every open device on the latest version: checks version.json about once a minute and, when a
    newer build is live, reloads at a safe moment (nothing unsaved, no editor open, not mid-typing). */
 (function(){
-  const ME='20261009194621'; let ready=false, lastCheck=0;
+  const ME='20261009195437'; let ready=false, lastCheck=0;
   const typing=()=>{ const a=document.activeElement; return a&&/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)&&a.value&&a.type!=='search'; };
   const safe=()=>!typing()&&(typeof window.__canReload!=='function'||window.__canReload());
   async function check(){ lastCheck=Date.now(); if(location.protocol==='file:') return;

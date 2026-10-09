@@ -159,7 +159,7 @@ async def main():
       const out=Object.fromEntries(pot.payouts.map(x=>[x.pid,x.amount])); const sumOut=Math.round(pot.payouts.reduce((a,x)=>a+x.amount,0)*100)/100; g.pots.pop(); render();
       return {sides:rows.length, status:rows[0].status, entry:pot.entry, summary:potSummary(pot), sumOut, out, prev:prev.slice(0,160)}; }""")
     # Ann/Bo/Cy (4s, with birdies) beat Di/Ed/Gus (5s and 6s) on total score in every segment: the winners split 6 × 20 = 120, 40 each
-    ok=ok and r6['sides']==2 and r6['entry']==20 and 'front $5' in r6['summary'] and r6['sumOut']==120 and all(abs(r6['out'].get(k,0)-40)<0.01 for k in ['gp_p0','gp_p1','gp_p2']) and r6['status'].startswith('F ') and 'ahead' in r6['status']
+    ok=ok and r6['sides']==2 and r6['entry']==20 and 'front $5' in r6['summary'] and r6['sumOut']==120 and all(abs(r6['out'].get(k,0)-40)<0.01 for k in ['gp_p0','gp_p1','gp_p2']) and __import__('re').match(r'^F [−+E]\S* · B [−+E]\S* · 18 [−+E]', r6['status'])
     print('mid-round team Nassau', r6, 'OK' if r6['sumOut']==120 and r6['sides']==2 else 'FAIL')
     # removing a player mid-round takes them out of every competition and the scoring event, scores and all
     r7=await pg.evaluate("""()=>{ const g=GAME(), ev=gameEvent(g); const p=g.players.find(x=>x.id==='gp_p4'), gpid=p.gpid; const before=evPlayers(ev).length, had=Object.keys(scoresFor(ev)[gpid]||{}).length; removePlayer(g,p); syncGameEvent(g,ev);

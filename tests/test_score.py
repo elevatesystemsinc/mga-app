@@ -54,7 +54,19 @@ async def main():
     pub4=copy.deepcopy(pub3); pub4['groups']=[g for g in pub4['groups'] if g['id']!='g1']; fdb._rows('golf_events')[0]['public']=pub4
     r=await ph.evaluate("()=>refresh().then(()=>({groupId,join:!!document.getElementById('code')}))")
     check('a removed group sends the phone back to the join screen',r['groupId'] is None and r['join'],json.dumps(r))
-    check('no script errors',not errs and not tverr and not pherr,json.dumps(errs+tverr+pherr))
+    # --- 4. score entry: moving on from a hole without touching anyone records par for them — by the arrow, not only the Save button
+    D=await b.new_context(); await cloud(D,fdb,no_session=True)
+    fdb._rows('golf_events')[0]['public']=copy.deepcopy(pub2)
+    sc=await D.new_page(); scerr=[]; sc.on('pageerror',lambda e:scerr.append(str(e)))
+    await sc.goto(page('score.html')+'?e=test-day'); await sc.wait_for_function("()=>!!pub&&!!document.getElementById('code')")
+    await sc.fill('#code','DEF34'); await sc.click('#joinBtn'); await sc.wait_for_function("()=>groupId==='g2'&&tab==='score'")
+    r=await sc.evaluate("""async()=>{ const g=group(), order=playOrder(g.startHole); holeIdx=9; renderHole(); const h=order[9], par=pub.courses[g.course].par.M[h-1]; const before=(scores.p3||{})[h]||null;
+      document.getElementById('next').click(); await new Promise(r=>setTimeout(r,400)); return {h, par, before, after:(scores.p3||{})[h]||null, hole:holeIdx, queued:queue.length}; }""")
+    srv=[x for x in fdb._rows('golf_scores') if x['player_id']=='p3' and x['hole']==r['h']]
+    check('the › arrow records par for an untouched hole and it reaches the server',r['before'] is None and r['after']==r['par'] and r['hole']==10 and len(srv)==1 and srv[0]['strokes']==r['par'],json.dumps(r))
+    r=await sc.evaluate("""async()=>{ const g=group(), order=playOrder(g.startHole); holeIdx=10; renderHole(); const h=order[10]; document.getElementById('prev').click(); return {h, left:(scores.p3||{})[h]||null, hole:holeIdx}; }""")
+    check('going back leaves the hole alone',r['left'] is None and r['hole']==9,json.dumps(r))
+    check('no script errors',not errs and not tverr and not pherr and not scerr,json.dumps(errs+tverr+pherr+scerr))
     await b.close()
   print('ALL OK' if not bad else f'{bad} FAILED'); sys.exit(1 if bad else 0)
 asyncio.run(main())

@@ -96,7 +96,7 @@ with real randomness, saves the result first, then reveals the teams one at a ti
 the groups" for a group-against-group challenge) and the standings pick up the scores already on the cards. Two
 team matches are built for exactly that: the **reverse waltz** (front, back and 18, each bet going to the side with
 the lower total of its counted balls; each hole counts the best three balls, then two, then one, repeating, with
-every ball counting on 9 and 18 — a leaderboard figure like "4 ahead" is strokes, never holes) and a
+every ball counting on 9 and 18 — the board shows each side's total to par for the front, the back and the 18) and a
 plain **team Nassau** on best ball. Set what each segment is worth per player and the match is settled segment by
 segment. **Groups & handicaps** on the game page: move players between groups, set each group's starting hole or tee time,
 pick a player's tee box, and type an index for the day where it differs from the directory. Course and playing
@@ -273,8 +273,10 @@ One-time: Supabase → SQL Editor → run `golf-setup.sql`. Upload `score.html` 
   tee time), course, starting hole, and players (members, field players, or guests), each with
   a tee and men's/women's par.
 - **Open scoring**, then share the link: `…/score.html?e=<your-link>`. Players enter their
-  Group ID and score hole by hole. Scores save as they tap, queue up in dead zones, and send
-  when signal returns. `…&view=board` is a big-screen leaderboard for the clubhouse TV.
+  Group ID and score hole by hole. Each hole starts at par and the scorer taps up or down from there;
+  moving on from a hole (the Save button, the › arrow or a tap on a later hole) records par for anyone
+  left untouched, while going back changes nothing. Scores save as they tap, queue up in dead zones, and
+  send when signal returns. `…&view=board` is a big-screen leaderboard for the clubhouse TV.
 - **Leaderboard:** gross stroke play, to par for holes played, both courses combined. It's in the
   event page, on the Dashboard, and a live link sits in the sidebar while scoring is open.
   Click any player to correct a group's scores from the hub.
