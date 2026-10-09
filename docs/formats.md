@@ -17,6 +17,8 @@ off for every association and small group. Beyond the formats in the tables belo
 | **Chicago** | Quota from 39 instead of 36 (same point table). |
 | **Nassau** | A singles match scored as three bets: front nine, back nine and the eighteen, one point each. |
 | **Hi-Lo** | Two against two, two points a hole: the better low ball and the better high ball. |
+| **Reverse waltz match** | Team against team (any size, and the teams may be in different groups), Nassau points for the front, back and 18. Each hole counts the best three balls, then two, then one, repeating by hole number; holes 9 and 18 count every ball. Sides play off the low man. |
+| **Team Nassau** | The same match on best ball of each side. |
 | **Foursomes match play** | Alternate shot, one ball per side off the team handicap (50% of combined), hole by hole. |
 | **Cha-cha-cha** | Best ball with 1, 2, 3 balls counting on successive holes, repeating. |
 | **1-2-3 by par** | One best ball on par 3s, two on par 4s, three on par 5s. |

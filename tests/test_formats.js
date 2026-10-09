@@ -55,6 +55,16 @@ check('net bogey: a stroke on the next hole makes the double a net bogey — sta
 sc={A:Object.assign(fill(4),{5:3,6:5}),B:Object.assign(fill(4),{6:6})};
 check('old names map: gross → par, net → net par',JSON.stringify(skinsResult(pub([P('A',0),P('B',0)]),sc,{net:false,carry:true,validate:'gross'}))===JSON.stringify(skinsResult(pub([P('A',0),P('B',0)]),sc,{net:false,carry:true,validate:'par'})));
 check('secureInt stays in range',Array.from({length:200},()=>secureInt(7)).every(x=>x>=0&&x<7));
+// 6c. reverse waltz: 3, 2, 1 balls by hole, every ball on 9 and 18
+check('321 pattern: holes 1-3 count 3,2,1; 9 and 18 count all',[1,2,3,4,8,9,17,18].map(h=>countOn({countPattern:'321'},'bestball',h,4,4)).join()==='3,2,1,3,2,4,2,4');
+check('321 pattern clamps to the team size',countOn({countPattern:'321'},'bestball',1,2,4)===2);
+// 6d. a team Nassau across two groups: side A (group 1) v side B (group 2), best 3/2/1 balls; A wins the front by one hole, B the back, 18 halved
+{ const mk=(ids,team)=>ids.map(id=>({id,name:id,set:'M',ph:0,team}));
+  const pubM={courses:{t:course},format:'match',teamSize:4,matchScoring:'nassau',countPattern:'321',groups:[{id:'g1',course:'t',startHole:1,players:mk(['a1','a2','a3','a4'],'S1')},{id:'g2',course:'t',startHole:1,players:mk(['b1','b2','b3','b4'],'S2')}]};
+  const scM={}; ['a1','a2','a3','a4','b1','b2','b3','b4'].forEach(id=>{ scM[id]=fill(4); }); scM.a1[1]=3; scM.b2[10]=3;   // hole 1 (3 balls): A 11 v B 12 → A; hole 10 (3 balls): B 11 v A 12 → B
+  const rows=matchBoard(pubM,scM,{});
+  check('group v group Nassau: two sides, A +1 front, B +1 back, 18 all square → 1 point each',rows.length===2&&rows[0].holesUp===0&&rows.map(r=>r.pts).join()==='1.5,1.5'&&rows.some(r=>r.name.startsWith('a1')&&/F \+1/.test(r.status)&&/B [-−]1/.test(r.status)&&/18 0/.test(r.status)),rows.map(r=>[r.name,r.status,r.pts]));
+}
 // 7. pending: next hole not scored yet; last hole needs no validation; shotgun start uses play order
 sc={A:Object.assign({},fill(4),{3:3}),B:fill(4)}; delete sc.A[4]; delete sc.B[4];
 r=skinsResult(pub([P('A',0),P('B',0)]),sc,{net:false,carry:false,validate:'gross'});

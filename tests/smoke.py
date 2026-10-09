@@ -142,6 +142,16 @@ async def main():
       const shown=q(`[data-gidx="${gp('gp_p0')}"]`).value; return {before, after, idx:p0.index, ch1:h1.ch, ph1:h1.ph, tee:p0.tee, ch2:h2.ch, shown}; }""")
     ok=ok and r5['before']==[4,2] and r5['after']==[5,1] and r5['idx']=='10.0' and r5['ch1'] is not None and r5['ph1'] is not None and r5['tee']=='Gold' and r5['ch2']>r5['ch1'] and r5['shown']=='10.0'
     print('groups & handicaps', r5, 'OK' if r5['after']==[5,1] and r5['tee']=='Gold' and r5['ch2']>r5['ch1'] else 'FAIL')
+    # a challenge added mid-round: group v group reverse-waltz Nassau, teams = the groups, stakes 5/5/10, settled by segment
+    r6=await pg.evaluate("""()=>{ const g=GAME(), ev=gameEvent(g); const pot=newPot('waltz321',g,{entry:20}); pot.rules.teamSize=3; g.pots.push(pot); const gp=id=>g.players.find(p=>p.id===id).gpid;
+      // 3 v 3: Ann, Bo, Cy (group 1) against Di, Ed, Gus (groups 1/2) — teams by hand here, as the drawer's "Teams = the groups" would do by group
+      pot.inn={}; ['gp_p0','gp_p1','gp_p2','gp_p3','gp_p4','gp_guest'].forEach(id=>pot.inn[id]=true); pot.teams={[gp('gp_p0')]:'S1',[gp('gp_p1')]:'S1',[gp('gp_p2')]:'S1',[gp('gp_p3')]:'S2',[gp('gp_p4')]:'S2',[gp('gp_guest')]:'S2'};
+      const pub=potPub(g,pot), rows=eventBoard(pub,scoresFor(ev),{sort:pub.scoring}); payNassau(g,pot,rows); const prev=document.getElementById('pnPrev').textContent; document.getElementById('dSave').click();
+      const out=Object.fromEntries(pot.payouts.map(x=>[x.pid,x.amount])); const sumOut=Math.round(pot.payouts.reduce((a,x)=>a+x.amount,0)*100)/100; g.pots.pop(); render();
+      return {sides:rows.length, status:rows[0].status, entry:pot.entry, summary:potSummary(pot), sumOut, out, prev:prev.slice(0,160)}; }""")
+    # Ann/Bo/Cy (4s, with birdies) beat Di/Ed/Gus (5s and 6s) on every segment: the winners split 6 × 20 = 120, 40 each
+    ok=ok and r6['sides']==2 and r6['entry']==20 and 'front $5' in r6['summary'] and r6['sumOut']==120 and all(abs(r6['out'].get(k,0)-40)<0.01 for k in ['gp_p0','gp_p1','gp_p2']) and 'F +9' in r6['status']
+    print('mid-round team Nassau', r6, 'OK' if r6['sumOut']==120 and r6['sides']==2 else 'FAIL')
     # the game sheet PDF and the designer round-trip
     r2=await pg.evaluate("""async()=>{ const g=GAME(); const doc=await gameSheetPDF(g,{returnDoc:true}); const n=doc.getNumberOfPages(); designGame(g); const names=GD.draft.pots.map(p=>p.name); const grid=document.querySelectorAll('[data-gdin]').length; document.getElementById('gdSave').click(); return {pages:n, names, grid, back:!!document.getElementById('gmSheet')}; }""")
     ok=ok and r2['pages']>=1 and len(r2['names'])==4 and r2['grid']==6*4 and r2['back']

@@ -89,7 +89,12 @@ they want, so nine can be in the skins while eight play the team game. A new gam
 
 **On the day.** Everyone plays their own ball; every competition is scored live from those cards. A team competition
 whose partners are not drawn yet shows individual standings until the **drawing**: a full-screen stage that draws
-with real randomness, saves the result first, then reveals the teams one at a time. **Groups & handicaps** on the game page: move players between groups, set each group's starting hole or tee time,
+with real randomness, saves the result first, then reveals the teams one at a time. A competition can be added at any point, even after you have teed off: Design, add it, pick the teams ("Teams =
+the groups" for a group-against-group challenge) and the standings pick up the scores already on the cards. Two
+team matches are built for exactly that: the **reverse waltz match** (Nassau points for the front, back and 18;
+each hole counts the best three balls, then two, then one, repeating, with every ball counting on 9 and 18) and a
+plain **team Nassau** on best ball. Set what each segment is worth per player and the match is settled segment by
+segment. **Groups & handicaps** on the game page: move players between groups, set each group's starting hole or tee time,
 pick a player's tee box, and type an index for the day where it differs from the directory. Course and playing
 handicaps update on the spot, before anyone tees off. The **settlement** shows what
 each player put in, pulled out and nets, and for net settlement the fewest payments that square it. The **game sheet

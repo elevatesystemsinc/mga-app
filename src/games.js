@@ -72,13 +72,16 @@ function potSummary(pot){
   if(pot.kind==='manual') return (potCat(pot).name||'Winners entered by hand');
   const E=potEngine(pot), C=potCat(pot); let s=C.name+(potIsTeam(pot)?` · ${E.teamSize}-player teams`:'')+' · '+(pot.rules.scoring||'gross');
   if(potIsTeam(pot)) s+=' · partners '+TEAMS_BY[pot.rules.teamsBy||'hand'];
-  if(pot.rules.places&&pot.rules.places.length) s+=' · pays '+pot.rules.places.join(' / ')+'%';
+  if(pot.rules.nassau){ const ns=nassauStakes(pot); s+=` · front ${gMoney(ns.front)} · back ${gMoney(ns.back)} · 18 ${gMoney(ns.total)}`; }
+  else if(pot.rules.places&&pot.rules.places.length) s+=' · pays '+pot.rules.places.join(' / ')+'%';
   return s;
 }
+const nassauStakes=pot=>Object.assign({front:5,back:5,total:10},pot.rules.nassau||{});
 function newPot(game,g,extra){
   const kind=kindOfGame(game), C=catalogById(game)||catalogById('stroke');
   const pot={id:uid(),kind,name:C.name.replace(/ \(.*$/,''),entry:kind==='manual'?0:5,inn:Object.fromEntries((g&&kind!=='manual'?g.players:[]).map(p=>[p.id,true])),rules:{game},payouts:[]};
-  if(kind==='format'){ Object.assign(pot.rules,{scoring:'net',teamSize:C.engine.teamSize||(C.sizes?C.sizes[0]:1),count:1,teamsBy:(C.engine.draw==='after'?'after':'hand'),places:[]}); pot.entry=20; }
+  if(kind==='format'){ Object.assign(pot.rules,{scoring:'net',teamSize:C.engine.teamSize||(C.sizes?C.sizes[0]:1),count:1,teamsBy:(C.engine.draw==='after'?'after':'hand'),places:[]}); pot.entry=20;
+    if(C.engine.format==='match'&&C.engine.matchScoring==='nassau'&&(C.engine.teamSize||1)>1){ pot.rules.nassau={front:5,back:5,total:10}; pot.entry=20; } }
   if(kind==='skins'){ pot.rules.skins={net:true,grossBeatsNet:true,validate:'netpar',mode:'pot',live:false}; }
   if(kind==='dots'){ pot.rules.dots=Object.assign({},DOTS_DEFAULT); pot.entry=2; }
   return Object.assign(pot,extra||{});
@@ -157,7 +160,8 @@ function vGameDesign(m){
         ${pot.kind==='format'?`<div class="fld"><span class="lbl">Scored</span>${seg('gdS_'+pot.id,[['gross','Gross'],['net','Net']],pot.rules.scoring||'gross')}</div>`:pot.kind==='skins'?`<div class="fld"><span class="lbl">Scored</span>${seg('gdS_'+pot.id,[['gross','Gross'],['net','Net']],sk.net?'net':'gross')}</div>`:pot.kind==='dots'?`<div class="fld"><span class="lbl">Birdies &amp; eagles</span>${seg('gdS_'+pot.id,[['gross','Gross'],['net','Net']],dr.net?'net':'gross')}</div>`:'<div></div>'}</div>
       ${pot.kind==='format'?`<div class="frow2">${team||C.sizes?field('Players per team','gdT_'+pot.id,E.teamSize,{type:'select',options:(C.sizes||[E.teamSize]).map(n=>[n,n+' players'])}):field('Pays','gdP_'+pot.id,(pot.rules.places||[]).join(' / '),{ph:'e.g. 60 / 30 / 10',hint:'Percent per place, 1st / 2nd / 3rd… Blank = the usual split for the field.'})}
           ${team?field('Partners','gdB_'+pot.id,pot.rules.teamsBy||'hand',{type:'select',options:[['hand','Picked by hand'],['before','Drawn before the round'],['after','Drawn after the round (blind draw)']]}):(C.count&&E.teamSize>1?field('Balls that count','gdC_'+pot.id,E.count,{type:'select',options:Array.from({length:Math.max(1,E.teamSize-1)},(_,k)=>[k+1,(k+1)+' of '+E.teamSize])}):'<div></div>')}</div>
-        ${team?`<div class="frow2">${field('Pays','gdP_'+pot.id,(pot.rules.places||[]).join(' / '),{ph:'e.g. 70 / 30',hint:'Percent per place. Blank = the usual split for the number of teams.'})}${C.count&&E.teamSize>1?field('Balls that count','gdC_'+pot.id,E.count,{type:'select',options:Array.from({length:Math.max(1,E.teamSize-1)},(_,k)=>[k+1,(k+1)+' of '+E.teamSize])}):'<div></div>'}</div>`:''}`:''}
+        ${team&&E.format==='match'&&E.matchScoring==='nassau'?(()=>{ const ns=nassauStakes(pot); return `<div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px">${field('Front worth $','gdNF_'+pot.id,ns.front,{type:'number'})}${field('Back worth $','gdNB_'+pot.id,ns.back,{type:'number'})}${field('18 worth $','gdNT_'+pot.id,ns.total,{type:'number'})}</div><p class="hint" style="margin:-6px 0 0">Per player, each segment: the losing side pays the winning side; a halved segment is a push. The entry above is what each player has at stake in all three.</p>`; })()
+          :team?`<div class="frow2">${field('Pays','gdP_'+pot.id,(pot.rules.places||[]).join(' / '),{ph:'e.g. 70 / 30',hint:'Percent per place. Blank = the usual split for the number of teams.'})}${C.count&&E.teamSize>1?field('Balls that count','gdC_'+pot.id,E.count,{type:'select',options:Array.from({length:Math.max(1,E.teamSize-1)},(_,k)=>[k+1,(k+1)+' of '+E.teamSize])}):'<div></div>'}</div>`:''}`:''}
       ${pot.kind==='skins'?`<div class="frow2">${field('Format','gdMode_'+pot.id,sk.mode,{type:'select',options:[['pot','Skins pot — divided by the skins won'],['hole','Per hole — the pot split over 18 holes, ties carry over']]})}${field('Validation on the next hole','gdV_'+pot.id,sk.validate||'none',{type:'select',options:Object.entries(SKIN_VALID_LABEL)})}</div>
           <div class="fld"><span class="lbl">Rules</span><label class="check"><input type="checkbox" id="gdGBN_${pot.id}"${sk.grossBeatsNet?' checked':''}${sk.net?'':' disabled'}>Gross beats net on a tied hole</label><label class="check"><input type="checkbox" id="gdLive_${pot.id}"${sk.live?' checked':''}>Announce skins live during the round</label></div>
           <p class="hint" style="margin:-6px 0 0">${sk.mode==='hole'?'Each hole is worth a share of the pot; a tied hole carries its share to the next, and holes unwon at the end are not paid.':'One pot for the day, divided by the skins won. A tied hole is nobody’s; a skin that fails validation is lost.'} A hole counts once everyone in the pot has scored it. Left quiet, skins stay off the game page during the round and are called out from the cards afterwards.</p>`:''}
@@ -188,7 +192,8 @@ function vGameDesign(m){
   const readAll=()=>{ d.name=fv('gdName'); d.course=fv('gdCourse'); d.date=fv('gdDate'); d.time=fv('gdTime'); d.notes=fv('gdNotes'); d.payWhen=$('gdWhen').dataset.val; d.settle=$('gdSettle').dataset.val;
     for(const pot of d.pots){ const v=id=>fv(id+'_'+pot.id); pot.name=v('gdN')||pot.name; if(pot.kind!=='manual') pot.entry=n0(v('gdE'));
       const S=$('gdS_'+pot.id); if(S){ const sc=S.dataset.val; if(pot.kind==='format') pot.rules.scoring=sc; if(pot.kind==='skins'){ skinsRulesOf(pot).net=sc==='net'; if(sc!=='net') skinsRulesOf(pot).grossBeatsNet=false; } if(pot.kind==='dots') dotsRules(pot).net=sc==='net'; }
-      if(pot.kind==='format'){ if($('gdT_'+pot.id)) pot.rules.teamSize=+v('gdT'); if($('gdC_'+pot.id)) pot.rules.count=+v('gdC'); if($('gdB_'+pot.id)) pot.rules.teamsBy=v('gdB'); if($('gdP_'+pot.id)) pot.rules.places=v('gdP').split(/[\/,\s]+/).map(Number).filter(x=>x>0); }
+      if(pot.kind==='format'){ if($('gdT_'+pot.id)) pot.rules.teamSize=+v('gdT'); if($('gdC_'+pot.id)) pot.rules.count=+v('gdC'); if($('gdB_'+pot.id)) pot.rules.teamsBy=v('gdB'); if($('gdP_'+pot.id)) pot.rules.places=v('gdP').split(/[\/,\s]+/).map(Number).filter(x=>x>0);
+        if($('gdNF_'+pot.id)){ pot.rules.nassau={front:n0(v('gdNF')),back:n0(v('gdNB')),total:n0(v('gdNT'))}; pot.entry=pot.rules.nassau.front+pot.rules.nassau.back+pot.rules.nassau.total; } }
       if(pot.kind==='skins'){ const sk=skinsRulesOf(pot); sk.grossBeatsNet=$('gdGBN_'+pot.id).checked&&sk.net; sk.mode=v('gdMode')==='hole'?'hole':'pot'; sk.carry=sk.mode==='hole'; sk.live=$('gdLive_'+pot.id).checked; sk.validate=v('gdV')||'none'; }
       if(pot.kind==='dots'){ const dr=pot.rules.dots=dotsRules(pot); dr.birdie=n0(v('gdDb')); dr.eagle=n0(v('gdDe')); dr.kinds=v('gdDk').split(',').map(s=>s.trim()).filter(Boolean); } } };
   m.querySelectorAll('.gd-pot').forEach(card=>{ const pot=d.pots.find(x=>x.id===card.dataset.pot);
@@ -228,7 +233,7 @@ function vGame(m,g){
       <div class="tr tot num" style="${gridCols}"><span>In the pot</span>${pots.map(pot=>`<span class="r">${gMoney(potTotal(g,pot))}</span>`).join('')}<b class="r">${gMoney(mo.total)}</b><span></span><span></span></div></div></div>`
     :'<div class="empty"><b>Nobody in yet</b><span>Add the regulars from the member list, or a guest by name.</span></div>'}</div>`;
   const potCard=pot=>{ const tot=potTotal(g,pot), paid=potPaid(pot), inN=potPlayers(g,pot).length, team=potIsTeam(pot), known=potTeamsKnown(pot), by=pot.rules.teamsBy||'hand';
-    const act=pot.kind==='skins'?'Pay skins':pot.kind==='dots'?'Tally & pay':pot.kind==='manual'?'Add winner':'Pay out';
+    const act=pot.kind==='skins'?'Pay skins':pot.kind==='dots'?'Tally & pay':pot.kind==='manual'?'Add winner':(pot.rules.nassau?'Settle the match':'Pay out');
     const quiet=pot.kind==='skins'&&!skinsRulesOf(pot).live?(pot.calledOut?`<button class="btn sm" data-callout="${pot.id}">Call out again</button>`:''):'';
     const teamBtn=team?(known?`<button class="btn sm" data-teams="${pot.id}">${by==='hand'?'Change teams':'Re-draw'}</button>`:by==='hand'?`<button class="btn sm pri" data-teams="${pot.id}">Pick teams</button>`:`<button class="btn sm pri" data-teams="${pot.id}">Draw partners</button>`):'';
     const payoutsTxt=pot.payouts.length?pot.payouts.slice().sort((a,b)=>b.amount-a.amount).map(x=>{ const p=g.players.find(y=>y.id===x.pid); return `<span class="chip ok">${esc(p?gpName(p):'—')} ${gMoney(x.amount)}</span>`; }).join(' '):'';
@@ -354,8 +359,10 @@ function editGamePlayer(g,p){
 /* ---------- teams for a competition: picked by hand, or drawn on the stage ---------- */
 function pickTeams(g,pot){
   const ev=gameEvent(g), E=potEngine(pot), size=E.teamSize||2, ps=potPlayers(g,pot).filter(p=>p.gpid), n=Math.max(1,Math.ceil(ps.length/size)), cur=pot.teams||{};
+  const nTeams=Math.max(n,ev.groups.length);
   openDrawer({kicker:gameTitle(g)+' · '+pot.name,title:'Teams',saveLabel:'Save teams',
-    body:`<p class="hint" style="margin-top:0">${ps.length} players · teams of ${size}.</p><div class="mini">${ps.map(p=>`<div class="mr" style="grid-template-columns:minmax(0,1fr) 120px"><span>${esc(gpName(p))}</span><select class="inp" data-pt="${p.gpid}" style="height:34px"><option value="">—</option>${Array.from({length:n},(_,k)=>`<option value="S${k+1}"${cur[p.gpid]==='S'+(k+1)?' selected':''}>Team ${k+1}</option>`).join('')}</select></div>`).join('')}</div>`,
+    body:`<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><p class="hint" style="margin:0;flex:1 1 200px">${ps.length} players · teams of ${size}.</p><button class="btn sm" type="button" id="ptByGroup">Teams = the groups</button></div><div class="mini">${ps.map(p=>`<div class="mr" style="grid-template-columns:minmax(0,1fr) 120px"><span>${esc(gpName(p))}</span><select class="inp" data-pt="${p.gpid}" style="height:34px"><option value="">—</option>${Array.from({length:nTeams},(_,k)=>`<option value="S${k+1}"${cur[p.gpid]==='S'+(k+1)?' selected':''}>Team ${k+1}</option>`).join('')}</select></div>`).join('')}</div>`,
+    wire:r=>{ r.querySelector('#ptByGroup').onclick=()=>{ ev.groups.forEach((grp,i)=>grp.players.forEach(p=>{ const s=r.querySelector(`[data-pt="${p.id}"]`); if(s) s.value='S'+(i+1); })); }; },
     save:()=>{ const t={}; document.querySelectorAll('[data-pt]').forEach(s=>{ if(s.value) t[s.dataset.pt]=s.value; }); pot.teams=t; pot.draw=null; applyPotTeams(g,pot); toast('Teams saved'); }});
 }
 /* one-ball games carry their teams on the event itself (the scoring page needs them); own-ball games keep them on the pot */
@@ -462,7 +469,36 @@ function payFormat(g,pot){
   const ev=gameEvent(g); if(!ev){ toast('No scoring event'); return; }
   if(potIsTeam(pot)&&!potTeamsKnown(pot)){ toast((pot.rules.teamsBy||'hand')==='hand'?'Pick the teams first':'Draw the partners first'); if((pot.rules.teamsBy||'hand')==='hand') pickTeams(g,pot); else drawStage(g,pot); return; }
   const pub=potPub(g,pot), rows=eventBoard(pub,scoresFor(ev),{sort:pub.scoring});
+  if(pub.format==='match'&&pub.matchScoring==='nassau'&&potIsTeam(pot)) return payNassau(g,pot,rows);
   payByFinish(g,pot,rows,`${pot.name}: pay out`,()=>potCat(pot).name+(pot.draw?' (drawn partners)':''));
+}
+/* a team Nassau: each segment (front, back, 18) is its own bet — the losing side's stakes go to the winners, a halved
+   segment is a push. Payouts are what each player pulls out of the pot: their own stake back on a push or a win,
+   plus the opponents' on a win. */
+function nassauSegments(rows){
+  const byId=new Map(rows.map(r=>[r.id,r])); const out=[];
+  rows.filter(r=>r.holesUp>=0).forEach(A=>{ const B=rows.find(r=>r!==A&&r.opp===A.name&&r.name===A.opp); if(!B||out.some(m=>m.A===B)) return;
+    let f=0,b=0; (A.holes||[]).forEach(x=>{ const d=x.a<x.b?1:x.b<x.a?-1:0; if(x.h<=9) f+=d; else b+=d; }); const n=(A.holes||[]).length;
+    out.push({A,B,front:{up:f,done:n>=9},back:{up:b,done:n>=18},total:{up:f+b,done:n>=18}}); });
+  return out;
+}
+function payNassau(g,pot,rows){
+  const st=nassauStakes(pot), M=nassauSegments(rows), byG=new Map(potPlayers(g,pot).filter(p=>p.gpid).map(p=>[p.gpid,p]));
+  if(!M.length){ toast('No match yet — pick the teams and get some scores in'); return; }
+  const segs=[['front','Front nine'],['back','Back nine'],['total','The 18']];
+  const calc=()=>{ const pays=new Map(), add=(pid,amt,note)=>{ const x=pays.get(pid)||{amount:0,notes:[]}; x.amount+=amt; x.notes.push(note); pays.set(pid,x); }; const lines=[];
+    for(const m of M){ for(const [k,label] of segs){ const s=n0($('pn_'+k)?$('pn_'+k).value:st[k]); if(!s) continue; const seg=m[k], a=m.A.members.map(id=>byG.get(id)).filter(Boolean), b=m.B.members.map(id=>byG.get(id)).filter(Boolean), pool=s*(a.length+b.length);
+        if(!seg.done){ lines.push({label,txt:`${m.A.name} vs ${m.B.name} · not finished`,amt:0}); a.concat(b).forEach(p=>add(p.id,s,label+' · open, stake back')); continue; }
+        if(seg.up===0){ lines.push({label,txt:'Halved — a push',amt:0}); a.concat(b).forEach(p=>add(p.id,s,label+' · halved')); continue; }
+        const W=seg.up>0?a:b, L=seg.up>0?b:a, each=Math.round(pool*100/W.length)/100; lines.push({label,txt:`${(seg.up>0?m.A:m.B).name} ${Math.abs(seg.up)} up`,amt:pool}); W.forEach(p=>add(p.id,each,`${label} · won ${Math.abs(seg.up)} up`)); } }
+    const el=$('pnPrev'); if(el) el.innerHTML=lines.map(l=>`<div class="mr num" style="grid-template-columns:100px minmax(0,1fr) 90px"><b>${l.label}</b><span>${esc(l.txt)}</span><b class="r">${l.amt?gMoney(l.amt):'—'}</b></div>`).join('')+[...pays.entries()].map(([pid,x])=>{ const p=g.players.find(y=>y.id===pid); return `<div class="mr num" style="grid-template-columns:minmax(0,1fr) 90px"><span>${esc(p?gpName(p):'—')} <span class="muted">${esc(x.notes.join(' · '))}</span></span><b class="r">${gMoney(x.amount)}</b></div>`; }).join('');
+    return pays; };
+  openDrawer({kicker:gameTitle(g)+' · '+pot.name,title:'Settle the match',saveLabel:'Record payouts',wide:true,
+    body:`<div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px">${field('Front $ per player','pn_front',st.front,{type:'number'})}${field('Back $ per player','pn_back',st.back,{type:'number'})}${field('18 $ per player','pn_total',st.total,{type:'number'})}</div>
+      <div class="fld"><span class="lbl">Result</span><div class="mini" id="pnPrev"></div></div><p class="hint">Each segment: the losing side's stakes go to the winners; a halved segment is a push and everyone gets that stake back. Payouts replace any recorded for this competition.</p>`,
+    wire:r=>{ r.querySelectorAll('input').forEach(i=>i.oninput=calc); calc(); },
+    save:()=>{ const pays=calc(); pot.rules.nassau={front:fnum('pn_front'),back:fnum('pn_back'),total:fnum('pn_total')}; pot.entry=pot.rules.nassau.front+pot.rules.nassau.back+pot.rules.nassau.total;
+      pot.payouts=[...pays.entries()].filter(([,x])=>x.amount>0).map(([pid,x])=>({id:uid(),pid,amount:Math.round(x.amount*100)/100,note:x.notes.join(' · ')})); toast('Match settled'); }});
 }
 /* ---------- skins ---------- */
 /* skins rules. mode 'pot' (the group's game): one pot divided by the skins won; a tied hole is nobody's, a skin that fails

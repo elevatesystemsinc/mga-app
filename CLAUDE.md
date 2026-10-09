@@ -176,6 +176,14 @@ Tournament = { id, name, season, days, startDate, field:[{id,memberId,team,paid,
   - Paying: `payFormat` (finish from `potPub` standings via `payByFinish`; `pot.rules.places` are the default splits;
     ties share places, cent-exact; hand-entered positions when there are no scores), `paySkins` (`skinsCalc` →
     `skinsResult`, one pot ÷ skins won; rules on the pot), `payDots`, `payManual`.
+  - **Team matches, group against group** (the mid-round challenge): catalog `waltz321` (match, Nassau, count
+    pattern `321`: 3, 2, 1 balls by hole number, every ball on 9 and 18) and `teamnassau` (best ball). `matchPairs()`
+    in golfcore pairs sides within a group as before, or — when teams span groups or no group holds two teams —
+    pairs teams in code order (S1 v S2…) so two foursomes can play each other; a side's hole score sums its k best
+    nets when the match has a count pattern. `pot.rules.nassau={front,back,total}` are the per-player stakes (the
+    designer's stake fields; entry = their sum); `payNassau` settles segment by segment (losers' stakes to the
+    winners, a halve is a push, an unfinished segment returns the stake). `pickTeams` has "Teams = the groups".
+    A competition can be added to a game at any point from Design; standings pick up the scores already on the cards.
   - **Groups & handicaps** (`gameGroupsCard`/`wireGameGroups` on the game page): per group the course, starting hole
     and tee time; per player an index for the day (`p.index` on the event player, blank = the directory index), the
     tee, and CH / PH from `playerHcp`; a Group select moves a player (or starts a new group). `syncGameEvent` no
