@@ -713,8 +713,11 @@ function showCardFor(gid,pid){
 /* a small-group game's competitions ride along with the event; each is its own board */
 function compChips(){ const cs=pub.comps||[]; if(cs.length<2) return ''; return `<div class="chips">${cs.map(c=>`<button data-comp="${esc(c.id)}" class="${lbComp===c.id?'on':''}">${esc(c.name)}</button>`).join('')}</div>`; }
 const multiCourse=()=>Object.keys(pub.courses||{}).length>1;
-/* the small line under a name: the course only when the field is split across courses, then gross and net so far */
-function subLine(r,net){ const bits=[]; if(multiCourse()&&r.courseName) bits.push(r.courseName.replace(' Course','')); if(r.flight&&!lbFlight) bits.push('Flt '+r.flight); if(r.n&&r.gross!=null){ bits.push((net&&r.net!=null?'Gross '+r.gross+' · Net '+r.net:String(r.gross))); } return bits.length?`<div class="muted" style="font-size:12px">${esc(bits.join(' · '))}</div>`:''; }
+/* the small line under a name: the course only when the field is split across courses, then the other basis — always
+   to par, never a total, because groups further along would always carry the higher total */
+function subLine(r,net){ const bits=[]; if(multiCourse()&&r.courseName) bits.push(r.courseName.replace(' Course','')); if(r.flight&&!lbFlight) bits.push('Flt '+r.flight);
+  if(r.n){ if(net) bits.push('Gross '+toParTxt(r.toPar)); else if(r.netToPar!=null) bits.push('Net '+toParTxt(r.netToPar)); }
+  return bits.length?`<div class="muted" style="font-size:12px">${esc(bits.join(' · '))}</div>`:''; }
 function renderSkinsBoard(comp,fromJoin){
   const sk=comp.skins||{}, r=skinsResult(compPub(pub,comp),scores,sk,comp.players), per=sk.mode==='hole', won=r.wins.filter(w=>w.status==='won');
   const txt=sk.validate&&sk.validate!=='none'?{par:'par',netpar:'net par',bogey:'bogey',netbogey:'net bogey'}[sk.validate]||'':'';
@@ -772,7 +775,7 @@ window.__canReload=()=>!queue.length;
 /* Keeps every open device on the latest version: checks version.json about once a minute and, when a
    newer build is live, reloads at a safe moment (nothing unsaved, no editor open, not mid-typing). */
 (function(){
-  const ME='20261009193734'; let ready=false, lastCheck=0;
+  const ME='20261009193923'; let ready=false, lastCheck=0;
   const typing=()=>{ const a=document.activeElement; return a&&/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)&&a.value&&a.type!=='search'; };
   const safe=()=>!typing()&&(typeof window.__canReload!=='function'||window.__canReload());
   async function check(){ lastCheck=Date.now(); if(location.protocol==='file:') return;
