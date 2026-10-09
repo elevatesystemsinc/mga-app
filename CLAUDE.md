@@ -139,8 +139,9 @@ Tournament = { id, name, season, days, startDate, field:[{id,memberId,team,paid,
   all scored from one own-ball round. `db.games` = [{id, season, date, time, name, course, notes, status, **payWhen**
   'after'|'before', **settle** 'pot'|'net', golfEventId, players:[{id, memberId|name, paid, extraIn, gpid}],
   pots:[{id, kind:'format'|'skins'|'dots'|'manual', name, entry, inn:{[player id]:true}, rules:{game (catalog id),
-  scoring, teamSize, count, teamsBy:'hand'|'before'|'after', places:[pcts], skins:{net, grossBeatsNet, carry,
-  validate:'none'|'par'|'netpar'|'bogey'|'netbogey'}, dots:{…}}, teams?:{[event player id]:'S1'…}, draw?:{at, method,
+  scoring, teamSize, count, teamsBy:'hand'|'before'|'after', places:[pcts], skins:{mode:'pot'|'hole', net,
+  grossBeatsNet, validate:'none'|'par'|'netpar'|'bogey'|'netbogey', live; carry is derived = mode==='hole'},
+  dots:{…}}, teams?:{[event player id]:'S1'…}, draw?:{at, method,
   size, log:[{at,reason}]}, sitOut?:[event player ids], tally?, payouts:[{id,pid,amount,note}]}]}] and `db.ledgerAdj`.
   `gamesData()` migrates older shapes (the old "finish" main pot becomes a `format` pot; skins `validate` 'gross'/'net'
   → 'par'/'netpar'). There is no distinguished main game. Money: a player's in = Σ entries of the pots they are in
@@ -161,9 +162,17 @@ Tournament = { id, name, season, days, startDate, field:[{id,memberId,team,paid,
     an odd player joins a team or sits out (`pot.sitOut`); the result is saved (`pot.teams`, `pot.draw`) **before** the
     staged reveal (full-screen, `rf-show` overlay + `dw-*` CSS, names cycling and landing team by team); a re-draw
     needs a reason, kept in `pot.draw.log`.
+  - **Skins formats.** `mode:'pot'` (the group's game, default): one pot ÷ skins won; a tied hole is nobody's; a
+    skin that fails validation is simply lost. **Never mention carry-overs in pot mode** — the owner has been firm.
+    `mode:'hole'`: the pot split over 18, a tied hole's share carries, unwon holes at the end unpaid. `skinValue()`
+    gives the worth of one skin / hole; `skinsRulesOf(pot)` normalises and derives `carry` from the mode.
   - **Quiet skins**: `rules.skins.live` (default off) keeps skins off the game page during the round; "Call out the
-    skins" opens `skinsCallout(g,pot)` (full-screen, one hole per tap in play order: winner, carry, validation
-    result, then the totals) and sets `pot.calledOut`, after which the standings show as usual.
+    skins" opens `skinsCallout(g,pot)` (full-screen, one hole per tap in play order) and sets `pot.calledOut`. A won
+    skin shows as pending until its validation hole is called; stepping onto that hole first flashes the verdict
+    full-screen (`sk-flash`: red "Didn't validate" / green "Validated"), then shows the hole's result.
+  - **Deleting**: the designer's "Delete game" (`deleteGame`) removes the game and its scoring event. Deleting an
+    event from Golf that belongs to a game or a tournament round removes that game / round too — otherwise
+    `ensureGameEvent` / `ensureTournamentScoring` would rebuild it on the next render.
   - Paying: `payFormat` (finish from `potPub` standings via `payByFinish`; `pot.rules.places` are the default splits;
     ties share places, cent-exact; hand-entered positions when there are no scores), `paySkins` (`skinsCalc` →
     `skinsResult`, one pot ÷ skins won; rules on the pot), `payDots`, `payManual`.

@@ -187,8 +187,11 @@ function editEvent(ev){
       const data=Object.assign({name,date:fv('geD'),defaultTee:fv('geT'),slug,tournamentId:fv('geTour'),front:fv('geFr'),back:fv('geBk'),scoring:fv('geSc'),allow:clone($('dBody')._allow||{})},E);
       if(ev) Object.assign(ev,data); else { const e=Object.assign({id:uid(),status:'live',groups:[],pool:[],flights:{count:0,names:[]},createdAt:new Date().toISOString()},data); g.events.push(e); view.geid=e.id; view.getab='field'; ev=e; }
       golfSave(ev); toast('Saved'); return undefined; },
-    del:ev?()=>{ if(!confirm(`Delete ${ev.name}? Its groups and scores are removed.`)) return false; g.events=g.events.filter(x=>x!==ev); view.geid=null;
-      if(CLOUD&&sessionOK) deleteEventRow(ev.id); }:null,delLabel:'Delete event'});
+    del:ev?()=>{ const game=ev.gameId&&typeof gamesData==='function'?gamesData().find(x=>x.id===ev.gameId):null, tt=ev.tournamentId?db.tournaments.find(x=>x.id===ev.tournamentId):null, rnd=tt&&ev.roundId?(tt.rounds||[]).find(x=>x.id===ev.roundId):null;
+      const what=game?`This is ${game.name||'a game'}’s scoring event — deleting it deletes the game and its money record too.`:rnd?`This is a round of ${tt.name} — deleting it removes that round from the tournament too.`:'Its groups and scores are removed.';
+      if(!confirm(`Delete ${ev.name}? ${what}`)) return false;
+      if(game) db.games=db.games.filter(x=>x!==game); if(rnd) tt.rounds=tt.rounds.filter(x=>x!==rnd);
+      g.events=g.events.filter(x=>x!==ev); view.geid=null; if(CLOUD&&sessionOK) deleteEventRow(ev.id); }:null,delLabel:'Delete event'});
 }
 
 /* Event detail */

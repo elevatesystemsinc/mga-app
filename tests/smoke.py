@@ -86,7 +86,7 @@ async def main():
     pages=await pg.evaluate("()=>{ ['p0','p1','p2','p3','p4'].forEach(id=>db.memberships.push({id,status:'Active',joined:'',notes:''})); persist(); return navItems().map(x=>x[0]); }")
     for v in pages: await pg.evaluate(f"()=>go('{v}')"); await pg.wait_for_timeout(60)
     r=await pg.evaluate("""()=>{ go('games'); designGame(null); const d=GD.draft; d.name='Friday game'; d.date='2026-05-01'; d.pots[0].entry=20; d.pots[0].rules.scoring='gross';
-      const sk=newPot('skins',d,{entry:5}); sk.rules.skins={net:false,grossBeatsNet:false,carry:true,validate:'none'}; d.pots.push(sk); render(); const designer=!!document.getElementById('gdSave'); document.getElementById('gdSave').click();
+      const sk=newPot('skins',d,{entry:5}); sk.rules.skins={net:false,grossBeatsNet:false,validate:'none',mode:'pot'}; d.pots.push(sk); render(); const designer=!!document.getElementById('gdSave'); document.getElementById('gdSave').click();
       const g=GAME(); ['p0','p1','p2','p3','p4'].forEach(id=>{ const p=addPlayer(g,{memberId:id}); p.id='gp_'+id; g.pots.forEach(pot=>{ delete pot.inn[p.id]; }); }); const gu=addPlayer(g,{name:'Guest Gus'}); gu.id='gp_guest';
       g.players.forEach(p=>{ g.pots[0].inn[p.id]=true; if(!['gp_p4','gp_guest'].includes(p.id)) g.pots[1].inn[p.id]=true; }); g.players.forEach(p=>{ p.paid=p.id!=='gp_guest'; });
       // a dots pot for everyone and a blind-draw best ball for four, partners drawn after the round
@@ -98,9 +98,11 @@ async def main():
     r=await pg.evaluate("""async()=>{ const g=GAME(), ev=gameEvent(g); const gp=id=>g.players.find(p=>p.id===id).gpid; const S=async(id,h,v)=>setScore(ev,gp(id),h,v);
       for(let h=1;h<=18;h++){ await S('gp_p0',h,h===7?3:4); await S('gp_p1',h,h===2?3:h===7?3:4); await S('gp_p2',h,h===8?3:5); await S('gp_p3',h,5); await S('gp_p4',h,5); await S('gp_guest',h,6); }
       const sk=skinsCalc(g,g.pots[1],{net:false,carry:true,validate:'none'}); const lb=eventBoard(publicEvent(ev),scoresFor(ev),{sort:'gross'}).map(r=>[r.name,r.pos,r.gross]);
-      const dots=dotsAuto(g,g.pots[2],dotsRules(g.pots[2])); return {skins:sk.wins.map(w=>[w.hole,w.name,w.count]), total:sk.total, lb, dots:['gp_p0','gp_p1','gp_p2','gp_p3'].map(id=>dots[id].birdies+'/'+dots[id].eagles)}; }""")
+      const potSk=skinsCalc(g,g.pots[1],{net:false,carry:false,validate:'none',mode:'pot'}); const potTxt=skinsRuleText(skinsRulesOf(newPot('skins',g)));
+      const dots=dotsAuto(g,g.pots[2],dotsRules(g.pots[2])); return {skins:sk.wins.map(w=>[w.hole,w.name,w.count]), total:sk.total, lb, dots:['gp_p0','gp_p1','gp_p2','gp_p3'].map(id=>dots[id].birdies+'/'+dots[id].eagles), pot:[potSk.total,potSk.wins.map(w=>w.count)], potTxt}; }""")
     # hole 1 ties (carry 1) → Bo wins 2 on hole 2; holes 3–7 tie (carry 5) → Cy wins 6 on hole 8; the rest carry unpaid. Oak par 5-4-5-3…: Ann birdies 1, 3, 7, 12; Bo adds hole 2; Cy hole 8
-    ok=r['skins']==[[2,'Bo Baker',2],[8,'Cy Cole',6]] and r['total']==8 and r['lb'][0]==['Bo Baker',1,70] and r['lb'][1]==['Ann Able',2,71] and r['dots']==['4/0','5/0','1/0','0/0']
+    ok=(r['skins']==[[2,'Bo Baker',2],[8,'Cy Cole',6]] and r['total']==8 and r['lb'][0]==['Bo Baker',1,70] and r['lb'][1]==['Ann Able',2,71] and r['dots']==['4/0','5/0','1/0','0/0']
+        and r['pot']==[2,[1,1]] and 'carry' not in r['potTxt'])   # pot skins: a skin is a skin, nothing carries
     print('skins + leaderboard + dots', r, 'OK' if ok else 'FAIL'); bad+=not ok
     r=await pg.evaluate("""async()=>{ const g=GAME(); const S=()=>document.getElementById('dSave').click(); payFormat(g,g.pots[0]); const pcts=document.getElementById('pfP').value; S(); paySkins(g,g.pots[1]); S();
       payDots(g,g.pots[2]); const di=document.querySelector('[data-dt="gp_p3|Sandy"]'); di.value='2'; di.dispatchEvent(new Event('input')); S();
@@ -111,16 +113,26 @@ async def main():
       const by=id=>Math.round(gpOut(g,g.players.find(p=>p.id===id))*100)/100; go('ledger'); const rows=ledgerRows('season').map(r=>[r.name,r.games,r.inn,Math.round(r.out*100)/100,Math.round(r.net*100)/100]);
       return {pcts, ann:by('gp_p0'), bo:by('gp_p1'), cy:by('gp_p2'), di:by('gp_p3'), bdAmt, drawn:dv.length, drawnSides:new Set(dv).size, teams:teams.map(t=>t.length), beforeDraw, afterDraw, bdPay:bd.payouts.map(x=>[x.pid,x.amount]), left:Math.round(gameMoney(g).left*100)/100, rows,
         settle:st.rows.map(r=>[r.name,r.net]), transfers:st.transfers, tSum:Math.round(st.transfers.reduce((a,t)=>a+t.amount,0)*100)/100, draw:!!bd.draw&&bd.draw.method}; }""")
-    # main 120 at 60/40: Bo 72, Ann 48; skins 20 over 8: Bo 5, Cy 15; dots 12 over 12 dots (Ann 4, Bo 5, Cy 1, Di 2 sandies) at $1; blind draw 20: Bo/Cy best ball 70 beats Ann/Di 71 → 10 each
-    ok=(r['pcts']=='60 / 40' and r['ann']==52 and r['bo']==92 and r['cy']==26 and r['di']==2 and r['bdAmt']=='20' and r['drawn']==4 and r['drawnSides']==2 and r['teams']==[2,2] and r['beforeDraw']==4 and r['afterDraw']==2 and r['draw']=='random' and sorted(r['bdPay'])==[['gp_p1',10],['gp_p2',10]]
-        and r['left']==0 and r['rows'][0]==['Bo Baker',1,32,92,60] and r['rows'][-1]==['Di Dunn',1,32,2,-30]
-        and r['settle'][0]==['Bo Baker',60] and r['settle'][-1]==['Di Dunn',-30] and r['tSum']==sum(x for _,x in r['settle'] if x>0) and all(t['amount']>0 for t in r['transfers']))
+    # main 120 at 60/40: Bo 72, Ann 48; skins pot 20 ÷ 2 skins (Bo hole 2, Cy hole 8): 10 each; dots 12 over 12 dots (Ann 4, Bo 5, Cy 1, Di 2 sandies) at $1; blind draw 20: Bo/Cy best ball 70 beats Ann/Di 71 → 10 each
+    ok=(r['pcts']=='60 / 40' and r['ann']==52 and r['bo']==97 and r['cy']==21 and r['di']==2 and r['bdAmt']=='20' and r['drawn']==4 and r['drawnSides']==2 and r['teams']==[2,2] and r['beforeDraw']==4 and r['afterDraw']==2 and r['draw']=='random' and sorted(r['bdPay'])==[['gp_p1',10],['gp_p2',10]]
+        and r['left']==0 and r['rows'][0]==['Bo Baker',1,32,97,65] and r['rows'][-1]==['Di Dunn',1,32,2,-30]
+        and r['settle'][0]==['Bo Baker',65] and r['settle'][-1]==['Di Dunn',-30] and r['tSum']==sum(x for _,x in r['settle'] if x>0) and all(t['amount']>0 for t in r['transfers']))
     # quiet skins: nothing live on the game page until the call-out, which walks the cards hole by hole
     r3=await pg.evaluate("""()=>{ const g=GAME(), pot=g.pots[1]; delete pot.calledOut; view.gameId=g.id; go('games'); const quiet=!!document.querySelector('[data-callout]')&&!document.body.textContent.includes('Hole 2'); skinsCallout(g,pot);
       const ov=document.querySelector('.rf-show'); let n=0; while(document.getElementById('skNext')){ document.getElementById('skNext').click(); n++; } const lines=ov.querySelectorAll('.sk-line').length, won=ov.querySelectorAll('.sk-line.won').length, txt=ov.textContent; document.getElementById('skFin').click();
-      const after=!!document.querySelector('[data-callout]')&&document.body.textContent.includes('Hole 2'); return {quiet, n, lines, won, after, called:pot.calledOut, sum:txt.includes('8 skins')}; }""")
+      const after=!!document.querySelector('[data-callout]')&&document.body.textContent.includes('Hole 2'); return {quiet, n, lines, won, after, called:pot.calledOut, sum:txt.includes('2 skins')}; }""")
     ok=ok and r3['quiet'] and r3['n']==18 and r3['lines']==18 and r3['won']==2 and r3['after'] and r3['called'] and r3['sum']
     print('quiet skins + call-out', r3, 'OK' if r3['quiet'] and r3['lines']==18 and r3['won']==2 and r3['after'] else 'FAIL')
+    # validation on the call-out: a won skin whose next hole fails flashes "Didn't validate" before that hole is shown
+    r4=await pg.evaluate("""async()=>{ const g=GAME(), ev=gameEvent(g); const pot=newPot('skins',g,{entry:5}); pot.rules.skins={net:false,grossBeatsNet:false,validate:'par',mode:'pot'}; g.pots.push(pot); const gp=id=>g.players.find(p=>p.id===id).gpid;
+      await setScore(ev,gp('gp_p1'),3,6);   // Bo bogeys hole 3 (par 5) after his birdie on 2 → the hole-2 skin doesn't validate
+      skinsCallout(g,pot); const nxt=()=>document.getElementById('skNext'); nxt().click(); nxt().click();   // holes 1 and 2 shown
+      const pend=document.querySelector('.sk-line.pending')&&document.body.textContent.includes('validates on hole 3');
+      nxt().click(); const flash=document.querySelector('.sk-flash.bad'); const big=flash?flash.querySelector('.sk-flash-big').textContent:''; nxt().click();
+      const after=[...document.querySelectorAll('.sk-line')].map(l=>l.className.replace('sk-line ','')); const voidTxt=document.body.textContent.includes('didn’t validate on hole 3');
+      document.getElementById('skClose').click(); g.pots.pop(); await setScore(ev,gp('gp_p1'),3,4); return {pend, big, after, voidTxt}; }""")
+    ok=ok and r4['pend'] and r4['big']=='Didn’t validate' and r4['after'][:3]==['muted','void','pending'] and r4['voidTxt']   # hole 3: Ann's 4 on the par 5 is a new skin, pending hole 4
+    print('call-out validation flash', r4, 'OK' if r4['big']=='Didn’t validate' and r4['after'][:3]==['muted','void','pending'] else 'FAIL')
     # the game sheet PDF and the designer round-trip
     r2=await pg.evaluate("""async()=>{ const g=GAME(); const doc=await gameSheetPDF(g,{returnDoc:true}); const n=doc.getNumberOfPages(); designGame(g); const names=GD.draft.pots.map(p=>p.name); const grid=document.querySelectorAll('[data-gdin]').length; document.getElementById('gdSave').click(); return {pages:n, names, grid, back:!!document.getElementById('gmSheet')}; }""")
     ok=ok and r2['pages']>=1 and len(r2['names'])==4 and r2['grid']==6*4 and r2['back']

@@ -264,7 +264,10 @@ textarea.inp{height:auto;min-height:84px;padding:10px 12px;resize:vertical}
 .sk-list{display:flex;flex-direction:column;gap:6px;width:min(640px,94vw);max-height:52vh;overflow:auto;padding:4px}
 .sk-line{display:grid;grid-template-columns:44px minmax(0,1fr);gap:12px;align-items:center;text-align:left;padding:10px 14px;border-radius:12px;background:rgba(255,255,255,.06);border:1px solid rgba(216,183,95,.25)}
 .sk-line b{font-family:var(--serif,Georgia),serif;font-size:26px;color:#D8B75F} .sk-line span{font-size:17px;font-weight:700;color:#fff} .sk-line small{display:block;font-size:12.5px;color:#C9CFD2;margin-top:2px}
-.sk-line.won{background:rgba(31,107,74,.45);border-color:#6FBF8E} .sk-line.void{background:rgba(160,60,40,.35);border-color:#E07B62} .sk-line.muted span{color:#C9CFD2;font-weight:500}
+.sk-line.won{background:rgba(31,107,74,.45);border-color:#6FBF8E} .sk-line.void{background:rgba(160,60,40,.35);border-color:#E07B62} .sk-line.muted span{color:#C9CFD2;font-weight:500} .sk-line.pending{border-style:dashed}
+.sk-flash{justify-content:center;gap:10px} .sk-flash-h{font-size:16px;font-weight:800;letter-spacing:.2em;text-transform:uppercase;color:#D8B75F}
+.sk-flash-big{font-family:var(--serif,Georgia),serif;font-size:min(13vw,120px);font-weight:700;line-height:1;margin:6px 0 10px;animation:skpop .5s cubic-bezier(.2,1.4,.4,1)} .sk-flash.bad .sk-flash-big{color:#E07B62} .sk-flash.ok .sk-flash-big{color:#6FBF8E}
+.sk-flash-s{font-size:18px;color:#E9E4D6;max-width:720px} @keyframes skpop{from{transform:scale(.6);opacity:0}to{transform:scale(1);opacity:1}}
 /* checklist */
 .ck-g{padding:10px 22px 4px;font-size:11.5px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--gold-dk,#7E5F1A);background:var(--ivory,#FBFAF5);border-top:1px solid var(--line)}
 .ck-row{display:grid;grid-template-columns:34px minmax(0,1fr) 210px;gap:10px;align-items:center;padding:10px 22px;border-top:1px solid var(--line);cursor:pointer}
@@ -2966,8 +2969,11 @@ function editEvent(ev){
       const data=Object.assign({name,date:fv('geD'),defaultTee:fv('geT'),slug,tournamentId:fv('geTour'),front:fv('geFr'),back:fv('geBk'),scoring:fv('geSc'),allow:clone($('dBody')._allow||{})},E);
       if(ev) Object.assign(ev,data); else { const e=Object.assign({id:uid(),status:'live',groups:[],pool:[],flights:{count:0,names:[]},createdAt:new Date().toISOString()},data); g.events.push(e); view.geid=e.id; view.getab='field'; ev=e; }
       golfSave(ev); toast('Saved'); return undefined; },
-    del:ev?()=>{ if(!confirm(`Delete ${ev.name}? Its groups and scores are removed.`)) return false; g.events=g.events.filter(x=>x!==ev); view.geid=null;
-      if(CLOUD&&sessionOK) deleteEventRow(ev.id); }:null,delLabel:'Delete event'});
+    del:ev?()=>{ const game=ev.gameId&&typeof gamesData==='function'?gamesData().find(x=>x.id===ev.gameId):null, tt=ev.tournamentId?db.tournaments.find(x=>x.id===ev.tournamentId):null, rnd=tt&&ev.roundId?(tt.rounds||[]).find(x=>x.id===ev.roundId):null;
+      const what=game?`This is ${game.name||'a game'}’s scoring event — deleting it deletes the game and its money record too.`:rnd?`This is a round of ${tt.name} — deleting it removes that round from the tournament too.`:'Its groups and scores are removed.';
+      if(!confirm(`Delete ${ev.name}? ${what}`)) return false;
+      if(game) db.games=db.games.filter(x=>x!==game); if(rnd) tt.rounds=tt.rounds.filter(x=>x!==rnd);
+      g.events=g.events.filter(x=>x!==ev); view.geid=null; if(CLOUD&&sessionOK) deleteEventRow(ev.id); }:null,delLabel:'Delete event'});
 }
 
 /* Event detail */
@@ -3546,7 +3552,7 @@ function gamesData(){
       if(p.kind==='finish'){   // the old "main game" becomes an ordinary competition with the game's format
         p.kind='format'; const C=catalogById(g.game||g.format||'stroke')||catalogById('stroke');
         Object.assign(p.rules,{game:C.id,scoring:g.net?'net':'gross',teamSize:g.teamSize||(C.sizes?C.sizes[0]:1),count:g.count||1,teamsBy:p.rules.teamsBy||'hand'}); }
-      if(p.kind==='skins'){ p.rules.game='skins'; const sk=p.rules.skins=p.rules.skins||{}; if(sk.validate==='gross') sk.validate='par'; if(sk.validate==='net') sk.validate='netpar'; }
+      if(p.kind==='skins'){ p.rules.game='skins'; const sk=p.rules.skins=p.rules.skins||{}; if(sk.validate==='gross') sk.validate='par'; if(sk.validate==='net') sk.validate='netpar'; if(!sk.mode) sk.mode='pot'; }
       if(p.kind==='dots') p.rules.game='dots';
       if(p.kind==='format'){ if(!p.rules.game) p.rules.game='stroke'; if(!p.rules.scoring) p.rules.scoring=g.net?'net':'gross'; if(!p.rules.teamsBy) p.rules.teamsBy='hand'; } }); }
   return db.games;
@@ -3589,10 +3595,12 @@ function newPot(game,g,extra){
   const kind=kindOfGame(game), C=catalogById(game)||catalogById('stroke');
   const pot={id:uid(),kind,name:C.name.replace(/ \(.*$/,''),entry:kind==='manual'?0:5,inn:Object.fromEntries((g&&kind!=='manual'?g.players:[]).map(p=>[p.id,true])),rules:{game},payouts:[]};
   if(kind==='format'){ Object.assign(pot.rules,{scoring:'net',teamSize:C.engine.teamSize||(C.sizes?C.sizes[0]:1),count:1,teamsBy:(C.engine.draw==='after'?'after':'hand'),places:[]}); pot.entry=20; }
-  if(kind==='skins'){ pot.rules.skins={net:true,grossBeatsNet:true,carry:true,validate:'netpar'}; }
+  if(kind==='skins'){ pot.rules.skins={net:true,grossBeatsNet:true,validate:'netpar',mode:'pot',live:false}; }
   if(kind==='dots'){ pot.rules.dots=Object.assign({},DOTS_DEFAULT); pot.entry=2; }
   return Object.assign(pot,extra||{});
 }
+/* a game and its scoring event go together */
+function deleteGame(g){ const ev=gameEvent(g); if(ev){ golfData().events=golfData().events.filter(e=>e!==ev); if(CLOUD&&sessionOK) deleteEventRow(ev.id); } db.games=db.games.filter(x=>x!==g); }
 function addPlayer(g,o){ const p={id:uid(),memberId:o.memberId||'',name:o.name||'',paid:false,extraIn:0,gpid:''}; g.players.push(p); g.pots.forEach(pot=>{ if(pot.kind!=='manual') pot.inn[p.id]=true; }); return p; }
 function removePlayer(g,p){ g.players=g.players.filter(x=>x!==p); g.pots.forEach(pot=>{ delete pot.inn[p.id]; pot.payouts=pot.payouts.filter(x=>x.pid!==p.id); if(pot.teams&&p.gpid) delete pot.teams[p.gpid]; }); }
 
@@ -3666,12 +3674,13 @@ function vGameDesign(m){
       ${pot.kind==='format'?`<div class="frow2">${team||C.sizes?field('Players per team','gdT_'+pot.id,E.teamSize,{type:'select',options:(C.sizes||[E.teamSize]).map(n=>[n,n+' players'])}):field('Pays','gdP_'+pot.id,(pot.rules.places||[]).join(' / '),{ph:'e.g. 60 / 30 / 10',hint:'Percent per place, 1st / 2nd / 3rd… Blank = the usual split for the field.'})}
           ${team?field('Partners','gdB_'+pot.id,pot.rules.teamsBy||'hand',{type:'select',options:[['hand','Picked by hand'],['before','Drawn before the round'],['after','Drawn after the round (blind draw)']]}):(C.count&&E.teamSize>1?field('Balls that count','gdC_'+pot.id,E.count,{type:'select',options:Array.from({length:Math.max(1,E.teamSize-1)},(_,k)=>[k+1,(k+1)+' of '+E.teamSize])}):'<div></div>')}</div>
         ${team?`<div class="frow2">${field('Pays','gdP_'+pot.id,(pot.rules.places||[]).join(' / '),{ph:'e.g. 70 / 30',hint:'Percent per place. Blank = the usual split for the number of teams.'})}${C.count&&E.teamSize>1?field('Balls that count','gdC_'+pot.id,E.count,{type:'select',options:Array.from({length:Math.max(1,E.teamSize-1)},(_,k)=>[k+1,(k+1)+' of '+E.teamSize])}):'<div></div>'}</div>`:''}`:''}
-      ${pot.kind==='skins'?`<div class="frow2"><div class="fld"><span class="lbl">Rules</span><label class="check"><input type="checkbox" id="gdGBN_${pot.id}"${sk.grossBeatsNet?' checked':''}${sk.net?'':' disabled'}>Gross beats net on a tied hole</label><label class="check"><input type="checkbox" id="gdCarry_${pot.id}"${sk.carry?' checked':''}>Carry-overs on tied holes</label><label class="check"><input type="checkbox" id="gdLive_${pot.id}"${sk.live?' checked':''}>Announce skins live during the round</label></div>
-          ${field('Validation on the next hole','gdV_'+pot.id,sk.validate||'none',{type:'select',options:Object.entries(SKIN_VALID_LABEL)})}</div><p class="hint" style="margin:-6px 0 0">One pot for the day: the skins pot divided by the skins won. A hole counts once everyone in the pot has scored it; carried holes with no winner at the end are not paid. Left quiet, skins stay off the game page during the round and are called out from the cards afterwards.</p>`:''}
+      ${pot.kind==='skins'?`<div class="frow2">${field('Format','gdMode_'+pot.id,sk.mode,{type:'select',options:[['pot','Skins pot — divided by the skins won'],['hole','Per hole — the pot split over 18 holes, ties carry over']]})}${field('Validation on the next hole','gdV_'+pot.id,sk.validate||'none',{type:'select',options:Object.entries(SKIN_VALID_LABEL)})}</div>
+          <div class="fld"><span class="lbl">Rules</span><label class="check"><input type="checkbox" id="gdGBN_${pot.id}"${sk.grossBeatsNet?' checked':''}${sk.net?'':' disabled'}>Gross beats net on a tied hole</label><label class="check"><input type="checkbox" id="gdLive_${pot.id}"${sk.live?' checked':''}>Announce skins live during the round</label></div>
+          <p class="hint" style="margin:-6px 0 0">${sk.mode==='hole'?'Each hole is worth a share of the pot; a tied hole carries its share to the next, and holes unwon at the end are not paid.':'One pot for the day, divided by the skins won. A tied hole is nobody’s; a skin that fails validation is lost.'} A hole counts once everyone in the pot has scored it. Left quiet, skins stay off the game page during the round and are called out from the cards afterwards.</p>`:''}
       ${pot.kind==='dots'?`<div class="frow2">${field('Points for a birdie','gdDb_'+pot.id,dr.birdie,{type:'number'})}${field('Points for an eagle','gdDe_'+pot.id,dr.eagle,{type:'number'})}</div>${field('Hand-tallied dots','gdDk_'+pot.id,dr.kinds.join(', '),{hint:'Comma-separated: sandies, greenies, chip-ins, polies…'})}`:''}
     </div>`; };
   m.innerHTML=`<div class="crumb"><button id="gdBack">Games</button><span class="muted">/</span><span class="muted">${isNew?'New game':esc(gameTitle(d))}</span></div>
-  <div class="phead"><div><h1 class="h1">${isNew?'Design the game':'Game design'}</h1><p class="sub">Who plays, which competitions run on the day’s scores, what goes in each and how it pays.</p></div><div class="actions"><button class="btn" id="gdCancel">Cancel</button><button class="btn pri" id="gdSave">${isNew?'Create game':'Save game'}</button></div></div><div class="rule"></div>
+  <div class="phead"><div><h1 class="h1">${isNew?'Design the game':'Game design'}</h1><p class="sub">Who plays, which competitions run on the day’s scores, what goes in each and how it pays.</p></div><div class="actions">${isNew?'':`<button class="btn danger" id="gdDelete">${I.trash}Delete game</button>`}<button class="btn" id="gdCancel">Cancel</button><button class="btn pri" id="gdSave">${isNew?'Create game':'Save game'}</button></div></div><div class="rule"></div>
   <div class="card pad" style="display:flex;flex-direction:column;gap:14px"><h2 class="h2">The day</h2>
     <div class="frow2">${field('Name','gdName',d.name,{ph:'e.g. Friday game'})}${field('Course','gdCourse',d.course,{type:'select',options:courses.map(c=>[c.id,c.name])})}</div>
     <div class="frow2">${field('Date','gdDate',d.date,{type:'date'})}${field('Tee time','gdTime',d.time||'',{type:'time'})}</div>
@@ -3691,15 +3700,16 @@ function vGameDesign(m){
   // wiring: every field writes straight to the draft; structural changes re-render
   const rerender=()=>render();
   $('gdBack').onclick=$('gdCancel').onclick=()=>{ if(!confirm('Leave without saving?')) return; GD=null; view.gdesign=null; render(); };
+  const del=$('gdDelete'); if(del) del.onclick=()=>{ const g=gamesData().find(x=>x.id===GD.id); if(!g) return; if(!confirm(`Delete ${gameTitle(g)} on ${shortDate(g.date)}? Its scoring event, scores and money record go with it.`)) return; deleteGame(g); GD=null; view.gdesign=null; view.gameId=null; persist(); render(); toast('Game deleted'); };
   const readAll=()=>{ d.name=fv('gdName'); d.course=fv('gdCourse'); d.date=fv('gdDate'); d.time=fv('gdTime'); d.notes=fv('gdNotes'); d.payWhen=$('gdWhen').dataset.val; d.settle=$('gdSettle').dataset.val;
     for(const pot of d.pots){ const v=id=>fv(id+'_'+pot.id); pot.name=v('gdN')||pot.name; if(pot.kind!=='manual') pot.entry=n0(v('gdE'));
       const S=$('gdS_'+pot.id); if(S){ const sc=S.dataset.val; if(pot.kind==='format') pot.rules.scoring=sc; if(pot.kind==='skins'){ skinsRulesOf(pot).net=sc==='net'; if(sc!=='net') skinsRulesOf(pot).grossBeatsNet=false; } if(pot.kind==='dots') dotsRules(pot).net=sc==='net'; }
       if(pot.kind==='format'){ if($('gdT_'+pot.id)) pot.rules.teamSize=+v('gdT'); if($('gdC_'+pot.id)) pot.rules.count=+v('gdC'); if($('gdB_'+pot.id)) pot.rules.teamsBy=v('gdB'); if($('gdP_'+pot.id)) pot.rules.places=v('gdP').split(/[\/,\s]+/).map(Number).filter(x=>x>0); }
-      if(pot.kind==='skins'){ const sk=skinsRulesOf(pot); sk.grossBeatsNet=$('gdGBN_'+pot.id).checked&&sk.net; sk.carry=$('gdCarry_'+pot.id).checked; sk.live=$('gdLive_'+pot.id).checked; sk.validate=v('gdV')||'none'; }
+      if(pot.kind==='skins'){ const sk=skinsRulesOf(pot); sk.grossBeatsNet=$('gdGBN_'+pot.id).checked&&sk.net; sk.mode=v('gdMode')==='hole'?'hole':'pot'; sk.carry=sk.mode==='hole'; sk.live=$('gdLive_'+pot.id).checked; sk.validate=v('gdV')||'none'; }
       if(pot.kind==='dots'){ const dr=pot.rules.dots=dotsRules(pot); dr.birdie=n0(v('gdDb')); dr.eagle=n0(v('gdDe')); dr.kinds=v('gdDk').split(',').map(s=>s.trim()).filter(Boolean); } } };
   m.querySelectorAll('.gd-pot').forEach(card=>{ const pot=d.pots.find(x=>x.id===card.dataset.pot);
     card.querySelector('#gdG_'+pot.id).onchange=e=>{ readAll(); const np=newPot(e.target.value,null); np.id=pot.id; np.inn=pot.inn; np.entry=pot.entry||np.entry; Object.assign(pot,np); rerender(); };
-    ['gdS','gdWhen'].forEach(()=>{}); wireSeg(card,'gdS_'+pot.id,()=>{ readAll(); if(pot.kind==='skins') rerender(); });
+    wireSeg(card,'gdS_'+pot.id,()=>{ readAll(); if(pot.kind==='skins') rerender(); }); const msel=card.querySelector('#gdMode_'+pot.id); if(msel) msel.onchange=()=>{ readAll(); rerender(); };
     const tsel=card.querySelector('#gdT_'+pot.id); if(tsel) tsel.onchange=()=>{ readAll(); rerender(); };
     const bsel=card.querySelector('#gdB_'+pot.id); if(bsel) bsel.onchange=()=>{ readAll(); };
     card.querySelector('[data-gdrm]').onclick=()=>{ readAll(); if(pot.payouts.length&&!confirm('This competition has payouts recorded. Remove it anyway?')) return; d.pots=d.pots.filter(x=>x!==pot); rerender(); }; });
@@ -3784,8 +3794,9 @@ function potStandingsHTML(g,pot,ev){
   if(pot.kind==='manual') return '';
   if(pot.kind==='skins'){ const r=skinsCalc(g,pot), rules=skinsRulesOf(pot), val=r&&r.total?potTotal(g,pot)/r.total:0;
     if(!rules.live&&!pot.calledOut) return `<div style="padding:12px 22px;display:flex;gap:12px;align-items:center;flex-wrap:wrap"><span class="muted" style="flex:1 1 260px">Skins are kept quiet during the round and called out from the cards afterwards${r&&r.incomplete?` · ${18-r.incomplete} of 18 holes in`:''}.</span><button class="btn sm pri" data-callout="${pot.id}">Call out the skins</button></div>`;
-    if(!r||!r.wins.length) return `<div style="padding:12px 22px" class="muted">No skins yet${r&&r.carried?` · ${r.carried} carried`:''}.</div>`;
-    return `<div class="mini" style="margin:10px 22px 14px">${r.wins.map(w=>`<div class="mr num" style="grid-template-columns:62px minmax(0,1fr) 90px"><b>Hole ${w.hole}</b><div class="cell2"><span>${esc(w.name)} <span class="muted">${w.score}${rules.net&&w.net!==w.score?' (net '+w.net+')':''}${w.count>1?' · '+w.count+' skins':''}</span></span>${w.status==='void'?`<small class="neg">Void — missed ${esc((SKIN_VALID_LABEL[rules.validate]||'').replace(' or better on the next hole','').toLowerCase())} on ${w.checkHole}</small>`:w.status==='pending'?`<small class="muted">Validates on hole ${w.checkHole}</small>`:''}</div><b class="r ${w.status==='won'?'':'muted'}">${w.status==='won'?gMoney(val*w.count):'—'}</b></div>`).join('')}<div class="mr num" style="grid-template-columns:minmax(0,1fr) 90px"><span class="muted">${r.total} skin${r.total===1?'':'s'}${r.total?' at '+gMoney(val):''}${r.pending?` · ${r.pending} pending`:''}${r.carried?` · ${r.carried} carried`:''}${r.incomplete?` · ${r.incomplete} hole${r.incomplete===1?'':'s'} open`:''}</span><b class="r">${gMoney(r.total?potTotal(g,pot):0)}</b></div></div>`; }
+    const hv=skinValue(rules,potTotal(g,pot),r), per=rules.mode==='hole';
+    if(!r||!r.wins.length) return `<div style="padding:12px 22px" class="muted">No skins yet${per&&r&&r.carried?` · ${r.carried} hole${r.carried===1?'':'s'} carried`:''}.</div>`;
+    return `<div class="mini" style="margin:10px 22px 14px">${r.wins.map(w=>`<div class="mr num" style="grid-template-columns:62px minmax(0,1fr) 90px"><b>Hole ${w.hole}</b><div class="cell2"><span>${esc(w.name)} <span class="muted">${w.score}${rules.net&&w.net!==w.score?' (net '+w.net+')':''}${per&&w.count>1?' · '+w.count+' holes':''}</span></span>${w.status==='void'?`<small class="neg">Void — missed ${esc((SKIN_VALID_LABEL[rules.validate]||'').replace(' or better on the next hole','').toLowerCase())} on ${w.checkHole}</small>`:w.status==='pending'?`<small class="muted">Validates on hole ${w.checkHole}</small>`:''}</div><b class="r ${w.status==='won'?'':'muted'}">${w.status==='won'?gMoney(hv*w.count):'—'}</b></div>`).join('')}<div class="mr num" style="grid-template-columns:minmax(0,1fr) 90px"><span class="muted">${per?`${r.total} of 18 holes won at ${gMoney(hv)} a hole`:`${r.total} skin${r.total===1?'':'s'}${r.total?' at '+gMoney(hv):''}`}${r.pending?` · ${r.pending} pending`:''}${per&&r.carried?` · ${r.carried} carried`:''}${r.incomplete?` · ${r.incomplete} hole${r.incomplete===1?'':'s'} open`:''}</span><b class="r">${gMoney(per?hv*r.total:(r.total?potTotal(g,pot):0))}</b></div></div>`; }
   if(pot.kind==='dots'){ const rules=dotsRules(pot), auto=dotsAuto(g,pot,rules), T=potPlayers(g,pot).map(p=>{ const a=auto[p.id]||{birdies:0,eagles:0}, t=(pot.tally||{})[p.id]||{}; return {p,dots:a.birdies*rules.birdie+a.eagles*rules.eagle+sum(rules.kinds,k=>t[k]),a}; }).filter(x=>x.dots).sort((a,b)=>b.dots-a.dots);
     return T.length?`<div class="mini" style="margin:10px 22px 14px">${T.map(x=>`<div class="mr num" style="grid-template-columns:minmax(0,1fr) 60px"><span>${esc(gpName(x.p))} <span class="muted">${x.a.birdies}b ${x.a.eagles}e</span></span><b class="r">${x.dots}</b></div>`).join('')}</div>`:'<div style="padding:12px 22px" class="muted">No dots yet.</div>'; }
   const pub=potPub(g,pot), rows=eventBoard(pub,sc,{sort:pub.scoring}).filter(r=>r.n), net=pub.scoring==='net', unit=unitOf(pub);
@@ -3934,7 +3945,10 @@ function payFormat(g,pot){
   payByFinish(g,pot,rows,`${pot.name}: pay out`,()=>potCat(pot).name+(pot.draw?' (drawn partners)':''));
 }
 /* ---------- skins ---------- */
-const skinsRulesOf=pot=>{ const sk=pot.rules.skins=pot.rules.skins||{net:true,grossBeatsNet:true,carry:true,validate:'netpar'}; if(sk.validate==='gross') sk.validate='par'; if(sk.validate==='net') sk.validate='netpar'; if(!sk.validate) sk.validate='none'; return sk; };
+/* skins rules. mode 'pot' (the group's game): one pot divided by the skins won; a tied hole is nobody's, a skin that fails
+   validation is lost. mode 'hole': the pot split over 18 holes, a tied hole's money carries to the next. */
+const skinsRulesOf=pot=>{ const sk=pot.rules.skins=pot.rules.skins||{net:true,grossBeatsNet:true,validate:'netpar',mode:'pot'}; if(sk.validate==='gross') sk.validate='par'; if(sk.validate==='net') sk.validate='netpar'; if(!sk.validate) sk.validate='none';
+  if(sk.mode!=='hole') sk.mode='pot'; sk.carry=sk.mode==='hole'; return sk; };
 const SKINS_DEFAULT=(g,pot)=>Object.assign({},skinsRulesOf(pot));
 function skinsCalc(g,pot,rules){
   const ev=gameEvent(g); if(!ev) return null;
@@ -3942,24 +3956,26 @@ function skinsCalc(g,pot,rules){
   const r=skinsResult(publicEvent(ev),scoresFor(ev),rules||skinsRulesOf(pot),[...byG.keys()]);
   r.wins.forEach(w=>{ const p=byG.get(w.pid); w.pid=p.id; w.name=gpName(p); }); r.per=Object.fromEntries(Object.entries(r.per).map(([k,v])=>[byG.get(k).id,v])); return r;
 }
-const skinsRuleText=r=>[r.net?(r.grossBeatsNet?'net, gross beats net':'net'):'gross',r.carry?'carry-overs':'no carry-overs',r.validate&&r.validate!=='none'?'validated by '+(SKIN_VALID_LABEL[r.validate]||r.validate).replace(' or better on the next hole','').toLowerCase()+' on the next hole':''].filter(Boolean).join(' · ');
+const skinsRuleText=r=>[r.mode==='hole'?'per hole, ties carry over':'pot ÷ skins won',r.net?(r.grossBeatsNet?'net, gross beats net':'net'):'gross',r.validate&&r.validate!=='none'?'validated by '+(SKIN_VALID_LABEL[r.validate]||r.validate).replace(' or better on the next hole','').toLowerCase()+' on the next hole':''].filter(Boolean).join(' · ');
+/* what one skin is worth: pot ÷ skins won, or (per hole) the pot over 18 holes */
+const skinValue=(rules,amt,r)=>rules.mode==='hole'?amt/18:(r&&r.total?amt/r.total:0);
 function paySkins(g,pot){
   const ev=gameEvent(g); if(!ev){ toast('No scoring event'); return; }
   const rules=SKINS_DEFAULT(g,pot);
-  const calc=()=>{ const r=skinsCalc(g,pot,rules), amt=fnum('skAmt'), el=$('skPrev'); if(!el) return r;
-    if(!r||!r.wins.length){ el.innerHTML=`<div class="mr"><span class="muted">${r&&r.incomplete===18?'No scores yet':'No skins won yet'+(r&&r.carried?` · ${r.carried} carried`:'')}.</span></div>`; return r; }
-    const val=r.total?amt/r.total:0;
-    el.innerHTML=r.wins.map(w=>`<div class="mr num" style="grid-template-columns:60px minmax(0,1fr) 90px"><b>Hole ${w.hole}</b><div class="cell2"><span>${esc(w.name)} <span class="muted">${w.score}${rules.net&&w.net!==w.score?' (net '+w.net+')':''}${w.count>1?' · '+w.count+' skins':''}</span></span>${w.status==='void'?`<small class="neg">Void — missed it on hole ${w.checkHole}${rules.carry?', carried':''}</small>`:w.status==='pending'?`<small class="muted">Waiting on hole ${w.checkHole} to validate</small>`:''}</div><b class="r ${w.status==='won'?'':'muted'}">${w.status==='won'?gMoney(val*w.count):'—'}</b></div>`).join('')+
-      `<div class="mr num" style="grid-template-columns:minmax(0,1fr) 90px"><span class="muted">${r.total} skin${r.total===1?'':'s'}${r.total?' at '+gMoney(val):''}${r.pending?` · ${r.pending} pending`:''}${r.incomplete?` · ${r.incomplete} hole${r.incomplete===1?'':'s'} not finished by everyone`:''}${r.carried?` · ${r.carried} carried, unpaid`:''}${r.lost?` · ${r.lost} void, unpaid`:''}</span><b class="r">${gMoney(r.total?amt:0)}</b></div>`; return r; };
+  const calc=()=>{ const r=skinsCalc(g,pot,rules), amt=fnum('skAmt'), el=$('skPrev'), per=rules.mode==='hole'; if(!el) return r;
+    if(!r||!r.wins.length){ el.innerHTML=`<div class="mr"><span class="muted">${r&&r.incomplete===18?'No scores yet':'No skins won yet'+(per&&r&&r.carried?` · ${r.carried} carried`:'')}.</span></div>`; return r; }
+    const val=skinValue(rules,amt,r);
+    el.innerHTML=r.wins.map(w=>`<div class="mr num" style="grid-template-columns:60px minmax(0,1fr) 90px"><b>Hole ${w.hole}</b><div class="cell2"><span>${esc(w.name)} <span class="muted">${w.score}${rules.net&&w.net!==w.score?' (net '+w.net+')':''}${per&&w.count>1?' · '+w.count+' holes':''}</span></span>${w.status==='void'?`<small class="neg">Void — missed it on hole ${w.checkHole}${per?', carried':''}</small>`:w.status==='pending'?`<small class="muted">Waiting on hole ${w.checkHole} to validate</small>`:''}</div><b class="r ${w.status==='won'?'':'muted'}">${w.status==='won'?gMoney(val*w.count):'—'}</b></div>`).join('')+
+      `<div class="mr num" style="grid-template-columns:minmax(0,1fr) 90px"><span class="muted">${per?`${r.total} of 18 holes won at ${gMoney(val)} a hole`:`${r.total} skin${r.total===1?'':'s'}${r.total?' at '+gMoney(val):''}`}${r.pending?` · ${r.pending} pending`:''}${r.incomplete?` · ${r.incomplete} hole${r.incomplete===1?'':'s'} not finished by everyone`:''}${per&&r.carried?` · ${r.carried} carried, unpaid`:''}${r.lost?` · ${r.lost} void`:''}</span><b class="r">${gMoney(per?val*r.total:(r.total?amt:0))}</b></div>`; return r; };
   openDrawer({kicker:gameTitle(g)+' · '+pot.name,title:'Pay out skins',saveLabel:'Record skins',
     body:pair(field('Skins pot $','skAmt',potTotal(g,pot),{type:'number'}),`<div class="fld"><span class="lbl">Scoring</span>${seg('skNet',[['gross','Gross'],['net','Net'],['gbn','Net · gross beats net']],rules.net?(rules.grossBeatsNet?'gbn':'net'):'gross')}</div>`)+
-      pair(field('Validation','skVal',rules.validate||'none',{type:'select',options:Object.entries(SKIN_VALID_LABEL)}),`<div class="fld"><span class="lbl">Ties</span><label class="check" style="height:42px"><input type="checkbox" id="skCarry"${rules.carry?' checked':''}>Carry over to the next hole</label></div>`)+
-      `<div class="fld"><span class="lbl">Skins</span><div class="mini" id="skPrev"></div></div><p class="hint">The pot is divided by the skins won. Only players in this pot count, and a hole counts once all of them have scored it. Gross beats net: on a net tie, the one player who made that score without a stroke takes the skin. Validation: the winner must meet the standard on their next hole or the skin is void — back into the carry, or lost without carry-overs; a skin on the last hole stands. Carried skins with no winner at the end are not paid.</p>`,
-    wire:r=>{ wireSeg(r,'skNet',v=>{ rules.net=v!=='gross'; rules.grossBeatsNet=v==='gbn'; calc(); }); r.querySelector('#skVal').onchange=e=>{ rules.validate=e.target.value; calc(); }; r.querySelector('#skCarry').onchange=e=>{ rules.carry=e.target.checked; calc(); }; r.querySelector('#skAmt').oninput=calc; calc(); },
-    save:()=>{ const r=skinsCalc(g,pot,rules); pot.rules.skins=Object.assign({},rules); if(!r||!r.total){ toast(r&&r.pending?'Skins are still waiting on validation holes':'No skins to pay yet'); return false; } const amt=fnum('skAmt'), val=amt/r.total;
-      const cents=Object.entries(r.per).map(([pid,n])=>({pid,n,c:Math.floor(amt*100*n/r.total)})); let rem=Math.round(amt*100)-cents.reduce((a,x)=>a+x.c,0); for(let i=0;rem>0;i++,rem--) cents[i%cents.length].c++;
-      pot.payouts=cents.map(x=>({id:uid(),pid:x.pid,amount:x.c/100,note:`${x.n} skin${x.n===1?'':'s'} · ${skinsRuleText(rules)}`}));
-      toast(`${r.total} skins paid at ${gMoney(val)}`); }});
+      pair(field('Validation','skVal',rules.validate||'none',{type:'select',options:Object.entries(SKIN_VALID_LABEL)}),field('Format','skMode',rules.mode,{type:'select',options:[['pot','Skins pot — divided by the skins won'],['hole','Per hole — pot over 18 holes, ties carry over']]}))+
+      `<div class="fld"><span class="lbl">Skins</span><div class="mini" id="skPrev"></div></div><p class="hint">Only players in this pot count, and a hole counts once all of them have scored it. Gross beats net: on a net tie, the one player who made that score without a stroke takes the skin. Validation: the winner must meet the standard on their next hole or the skin is void; a skin on the last hole stands.</p>`,
+    wire:r=>{ wireSeg(r,'skNet',v=>{ rules.net=v!=='gross'; rules.grossBeatsNet=v==='gbn'; calc(); }); r.querySelector('#skVal').onchange=e=>{ rules.validate=e.target.value; calc(); }; r.querySelector('#skMode').onchange=e=>{ rules.mode=e.target.value; rules.carry=rules.mode==='hole'; calc(); }; r.querySelector('#skAmt').oninput=calc; calc(); },
+    save:()=>{ const r=skinsCalc(g,pot,rules); pot.rules.skins=Object.assign({},rules); if(!r||!r.total){ toast(r&&r.pending?'Skins are still waiting on validation holes':'No skins to pay yet'); return false; } const amt=fnum('skAmt'), val=skinValue(rules,amt,r), paidAmt=rules.mode==='hole'?val*r.total:amt;
+      const cents=Object.entries(r.per).map(([pid,n])=>({pid,n,c:Math.floor(paidAmt*100*n/r.total)})); let rem=Math.round(paidAmt*100)-cents.reduce((a,x)=>a+x.c,0); for(let i=0;rem>0;i++,rem--) cents[i%cents.length].c++;
+      pot.payouts=cents.map(x=>({id:uid(),pid:x.pid,amount:x.c/100,note:`${x.n} ${rules.mode==='hole'?'hole':'skin'}${x.n===1?'':'s'} · ${skinsRuleText(rules)}`}));
+      toast(`${r.total} ${rules.mode==='hole'?'holes':'skins'} paid at ${gMoney(val)}`); }});
 }
 /* the skins call-out: hole by hole from the cards, read out after the round — one hole per tap, validations shown as
    they fall; opening it marks the pot as called out so the game page shows the standings from then on */
@@ -3972,23 +3988,34 @@ function skinsCallout(g,pot){
   const winAt=Object.fromEntries(r.wins.map(w=>[w.hole,w]));
   const lowAt=h=>{ const rows=[]; for(const gr of pub.groups){ const c=pub.courses[gr.course]; if(!c) continue; for(const p of gr.players){ if(!byG.has(p.id)) continue; const s=+((sc[p.id]||{})[h]); if(!s) continue; const hc=(c.hcp[p.set||'M']||c.hcp.M)[h-1], k=rules.net&&typeof p.ph==='number'?strokesOn(p.ph,hc):0; rows.push({name:byG.get(p.id)?gpName(byG.get(p.id)):p.name,s,net:s-k}); } }
     if(!rows.length) return null; const key=x=>rules.net?x.net:x.s, low=Math.min(...rows.map(key)); return {low,who:rows.filter(x=>key(x)===low),n:rows.length}; };
-  const total=potTotal(g,pot), val=r.total?total/r.total:0;
-  const lines=order.map(h=>{ const w=winAt[h], L=lowAt(h); if(!L) return {h,txt:'No scores on this hole yet',cls:'muted'};
-    if(w){ const v=w.status==='won'?`${w.count>1?w.count+' skins':'1 skin'} · ${gMoney(val*w.count)}`:w.status==='void'?`void — missed the standard on hole ${w.checkHole}${rules.carry?', carried on':''}`:`waiting on hole ${w.checkHole}`;
-      return {h,txt:`${w.name} · ${w.score}${rules.net&&w.net!==w.score?' (net '+w.net+')':''}`,sub:v,cls:w.status==='won'?'won':w.status==='void'?'void':'pending'}; }
-    return {h,txt:L.who.length>1?`${L.who.map(x=>x.name.split(' ')[0]).join(', ')} tied at ${L.low}`:`${L.who[0].name} low, but not outright`,sub:rules.carry?'carries over':'no skin',cls:'muted'}; });
+  const total=potTotal(g,pot), per=rules.mode==='hole', val=skinValue(rules,total,r), validating=rules.validate&&rules.validate!=='none';
+  const idx=h=>order.indexOf(h);
+  // the line for each hole; a won skin's verdict is only shown once its validation hole has been called
+  const lineFor=(h,upto)=>{ const w=winAt[h], L=lowAt(h); if(!L) return {h,txt:'No scores on this hole yet',cls:'muted'};
+    if(w){ const name=`${w.name} · ${w.score}${rules.net&&w.net!==w.score?' (net '+w.net+')':''}`, worth=per?`${w.count>1?w.count+' holes':'1 hole'} · ${gMoney(val*w.count)}`:`skin · ${gMoney(val)}`;
+      if(validating&&w.checkHole!=null&&idx(w.checkHole)>=upto) return {h,txt:name,sub:`skin — validates on hole ${w.checkHole}`,cls:'pending'};
+      if(w.status==='won') return {h,txt:name,sub:worth+(validating&&w.checkHole!=null?' · validated on hole '+w.checkHole:''),cls:'won'};
+      if(w.status==='void') return {h,txt:name,sub:`didn’t validate on hole ${w.checkHole}${per?' — carried on':' — no skin'}`,cls:'void'};
+      return {h,txt:name,sub:`waiting on hole ${w.checkHole}`,cls:'pending'}; }
+    return {h,txt:L.who.length>1?`${L.who.map(x=>x.name.split(' ')[0]).join(', ')} tied at ${L.low}`:`${L.who[0].name} low, but not outright`,sub:per?'carries over':'no skin',cls:'muted'}; };
   pot.calledOut=true; persist();
   const ov=document.createElement('div'); ov.className='rf-show'; document.body.appendChild(ov);
   try{ const fs=ov.requestFullscreen&&ov.requestFullscreen(); if(fs&&fs.catch) fs.catch(()=>{}); }catch(_){}
-  let i=0; const close=()=>{ if(document.fullscreenElement) document.exitFullscreen().catch(()=>{}); ov.remove(); document.removeEventListener('keydown',key); render(); };
-  const paint=()=>{ const shown=lines.slice(0,i); const done=i>=lines.length;
+  let i=0, flash=null;   // flash: the verdict interstitial shown before the next hole's result
+  const close=()=>{ if(document.fullscreenElement) document.exitFullscreen().catch(()=>{}); ov.remove(); document.removeEventListener('keydown',key); render(); };
+  const paint=()=>{ const shown=order.slice(0,i).map(h=>lineFor(h,i)); const done=i>=order.length;
     ov.innerHTML=`<div class="rf-top"><img src="${typeof crestSrc==='function'?crestSrc():'crest.png'}" alt=""><div><div class="rf-k">${esc(orgName())} · ${esc(gameTitle(g))}</div><div class="rf-h">${esc(pot.name)} — from the cards</div></div><button class="rf-x" id="skClose" aria-label="Close">✕</button></div>
-      <div class="rf-stage" style="justify-content:flex-start;padding-top:26px"><div class="rf-lbl">${done?'All 18 holes':'Hole by hole · '+skinsRuleText(rules)}</div>
+      ${flash?`<div class="rf-stage sk-flash ${flash.ok?'ok':'bad'}"><div class="sk-flash-h">Hole ${flash.w.hole} · ${esc(flash.w.name)}</div><div class="sk-flash-big">${flash.ok?'Validated':'Didn’t validate'}</div><div class="sk-flash-s">${flash.ok?`${esc((SKIN_VALID_LABEL[rules.validate]||'').replace(' or better on the next hole','').toLowerCase())} or better on hole ${flash.w.checkHole} — the skin stands`:`missed ${esc((SKIN_VALID_LABEL[rules.validate]||'').replace(' or better on the next hole','').toLowerCase())} on hole ${flash.w.checkHole}${per?' — carried on':' — no skin'}`}</div><button class="rf-go" id="skNext">Hole ${flash.w.checkHole}</button><div class="rf-hint">or press the space bar</div></div>`
+      :`<div class="rf-stage" style="justify-content:flex-start;padding-top:26px"><div class="rf-lbl">${done?'All 18 holes':'Hole by hole · '+skinsRuleText(rules)}</div>
         <div class="sk-list">${shown.map(l=>`<div class="sk-line ${l.cls}"><b>${l.h}</b><div><span>${esc(l.txt)}</span>${l.sub?`<small>${esc(l.sub)}</small>`:''}</div></div>`).join('')}</div>
-        ${done?`<div class="rf-sum" style="margin-top:14px"><span>${r.total} skin${r.total===1?'':'s'} · ${gMoney(total)} pot</span><b>${r.total?gMoney(val)+' a skin':'No skins — pot carries'}</b><small>${Object.entries(r.per).map(([pid,n])=>{ const p=g.players.find(x=>x.id===pid); return `${p?gpName(p):'—'} ${n}`; }).join(' · ')}${r.pending?' · '+r.pending+' still pending':''}</small></div>`
-          :`<button class="rf-go" id="skNext">${i?'Next hole':'Start at hole '+order[0]}</button><div class="rf-hint">or press the space bar</div>`}</div>
-      <div class="rf-facts"><span><b>${byG.size}</b> in the skins</span><span><b>${gMoney(total)}</b> pot</span>${done?`<button class="rf-go" id="skFin" style="margin-left:auto">Done</button>`:''}</div>`;
-    ov.querySelector('#skClose').onclick=close; const nx=ov.querySelector('#skNext'); if(nx) nx.onclick=()=>{ i++; paint(); const el=ov.querySelector('.sk-list'); if(el) el.scrollTop=el.scrollHeight; }; const fin=ov.querySelector('#skFin'); if(fin) fin.onclick=close; };
+        ${done?`<div class="rf-sum" style="margin-top:14px"><span>${per?`${r.total} of 18 holes won`:`${r.total} skin${r.total===1?'':'s'}`} · ${gMoney(total)} pot</span><b>${r.total?gMoney(val)+(per?' a hole':' a skin'):'No skins today'}</b><small>${Object.entries(r.per).map(([pid,n])=>{ const p=g.players.find(x=>x.id===pid); return `${p?gpName(p):'—'} ${n}`; }).join(' · ')}${r.pending?' · '+r.pending+' still pending':''}</small></div>`
+          :`<button class="rf-go" id="skNext">${i?'Next hole':'Start at hole '+order[0]}</button><div class="rf-hint">or press the space bar</div>`}</div>`}
+      <div class="rf-facts"><span><b>${byG.size}</b> in the skins</span><span><b>${gMoney(total)}</b> pot</span>${done&&!flash?`<button class="rf-go" id="skFin" style="margin-left:auto">Done</button>`:''}</div>`;
+    ov.querySelector('#skClose').onclick=close; const nx=ov.querySelector('#skNext'); if(nx) nx.onclick=next; const fin=ov.querySelector('#skFin'); if(fin) fin.onclick=close; };
+  const next=()=>{ if(flash){ flash=null; i++; paint(); const el=ov.querySelector('.sk-list'); if(el) el.scrollTop=el.scrollHeight; return; }
+    const nh=order[i]; const w=validating&&nh!=null?r.wins.find(x=>x.checkHole===nh&&x.status!=='pending'):null;   // a skin decided by the hole about to be called
+    if(w){ flash={w,ok:w.status==='won'}; paint(); return; }
+    i++; paint(); const el=ov.querySelector('.sk-list'); if(el) el.scrollTop=el.scrollHeight; };
   const key=e=>{ if(e.key==='Escape') close(); if(e.code==='Space'){ e.preventDefault(); const b=ov.querySelector('#skNext')||ov.querySelector('#skFin'); if(b) b.click(); } };
   document.addEventListener('keydown',key); paint();
 }
@@ -5925,7 +5952,7 @@ async function resultsPDF(t,opt){
 /* Keeps every open device on the latest version: checks version.json about once a minute and, when a
    newer build is live, reloads at a safe moment (nothing unsaved, no editor open, not mid-typing). */
 (function(){
-  const ME='20261009172332'; let ready=false, lastCheck=0;
+  const ME='20261009173204'; let ready=false, lastCheck=0;
   const typing=()=>{ const a=document.activeElement; return a&&/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)&&a.value&&a.type!=='search'; };
   const safe=()=>!typing()&&(typeof window.__canReload!=='function'||window.__canReload());
   async function check(){ lastCheck=Date.now(); if(location.protocol==='file:') return;
