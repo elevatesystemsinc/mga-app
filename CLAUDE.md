@@ -193,7 +193,13 @@ Tournament = { id, name, season, days, startDate, field:[{id,memberId,team,paid,
     ties share places, cent-exact; hand-entered positions when there are no scores), `paySkins` (`skinsCalc` →
     `skinsResult`, one pot ÷ skins won; rules on the pot), `payDots`, `payManual`.
   - **Team matches, group against group** (the mid-round challenge): catalog `waltz321` (match, Nassau, count
-    pattern `321`: 3, 2, 1 balls by hole number, every ball on 9 and 18) and `teamnassau` (best ball). `matchPairs()`
+    pattern `321`: 3, 2, 1 balls by hole number, every ball on 9 and 18, **`matchBy:'strokes'`** — each of the three
+    bets goes to the side with the lower total of its counted balls; the owner was clear this is total score, not
+    holes won) and `teamnassau` (best ball, by holes). `matchBy` ('holes' default | 'strokes') is an engine field on
+    events/comps (designer: "Each segment goes to"); `matchBoard` rows carry `segs:[{k:'F'|'B'|'18',v,done,started,txt}]`
+    and `by`, `status` reads "F 4 ahead · B — · 18 4 ahead" (strokes) or "F 1 up · B AS · 18 1 up" (holes), and
+    `nassauSegments`/`payNassau` settle from `segs`. The phone board gives a match row the 18 in its value column and
+    the front/back under the names (`.lb.m`). `matchPairs()`
     in golfcore pairs sides within a group as before, or — when teams span groups or no group holds two teams —
     pairs teams in code order (S1 v S2…) so two foursomes can play each other; a side's hole score sums its k best
     nets when the match has a count pattern. `pot.rules.nassau={front,back,total}` are the per-player stakes (the

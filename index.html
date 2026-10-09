@@ -2613,7 +2613,7 @@ const GAME_CATALOG=[
   {id:'match',name:'Singles match play',group:'Match play',engine:{format:'match',teamSize:1},desc:'Two players in a group, hole by hole; the better net score wins the hole.',hcp:'100% of the difference'},
   {id:'nassau',name:'Nassau (front · back · 18)',group:'Match play',engine:{format:'match',teamSize:1,matchScoring:'nassau'},desc:'Three singles bets in one match: front nine, back nine and the eighteen — a point for each.',hcp:'100% of the difference'},
   {id:'fourballmatch',name:'Four-ball match play',group:'Match play',engine:{format:'match',teamSize:2},sizes:[2],desc:'Two against two, best net ball of each side on every hole.',hcp:'90%, everyone off the low man'},
-  {id:'waltz321',name:'Reverse waltz match (3-2-1, all on 9 & 18)',group:'Match play',engine:{format:'match',teamSize:4,matchScoring:'nassau',countPattern:'321'},sizes:[2,3,4,5,6],desc:'Team against team with Nassau points for the front, the back and the 18. Each hole counts the best three balls, then two, then one, repeating from the first hole — and every ball on 9 and 18.',hcp:'100% of the difference, everyone off the low man'},
+  {id:'waltz321',name:'Reverse waltz (3-2-1, all on 9 & 18)',group:'Match play',engine:{format:'match',teamSize:4,matchScoring:'nassau',countPattern:'321',matchBy:'strokes'},sizes:[2,3,4,5,6],desc:'Team against team, three bets: the front, the back and the 18 — each goes to the side with the lower total of its counted balls. Each hole counts the best three balls, then two, then one, repeating from the first hole — and every ball on 9 and 18.',hcp:'100% of the difference, everyone off the low man'},
   {id:'teamnassau',name:'Team Nassau (best ball)',group:'Match play',engine:{format:'match',teamSize:4,matchScoring:'nassau'},sizes:[2,3,4,5,6],desc:'Team against team, best ball of each side on every hole; points for the front, the back and the 18.',hcp:'100% of the difference, everyone off the low man'},
   {id:'hilo',name:'Hi-Lo (low ball · high ball)',group:'Match play',engine:{format:'match',teamSize:2,matchScoring:'hilo'},sizes:[2],desc:'Two against two, two points a hole: the better low ball and the better high ball.',hcp:'90%, everyone off the low man'},
   {id:'foursomesmatch',name:'Foursomes match play',group:'Match play',engine:{format:'match',teamSize:2,matchForm:'foursomes'},sizes:[2],desc:'Alternate shot, one ball per side, hole by hole.',hcp:'50% of combined, difference'},
@@ -2677,7 +2677,7 @@ function holeFormat(pub,h){ return pub.format==='split'?(h<=9?pub.front:pub.back
 /* A published event may carry `comps`: the competitions of a small-group game that are shown live, each with its own
    engine fields, players and (when known) teams. compPub() cuts the event down to one of them; a team competition
    whose partners are not drawn yet is shown as individual stroke play. */
-const COMP_KEYS=['format','teamSize','count','countPattern','quotaBase','cap','matchScoring','matchForm','scoring'];
+const COMP_KEYS=['format','teamSize','count','countPattern','quotaBase','cap','matchScoring','matchForm','matchBy','scoring'];
 function compPub(pub,comp){
   const out=Object.assign({},pub,{allow:{},flights:[]}); COMP_KEYS.forEach(k=>{ if(comp[k]!==undefined) out[k]=comp[k]; });
   const inP=new Set(comp.players||[]), teams=comp.teams||null, teamy=!!teams&&Object.keys(teams).length>0, isTeamFmt=!!((FORMATS[out.format]||{}).team)&&(+out.teamSize||1)>=2;
@@ -2694,7 +2694,7 @@ function playerFormatOf(pub){ return eventFormats(pub).find(f=>FORMATS[f]&&FORMA
 /* an individual's unit on their own row (team Stableford players still count points) */
 function formatSummary(pub){ const n=teamSizeOf(pub), k=countOf(pub), P=pub.countPattern, one=f=>{ const F=FORMATS[f]||FORMATS.stroke; let l=F.label;
     if(F.count) l=P==='123'?'1-2-3 best ball':P==='123rot'?'Cha-cha-cha':P==='par345'?'1-2-3 by par':P==='yellow'?`Yellow ball (${n}-player)`:l+` (best ${k} of ${n})`; else if(F.team===true&&!F.size) l+=` (${n}-player)`;
-    if(f==='match') l=pub.matchScoring==='nassau'?'Nassau':pub.matchScoring==='hilo'?'Hi-Lo':pub.matchForm==='foursomes'?'Foursomes match play':n>=2?'Four-ball match play':'Singles match play';
+    if(f==='match') l=pub.matchScoring==='nassau'?(pub.matchBy==='strokes'?'Nassau by total score':'Nassau'):pub.matchScoring==='hilo'?'Hi-Lo':pub.matchForm==='foursomes'?'Foursomes match play':n>=2?'Four-ball match play':'Singles match play';
     if(f==='quota'&&+pub.quotaBase===39) l='Chicago (quota 39)'; if(f==='stroke'&&pub.cap==='nddb') l='Maximum score'; return l; };
   return pub.format==='split'?`Front: ${one(pub.front)} · Back: ${one(pub.back)}`:one(pub.format||'stroke'); }
 /* a player's playing handicap for a per-player format in this event (from their course handicap) */
@@ -2781,20 +2781,27 @@ function matchBoard(pub,scores,opt){
       const side=(S,h)=>{ const v=nets(S,h); if(!v) return null; const k=pub.countPattern||(+pub.count>1)?countOn(pub,'bestball',h,S.members.length,((c.par[S.captain.set||'M']||c.par.M)[h-1])):1;
         if(k<=1) return Math.min(...v); if(v.length<Math.min(k,S.members.length)) return null; return v.slice().sort((x,y)=>x-y).slice(0,k).reduce((a,b)=>a+b,0); };
       const sc=pub.matchScoring||'holes';
-      let up=0,played=0,wA=0,wB=0,ptsA=0,ptsB=0,upF=0,upB=0; const holes=[];
-      for(const h of order){ const a=side(A,h), b=side(B,h); if(a==null||b==null) break; played++;
+      // a Nassau is decided by holes won (match play) or, matchBy 'strokes', by the total of the sides' counted balls
+      const by=sc==='nassau'&&pub.matchBy==='strokes'?'strokes':'holes';
+      let up=0,played=0,wA=0,wB=0,ptsA=0,ptsB=0,upF=0,upB=0,sF=0,sB=0; const holes=[];
+      for(const h of order){ const a=side(A,h), b=side(B,h); if(a==null||b==null) break; played++; if(h<=9) sF+=b-a; else sB+=b-a;
         if(sc==='hilo'){ const na=nets(A,h), nb=nets(B,h); const la=Math.min(...na), lb=Math.min(...nb), ha=Math.max(...na), hb=Math.max(...nb); if(la<lb) ptsA++; else if(lb<la) ptsB++; if(ha<hb) ptsA++; else if(hb<ha) ptsB++; up=ptsA-ptsB; if(la<lb||ha<hb) wA++; if(lb<la||hb<ha) wB++; }
         else { if(a<b){ up++; wA++; if(h<=9) upF++; else upB++; } else if(b<a){ up--; wB++; if(h<=9) upF--; else upB--; } }
         holes.push({h,a,b}); if(sc==='holes'&&Math.abs(up)>18-played) break; }
       let st=matchStatus(up,played,false);
       if(sc==='hilo'){ const over=played===18; st={txt:(up===0?'AS':Math.abs(up)+' '+(up>0?'up':'dn'))+(over?'':' thru '+played),over,won:up>0?1:up<0?-1:0}; }
-      if(sc==='nassau'){ const fin=played>=9, done=played===18; const pt=(u,ok)=>!ok?0.5:u>0?1:u<0?0:0.5; const fF=pt(upF,fin), fB=pt(upB,done), fT=pt(up,done);
-        st={txt:`F ${upF>0?'+':''}${upF}${fin?'':'*'} · B ${upB>0?'+':''}${upB}${done?'':'*'} · 18 ${up>0?'+':''}${up}`,over:done,won:up>0?1:up<0?-1:0,nassauA:fin||done?fF*(fin?1:0)+(done?fB+fT:0):0}; }
-      const nassauPts=sign=>{ if(sc!=='nassau') return null; const seg=(u,ok)=>!ok?0:(sign*u>0?1:sign*u<0?0:0.5); return seg(upF,played>=9)+seg(upB,played===18)+seg(up,played===18); };
+      let segsA=null, lead=up;
+      if(sc==='nassau'){ const nF=holes.filter(x=>x.h<=9).length, nB=holes.length-nF, fin=nF>=9, done=fin&&nB>=9;
+        const vF=by==='strokes'?sF:upF, vB=by==='strokes'?sB:upB, vT=by==='strokes'?sF+sB:up; lead=vT;
+        segsA=[{k:'F',label:'Front',v:vF,done:fin,started:nF>0},{k:'B',label:'Back',v:vB,done,started:nB>0},{k:'18',label:'18',v:vT,done,started:played>0}];
+        st={txt:'',over:done,won:vT>0?1:vT<0?-1:0}; }
+      const segTxt=(v,started)=>!started?'—':by==='strokes'?(v>0?v+' ahead':v<0?(-v)+' behind':'even'):(v>0?v+' up':v<0?(-v)+' dn':'AS');
+      const nassauPts=sign=>{ if(sc!=='nassau') return null; return segsA.reduce((t,s)=>t+(!s.done?0:(sign*s.v>0?1:sign*s.v<0?0:0.5)),0); };
+      const sideSegs=sign=>segsA&&segsA.map(s=>({k:s.k,label:s.label,v:sign*s.v,done:s.done,started:s.started,txt:segTxt(sign*s.v,s.started)}));
       const mk=(S,O,sign,won,lost)=>({id:S.key,name:S.members.map(p=>p.name).join(' / '),members:S.members.map(p=>p.id),opp:O.members.map(p=>p.name).join(' / '),group:g.label||'',groupId:g.id,course:g.course,courseName:c.name,
         n:played,thru:played===18||st.over?'F':String(played),
-        status:sc==='nassau'?st.txt.replace(/([FB18]+) ([+−-]?)(\d+)/g,(m0,seg,sg,v)=>`${seg} ${sign<0&&+v!==0?(sg==='+'?'−':'+'):sg}${v}`):sc==='hilo'?(up===0?'AS':(sign*up>0?Math.abs(up)+' up':Math.abs(up)+' dn'))+(st.over?'':' thru '+played):st.over?(sign*up>0?st.txt:sign*up<0?'lost '+st.txt:'AS'):(up===0?st.txt:(sign*up>0?Math.abs(up)+' up':Math.abs(up)+' dn')+(st.txt.includes('dormie')?' · dormie':'')+' thru '+played),
-        pts:sc==='nassau'?nassauPts(sign):sc==='hilo'?(st.over?(sign*up>0?1:sign*up<0?0:0.5):0):(st.over?(sign*up>0?1:sign*up<0?0:0.5):0),holesWon:won,holesLost:lost,gross:0,toPar:0,net:null,netToPar:null,holesUp:sign*up,flight:[...new Set(S.members.map(p=>p.flight).filter(Boolean))].join('/'),team:S.members.length>1,unit:'match',over:st.over,holes});
+        status:sc==='nassau'?sideSegs(sign).map(s=>s.k+' '+s.txt).join(' · '):sc==='hilo'?(up===0?'AS':(sign*up>0?Math.abs(up)+' up':Math.abs(up)+' dn'))+(st.over?'':' thru '+played):st.over?(sign*up>0?st.txt:sign*up<0?'lost '+st.txt:'AS'):(up===0?st.txt:(sign*up>0?Math.abs(up)+' up':Math.abs(up)+' dn')+(st.txt.includes('dormie')?' · dormie':'')+' thru '+played),
+        pts:sc==='nassau'?nassauPts(sign):sc==='hilo'?(st.over?(sign*up>0?1:sign*up<0?0:0.5):0):(st.over?(sign*up>0?1:sign*up<0?0:0.5):0),holesWon:won,holesLost:lost,gross:0,toPar:0,net:null,netToPar:null,holesUp:sign*lead,segs:sideSegs(sign),by,flight:[...new Set(S.members.map(p=>p.flight).filter(Boolean))].join('/'),team:S.members.length>1,unit:'match',over:st.over,holes});
       rows.push(mk(A,B,1,wA,wB),mk(B,A,-1,wB,wA)); } }
   const pool=opt.flight?rows.filter(r=>r.flight===opt.flight):rows;
   const played=pool.filter(r=>r.n>0).sort((a,b)=>b.pts-a.pts||b.holesUp-a.holesUp||a.name.localeCompare(b.name)), idle=pool.filter(r=>!r.n).sort((a,b)=>a.name.localeCompare(b.name));
@@ -2847,8 +2854,8 @@ function gameOptions(selectedId){ const gs=enabledGames().filter(g=>!g.side&&!g.
   return groups.map(gr=>`<optgroup label="${esc(gr)}">${gs.filter(g=>g.group===gr).map(g=>`<option value="${g.id}"${g.id===selectedId?' selected':''}>${esc(g.name)}</option>`).join('')}</optgroup>`).join(''); }
 /* an event's format fields from a catalog entry + the editor's team size / balls that count */
 function engineFrom(C,teamSize,count){ const e=C.engine, F=FORMATS[e.format]||FORMATS.stroke; const sizes=C.sizes||null; let ts=sizes?Math.min(Math.max(+teamSize||e.teamSize||sizes[0],sizes[0]),sizes[sizes.length-1]):(e.teamSize||1); if(e.format==='match'&&!e.teamSize&&!sizes) ts=1;
-  return {game:C.id,format:e.format,teamSize:ts,count:C.count?Math.max(1,Math.min(ts-1,+count||1)):1,countPattern:e.countPattern||'',quotaBase:e.quotaBase||36,cap:e.cap||'',matchScoring:e.matchScoring||'holes',matchForm:e.matchForm||''}; }
-const EV_GAME_KEYS=['game','format','teamSize','count','countPattern','quotaBase','cap','matchScoring','matchForm'];
+  return {game:C.id,format:e.format,teamSize:ts,count:C.count?Math.max(1,Math.min(ts-1,+count||1)):1,countPattern:e.countPattern||'',quotaBase:e.quotaBase||36,cap:e.cap||'',matchScoring:e.matchScoring||'holes',matchForm:e.matchForm||'',matchBy:e.matchBy||'holes'}; }
+const EV_GAME_KEYS=['game','format','teamSize','count','countPattern','quotaBase','cap','matchScoring','matchForm','matchBy'];
 const CODE_CHARS='ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 function newCode(ev){ let c; do{ c=Array.from({length:5},()=>CODE_CHARS[Math.floor(Math.random()*CODE_CHARS.length)]).join(''); }while(ev.groups.some(g=>g.code===c)); return c; }
 const slugify=s=>String(s||'').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'').slice(0,40)||'event';
@@ -2871,7 +2878,7 @@ function publicEvent(ev){
   for(const g of ev.groups){ if(!courses[g.course]){ const c=courseById(g.course); if(c) courses[g.course]={name:c.name,par:c.par,hcp:c.hcp,tees:Object.fromEntries(c.tees.map(t=>[t.name,t.yards||null]))}; } }
   return {slug:ev.slug,name:ev.name,date:ev.date,status:ev.status,club:'Walnut Creek Country Club',org:ORG_ID,courses,
     groups:ev.groups.map(g=>({id:g.id,label:g.label||'',course:g.course,startHole:+g.startHole||1,teeTime:g.teeTime||'',players:g.players.map(p=>{ const h=playerHcp(ev,g,p); return {id:p.id,name:p.name,tee:p.tee||ev.defaultTee||'White',set:p.set||'M',ch:h.ch,ph:h.ph,flight:p.flight||'',team:evTeam(ev)?(p.team||ftm.get(p.memberId)||''):''}; })})),
-    format:ev.format||'stroke',front:ev.front,back:ev.back,teamSize:ev.teamSize||(isTeamEvent(ev)||ev.format==='match'&&ev.teamSize>=2?2:1),count:ev.count||1,countPattern:ev.countPattern||'',quotaBase:ev.quotaBase||36,cap:ev.cap||'',matchScoring:ev.matchScoring||'holes',matchForm:ev.matchForm||'',game:ev.game||'',allow:Object.assign({},ev.allow||{}),scoring:ev.scoring||'gross',flights:(ev.flights&&ev.flights.names)||[],
+    format:ev.format||'stroke',front:ev.front,back:ev.back,teamSize:ev.teamSize||(isTeamEvent(ev)||ev.format==='match'&&ev.teamSize>=2?2:1),count:ev.count||1,countPattern:ev.countPattern||'',quotaBase:ev.quotaBase||36,cap:ev.cap||'',matchScoring:ev.matchScoring||'holes',matchForm:ev.matchForm||'',matchBy:ev.matchBy||'holes',game:ev.game||'',allow:Object.assign({},ev.allow||{}),scoring:ev.scoring||'gross',flights:(ev.flights&&ev.flights.names)||[],
     comps:ev.gameId&&typeof gameComps==='function'?gameComps(ev):[]};
 }
 
@@ -3618,7 +3625,7 @@ const gameWhen=g=>(g.date?shortDate(g.date):'Date TBD')+(g.time?' · '+fmtTime(g
 const isUpcoming=g=>{ const d=parseD(g.date); if(!d) return true; const now=new Date(); now.setHours(0,0,0,0); return d>=now; };
 /* the catalog entry behind a pot and what it implies */
 const potCat=pot=>catalogById(pot.rules.game)||catalogById(pot.kind==='skins'?'skins':pot.kind==='dots'?'dots':'stroke');
-const potEngine=pot=>{ const C=potCat(pot); return engineFrom(C,pot.rules.teamSize||(C.sizes?C.sizes[0]:(C.engine.teamSize||1)),pot.rules.count||1); };
+const potEngine=pot=>{ const C=potCat(pot); const E=engineFrom(C,pot.rules.teamSize||(C.sizes?C.sizes[0]:(C.engine.teamSize||1)),pot.rules.count||1); if(E.format==='match'&&pot.rules.matchBy) E.matchBy=pot.rules.matchBy; return E; };
 const potIsTeam=pot=>pot.kind==='format'&&(()=>{ const E=potEngine(pot); return !!((FORMATS[E.format]||{}).team)&&E.teamSize>=2; })();
 const potOneBall=pot=>pot.kind==='format'&&(FORMATS[potEngine(pot).format]||{}).entry==='team';
 const potTeamsKnown=pot=>!!(pot.teams&&Object.keys(pot.teams).length);
@@ -3722,7 +3729,7 @@ function vGameDesign(m){
         ${pot.kind==='format'?`<div class="fld"><span class="lbl">Scored</span>${seg('gdS_'+pot.id,[['gross','Gross'],['net','Net']],pot.rules.scoring||'gross')}</div>`:pot.kind==='skins'?`<div class="fld"><span class="lbl">Scored</span>${seg('gdS_'+pot.id,[['gross','Gross'],['net','Net']],sk.net?'net':'gross')}</div>`:pot.kind==='dots'?`<div class="fld"><span class="lbl">Birdies &amp; eagles</span>${seg('gdS_'+pot.id,[['gross','Gross'],['net','Net']],dr.net?'net':'gross')}</div>`:'<div></div>'}</div>
       ${pot.kind==='format'?`<div class="frow2">${team||C.sizes?field('Players per team','gdT_'+pot.id,E.teamSize,{type:'select',options:(C.sizes||[E.teamSize]).map(n=>[n,n+' players'])}):field('Pays','gdP_'+pot.id,(pot.rules.places||[]).join(' / '),{ph:'e.g. 60 / 30 / 10',hint:'Percent per place, 1st / 2nd / 3rd… Blank = the usual split for the field.'})}
           ${team?field('Partners','gdB_'+pot.id,pot.rules.teamsBy||'hand',{type:'select',options:[['hand','Picked by hand'],['before','Drawn before the round'],['after','Drawn after the round (blind draw)']]}):(C.count&&E.teamSize>1?field('Balls that count','gdC_'+pot.id,E.count,{type:'select',options:Array.from({length:Math.max(1,E.teamSize-1)},(_,k)=>[k+1,(k+1)+' of '+E.teamSize])}):'<div></div>')}</div>
-        ${team&&E.format==='match'&&E.matchScoring==='nassau'?(()=>{ const ns=nassauStakes(pot); return `<div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px">${field('Front worth $','gdNF_'+pot.id,ns.front,{type:'number'})}${field('Back worth $','gdNB_'+pot.id,ns.back,{type:'number'})}${field('18 worth $','gdNT_'+pot.id,ns.total,{type:'number'})}</div><p class="hint" style="margin:-6px 0 0">Per player, each segment: the losing side pays the winning side; a halved segment is a push. The entry above is what each player has at stake in all three.</p>`; })()
+        ${team&&E.format==='match'&&E.matchScoring==='nassau'?(()=>{ const ns=nassauStakes(pot); return `<div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px">${field('Front worth $','gdNF_'+pot.id,ns.front,{type:'number'})}${field('Back worth $','gdNB_'+pot.id,ns.back,{type:'number'})}${field('18 worth $','gdNT_'+pot.id,ns.total,{type:'number'})}</div>${field('Each segment goes to','gdNBy_'+pot.id,E.matchBy||'holes',{type:'select',options:[['strokes','the lower total score (the counted balls added up)'],['holes','the side that wins more holes (match play)']]})}<p class="hint" style="margin:-6px 0 0">Per player, each segment: the losing side pays the winning side; a tied segment is a push. The entry above is what each player has at stake in all three.</p>`; })()
           :team?`<div class="frow2">${field('Pays','gdP_'+pot.id,(pot.rules.places||[]).join(' / '),{ph:'e.g. 70 / 30',hint:'Percent per place. Blank = the usual split for the number of teams.'})}${C.count&&E.teamSize>1?field('Balls that count','gdC_'+pot.id,E.count,{type:'select',options:Array.from({length:Math.max(1,E.teamSize-1)},(_,k)=>[k+1,(k+1)+' of '+E.teamSize])}):'<div></div>'}</div>`:''}`:''}
       ${pot.kind==='skins'?`<div class="frow2">${field('Format','gdMode_'+pot.id,sk.mode,{type:'select',options:[['pot','Skins pot — divided by the skins won'],['hole','Per hole — the pot split over 18 holes, ties carry over']]})}${field('Validation on the next hole','gdV_'+pot.id,sk.validate||'none',{type:'select',options:Object.entries(SKIN_VALID_LABEL)})}</div>
           <div class="fld"><span class="lbl">Rules</span><label class="check"><input type="checkbox" id="gdGBN_${pot.id}"${sk.grossBeatsNet?' checked':''}${sk.net?'':' disabled'}>Gross beats net on a tied hole</label><label class="check"><input type="checkbox" id="gdLive_${pot.id}"${sk.live?' checked':''}>Show skins on the live leaderboard during the round</label></div>
@@ -3755,7 +3762,7 @@ function vGameDesign(m){
     for(const pot of d.pots){ const v=id=>fv(id+'_'+pot.id); pot.name=v('gdN')||pot.name; if(pot.kind!=='manual') pot.entry=n0(v('gdE'));
       const S=$('gdS_'+pot.id); if(S){ const sc=S.dataset.val; if(pot.kind==='format') pot.rules.scoring=sc; if(pot.kind==='skins'){ skinsRulesOf(pot).net=sc==='net'; if(sc!=='net') skinsRulesOf(pot).grossBeatsNet=false; } if(pot.kind==='dots') dotsRules(pot).net=sc==='net'; }
       if(pot.kind==='format'){ pot.rules.live=$('gdLive_'+pot.id)?$('gdLive_'+pot.id).checked:pot.rules.live!==false; if($('gdT_'+pot.id)) pot.rules.teamSize=+v('gdT'); if($('gdC_'+pot.id)) pot.rules.count=+v('gdC'); if($('gdB_'+pot.id)) pot.rules.teamsBy=v('gdB'); if($('gdP_'+pot.id)) pot.rules.places=v('gdP').split(/[\/,\s]+/).map(Number).filter(x=>x>0);
-        if($('gdNF_'+pot.id)){ pot.rules.nassau={front:n0(v('gdNF')),back:n0(v('gdNB')),total:n0(v('gdNT'))}; pot.entry=pot.rules.nassau.front+pot.rules.nassau.back+pot.rules.nassau.total; } }
+        if($('gdNF_'+pot.id)){ pot.rules.nassau={front:n0(v('gdNF')),back:n0(v('gdNB')),total:n0(v('gdNT'))}; pot.entry=pot.rules.nassau.front+pot.rules.nassau.back+pot.rules.nassau.total; if($('gdNBy_'+pot.id)) pot.rules.matchBy=v('gdNBy'); } }
       if(pot.kind==='skins'){ const sk=skinsRulesOf(pot); sk.grossBeatsNet=$('gdGBN_'+pot.id).checked&&sk.net; sk.mode=v('gdMode')==='hole'?'hole':'pot'; sk.carry=sk.mode==='hole'; sk.live=$('gdLive_'+pot.id).checked; sk.validate=v('gdV')||'none'; }
       if(pot.kind==='dots'){ const dr=pot.rules.dots=dotsRules(pot); dr.birdie=n0(v('gdDb')); dr.eagle=n0(v('gdDe')); dr.kinds=v('gdDk').split(',').map(s=>s.trim()).filter(Boolean); } } };
   m.querySelectorAll('.gd-pot').forEach(card=>{ const pot=d.pots.find(x=>x.id===card.dataset.pot);
@@ -4043,11 +4050,12 @@ function payFormat(g,pot){
 /* a team Nassau: each segment (front, back, 18) is its own bet — the losing side's stakes go to the winners, a halved
    segment is a push. Payouts are what each player pulls out of the pot: their own stake back on a push or a win,
    plus the opponents' on a win. */
+/* the three bets of each match from the board's rows: `up` is A's lead — holes, or strokes when the match is decided by total score */
 function nassauSegments(rows){
-  const byId=new Map(rows.map(r=>[r.id,r])); const out=[];
-  rows.filter(r=>r.holesUp>=0).forEach(A=>{ const B=rows.find(r=>r!==A&&r.opp===A.name&&r.name===A.opp); if(!B||out.some(m=>m.A===B)) return;
-    let f=0,b=0; (A.holes||[]).forEach(x=>{ const d=x.a<x.b?1:x.b<x.a?-1:0; if(x.h<=9) f+=d; else b+=d; }); const n=(A.holes||[]).length;
-    out.push({A,B,front:{up:f,done:n>=9},back:{up:b,done:n>=18},total:{up:f+b,done:n>=18}}); });
+  const out=[];
+  rows.filter(r=>r.holesUp>=0&&r.segs).forEach(A=>{ const B=rows.find(r=>r!==A&&r.opp===A.name&&r.name===A.opp); if(!B||out.some(m=>m.A===B)) return;
+    const S=k=>A.segs.find(s=>s.k===k)||{v:0,done:false};
+    out.push({A,B,by:A.by||'holes',front:{up:S('F').v,done:S('F').done},back:{up:S('B').v,done:S('B').done},total:{up:S('18').v,done:S('18').done}}); });
   return out;
 }
 function payNassau(g,pot,rows){
@@ -4057,13 +4065,14 @@ function payNassau(g,pot,rows){
   const calc=()=>{ const pays=new Map(), add=(pid,amt,note)=>{ const x=pays.get(pid)||{amount:0,notes:[]}; x.amount+=amt; x.notes.push(note); pays.set(pid,x); }; const lines=[];
     for(const m of M){ for(const [k,label] of segs){ const s=n0($('pn_'+k)?$('pn_'+k).value:st[k]); if(!s) continue; const seg=m[k], a=m.A.members.map(id=>byG.get(id)).filter(Boolean), b=m.B.members.map(id=>byG.get(id)).filter(Boolean), pool=s*(a.length+b.length);
         if(!seg.done){ lines.push({label,txt:`${m.A.name} vs ${m.B.name} · not finished`,amt:0}); a.concat(b).forEach(p=>add(p.id,s,label+' · open, stake back')); continue; }
-        if(seg.up===0){ lines.push({label,txt:'Halved — a push',amt:0}); a.concat(b).forEach(p=>add(p.id,s,label+' · halved')); continue; }
-        const W=seg.up>0?a:b, L=seg.up>0?b:a, each=Math.round(pool*100/W.length)/100; lines.push({label,txt:`${(seg.up>0?m.A:m.B).name} ${Math.abs(seg.up)} up`,amt:pool}); W.forEach(p=>add(p.id,each,`${label} · won ${Math.abs(seg.up)} up`)); } }
+        if(seg.up===0){ lines.push({label,txt:(m.by==='strokes'?'Tied':'Halved')+' — a push',amt:0}); a.concat(b).forEach(p=>add(p.id,s,label+' · '+(m.by==='strokes'?'tied':'halved'))); continue; }
+        const W=seg.up>0?a:b, L=seg.up>0?b:a, each=Math.round(pool*100/W.length)/100, byTxt=m.by==='strokes'?`by ${Math.abs(seg.up)} stroke${Math.abs(seg.up)===1?'':'s'}`:`${Math.abs(seg.up)} up`;
+        lines.push({label,txt:`${(seg.up>0?m.A:m.B).name} ${byTxt}`,amt:pool}); W.forEach(p=>add(p.id,each,`${label} · won ${byTxt}`)); } }
     const el=$('pnPrev'); if(el) el.innerHTML=lines.map(l=>`<div class="mr num" style="grid-template-columns:100px minmax(0,1fr) 90px"><b>${l.label}</b><span>${esc(l.txt)}</span><b class="r">${l.amt?gMoney(l.amt):'—'}</b></div>`).join('')+[...pays.entries()].map(([pid,x])=>{ const p=g.players.find(y=>y.id===pid); return `<div class="mr num" style="grid-template-columns:minmax(0,1fr) 90px"><span>${esc(p?gpName(p):'—')} <span class="muted">${esc(x.notes.join(' · '))}</span></span><b class="r">${gMoney(x.amount)}</b></div>`; }).join('');
     return pays; };
   openDrawer({kicker:gameTitle(g)+' · '+pot.name,title:'Settle the match',saveLabel:'Record payouts',wide:true,
     body:`<div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px">${field('Front $ per player','pn_front',st.front,{type:'number'})}${field('Back $ per player','pn_back',st.back,{type:'number'})}${field('18 $ per player','pn_total',st.total,{type:'number'})}</div>
-      <div class="fld"><span class="lbl">Result</span><div class="mini" id="pnPrev"></div></div><p class="hint">Each segment: the losing side's stakes go to the winners; a halved segment is a push and everyone gets that stake back. Payouts replace any recorded for this competition.</p>`,
+      <div class="fld"><span class="lbl">Result</span><div class="mini" id="pnPrev"></div></div><p class="hint">Each segment: the losing side's stakes go to the winners; a tied segment is a push and everyone gets that stake back. Payouts replace any recorded for this competition.</p>`,
     wire:r=>{ r.querySelectorAll('input').forEach(i=>i.oninput=calc); calc(); },
     save:()=>{ const pays=calc(); pot.rules.nassau={front:fnum('pn_front'),back:fnum('pn_back'),total:fnum('pn_total')}; pot.entry=pot.rules.nassau.front+pot.rules.nassau.back+pot.rules.nassau.total;
       pot.payouts=[...pays.entries()].filter(([,x])=>x.amount>0).map(([pid,x])=>({id:uid(),pid,amount:Math.round(x.amount*100)/100,note:x.notes.join(' · ')})); toast('Match settled'); }});
@@ -5823,7 +5832,7 @@ const roundLabel=(t,r)=>r.name||`${dayLabel(t,r.day).split(' · ')[0]} · ${form
 function defaultRounds(t){ const n=Math.max(1,t.days||1), ts=t.teamSize||1;
   return Array.from({length:n},(_,day)=>Object.assign({id:uid(),day,name:'',front:'scramble',back:'shamble',scoring:'net',eventId:''},engineFrom(catalogById(ts>=2?'bestball':'stroke'),ts,1))); }
 /* the round's format fields, pushed onto its event */
-const ROUND_KEYS=['game','format','front','back','teamSize','count','countPattern','quotaBase','cap','matchScoring','matchForm','scoring'];
+const ROUND_KEYS=['game','format','front','back','teamSize','count','countPattern','quotaBase','cap','matchScoring','matchForm','matchBy','scoring'];
 function roundToEvent(r,ev){ ROUND_KEYS.forEach(k=>{ ev[k]=r[k]; }); if(!ev.allow) ev.allow={}; }
 
 function tRounds(el,t){
@@ -6075,7 +6084,7 @@ async function resultsPDF(t,opt){
 /* Keeps every open device on the latest version: checks version.json about once a minute and, when a
    newer build is live, reloads at a safe moment (nothing unsaved, no editor open, not mid-typing). */
 (function(){
-  const ME='20261009193923'; let ready=false, lastCheck=0;
+  const ME='20261009194621'; let ready=false, lastCheck=0;
   const typing=()=>{ const a=document.activeElement; return a&&/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)&&a.value&&a.type!=='search'; };
   const safe=()=>!typing()&&(typeof window.__canReload!=='function'||window.__canReload());
   async function check(){ lastCheck=Date.now(); if(location.protocol==='file:') return;
