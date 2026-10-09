@@ -174,7 +174,10 @@ Tournament = { id, name, season, days, startDate, field:[{id,memberId,team,paid,
   - **Live leaderboard per competition**: each format competition has "Show on the live leaderboard"
     (`rules.live`, default on; skins use `rules.skins.live`, dots never show). `gameComps(ev)` → the live competitions
     as `{id,name,kind,players,teams,sitOut,engine…}`; `publicEvent` publishes them as `comps`, and the scoring page
-    (score_src.html: `compChips`, `renderCompBoard`, `renderSkinsBoard`) shows one board per competition. `potPub(g,pot)`
+    (score_src.html: `compChips`, `renderCompBoard`, `renderSkinsBoard`) shows one board per competition — a game opens on
+    its first competition (the raw round board only appears for events without competitions), the chips are one
+    scrolling row, the header drops the date the event name already carries, and a row's sub-line is gross · net
+    (course only when the field is split across courses). `potPub(g,pot)`
     = `compPub(publicEvent(ev), potComp(g,pot))` (golfcore) is the same cut-down used by the game page's standings.
   - **Removing a player is total** (`removePlayer(g,p)`, the game page's ✕ or the designer's ✕ + Save): out of every
     competition, its payouts, teams and sit-outs, and out of the scoring event with their scores (`removeEventPlayer`
