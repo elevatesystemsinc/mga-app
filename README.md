@@ -228,6 +228,13 @@ each have a search box: names, paddle numbers (101 or #101), lot numbers, flight
   bidders never overwrite each other; on the same one, the latest wins. A laptop that drops offline keeps
   its changes and saves them when it reconnects. **Turn off** locks the link immediately; the data stays.
 
+### Payout exports
+
+On the Payouts sub-tab: **Spreadsheet** (payouts by person, the detail behind each, and the flights), **Payouts PDF**
+(the branded sheet with finishes, team payouts and what each person is owed) and **Winners PDF (no amounts)** — the
+same sheet with no dollar figure on it, listing finishes and who should see the cashier, for posting on the board or
+online.
+
 ## Live scoring (Golf)
 
 One-time: Supabase → SQL Editor → run `golf-setup.sql`. Upload `score.html` alongside

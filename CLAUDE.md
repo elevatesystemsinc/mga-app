@@ -264,7 +264,12 @@ Sub-tabs: Lots · Bidders · Buyers & shares · Money · Results · Payouts · S
   paid-out mark (`c.paidOut`, a synced setting). Payouts are **not** netted against what a buyer owes.
 - **Cashier link** (`cashier.html?k=TOKEN`): sales, bidders, payments from phones/laptops without the board login.
 - **Exports:** results workbook (Lots, Bidders, Buyers & shares, By flight, Expenses, Payments, Payouts…),
-  auction order (Excel), **bidder sheet PDF** (always blank; built in-browser with jsPDF + `PDF_FONTS`).
+  auction order (Excel), **bidder sheet PDF** (always blank; built in-browser with jsPDF + `PDF_FONTS`). From the
+  Payouts sub-tab (`payouts.js`): **payout spreadsheet** (`exportPayoutsXLSX`: by person, detail, by flight), the
+  branded **Payouts PDF** (`payoutsPDF(t,{amounts:true})`: finishes and team payouts per flight, then every person
+  with their total) and the **Winners PDF** (`{amounts:false}`: the same without a dollar figure anywhere — finishes,
+  then "please see the cashier" by name and paddle; for posting). `tests/test_payouts.py` downloads all three and
+  checks the winners PDF carries no money.
 
 ### 50/50 Drawing (`raffle.js`) — legitimacy matters
 Tickets = tournament + ticket # (numbers restart per tournament); hand-sold tickets with no number are identified
