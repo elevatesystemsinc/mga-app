@@ -3622,7 +3622,8 @@ function newPot(game,g,extra){
 /* a game and its scoring event go together */
 function deleteGame(g){ const ev=gameEvent(g); if(ev){ golfData().events=golfData().events.filter(e=>e!==ev); if(CLOUD&&sessionOK) deleteEventRow(ev.id); } db.games=db.games.filter(x=>x!==g); }
 function addPlayer(g,o){ const p={id:uid(),memberId:o.memberId||'',name:o.name||'',paid:false,extraIn:0,gpid:''}; g.players.push(p); g.pots.forEach(pot=>{ if(pot.kind!=='manual') pot.inn[p.id]=true; }); return p; }
-function removePlayer(g,p){ g.players=g.players.filter(x=>x!==p); g.pots.forEach(pot=>{ delete pot.inn[p.id]; pot.payouts=pot.payouts.filter(x=>x.pid!==p.id); if(pot.teams&&p.gpid) delete pot.teams[p.gpid]; }); }
+function removePlayer(g,p){ g.players=g.players.filter(x=>x!==p); g.pots.forEach(pot=>{ delete pot.inn[p.id]; pot.payouts=pot.payouts.filter(x=>x.pid!==p.id); if(pot.teams&&p.gpid) delete pot.teams[p.gpid]; });
+  const ev=gameEvent(g); if(ev&&p.gpid){ ev.groups.forEach(grp=>{ grp.players=grp.players.filter(x=>x.id!==p.gpid); }); ev.pool=(ev.pool||[]).filter(x=>x.id!==p.gpid); } }
 
 /* ---------- season ledger ---------- */
 const QUARTERS=[['season','Season'],['q1','Q1'],['q2','Q2'],['q3','Q3'],['q4','Q4']];
@@ -3762,7 +3763,7 @@ function vGame(m,g){
   const gridCols=`grid-template-columns:minmax(150px,1fr) ${pots.map(()=>'84px').join(' ')} 76px 90px 40px`;
   const grid=`<div class="card" style="overflow:hidden"><div class="cardhead"><div><h2 class="h2">Who’s in</h2><span class="muted">${g.players.length} playing · ${mo.unpaid?`<span class="neg">${mo.unpaid} still to pay in</span>`:g.players.length?'everyone has paid in':''}</span></div><div class="actions"><button class="btn sm" id="gmAllPaid">Mark all paid</button><button class="btn sm pri" id="gmAdd">${I.plus}Add players</button></div></div>
     ${g.players.length?`<div class="tw"><div class="t" style="min-width:${340+pots.length*84}px"><div class="tr th" style="${gridCols}"><span>Player</span>${pots.map(pot=>`<span class="r" title="${esc(pot.name)}">${esc(pot.name.length>10?pot.name.slice(0,9)+'…':pot.name)}<br><small class="muted">${gMoney(pot.entry)}</small></span>`).join('')}<span class="r">In</span><span>Paid</span><span></span></div>
-      ${g.players.slice().sort((a,b)=>gpName(a).localeCompare(gpName(b))).map(p=>{ const inn=gpIn(g,p); return `<div class="tr num" style="${gridCols}"><div class="cell2 click" data-gp="${p.id}"><b class="trunc">${esc(gpName(p))}</b>${p.memberId?'':'<small>Guest</small>'}${n0(p.extraIn)?`<small>+ ${gMoney(p.extraIn)} extra</small>`:''}</div>${pots.map(pot=>`<span class="r"><input type="checkbox" data-gin="${pot.id}|${p.id}"${potIn(pot,p)?' checked':''} aria-label="${esc(gpName(p))} in ${esc(pot.name)}"></span>`).join('')}<b class="r">${gMoney(inn)}</b><span><label class="check" style="font-weight:400;margin:0"><input type="checkbox" data-gpaid="${p.id}"${p.paid?' checked':''}>${p.paid?'<span class="pos">Paid</span>':inn?'<span class="muted">owes</span>':''}</label></span><button class="ib" data-gp="${p.id}" aria-label="Edit">${I.edit}</button></div>`; }).join('')}
+      ${g.players.slice().sort((a,b)=>gpName(a).localeCompare(gpName(b))).map(p=>{ const inn=gpIn(g,p); return `<div class="tr num" style="${gridCols}"><div class="cell2 click" data-gp="${p.id}"><b class="trunc">${esc(gpName(p))}</b>${p.memberId?'':'<small>Guest</small>'}${n0(p.extraIn)?`<small>+ ${gMoney(p.extraIn)} extra</small>`:''}</div>${pots.map(pot=>`<span class="r"><input type="checkbox" data-gin="${pot.id}|${p.id}"${potIn(pot,p)?' checked':''} aria-label="${esc(gpName(p))} in ${esc(pot.name)}"></span>`).join('')}<b class="r">${gMoney(inn)}</b><span><label class="check" style="font-weight:400;margin:0"><input type="checkbox" data-gpaid="${p.id}"${p.paid?' checked':''}>${p.paid?'<span class="pos">Paid</span>':inn?'<span class="muted">owes</span>':''}</label></span><span style="display:flex;gap:2px"><button class="ib" data-gp="${p.id}" aria-label="Edit">${I.edit}</button><button class="ib" data-gprm="${p.id}" aria-label="Remove">${I.x}</button></span></div>`; }).join('')}
       <div class="tr tot num" style="${gridCols}"><span>In the pot</span>${pots.map(pot=>`<span class="r">${gMoney(potTotal(g,pot))}</span>`).join('')}<b class="r">${gMoney(mo.total)}</b><span></span><span></span></div></div></div>`
     :'<div class="empty"><b>Nobody in yet</b><span>Add the regulars from the member list, or a guest by name.</span></div>'}</div>`;
   const potCard=pot=>{ const tot=potTotal(g,pot), paid=potPaid(pot), inN=potPlayers(g,pot).length, team=potIsTeam(pot), known=potTeamsKnown(pot), by=pot.rules.teamsBy||'hand';
@@ -3805,6 +3806,7 @@ function vGame(m,g){
   m.querySelectorAll('[data-gsheet]').forEach(b=>b.onclick=()=>scoreSheet(ev,ev.groups.find(x=>x.id===b.dataset.gsheet)));
   m.querySelectorAll('[data-gp]').forEach(r=>r.onclick=()=>editGamePlayer(g,g.players.find(p=>p.id===r.dataset.gp)));
   m.querySelectorAll('[data-gin]').forEach(c=>c.onchange=()=>{ const [pid,plid]=c.dataset.gin.split('|'); const pot=g.pots.find(x=>x.id===pid); if(c.checked) pot.inn[plid]=true; else delete pot.inn[plid]; persist(); render(); });
+  m.querySelectorAll('[data-gprm]').forEach(b=>b.onclick=()=>{ const p=g.players.find(x=>x.id===b.dataset.gprm); const out=gpOut(g,p); if(!confirm(`Remove ${gpName(p)} from the game${out?` — they have ${gMoney(out)} in payouts recorded`:''}? They leave every competition and the leaderboard.`)) return; removePlayer(g,p); syncGameEvent(g,ev); golfSave(ev); render(); toast(gpName(p)+' removed'); });
   m.querySelectorAll('[data-gpaid]').forEach(c=>c.onchange=()=>{ const p=g.players.find(x=>x.id===c.dataset.gpaid); p.paid=c.checked; persist(); render(); });
   m.querySelectorAll('[data-potedit]').forEach(b=>b.onclick=()=>designGame(g));
   m.querySelectorAll('[data-callout]').forEach(b=>b.onclick=()=>skinsCallout(g,g.pots.find(p=>p.id===b.dataset.callout)));
@@ -3886,7 +3888,8 @@ function editGamePlayer(g,p){
       <div class="fld"><span class="lbl">In which competitions</span>${g.pots.filter(pot=>pot.kind!=='manual').map(pot=>`<label class="check" style="font-weight:400"><input type="checkbox" data-gpp="${pot.id}"${potIn(pot,p)?' checked':''}>${esc(pot.name)} <span class="muted">· ${gMoney(pot.entry)}</span></label>`).join('')}</div>`+
       field('Extra money in $','gpX',p.extraIn||0,{type:'number',hint:'Side action put through the group, e.g. a double entry.'})+(out?`<p class="hint">Won ${gMoney(out)} in this game — change it under the competition.</p>`:''),
     save:()=>{ p.paid=$('gpPaid').checked; document.querySelectorAll('[data-gpp]').forEach(c=>{ const pot=g.pots.find(x=>x.id===c.dataset.gpp); if(c.checked) pot.inn[p.id]=true; else delete pot.inn[p.id]; }); p.extraIn=fnum('gpX'); },
-    del:()=>{ if(out&&!confirm(`${gpName(p)} has ${gMoney(out)} in payouts recorded. Remove anyway?`)) return false; removePlayer(g,p); const ev=gameEvent(g); if(ev){ syncGameEvent(g,ev); golfSave(ev); } },delLabel:'Remove from game'});
+    del:()=>{ const ev=gameEvent(g), scored=ev&&p.gpid&&Object.keys((scoresFor(ev)||{})[p.gpid]||{}).length; if(out&&!confirm(`${gpName(p)} has ${gMoney(out)} in payouts recorded. Remove anyway?`)) return false;
+      if(scored&&!confirm(`${gpName(p)} has scores on the card. Remove them from the game, every competition and the leaderboard?`)) return false; removePlayer(g,p); if(ev){ syncGameEvent(g,ev); golfSave(ev); } },delLabel:'Remove from game'});
 }
 
 /* ---------- teams for a competition: picked by hand, or drawn on the stage ---------- */
@@ -6041,7 +6044,7 @@ async function resultsPDF(t,opt){
 /* Keeps every open device on the latest version: checks version.json about once a minute and, when a
    newer build is live, reloads at a safe moment (nothing unsaved, no editor open, not mid-typing). */
 (function(){
-  const ME='20261009185111'; let ready=false, lastCheck=0;
+  const ME='20261009185749'; let ready=false, lastCheck=0;
   const typing=()=>{ const a=document.activeElement; return a&&/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)&&a.value&&a.type!=='search'; };
   const safe=()=>!typing()&&(typeof window.__canReload!=='function'||window.__canReload());
   async function check(){ lastCheck=Date.now(); if(location.protocol==='file:') return;

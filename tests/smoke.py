@@ -152,10 +152,16 @@ async def main():
     # Ann/Bo/Cy (4s, with birdies) beat Di/Ed/Gus (5s and 6s) on every segment: the winners split 6 × 20 = 120, 40 each
     ok=ok and r6['sides']==2 and r6['entry']==20 and 'front $5' in r6['summary'] and r6['sumOut']==120 and all(abs(r6['out'].get(k,0)-40)<0.01 for k in ['gp_p0','gp_p1','gp_p2']) and 'F +9' in r6['status']
     print('mid-round team Nassau', r6, 'OK' if r6['sumOut']==120 and r6['sides']==2 else 'FAIL')
+    # removing a player mid-round takes them out of every competition and the scoring event, scores and all
+    r7=await pg.evaluate("""()=>{ const g=GAME(), ev=gameEvent(g); const p=g.players.find(x=>x.id==='gp_p4'), gpid=p.gpid; const before=evPlayers(ev).length; removePlayer(g,p); syncGameEvent(g,ev);
+      const left=evPlayers(ev).some(x=>x.p.id===gpid), inPots=g.pots.some(pot=>pot.inn['gp_p4']), lb=eventBoard(publicEvent(ev),scoresFor(ev),{sort:'gross'}).some(r=>r.id===gpid); view.gameId=g.id; go('games'); const btn=document.querySelectorAll('[data-gprm]').length;
+      return {before, after:evPlayers(ev).length, left, inPots, lb, players:g.players.length, btn}; }""")
+    ok=ok and r7['before']==6 and r7['after']==5 and not r7['left'] and not r7['inPots'] and not r7['lb'] and r7['players']==5 and r7['btn']==5
+    print('remove a player mid-round', r7, 'OK' if r7['after']==5 and not r7['lb'] else 'FAIL')
     # the game sheet PDF and the designer round-trip
     r2=await pg.evaluate("""async()=>{ const g=GAME(); const doc=await gameSheetPDF(g,{returnDoc:true}); const n=doc.getNumberOfPages(); designGame(g); const names=GD.draft.pots.map(p=>p.name); const grid=document.querySelectorAll('[data-gdin]').length; document.getElementById('gdSave').click(); return {pages:n, names, grid, back:!!document.getElementById('gmSheet')}; }""")
-    ok=ok and r2['pages']>=1 and len(r2['names'])==4 and r2['grid']==6*4 and r2['back']
-    print('game sheet + designer', r2, 'OK' if r2['pages']>=1 and r2['grid']==24 else 'FAIL')
+    ok=ok and r2['pages']>=1 and len(r2['names'])==4 and r2['grid']==5*4 and r2['back']
+    print('game sheet + designer', r2, 'OK' if r2['pages']>=1 and r2['grid']==20 else 'FAIL')
     print('payouts + ledger', r, 'OK' if ok else 'FAIL'); bad+=not ok
     print('  group errors', errs); bad+=bool(errs)
     await b.close()
