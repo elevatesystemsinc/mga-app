@@ -39,7 +39,18 @@ class FakeDB:
         return None
     def _rpc(self,fn,a):
         err=lambda m:json.dumps({'data':None,'error':{'message':m,'code':'42501'}})
-        if fn in('calcutta_get','calcutta_put','golf_event','golf_join','golf_submit'): return json.dumps({'data':None,'error':None})
+        if fn in('calcutta_get','calcutta_put'): return json.dumps({'data':None,'error':None})
+        # the public scoring page's functions, as in golf-setup.sql, over the golf_events / golf_scores tables
+        if fn=='golf_event':
+            r=next((r for r in self._rows('golf_events') if str(r.get('slug','')).lower()==str(a.get('p_slug','')).strip().lower()),None)
+            return json.dumps({'data':dict(copy.deepcopy(r['public']),id=r['id']) if r else None,'error':None})
+        if fn=='golf_join':
+            r=next((r for r in self._rows('golf_events') if str(r.get('slug','')).lower()==str(a.get('p_slug','')).strip().lower()),None)
+            return json.dumps({'data':(r or {}).get('codes',{}).get(str(a.get('p_code','')).upper()),'error':None})
+        if fn=='golf_submit':
+            rows=self._rows('golf_scores'); rows[:]=[r for r in rows if not(r['event_id']==a['p_event'] and r['player_id']==a['p_player'] and r['hole']==a['p_hole'])]
+            if a.get('p_strokes'): rows.append({'event_id':a['p_event'],'player_id':a['p_player'],'hole':a['p_hole'],'strokes':a['p_strokes']})
+            return json.dumps({'data':True,'error':None})
         org=self._key_org(a.get('p_key'))
         if org is None: return err('invalid key')
         if fn=='hub_key_read':
@@ -73,6 +84,8 @@ class FakeDB:
         if t!='mga_hub':
             rows=self._rows(t); hits=[r for r in rows if self._col_match(r,a['filters'])]
             if op=='select': return json.dumps({'data':(copy.deepcopy(hits[0]) if hits else None) if a['single'] else copy.deepcopy(hits),'error':None})
+            if op=='upsert':
+                row=dict(a['payload']); rows[:]=[r for r in rows if r.get('id')!=row.get('id')]; rows.append(copy.deepcopy(row)); return json.dumps({'data':None,'error':None})
             if op=='insert': row=dict(a['payload']); row.setdefault('id',str(uuid.uuid4())); row.setdefault('created_at',datetime.datetime.utcnow().isoformat()+'Z'); row.setdefault('revoked_at',None); rows.append(row); return json.dumps({'data':None,'error':None})
             if op=='update':
                 for r in hits: r.update(a['payload'])

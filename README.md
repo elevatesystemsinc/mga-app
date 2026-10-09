@@ -98,7 +98,8 @@ each hole counts the best three balls, then two, then one, repeating, with every
 plain **team Nassau** on best ball. Set what each segment is worth per player and the match is settled segment by
 segment. **Groups & handicaps** on the game page: move players between groups, set each group's starting hole or tee time,
 pick a player's tee box, and type an index for the day where it differs from the directory. Course and playing
-handicaps update on the spot, before anyone tees off. The **settlement** shows what
+handicaps update on the spot, and the same card works mid-round: correct an index on the 7th tee and the standings,
+the leaderboard and every phone scoring the round pick it up within half a minute, no reload needed. The **settlement** shows what
 each player put in, pulled out and nets, and for net settlement the fewest payments that square it. The **game sheet
 PDF** carries the competitions and denominations, the teams when they are known, and the groups as they play with
 each player's strokes. The **Ledger** shows who is up or down for the season or any quarter, with a one-click

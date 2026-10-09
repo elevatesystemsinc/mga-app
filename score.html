@@ -569,20 +569,37 @@ async function loadScores(){
   for(const q of queue){ (m[q.p]=m[q.p]||{}); if(q.s) m[q.p][q.h]=q.s; else delete m[q.p][q.h]; } // local edits win until they're saved
   scores=m;
 }
+/* the event itself (groups, tees, handicaps, competitions) is re-read every 30 s and whenever the page comes back
+   into view, so a mid-round change in the hub — an index corrected, a player moved, a competition added — reaches
+   every phone and board without a reload */
+let pubSig='';
+async function loadEvent(){
+  const {data,error}=await sb.rpc('golf_event',{p_slug:SLUG});
+  if(error) return 'error'; if(!data) return 'none';
+  const sig=JSON.stringify(data), changed=sig!==pubSig; pubSig=sig; pub=data;
+  if(changed){ $('evName').textContent=pub.name; $('evSub').textContent=[pub.date&&new Date(pub.date+'T12:00').toLocaleDateString('en-US',{month:'short',day:'numeric'}),formatSummary(pub),pub.club].filter(Boolean).join(' · '); document.title=pub.name+' · Live Scoring';
+    if(groupId&&!group()){ groupId=null; code=''; tab='score'; } } // our group was removed from the event
+  return changed;
+}
+const typing=()=>{ const a=document.activeElement; return !!a&&(a.tagName==='INPUT'||a.tagName==='SELECT'||a.tagName==='TEXTAREA'); };
+async function refresh(){
+  if(document.visibilityState!=='visible') return;
+  const changed=await loadEvent(); if(changed==='error'||changed==='none') return;
+  if(BIG||tab==='board'){ await loadScores(); render(); }
+  else if(changed&&!typing()) render();
+}
 async function boot(){
   if(!SLUG) return fail('This link is missing its event. Ask the committee for the scoring link.');
   if(!sb) return fail('Live scoring isn’t connected yet.');
-  const {data,error}=await sb.rpc('golf_event',{p_slug:SLUG});
-  if(error) return fail('Couldn’t reach live scoring. Check your signal and reload.');
-  if(!data) return fail('No event found for this link. Check the link with the committee.');
-  pub=data; $('evName').textContent=pub.name; $('evSub').textContent=[pub.date&&new Date(pub.date+'T12:00').toLocaleDateString('en-US',{month:'short',day:'numeric'}),formatSummary(pub),pub.club].filter(Boolean).join(' · ');
-  document.title=pub.name+' · Live Scoring';
+  const r=await loadEvent();
+  if(r==='error') return fail('Couldn’t reach live scoring. Check your signal and reload.');
+  if(r==='none') return fail('No event found for this link. Check the link with the committee.');
   await loadScores();
   sb.channel('s-'+pub.id).on('postgres_changes',{event:'*',schema:'public',table:'golf_scores',filter:'event_id=eq.'+pub.id},p=>{
     const r=p.eventType==='DELETE'?p.old:p.new; if(!r) return; if(queue.some(q=>q.p===r.player_id&&q.h===r.hole)) return;
     scores[r.player_id]=scores[r.player_id]||{}; if(p.eventType==='DELETE') delete scores[r.player_id][r.hole]; else scores[r.player_id][r.hole]=r.strokes;
     if(tab!=='score') render(); }).subscribe();
-  setInterval(async()=>{ if(tab==='board'&&document.visibilityState==='visible'){ await loadScores(); render(); } },30000);
+  setInterval(refresh,30000); document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='visible') refresh(); });
   const saved=(()=>{ try{ return JSON.parse(localStorage.getItem(KEY)||'null'); }catch(_){ return null; } })();
   const qg=(qs.get('g')||'').trim();
   if(qg&&!BIG){ const ok=await join(qg,true); if(ok) history.replaceState(null,'',location.pathname+'?e='+encodeURIComponent(SLUG)); }
@@ -746,7 +763,7 @@ window.__canReload=()=>!queue.length;
 /* Keeps every open device on the latest version: checks version.json about once a minute and, when a
    newer build is live, reloads at a safe moment (nothing unsaved, no editor open, not mid-typing). */
 (function(){
-  const ME='20261009190556'; let ready=false, lastCheck=0;
+  const ME='20261009191151'; let ready=false, lastCheck=0;
   const typing=()=>{ const a=document.activeElement; return a&&/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)&&a.value&&a.type!=='search'; };
   const safe=()=>!typing()&&(typeof window.__canReload!=='function'||window.__canReload());
   async function check(){ lastCheck=Date.now(); if(location.protocol==='file:') return;

@@ -79,6 +79,7 @@ deploy must include `version.json`**, and all four pages must be rebuilt togethe
 python3 tests/smoke.py        # every page + every hub screen/tab renders with no script errors
 python3 tests/test_payouts.py # Calcutta tie-splitting / owner payouts end to end
 python3 tests/test_sync.py    # migration + two devices on a shared fake database (see §3)
+python3 tests/test_score.py   # the public scoring page against the fake: mid-round changes reach open phones/boards
 git add -A && git commit && git push origin main  # Render deploys main to app.wcccmga.org
 ```
 Tests need `pip install playwright && playwright install chromium` and `cd tests && npm i xlsx@0.18.5`.
@@ -191,7 +192,11 @@ Tournament = { id, name, season, days, startDate, field:[{id,memberId,team,paid,
     A competition can be added to a game at any point from Design; standings pick up the scores already on the cards.
   - **Groups & handicaps** (`gameGroupsCard`/`wireGameGroups` on the game page): per group the course, starting hole
     and tee time; per player an index for the day (`p.index` on the event player, blank = the directory index), the
-    tee, and CH / PH from `playerHcp`; a Group select moves a player (or starts a new group). `syncGameEvent` no
+    tee, and CH / PH from `playerHcp`; a Group select moves a player (or starts a new group). **All of it works
+    mid-round**: every change goes through `golfSave` (persist + `publishEvent`), and the scoring page re-reads the
+    event every 30 s and on returning to the foreground (`loadEvent`/`refresh` in score_src.html — it used to load the
+    event once), so corrected indexes reach every phone and board; a scorer with a field focused is not re-rendered,
+    and a phone whose group was removed returns to the join screen. `syncGameEvent` no
     longer prunes empty groups, so a group made on purpose survives until someone lands in it.
   - **Game sheet PDF** (`gameSheetPDF(g,{strokes,returnDoc})`): competitions and denominations, teams when known
     (an after-round draw says so), the groups as they play with each player's strokes.

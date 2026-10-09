@@ -283,8 +283,9 @@ function vGame(m,g){
   m.querySelectorAll('[data-pay]').forEach(b=>b.onclick=()=>{ const pot=g.pots.find(p=>p.id===b.dataset.pay); ({skins:paySkins,dots:payDots,format:payFormat,manual:(g,pot)=>payManual(g,pot,null)})[pot.kind](g,pot); });
 }
 /* ---------- groups & handicaps on the game page ----------
-   Who plays with whom, from which tees, and what each player's course and playing handicap come to — settled before
-   the first tee. An index typed here is for this game only; blank means the member's index from the directory. */
+   Who plays with whom, from which tees, and what each player's course and playing handicap come to. An index typed
+   here is for this game only; blank means the member's index from the directory. It can change mid-round: golfSave
+   republishes the event, and the scoring page re-reads it every 30 s (loadEvent in score_src.html). */
 function gameGroupsCard(g,ev){
   const courses=golfData().courses, tees=c=>(c?c.tees:[]).map(t=>t.name);
   const cols='grid-template-columns:minmax(150px,1fr) 88px 110px 54px 54px 150px';
@@ -298,7 +299,7 @@ function gameGroupsCard(g,ev){
       <select class="inp" data-gcourse="${grp.id}" aria-label="Course">${courses.map(c=>`<option value="${c.id}"${c.id===grp.course?' selected':''}>${esc(c.name)}</option>`).join('')}</select>
       <select class="inp" data-ghole="${grp.id}" aria-label="Starting hole">${Array.from({length:18},(_,k)=>`<option value="${k+1}"${(+grp.startHole||1)===k+1?' selected':''}>Hole ${k+1}</option>`).join('')}</select>
       <input class="inp" type="time" data-gtime="${grp.id}" value="${esc(grp.teeTime||'')}" aria-label="Tee time"></div>`;
-  return `<div class="card" style="overflow:hidden"><div class="cardhead"><div><h2 class="h2">Groups &amp; handicaps</h2><span class="muted">Who plays with whom, their tees, and each player’s course (CH) and playing (PH) handicap for today. An index typed here is for this game only.</span></div><div class="actions"><button class="btn sm" id="ggAddGroup">${I.plus}New group</button></div></div>
+  return `<div class="card" style="overflow:hidden"><div class="cardhead"><div><h2 class="h2">Groups &amp; handicaps</h2><span class="muted">Who plays with whom, their tees, and each player’s course (CH) and playing (PH) handicap for today. An index typed here is for this game only, and can be corrected mid-round: the handicaps, the standings and the live leaderboard on everyone’s phone follow within half a minute.</span></div><div class="actions"><button class="btn sm" id="ggAddGroup">${I.plus}New group</button></div></div>
     ${ev.groups.length?`<div class="tw"><div class="t" style="min-width:720px"><div class="tr th" style="${cols}"><span>Player</span><span class="r">Index</span><span>Tee</span><span class="r">CH</span><span class="r">PH</span><span>Group</span></div>
       ${ev.groups.map((grp,i)=>groupHead(grp,i)+grp.players.map(p=>row(grp,p)).join('')).join('')}</div></div>`:'<div class="empty"><b>No groups yet</b><span>Groups appear as players are added.</span></div>'}</div>`;
 }
