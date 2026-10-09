@@ -85,7 +85,8 @@ Skins stay off the screen during the round unless you switch "announce live" on;
 walks the cards one hole per tap, a skin stays pending until its validation hole comes up, and a failed validation
 flashes "Didn't validate" before that hole's result. Every other competition has its own **Show on the live
 leaderboard** switch in the designer, and the live scoring page shows one board per competition that is switched on
-(dots are tallied by hand and never show). Games are deleted from the designer; deleting a scoring event
+(dots are tallied by hand and never show). Removing a player, from the game page or the designer, takes them out
+of every competition, the scoring event, the leaderboard and live scoring, scores and all. Games are deleted from the designer; deleting a scoring event
 that belongs to a game or a tournament round removes that game or round with it. The **who's-in grid** ticks every player into every competition
 they want, so nine can be in the skins while eight play the team game. A new game starts from the last one.
 

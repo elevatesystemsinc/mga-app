@@ -176,6 +176,13 @@ Tournament = { id, name, season, days, startDate, field:[{id,memberId,team,paid,
     as `{id,name,kind,players,teams,sitOut,engine…}`; `publicEvent` publishes them as `comps`, and the scoring page
     (score_src.html: `compChips`, `renderCompBoard`, `renderSkinsBoard`) shows one board per competition. `potPub(g,pot)`
     = `compPub(publicEvent(ev), potComp(g,pot))` (golfcore) is the same cut-down used by the game page's standings.
+  - **Removing a player is total** (`removePlayer(g,p)`, the game page's ✕ or the designer's ✕ + Save): out of every
+    competition, its payouts, teams and sit-outs, and out of the scoring event with their scores (`removeEventPlayer`
+    + `dropPlayerScores` in golf.js: one delete on `golf_scores`, or `hub_key_score` per hole on an admin link), so the
+    leaderboard and the phones drop them on their next refresh. `syncGameEvent` prunes anyone no longer in the game
+    the same way (it used to keep players with scores); the designer only touches the event on Save. Tournament
+    rounds do the same when someone leaves the field (`syncRoundEvent`), and the Golf group editor drops the scores of
+    players taken out of a group.
   - **Deleting**: the designer's "Delete game" (`deleteGame`) removes the game and its scoring event. Deleting an
     event from Golf that belongs to a game or a tournament round removes that game / round too — otherwise
     `ensureGameEvent` / `ensureTournamentScoring` would rebuild it on the next render.

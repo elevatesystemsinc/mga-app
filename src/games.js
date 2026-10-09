@@ -89,8 +89,11 @@ function newPot(game,g,extra){
 /* a game and its scoring event go together */
 function deleteGame(g){ const ev=gameEvent(g); if(ev){ golfData().events=golfData().events.filter(e=>e!==ev); if(CLOUD&&sessionOK) deleteEventRow(ev.id); } db.games=db.games.filter(x=>x!==g); }
 function addPlayer(g,o){ const p={id:uid(),memberId:o.memberId||'',name:o.name||'',paid:false,extraIn:0,gpid:''}; g.players.push(p); g.pots.forEach(pot=>{ if(pot.kind!=='manual') pot.inn[p.id]=true; }); return p; }
-function removePlayer(g,p){ g.players=g.players.filter(x=>x!==p); g.pots.forEach(pot=>{ delete pot.inn[p.id]; pot.payouts=pot.payouts.filter(x=>x.pid!==p.id); if(pot.teams&&p.gpid) delete pot.teams[p.gpid]; });
-  const ev=gameEvent(g); if(ev&&p.gpid){ ev.groups.forEach(grp=>{ grp.players=grp.players.filter(x=>x.id!==p.gpid); }); ev.pool=(ev.pool||[]).filter(x=>x.id!==p.gpid); } }
+/* out of the game completely: every competition, the payouts, the teams, the scoring event and their scores (so the
+   leaderboard and the phones drop them too). The designer passes {keepEvent:true} — its draft only touches the event
+   when it is saved (syncGameEvent then prunes), so Cancel leaves the round as it was. */
+function removePlayer(g,p,opt){ g.players=g.players.filter(x=>x!==p); g.pots.forEach(pot=>{ delete pot.inn[p.id]; pot.payouts=pot.payouts.filter(x=>x.pid!==p.id); if(pot.teams&&p.gpid) delete pot.teams[p.gpid]; if(pot.sitOut&&p.gpid) pot.sitOut=pot.sitOut.filter(x=>x!==p.gpid); });
+  const ev=gameEvent(g); if(ev&&p.gpid&&!(opt&&opt.keepEvent)) removeEventPlayer(ev,p.gpid); }
 
 /* ---------- season ledger ---------- */
 const QUARTERS=[['season','Season'],['q1','Q1'],['q2','Q2'],['q3','Q3'],['q4','Q4']];
@@ -207,7 +210,7 @@ function vGameDesign(m){
   wireSeg(m,'gdWhen',()=>{}); wireSeg(m,'gdSettle',()=>{});
   $('gdAddSel').onchange=e=>{ if(!e.target.value) return; readAll(); d.pots.push(newPot(e.target.value,d)); rerender(); };
   m.querySelectorAll('[data-gdin]').forEach(c=>c.onchange=()=>{ readAll(); const [pid,plid]=c.dataset.gdin.split('|'); const pot=d.pots.find(x=>x.id===pid); if(c.checked) pot.inn[plid]=true; else delete pot.inn[plid]; rerender(); });
-  m.querySelectorAll('[data-gdpx]').forEach(b=>b.onclick=()=>{ readAll(); const p=d.players.find(x=>x.id===b.dataset.gdpx); if(gpOut(d,p)&&!confirm(`${gpName(p)} has payouts recorded. Remove anyway?`)) return; removePlayer(d,p); rerender(); });
+  m.querySelectorAll('[data-gdpx]').forEach(b=>b.onclick=()=>{ readAll(); const p=d.players.find(x=>x.id===b.dataset.gdpx); if(gpOut(d,p)&&!confirm(`${gpName(p)} has payouts recorded. Remove anyway?`)) return; removePlayer(d,p,{keepEvent:true}); rerender(); });
   const q=$('gdQ'), pk=$('gdPick'); q.oninput=()=>{ const s=q.value.toLowerCase().trim(); const hits=s?pool.filter(x=>!inG.has(x.id)&&memberName(x).toLowerCase().includes(s)).slice(0,8):[];
     pk.innerHTML=hits.map(x=>`<button type="button" data-gdadd="${x.id}"><span class="av">${initials(x)}</span><b>${esc(memberName(x))}</b><span class="muted" style="margin-left:auto;font-size:12.5px">${x.hcp?'Index '+esc(x.hcp):''}</span></button>`).join('')||(s?'<span class="muted" style="padding:10px 14px;display:block">No one matches.</span>':''); pk.style.display=pk.innerHTML?'':'none';
     pk.querySelectorAll('[data-gdadd]').forEach(b=>b.onclick=()=>{ readAll(); addPlayer(d,{memberId:b.dataset.gdadd}); rerender(); setTimeout(()=>{ const n=$('gdQ'); if(n) n.focus(); },0); }); };
@@ -275,7 +278,7 @@ function vGame(m,g){
   m.querySelectorAll('[data-gsheet]').forEach(b=>b.onclick=()=>scoreSheet(ev,ev.groups.find(x=>x.id===b.dataset.gsheet)));
   m.querySelectorAll('[data-gp]').forEach(r=>r.onclick=()=>editGamePlayer(g,g.players.find(p=>p.id===r.dataset.gp)));
   m.querySelectorAll('[data-gin]').forEach(c=>c.onchange=()=>{ const [pid,plid]=c.dataset.gin.split('|'); const pot=g.pots.find(x=>x.id===pid); if(c.checked) pot.inn[plid]=true; else delete pot.inn[plid]; persist(); render(); });
-  m.querySelectorAll('[data-gprm]').forEach(b=>b.onclick=()=>{ const p=g.players.find(x=>x.id===b.dataset.gprm); const out=gpOut(g,p); if(!confirm(`Remove ${gpName(p)} from the game${out?` — they have ${gMoney(out)} in payouts recorded`:''}? They leave every competition and the leaderboard.`)) return; removePlayer(g,p); syncGameEvent(g,ev); golfSave(ev); render(); toast(gpName(p)+' removed'); });
+  m.querySelectorAll('[data-gprm]').forEach(b=>b.onclick=()=>{ const p=g.players.find(x=>x.id===b.dataset.gprm); const out=gpOut(g,p); if(!confirm(`Remove ${gpName(p)} from the game${out?` — they have ${gMoney(out)} in payouts recorded`:''}? They leave every competition, the leaderboard and live scoring, and their scores go with them.`)) return; removePlayer(g,p); syncGameEvent(g,ev); golfSave(ev); render(); toast(gpName(p)+' removed'); });
   m.querySelectorAll('[data-gpaid]').forEach(c=>c.onchange=()=>{ const p=g.players.find(x=>x.id===c.dataset.gpaid); p.paid=c.checked; persist(); render(); });
   m.querySelectorAll('[data-potedit]').forEach(b=>b.onclick=()=>designGame(g));
   m.querySelectorAll('[data-callout]').forEach(b=>b.onclick=()=>skinsCallout(g,g.pots.find(p=>p.id===b.dataset.callout)));
@@ -643,9 +646,8 @@ function syncGameEvent(g,ev){
     let grp=ev.groups.find(x=>x.players.length<4);
     if(!grp){ grp={id:uid(),code:newCode(ev),label:'Group '+(ev.groups.length+1),course:g.course||ev.defaultCourse||'oak',startHole:1,teeTime:g.time||'',players:[]}; ev.groups.push(grp); }
     grp.players.push(gp); }
-  const ids=new Set(g.players.map(p=>p.gpid)), sc=scoresFor(ev);
-  ev.groups.forEach(grp=>{ grp.players=grp.players.filter(p=>ids.has(p.id)||Object.keys(sc[p.id]||{}).length); });
-  ev.pool=(ev.pool||[]).filter(p=>ids.has(p.id));
+  const ids=new Set(g.players.map(p=>p.gpid));   // anyone no longer in the game leaves the event, scores and all
+  evPlayers(ev).filter(x=>!ids.has(x.p.id)).forEach(x=>removeEventPlayer(ev,x.p.id));
   const E=gameEventEngine(g); EV_GAME_KEYS.forEach(k=>{ ev[k]=E[k]; });
   ev.scoring=g.pots.some(p=>p.kind==='format'&&(p.rules.scoring||'gross')==='net')||g.pots.some(p=>p.kind==='skins'&&skinsRulesOf(p).net)?'net':'gross';
   const teams=E._pot&&E._pot.teams||null; evPlayers(ev).forEach(({p})=>{ p.team=teams?(teams[p.id]||''):''; });

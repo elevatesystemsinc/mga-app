@@ -100,13 +100,13 @@ function buildRoundEvent(t,r,rs){
 /* field → event: new players join the pool with their team; team codes follow the field; players who left the field
    leave the event unless they already have scores */
 function syncRoundEvent(t,ev){
-  const inField=new Map(t.field.map(fp=>[fp.memberId,fp])), sc=scoresFor(ev), team=fp=>(t.teamSize||1)>1?'T'+(fp.team||0):''; let changed=false;
+  const inField=new Map(t.field.map(fp=>[fp.memberId,fp])), team=fp=>(t.teamSize||1)>1?'T'+(fp.team||0):''; let changed=false;
   const have=new Set(evPlayers(ev).map(x=>x.p.memberId).filter(Boolean));
   for(const fp of t.field){ if(!fp.memberId||have.has(fp.memberId)) continue; const m=memberById(fp.memberId);
     ev.pool.push({id:uid(),memberId:fp.memberId,name:m?memberName(m):(fp.name||'Player'),tee:ev.defaultTee||'White',set:'M',team:team(fp),index:'',flight:''}); have.add(fp.memberId); changed=true; }
   for(const {p,grp} of evPlayers(ev)){ if(!p.memberId) continue; const fp=inField.get(p.memberId);
     if(fp){ if(p.team!==team(fp)){ p.team=team(fp); changed=true; } }
-    else if(!Object.keys(sc[p.id]||{}).length){ if(grp) grp.players=grp.players.filter(x=>x!==p); else ev.pool=ev.pool.filter(x=>x!==p); changed=true; } }
+    else { removeEventPlayer(ev,p.id); changed=true; } }   // left the field → off the leaderboard and live scoring, scores and all
   if(changed) ev.groups=ev.groups.filter(g=>g.players.length||!ev.groups.some(o=>o!==g&&o.players.length));
   return changed;
 }

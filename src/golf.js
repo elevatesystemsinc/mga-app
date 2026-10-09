@@ -74,6 +74,17 @@ async function publishEvent(ev){
   if(error) toast(/duplicate|unique/i.test(error.message)?'That link is already used by another event — pick a different one':/relation|does not exist/i.test(error.message)?'Run golf-setup.sql in Supabase to turn on live scoring':'Couldn’t publish the event: '+error.message);
 }
 function golfSave(ev){ persist(); publishEvent(ev); }
+/* A player who is deleted leaves the leaderboard and live scoring with them: their scores go too (board session: one
+   delete; admin link: hub_key_score per hole; local mode: the local map). The caller republishes with golfSave. */
+function dropPlayerScores(ev,pid){ if(!ev||!pid) return;
+  if(CLOUD&&sessionOK){ const m=golfScores[ev.id]; const holes=m?Object.keys(m[pid]||{}).map(Number):Array.from({length:18},(_,i)=>i+1); if(m) delete m[pid];
+    if(KEYMODE) holes.forEach(h=>keyRPC('hub_key_score',{p_event:ev.id,p_player:pid,p_hole:h,p_strokes:null}).then(()=>{},()=>{}));
+    else sb.from('golf_scores').delete().eq('event_id',ev.id).eq('player_id',pid).then(r=>{ if(r&&r.error) toast('Couldn’t clear their scores: '+r.error.message); },()=>{});
+  } else { const L=golfData().localScores; if(L[ev.id]) delete L[ev.id][pid]; } }
+function removeEventPlayer(ev,pid){ let found=false;
+  ev.groups.forEach(grp=>{ const n=grp.players.length; grp.players=grp.players.filter(x=>x.id!==pid); found=found||grp.players.length<n; });
+  const n=(ev.pool||[]).length; ev.pool=(ev.pool||[]).filter(x=>x.id!==pid); found=found||ev.pool.length<n;
+  if(found) dropPlayerScores(ev,pid); return found; }
 function deleteEventRow(id){ return KEYMODE?keyRPC('hub_key_golf_delete',{p_id:id}):sb.from('golf_events').delete().eq('id',id); }
 function scoresFor(ev){ return CLOUD&&sessionOK?(golfScores[ev.id]||{}):(golfData().localScores[ev.id]||{}); }
 async function loadScores(ev){
@@ -253,7 +264,7 @@ function editGroup(ev,grp){
       const ps=players.filter(p=>p.name.trim()).map(p=>{ const prof=(memberById(p.memberId)||{}).hcp; const idx=String(p.index??'').trim(); return {...p,name:p.name.trim(),index:idx&&idx!==String(prof??'')?idx:''}; });
       if(!ps.length){ toast('Add at least one player'); return false; }
       const data={code,label:fv('ggL'),course:fv('ggC'),startHole:+fv('ggS')||1,teeTime:fv('ggTT'),players:ps};
-      if(grp) Object.assign(grp,data); else ev.groups.push(Object.assign({id:uid()},data));
+      if(grp){ const keep=new Set(ps.map(p=>p.id)); grp.players.filter(p=>!keep.has(p.id)).forEach(p=>dropPlayerScores(ev,p.id)); Object.assign(grp,data); } else ev.groups.push(Object.assign({id:uid()},data));
       const inG=new Set(ps.map(p=>p.id)), inM=new Set(ps.map(p=>p.memberId).filter(Boolean)); ev.pool=(ev.pool||[]).filter(p=>!inG.has(p.id)&&!(p.memberId&&inM.has(p.memberId)));
       golfSave(ev); toast(grp?'Group saved':'Group '+code+' added'); return undefined; },
     del:grp?()=>{ ev.pool=(ev.pool||[]).concat(grp.players); ev.groups=ev.groups.filter(x=>x!==grp); golfSave(ev); toast('Group removed — its players are back on the Field'); }:null,delLabel:'Remove group'});

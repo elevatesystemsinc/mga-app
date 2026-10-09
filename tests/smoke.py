@@ -37,6 +37,15 @@ async def main():
             and r['rows'][1][1]=='2' and r['rows'][1][2]=='+14' and r['rows'][1][3]=='+7' and r['rows'][1][4]=='+7'
             and r['tabsAll']==['overview','meals','field','checkin','rounds','sponsors','budget','checklist','calcutta','raffle'] and r['tabsFew']==['overview','field','checkin','rounds','budget'] and r['rowsShown']==2)
         print('rounds → events → results; tab toggles', r, 'OK' if ok else 'FAIL'); bad+=not ok
+        # a player taken out of the field leaves every round's event, the leaderboard and live scoring, scores and all
+        rf=await pg.evaluate("""async()=>{ const t=db.tournaments.find(x=>x.id==='T1'); const evs=t.rounds.map(roundEvent);
+          CLUB.members.push({id:'q4',first:'Ed',last:'Eng',hcp:'9.0',status:'Active'}); db.memberships.push({id:'q4',status:'Active',joined:'',notes:''}); t.field.push({id:uid(),memberId:'q4',team:3,paid:true,skins:false,answers:{}}); ensureTournamentScoring(t);
+          const gone=evs.map(ev=>evPlayers(ev).find(x=>x.p.memberId==='q4').p.id); for(let i=0;i<evs.length;i++) for(let h=1;h<=18;h++) await setScore(evs[i],gone[i],h,5);
+          const had=evs.map((ev,i)=>Object.keys(scoresFor(ev)[gone[i]]||{}).length), lbBefore=evs.map((ev,i)=>eventBoard(publicEvent(ev),scoresFor(ev),{sort:'gross'}).some(r=>r.id===gone[i]||(r.members||[]).includes(gone[i])));
+          t.field=t.field.filter(fp=>fp.memberId!=='q4'); ensureTournamentScoring(t); CLUB.members=CLUB.members.filter(m=>m.id!=='q4'); db.memberships=db.memberships.filter(m=>m.id!=='q4');
+          return {had, lbBefore, inEv:evs.map((ev,i)=>evPlayers(ev).some(x=>x.p.id===gone[i])), scores:evs.map((ev,i)=>Object.keys(scoresFor(ev)[gone[i]]||{}).length), lb:evs.map((ev,i)=>eventBoard(publicEvent(ev),scoresFor(ev),{sort:'gross'}).some(r=>r.id===gone[i]||(r.members||[]).includes(gone[i]))), players:evs.map(ev=>evPlayers(ev).length)}; }""")
+        okf=rf['had']==[18,18] and rf['inEv']==[False,False] and rf['scores']==[0,0] and rf['lb']==[False,False] and rf['players']==[4,4]
+        print('field removal → off every round, scores gone', rf, 'OK' if okf else 'FAIL'); bad+=not okf
         # partner cap, tournament flights → events, pairing by standings, results PDF
         r=await pg.evaluate("""async()=>{ const t=db.tournaments.find(x=>x.id==='T1'); t.hcpDiff=10; const evs=t.rounds.map(roundEvent);
           const cy=evPlayers(evs[0]).find(x=>x.p.memberId==='q2'); const h=hcpOf(evs[0],cy.p,cy.grp);
@@ -153,21 +162,30 @@ async def main():
     ok=ok and r6['sides']==2 and r6['entry']==20 and 'front $5' in r6['summary'] and r6['sumOut']==120 and all(abs(r6['out'].get(k,0)-40)<0.01 for k in ['gp_p0','gp_p1','gp_p2']) and 'F +9' in r6['status']
     print('mid-round team Nassau', r6, 'OK' if r6['sumOut']==120 and r6['sides']==2 else 'FAIL')
     # removing a player mid-round takes them out of every competition and the scoring event, scores and all
-    r7=await pg.evaluate("""()=>{ const g=GAME(), ev=gameEvent(g); const p=g.players.find(x=>x.id==='gp_p4'), gpid=p.gpid; const before=evPlayers(ev).length; removePlayer(g,p); syncGameEvent(g,ev);
-      const left=evPlayers(ev).some(x=>x.p.id===gpid), inPots=g.pots.some(pot=>pot.inn['gp_p4']), lb=eventBoard(publicEvent(ev),scoresFor(ev),{sort:'gross'}).some(r=>r.id===gpid); view.gameId=g.id; go('games'); const btn=document.querySelectorAll('[data-gprm]').length;
-      return {before, after:evPlayers(ev).length, left, inPots, lb, players:g.players.length, btn}; }""")
-    ok=ok and r7['before']==6 and r7['after']==5 and not r7['left'] and not r7['inPots'] and not r7['lb'] and r7['players']==5 and r7['btn']==5
-    print('remove a player mid-round', r7, 'OK' if r7['after']==5 and not r7['lb'] else 'FAIL')
+    r7=await pg.evaluate("""()=>{ const g=GAME(), ev=gameEvent(g); const p=g.players.find(x=>x.id==='gp_p4'), gpid=p.gpid; const before=evPlayers(ev).length, had=Object.keys(scoresFor(ev)[gpid]||{}).length; removePlayer(g,p); syncGameEvent(g,ev);
+      const left=evPlayers(ev).some(x=>x.p.id===gpid), inPots=g.pots.some(pot=>pot.inn['gp_p4']), lb=eventBoard(publicEvent(ev),scoresFor(ev),{sort:'gross'}).some(r=>r.id===gpid), scores=Object.keys(scoresFor(ev)[gpid]||{}).length; view.gameId=g.id; go('games'); const btn=document.querySelectorAll('[data-gprm]').length;
+      return {before, after:evPlayers(ev).length, left, inPots, lb, had, scores, players:g.players.length, btn}; }""")
+    ok=ok and r7['before']==6 and r7['after']==5 and not r7['left'] and not r7['inPots'] and not r7['lb'] and r7['had']>0 and r7['scores']==0 and r7['players']==5 and r7['btn']==5
+    print('remove a player mid-round', r7, 'OK' if r7['after']==5 and not r7['lb'] and r7['scores']==0 else 'FAIL')
+    # the same from the designer: Cancel leaves the round alone, Save takes the player out of the event with their scores
+    r7b=await pg.evaluate("""()=>{ const g=GAME(), ev=gameEvent(g); const p=g.players.find(x=>x.id==='gp_p3'), gpid=p.gpid; const had=Object.keys(scoresFor(ev)[gpid]||{}).length;
+      designGame(g); const d=GD.draft; removePlayer(d,d.players.find(x=>x.id==='gp_p3'),{keepEvent:true}); const stillInEv=evPlayers(ev).some(x=>x.p.id===gpid), stillScored=Object.keys(scoresFor(ev)[gpid]||{}).length; $('gdCancel').click();
+      const afterCancel={inGame:g.players.some(x=>x.id==='gp_p3'), inEv:evPlayers(ev).some(x=>x.p.id===gpid), scores:Object.keys(scoresFor(ev)[gpid]||{}).length};
+      designGame(g); removePlayer(GD.draft,GD.draft.players.find(x=>x.id==='gp_p3'),{keepEvent:true}); $('gdSave').click();
+      const afterSave={inGame:g.players.some(x=>x.id==='gp_p3'), inEv:evPlayers(ev).some(x=>x.p.id===gpid), scores:Object.keys(scoresFor(ev)[gpid]||{}).length, lb:eventBoard(publicEvent(ev),scoresFor(ev),{sort:'gross'}).some(r=>r.id===gpid)};
+      return {had, stillInEv, stillScored, afterCancel, afterSave, players:g.players.length}; }""")
+    ok7b=r7b['had']>0 and r7b['stillInEv'] and r7b['stillScored']==r7b['had'] and r7b['afterCancel']['inGame'] and r7b['afterCancel']['inEv'] and r7b['afterCancel']['scores']==r7b['had'] and not r7b['afterSave']['inGame'] and not r7b['afterSave']['inEv'] and r7b['afterSave']['scores']==0 and not r7b['afterSave']['lb'] and r7b['players']==4
+    ok=ok and ok7b; print('remove a player from the designer', r7b, 'OK' if ok7b else 'FAIL')
     # what the live leaderboard carries: competitions marked live (skins only when switched on), with players and teams
     r8=await pg.evaluate("""()=>{ const g=GAME(), ev=gameEvent(g); const pub=publicEvent(ev); const names=pub.comps.map(c=>c.name); skinsRulesOf(g.pots[1]).live=true; g.pots[0].rules.live=false; const pub2=publicEvent(ev); const names2=pub2.comps.map(c=>c.name);
       const bd=pub2.comps.find(c=>c.format==='bestball'); const cp=compPub(pub2,bd); const rows=eventBoard(cp,scoresFor(ev),{sort:'gross'}).filter(r=>r.n); g.pots[0].rules.live=true; skinsRulesOf(g.pots[1]).live=false;
       return {names, names2, bdTeams:bd&&bd.teams?Object.keys(bd.teams).length:0, rows:rows.length, team:rows[0]&&rows[0].team}; }""")
-    ok=ok and r8['names']==['Stroke play','Blind-draw partners'] and r8['names2']==['Skins','Blind-draw partners'] and r8['bdTeams']==4 and r8['rows']==2 and r8['team']
+    ok=ok and r8['names']==['Stroke play','Blind-draw partners'] and r8['names2']==['Skins','Blind-draw partners'] and r8['bdTeams']==3 and r8['rows']==2 and r8['team']
     print('live leaderboard competitions', r8, 'OK' if r8['names2']==['Skins','Blind-draw partners'] and r8['rows']==2 else 'FAIL')
     # the game sheet PDF and the designer round-trip
     r2=await pg.evaluate("""async()=>{ const g=GAME(); const doc=await gameSheetPDF(g,{returnDoc:true}); const n=doc.getNumberOfPages(); designGame(g); const names=GD.draft.pots.map(p=>p.name); const grid=document.querySelectorAll('[data-gdin]').length; document.getElementById('gdSave').click(); return {pages:n, names, grid, back:!!document.getElementById('gmSheet')}; }""")
-    ok=ok and r2['pages']>=1 and len(r2['names'])==4 and r2['grid']==5*4 and r2['back']
-    print('game sheet + designer', r2, 'OK' if r2['pages']>=1 and r2['grid']==20 else 'FAIL')
+    ok=ok and r2['pages']>=1 and len(r2['names'])==4 and r2['grid']==4*4 and r2['back']
+    print('game sheet + designer', r2, 'OK' if r2['pages']>=1 and r2['grid']==16 else 'FAIL')   # 4 players left × 4 competitions
     print('payouts + ledger', r, 'OK' if ok else 'FAIL'); bad+=not ok
     print('  group errors', errs); bad+=bool(errs)
     await b.close()
