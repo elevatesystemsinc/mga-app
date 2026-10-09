@@ -230,6 +230,7 @@ function vGame(m,g){
   let ev=gameEvent(g); if(!ev){ ev=ensureGameEvent(g); golfSave(ev); }
   const mo=gameMoney(g), live=ev.status==='live', after=(g.payWhen||'after')==='after', S=settlement(g), scored=Object.keys(scoresFor(ev)||{}).length>0;
   if(CLOUD&&sessionOK&&!golfScores[ev.id]) setTimeout(()=>loadScores(ev),0);
+  publishIfChanged(ev);
   const pots=g.pots.filter(p=>p.kind!=='manual'), link=scoringLink(ev);
   const gridCols=`grid-template-columns:minmax(150px,1fr) ${pots.map(()=>'84px').join(' ')} 76px 90px 40px`;
   const grid=`<div class="card" style="overflow:hidden"><div class="cardhead"><div><h2 class="h2">Who’s in</h2><span class="muted">${g.players.length} playing · ${mo.unpaid?`<span class="neg">${mo.unpaid} still to pay in</span>`:g.players.length?'everyone has paid in':''}</span></div><div class="actions"><button class="btn sm" id="gmAllPaid">Mark all paid</button><button class="btn sm pri" id="gmAdd">${I.plus}Add players</button></div></div>

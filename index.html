@@ -2888,13 +2888,19 @@ function publicEvent(ev){
 /* ---------- publishing + scores ---------- */
 const golfScores={}; let golfSub=null;
 async function publishEvent(ev){
-  if(!CLOUD||!sessionOK) return;
+  if(!CLOUD||!sessionOK) return; try{ PUB_SIG[ev.id]=JSON.stringify(publicEvent(ev)); }catch(_){}
   const codes=Object.fromEntries(ev.groups.map(g=>[String(g.code).toUpperCase(),g.id]));
   const {error}=KEYMODE?await keyRPC('hub_key_golf_event',{p_id:ev.id,p_slug:ev.slug.toLowerCase(),p_public:publicEvent(ev),p_codes:codes})
     :await sb.from('golf_events').upsert({id:ev.id,slug:ev.slug.toLowerCase(),public:publicEvent(ev),codes,updated_at:new Date().toISOString()});
   if(error) toast(/duplicate|unique/i.test(error.message)?'That link is already used by another event — pick a different one':/relation|does not exist/i.test(error.message)?'Run golf-setup.sql in Supabase to turn on live scoring':'Couldn’t publish the event: '+error.message);
 }
 function golfSave(ev){ persist(); publishEvent(ev); }
+/* The published copy carries derived data (handicaps, competitions, the format fields), so a change in how those are
+   computed — a new build, a corrected index, a rule — must reach the phones without anyone pressing Save: every render
+   of an event's page republishes when the public shape differs from what this session last sent. */
+const PUB_SIG={};
+function publishIfChanged(ev){ if(!CLOUD||!sessionOK||!ev) return; let sig; try{ sig=JSON.stringify(publicEvent(ev)); }catch(_){ return; }
+  if(PUB_SIG[ev.id]===sig) return; PUB_SIG[ev.id]=sig; publishEvent(ev); }
 /* A player who is deleted leaves the leaderboard and live scoring with them: their scores go too (board session: one
    delete; admin link: hub_key_score per hole; local mode: the local map). The caller republishes with golfSave. */
 function dropPlayerScores(ev,pid){ if(!ev||!pid) return;
@@ -3029,6 +3035,7 @@ function editEvent(ev){
 
 /* Event detail */
 function vGolfEvent(m,ev){
+  publishIfChanged(ev);
   const pub=publicEvent(ev), lb=leaderboard(pub,scoresFor(ev)), link=scoringLink(ev);
   const t=db.tournaments.find(x=>x.id===ev.tournamentId);
   m.innerHTML=`<div class="crumb"><button id="gBack">Golf</button><span class="muted">/</span><span class="muted">${esc(ev.name)}</span></div>
@@ -3797,6 +3804,7 @@ function vGame(m,g){
   let ev=gameEvent(g); if(!ev){ ev=ensureGameEvent(g); golfSave(ev); }
   const mo=gameMoney(g), live=ev.status==='live', after=(g.payWhen||'after')==='after', S=settlement(g), scored=Object.keys(scoresFor(ev)||{}).length>0;
   if(CLOUD&&sessionOK&&!golfScores[ev.id]) setTimeout(()=>loadScores(ev),0);
+  publishIfChanged(ev);
   const pots=g.pots.filter(p=>p.kind!=='manual'), link=scoringLink(ev);
   const gridCols=`grid-template-columns:minmax(150px,1fr) ${pots.map(()=>'84px').join(' ')} 76px 90px 40px`;
   const grid=`<div class="card" style="overflow:hidden"><div class="cardhead"><div><h2 class="h2">Who’s in</h2><span class="muted">${g.players.length} playing · ${mo.unpaid?`<span class="neg">${mo.unpaid} still to pay in</span>`:g.players.length?'everyone has paid in':''}</span></div><div class="actions"><button class="btn sm" id="gmAllPaid">Mark all paid</button><button class="btn sm pri" id="gmAdd">${I.plus}Add players</button></div></div>
@@ -5841,7 +5849,7 @@ function roundToEvent(r,ev){ ROUND_KEYS.forEach(k=>{ ev[k]=r[k]; }); if(!ev.allo
 function tRounds(el,t){
   const rs=tournamentRounds(t).slice().sort((a,b)=>a.day-b.day), missing=rs.filter(r=>!roundEvent(r));
   const R=tournamentResults(t,t.resultsBasis||'net');
-  rs.forEach(r=>{ const ev=roundEvent(r); if(ev&&CLOUD&&sessionOK&&!golfScores[ev.id]) setTimeout(()=>loadScores(ev),0); });
+  rs.forEach(r=>{ const ev=roundEvent(r); if(ev&&CLOUD&&sessionOK&&!golfScores[ev.id]) setTimeout(()=>loadScores(ev),0); publishIfChanged(ev); });
   const rrow=r=>{ const ev=roundEvent(r), n=ev?evPlayers(ev).length:0;
     return `<div class="tr click" data-rnd="${r.id}" style="grid-template-columns:110px minmax(0,1.6fr) minmax(0,1fr) 120px 40px"><span><b>${esc(dayLabel(t,r.day).split(' · ')[0])}</b><br><small class="muted">${esc(dayShort(t,r.day))}</small></span><div class="cell2"><b class="trunc">${esc(roundLabel(t,r))}</b><small>${esc(formatSummary(r))} · ${r.scoring==='net'?'net':'gross'}</small></div>
       <span class="muted" style="font-size:13px">${ev?`${n} players · ${ev.groups.length} groups${ev.flights&&ev.flights.count?' · '+ev.flights.count+' flights':''}`:'Building the scoring event…'}</span><span>${ev?evStatusChip(ev):'<span class="chip">Building…</span>'}</span><span class="ib">${I.edit}</span></div>`; };
@@ -6087,7 +6095,7 @@ async function resultsPDF(t,opt){
 /* Keeps every open device on the latest version: checks version.json about once a minute and, when a
    newer build is live, reloads at a safe moment (nothing unsaved, no editor open, not mid-typing). */
 (function(){
-  const ME='20261009195437'; let ready=false, lastCheck=0;
+  const ME='20261009200205'; let ready=false, lastCheck=0;
   const typing=()=>{ const a=document.activeElement; return a&&/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)&&a.value&&a.type!=='search'; };
   const safe=()=>!typing()&&(typeof window.__canReload!=='function'||window.__canReload());
   async function check(){ lastCheck=Date.now(); if(location.protocol==='file:') return;

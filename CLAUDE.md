@@ -171,6 +171,11 @@ Tournament = { id, name, season, days, startDate, field:[{id,memberId,team,paid,
     skins" opens `skinsCallout(g,pot)` (full-screen, one hole per tap in play order) and sets `pot.calledOut`. A won
     skin shows as pending until its validation hole is called; stepping onto that hole first flashes the verdict
     full-screen (`sk-flash`: red "Didn't validate" / green "Validated"), then shows the hole's result.
+  - **Published copy stays current**: `publishIfChanged(ev)` (golf.js) runs on every render of a game page, a Golf
+    event page and a tournament's Rounds tab — it republishes when `publicEvent(ev)` differs from what this session
+    last sent (`PUB_SIG`), so a new build that changes derived data (competitions, handicaps, `matchBy`…) reaches the
+    phones on the next 30 s refresh without anyone pressing Save. Without it the phones showed the old competition
+    rules after the reverse-waltz change.
   - **Live leaderboard per competition**: each format competition has "Show on the live leaderboard"
     (`rules.live`, default on; skins use `rules.skins.live`, dots never show). `gameComps(ev)` → the live competitions
     as `{id,name,kind,players,teams,sitOut,engine…}`; `publicEvent` publishes them as `comps`, and the scoring page

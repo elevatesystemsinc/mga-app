@@ -23,7 +23,7 @@ function roundToEvent(r,ev){ ROUND_KEYS.forEach(k=>{ ev[k]=r[k]; }); if(!ev.allo
 function tRounds(el,t){
   const rs=tournamentRounds(t).slice().sort((a,b)=>a.day-b.day), missing=rs.filter(r=>!roundEvent(r));
   const R=tournamentResults(t,t.resultsBasis||'net');
-  rs.forEach(r=>{ const ev=roundEvent(r); if(ev&&CLOUD&&sessionOK&&!golfScores[ev.id]) setTimeout(()=>loadScores(ev),0); });
+  rs.forEach(r=>{ const ev=roundEvent(r); if(ev&&CLOUD&&sessionOK&&!golfScores[ev.id]) setTimeout(()=>loadScores(ev),0); publishIfChanged(ev); });
   const rrow=r=>{ const ev=roundEvent(r), n=ev?evPlayers(ev).length:0;
     return `<div class="tr click" data-rnd="${r.id}" style="grid-template-columns:110px minmax(0,1.6fr) minmax(0,1fr) 120px 40px"><span><b>${esc(dayLabel(t,r.day).split(' · ')[0])}</b><br><small class="muted">${esc(dayShort(t,r.day))}</small></span><div class="cell2"><b class="trunc">${esc(roundLabel(t,r))}</b><small>${esc(formatSummary(r))} · ${r.scoring==='net'?'net':'gross'}</small></div>
       <span class="muted" style="font-size:13px">${ev?`${n} players · ${ev.groups.length} groups${ev.flights&&ev.flights.count?' · '+ev.flights.count+' flights':''}`:'Building the scoring event…'}</span><span>${ev?evStatusChip(ev):'<span class="chip">Building…</span>'}</span><span class="ib">${I.edit}</span></div>`; };

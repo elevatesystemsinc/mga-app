@@ -67,13 +67,19 @@ function publicEvent(ev){
 /* ---------- publishing + scores ---------- */
 const golfScores={}; let golfSub=null;
 async function publishEvent(ev){
-  if(!CLOUD||!sessionOK) return;
+  if(!CLOUD||!sessionOK) return; try{ PUB_SIG[ev.id]=JSON.stringify(publicEvent(ev)); }catch(_){}
   const codes=Object.fromEntries(ev.groups.map(g=>[String(g.code).toUpperCase(),g.id]));
   const {error}=KEYMODE?await keyRPC('hub_key_golf_event',{p_id:ev.id,p_slug:ev.slug.toLowerCase(),p_public:publicEvent(ev),p_codes:codes})
     :await sb.from('golf_events').upsert({id:ev.id,slug:ev.slug.toLowerCase(),public:publicEvent(ev),codes,updated_at:new Date().toISOString()});
   if(error) toast(/duplicate|unique/i.test(error.message)?'That link is already used by another event — pick a different one':/relation|does not exist/i.test(error.message)?'Run golf-setup.sql in Supabase to turn on live scoring':'Couldn’t publish the event: '+error.message);
 }
 function golfSave(ev){ persist(); publishEvent(ev); }
+/* The published copy carries derived data (handicaps, competitions, the format fields), so a change in how those are
+   computed — a new build, a corrected index, a rule — must reach the phones without anyone pressing Save: every render
+   of an event's page republishes when the public shape differs from what this session last sent. */
+const PUB_SIG={};
+function publishIfChanged(ev){ if(!CLOUD||!sessionOK||!ev) return; let sig; try{ sig=JSON.stringify(publicEvent(ev)); }catch(_){ return; }
+  if(PUB_SIG[ev.id]===sig) return; PUB_SIG[ev.id]=sig; publishEvent(ev); }
 /* A player who is deleted leaves the leaderboard and live scoring with them: their scores go too (board session: one
    delete; admin link: hub_key_score per hole; local mode: the local map). The caller republishes with golfSave. */
 function dropPlayerScores(ev,pid){ if(!ev||!pid) return;
@@ -208,6 +214,7 @@ function editEvent(ev){
 
 /* Event detail */
 function vGolfEvent(m,ev){
+  publishIfChanged(ev);
   const pub=publicEvent(ev), lb=leaderboard(pub,scoresFor(ev)), link=scoringLink(ev);
   const t=db.tournaments.find(x=>x.id===ev.tournamentId);
   m.innerHTML=`<div class="crumb"><button id="gBack">Golf</button><span class="muted">/</span><span class="muted">${esc(ev.name)}</span></div>
