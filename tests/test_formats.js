@@ -60,7 +60,7 @@ check('321 pattern: holes 1-3 count 3,2,1; 9 and 18 count all',[1,2,3,4,8,9,17,1
 check('321 pattern clamps to the team size',countOn({countPattern:'321'},'bestball',1,2,4)===2);
 // 6d. a team Nassau across two groups: side A (group 1) v side B (group 2), best 3/2/1 balls; A wins the front by one hole, B the back, 18 halved
 { const mk=(ids,team)=>ids.map(id=>({id,name:id,set:'M',ph:0,team}));
-  const pubM={courses:{t:course},format:'match',teamSize:4,matchScoring:'nassau',countPattern:'321',groups:[{id:'g1',course:'t',startHole:1,players:mk(['a1','a2','a3','a4'],'S1')},{id:'g2',course:'t',startHole:1,players:mk(['b1','b2','b3','b4'],'S2')}]};
+  const pubM={courses:{t:course},format:'match',teamSize:4,matchScoring:'nassau',countPattern:'321',matchBy:'holes',groups:[{id:'g1',course:'t',startHole:1,players:mk(['a1','a2','a3','a4'],'S1')},{id:'g2',course:'t',startHole:1,players:mk(['b1','b2','b3','b4'],'S2')}]};
   const scM={}; ['a1','a2','a3','a4','b1','b2','b3','b4'].forEach(id=>{ scM[id]=fill(4); }); scM.a1[1]=3; scM.b2[10]=3;   // hole 1 (3 balls): A 11 v B 12 → A; hole 10 (3 balls): B 11 v A 12 → B
   const rows=matchBoard(pubM,scM,{});
   check('group v group Nassau: two sides, A +1 front, B +1 back, 18 all square → 1 point each',rows.length===2&&rows[0].holesUp===0&&rows.map(r=>r.pts).join()==='1.5,1.5'&&rows.some(r=>r.name.startsWith('a1')&&/F 1 up/.test(r.status)&&/B 1 dn/.test(r.status)&&/18 AS/.test(r.status)),rows.map(r=>[r.name,r.status,r.pts]));
@@ -71,6 +71,7 @@ check('321 pattern clamps to the team size',countOn({countPattern:'321'},'bestba
   check('Nassau by holes: A wins the front and the 18 (2 holes to 1)',aH.pts===2.5&&/F 1 up/.test(aH.status),rowsH.map(r=>[r.name,r.status,r.pts]));
   // each side reads its own counted balls to par: A −2 on the front (two birdies among 3- and 2-ball holes), B −6 (three 2s on a 3-ball hole); the lead (4 strokes) decides the bets
   check('Nassau by total score: B wins the front and the 18 by four strokes, back tied; figures are to par',bS.pts===2.5&&aS.pts===0.5&&bS.status==='F −6 · B E · 18 −6'&&aS.status==='F −2 · B E · 18 −2'&&bS.segs[0].v===4&&bS.segs[0].rel===-6&&aS.segs[2].rel===-2&&bS.by==='strokes',rowsS.map(r=>[r.name,r.status,r.pts]));
+  check('a reverse waltz published before matchBy existed is still decided by total score',(()=>{ const p=Object.assign({},pubM); delete p.matchBy; const r=matchBoard(p,scS,{}).find(x=>x.name.startsWith('b1')); return r.by==='strokes'&&r.status==='F −6 · B E · 18 −6'&&/total score/.test(formatSummary(p)); })());
   check('Nassau by total score: segments not yet started read —',(()=>{ const sc9={}; Object.keys(scS).forEach(id=>{ sc9[id]={}; for(let h=1;h<=6;h++) sc9[id][h]=scS[id][h]; }); const r=matchBoard(Object.assign({},pubM,{matchBy:'strokes'}),sc9,{}).find(x=>x.name.startsWith('b1')); return r.status==='F −6 · B — · 18 −6'&&r.thru==='6'&&r.pts===0; })());
 }
 // 6e. compPub: a competition cut out of a published event — players, teams, and individual standings until partners exist

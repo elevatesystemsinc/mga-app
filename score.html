@@ -394,6 +394,9 @@ const catalogById=id=>GAME_CATALOG.find(g=>g.id===id);
 /* the catalog with the club's switches applied (CLUB.games.disabled) */
 function enabledGames(){ const dis=(typeof CLUB!=='undefined'&&CLUB&&CLUB.games&&CLUB.games.disabled)||{}; return GAME_CATALOG.filter(g=>!dis[g.id]); }
 /* the catalog entry that best describes an event's format fields (for display) */
+/* how a Nassau is decided: the event/competition's own matchBy, else by what it is — the reverse waltz (count pattern
+   321) has always been total score, so an older published copy without the field still reads right on the phones */
+function matchByOf(pub){ if(pub.matchBy==='strokes'||pub.matchBy==='holes') return pub.matchBy; return pub.game==='waltz321'||(pub.matchScoring==='nassau'&&pub.countPattern==='321')?'strokes':'holes'; }
 function catalogOf(pub){ const f=pub.format||'stroke'; return GAME_CATALOG.find(g=>!g.side&&!g.tool&&g.engine.format===f&&(g.engine.countPattern||'')===(pub.countPattern||'')&&(g.engine.matchScoring||'holes')===(pub.matchScoring||'holes')&&(g.engine.matchForm||'')===(pub.matchForm||'')&&(g.engine.quotaBase||36)===(+pub.quotaBase||36)&&(g.engine.cap||'')===(pub.cap||'')&&(f!=='match'||(g.engine.teamSize||1)===(pub.teamSize>=2?2:1)))||GAME_CATALOG.find(g=>g.engine.format===f)||GAME_CATALOG[0]; }
 const TEAM_FORMATS=Object.keys(FORMATS).filter(k=>FORMATS[k].team===true);
 /* points per hole by score to par (d): standard Stableford, the modified (pro-tour) table, and quota points (gross) */
@@ -437,7 +440,7 @@ function playerFormatOf(pub){ return eventFormats(pub).find(f=>FORMATS[f]&&FORMA
 /* an individual's unit on their own row (team Stableford players still count points) */
 function formatSummary(pub){ const n=teamSizeOf(pub), k=countOf(pub), P=pub.countPattern, one=f=>{ const F=FORMATS[f]||FORMATS.stroke; let l=F.label;
     if(F.count) l=P==='123'?'1-2-3 best ball':P==='123rot'?'Cha-cha-cha':P==='par345'?'1-2-3 by par':P==='yellow'?`Yellow ball (${n}-player)`:l+` (best ${k} of ${n})`; else if(F.team===true&&!F.size) l+=` (${n}-player)`;
-    if(f==='match') l=pub.matchScoring==='nassau'?(pub.matchBy==='strokes'?'Nassau by total score':'Nassau'):pub.matchScoring==='hilo'?'Hi-Lo':pub.matchForm==='foursomes'?'Foursomes match play':n>=2?'Four-ball match play':'Singles match play';
+    if(f==='match') l=pub.matchScoring==='nassau'?(matchByOf(pub)==='strokes'?'Nassau by total score':'Nassau'):pub.matchScoring==='hilo'?'Hi-Lo':pub.matchForm==='foursomes'?'Foursomes match play':n>=2?'Four-ball match play':'Singles match play';
     if(f==='quota'&&+pub.quotaBase===39) l='Chicago (quota 39)'; if(f==='stroke'&&pub.cap==='nddb') l='Maximum score'; return l; };
   return pub.format==='split'?`Front: ${one(pub.front)} · Back: ${one(pub.back)}`:one(pub.format||'stroke'); }
 /* a player's playing handicap for a per-player format in this event (from their course handicap) */
@@ -526,7 +529,7 @@ function matchBoard(pub,scores,opt){
         if(k<=1) return Math.min(...v); if(v.length<k) return null; return v.slice().sort((x,y)=>x-y).slice(0,k).reduce((a,b)=>a+b,0); };
       const sc=pub.matchScoring||'holes';
       // a Nassau is decided by holes won (match play) or, matchBy 'strokes', by the total of the sides' counted balls
-      const by=sc==='nassau'&&pub.matchBy==='strokes'?'strokes':'holes';
+      const by=sc==='nassau'&&matchByOf(pub)==='strokes'?'strokes':'holes';
       let up=0,played=0,wA=0,wB=0,ptsA=0,ptsB=0,upF=0,upB=0,sF=0,sB=0,pAF=0,pAB=0,pBF=0,pBB=0; const holes=[];   // pXF/pXB: a side's counted balls to par, front/back
       for(const h of order){ const a=side(A,h), b=side(B,h); if(a==null||b==null) break; played++;
         const ra=a-kOf(A,h)*parOf(A,h), rb=b-kOf(B,h)*parOf(B,h); if(h<=9){ sF+=b-a; pAF+=ra; pBF+=rb; } else { sB+=b-a; pAB+=ra; pBB+=rb; }
@@ -790,7 +793,7 @@ window.__canReload=()=>!queue.length;
 /* Keeps every open device on the latest version: checks version.json about once a minute and, when a
    newer build is live, reloads at a safe moment (nothing unsaved, no editor open, not mid-typing). */
 (function(){
-  const ME='20261009200205'; let ready=false, lastCheck=0;
+  const ME='20261009201038'; let ready=false, lastCheck=0;
   const typing=()=>{ const a=document.activeElement; return a&&/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)&&a.value&&a.type!=='search'; };
   const safe=()=>!typing()&&(typeof window.__canReload!=='function'||window.__canReload());
   async function check(){ lastCheck=Date.now(); if(location.protocol==='file:') return;
