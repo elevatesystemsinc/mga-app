@@ -113,7 +113,8 @@ holes on which it has a counting score.
   the leaderboards all follow the event's format.
 - **Tournaments:** a tournament's scoring event carries the format; the field's teams come across as the teams.
 - **Small groups → Games:** a game is any number of competitions on one own-ball round, each a catalog entry with
-  its own entry, players and payout places — stroke play, a best ball with partners picked, drawn before or drawn
+  its own entry, players, payout places and its own "Show on the live leaderboard" switch (`compPub` cuts the
+  published event down to one competition's players, format and teams; the scoring page shows a board per competition) — stroke play, a best ball with partners picked, drawn before or drawn
   after the round, skins (one pot ÷ skins won, with gross/net, gross beats net, carry-overs and a validation standard
   of par, net par, bogey or net bogey on the next hole), dots / doodah, or winners entered by hand. Only a one-ball
   game (scramble, foursomes, greensome) changes how the round is played.

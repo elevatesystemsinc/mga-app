@@ -83,7 +83,9 @@ gross-beats-net and the validation standard on the next hole (par, net par, boge
 a per-hole format (the pot split over 18 holes, ties carrying forward) is there for groups that play it that way.
 Skins stay off the screen during the round unless you switch "announce live" on; afterwards **Call out the skins**
 walks the cards one hole per tap, a skin stays pending until its validation hole comes up, and a failed validation
-flashes "Didn't validate" before that hole's result. Games are deleted from the designer; deleting a scoring event
+flashes "Didn't validate" before that hole's result. Every other competition has its own **Show on the live
+leaderboard** switch in the designer, and the live scoring page shows one board per competition that is switched on
+(dots are tallied by hand and never show). Games are deleted from the designer; deleting a scoring event
 that belongs to a game or a tournament round removes that game or round with it. The **who's-in grid** ticks every player into every competition
 they want, so nine can be in the skins while eight play the team game. A new game starts from the last one.
 

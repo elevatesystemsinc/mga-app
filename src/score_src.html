@@ -82,7 +82,7 @@ const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&
 const CFG=window.MM_CONFIG||{}; const sb=(CFG.url&&CFG.anonKey&&window.supabase)?window.supabase.createClient(CFG.url,CFG.anonKey,{auth:{persistSession:false}}):null;
 const qs=new URLSearchParams(location.search), SLUG=(qs.get('e')||'').trim(), BIG=qs.get('view')==='board';
 if(BIG) document.body.classList.add('big');
-let pub=null, scores={}, groupId=null, code='', tab=BIG?'board':'score', holeIdx=0, lbFlight=qs.get('flight')||'', lbSort=null, lbView=qs.get('players')?'players':'teams';
+let pub=null, scores={}, groupId=null, code='', tab=BIG?'board':'score', holeIdx=0, lbFlight=qs.get('flight')||'', lbSort=null, lbView=qs.get('players')?'players':'teams', lbComp='';
 const KEY='mga_score_'+SLUG, QKEY='mga_scoreq_'+SLUG;
 let queue=[]; try{ queue=JSON.parse(localStorage.getItem(QKEY)||'[]'); }catch(_){}
 const saveQ=()=>{ try{ localStorage.setItem(QKEY,JSON.stringify(queue)); }catch(_){} };
@@ -218,7 +218,22 @@ function showCardFor(gid,pid){
   $('main').innerHTML=`<p style="margin:0 0 12px"><button class="btn" id="cardBack" style="height:40px">‹ Leaderboard</button></p>`+scorecardHTML(pub,g,scores,{split:true,highlight:pid});
   $('cardBack').onclick=()=>renderBoard(); window.scrollTo(0,0);
 }
+/* a small-group game's competitions ride along with the event; each is its own board */
+function compChips(){ const cs=pub.comps||[]; if(!cs.length) return ''; return `<div class="chips">${[['','Round'],...cs.map(c=>[c.id,c.name])].map(([k,l])=>`<button data-comp="${esc(k)}" class="${lbComp===k?'on':''}">${esc(l)}</button>`).join('')}</div>`; }
+function renderSkinsBoard(comp,fromJoin){
+  const sk=comp.skins||{}, r=skinsResult(compPub(pub,comp),scores,sk,comp.players), per=sk.mode==='hole', won=r.wins.filter(w=>w.status==='won');
+  const txt=sk.validate&&sk.validate!=='none'?{par:'par',netpar:'net par',bogey:'bogey',netbogey:'net bogey'}[sk.validate]||'':'';
+  $('main').innerHTML=`${BIG?`<h1 style="font-size:44px;margin:6px 4px 16px">${esc(pub.name)} · ${esc(comp.name)}</h1>`:''}${BIG?'':compChips()}
+   <div class="card" style="overflow:hidden"><div class="lb h"><span>Hole</span><span>Skin</span><span class="r"></span><span class="r">${per?'Holes':''}</span></div>
+   ${r.wins.length?r.wins.map(w=>`<div class="lb num"><b>${w.hole}</b><div style="min-width:0"><div style="font-weight:700">${esc(w.name)}</div><div class="muted" style="font-size:12px">${w.score}${sk.net&&w.net!==w.score?' (net '+w.net+')':''}${w.status==='void'?' · didn’t validate on '+w.checkHole:w.status==='pending'?' · validates on '+w.checkHole:txt?' · validated':''}</div></div><span class="r">${w.status==='void'?'✕':w.status==='pending'?'…':'✓'}</span><span class="r">${per&&w.count>1?w.count:''}</span></div>`).join(''):'<div class="lb"><span></span><span class="muted">No skins yet.</span></div>'}
+   </div><p class="muted" style="text-align:center;font-size:12.5px">${won.length} skin${won.length===1?'':'s'}${r.pending?' · '+r.pending+' pending':''} · ${sk.net?(sk.grossBeatsNet?'net, gross beats net':'net'):'gross'}${txt?' · validated by '+txt+' on the next hole':''} · updates live</p>${fromJoin?'<p style="text-align:center"><button class="btn" id="backJoin">Back</button></p>':''}`;
+  const bj=$('backJoin'); if(bj) bj.onclick=()=>renderJoin();
+  document.querySelectorAll('[data-comp]').forEach(b=>b.onclick=()=>{ lbComp=b.dataset.comp; renderBoard(fromJoin); });
+}
 function renderBoard(fromJoin){
+  const comp=(pub.comps||[]).find(c=>c.id===lbComp)||null; if(lbComp&&!comp) lbComp='';
+  if(comp&&comp.kind==='skins') return renderSkinsBoard(comp,fromJoin);
+  if(comp) return renderCompBoard(comp,fromJoin);
   if(lbSort==null) lbSort=pub.scoring||'gross';
   const flights=pub.flights||[], hasNet=(pub.groups||[]).some(g=>g.players.some(p=>typeof p.ph==='number'||typeof p.ch==='number')), net=lbSort==='net'&&hasNet;
   const mine=new Set((group()||{players:[]}).players.map(p=>p.id));
@@ -228,16 +243,32 @@ function renderBoard(fromJoin){
   const valTxt=r=>MATCH?r.status:unit==='points'?(r.n?r.pts:'—'):unit==='holes'?(r.n?(r.holesUp>0?'+':'')+r.holesUp:'—'):(r.n?toParTxt(net&&r.netToPar!=null?r.netToPar:r.toPar):'—');
   const colHead=MATCH?'Match':unit==='points'?'Points':unit==='holes'?'Holes':(net?'Net':'To par');
   $('main').innerHTML=`${BIG?`<h1 style="font-size:44px;margin:6px 4px 16px">${esc(pub.name)}${lbFlight?' · Flight '+esc(lbFlight):''}</h1>`:''}
-   ${!BIG&&(flights.length||hasNet||BB)?`<div class="chips">${BB&&!noPl&&!MATCH?[['teams','Teams'],['players','Players']].map(([k,l])=>`<button data-vw="${k}" class="${lbView===k?'on':''}">${l}</button>`).join(''):''}${hasNet&&!MATCH&&unit==='strokes'?['gross','net'].map(x=>`<button data-sort="${x}" class="${(net?'net':'gross')===x?'on':''}">${x==='net'?'Net':'Gross'}</button>`).join(''):''}${flights.length?['',...flights].map(f=>`<button data-fl="${f}" class="${lbFlight===f?'on':''}">${f?'Flight '+f:'All'}</button>`).join(''):''}</div>`:''}
+   ${BIG?'':compChips()}${!BIG&&(flights.length||hasNet||BB)?`<div class="chips">${BB&&!noPl&&!MATCH?[['teams','Teams'],['players','Players']].map(([k,l])=>`<button data-vw="${k}" class="${lbView===k?'on':''}">${l}</button>`).join(''):''}${hasNet&&!MATCH&&unit==='strokes'?['gross','net'].map(x=>`<button data-sort="${x}" class="${(net?'net':'gross')===x?'on':''}">${x==='net'?'Net':'Gross'}</button>`).join(''):''}${flights.length?['',...flights].map(f=>`<button data-fl="${f}" class="${lbFlight===f?'on':''}">${f?'Flight '+f:'All'}</button>`).join(''):''}</div>`:''}
    <div class="card" style="overflow:hidden">
    <div class="lb h"><span>Pos</span><span>${MATCH?'Side':BB&&lbView==='teams'?'Team':'Player'}</span><span class="r">Thru</span><span class="r">${colHead}</span></div>
    ${lb.map(r=>`<div class="lb num${mine.has(r.id)||(r.members||[]).some(id=>mine.has(id))?' me':''}" data-card="${esc(r.groupId)}|${esc(r.team?(r.members||[])[0]:r.id)}" style="cursor:pointer"><b>${r.posTxt}</b><div style="min-width:0"><div style="font-weight:700;${r.team?'line-height:1.25':'overflow:hidden;text-overflow:ellipsis;white-space:nowrap'}" title="${esc(r.name)}">${r.team?r.name.split(' / ').map(esc).join('<br>'):esc(r.name)}</div>${BIG?'':`<div class="muted" style="font-size:12px">${esc(r.courseName.replace(' Course',''))}${r.flight&&!lbFlight?' · Flt '+esc(r.flight):''}${r.n?' · '+r.gross+(net&&r.net!=null?' / net '+r.net:''):''}</div>`}</div><span class="r muted">${r.n?r.thru:'—'}</span>${(()=>{ if(MATCH) return `<span class="tp ${r.over&&r.pts===1?'pos':''}" style="font-size:14px;white-space:nowrap">${esc(r.status)}</span>`; if(unit==='points') return `<span class="tp ${r.n?'':'muted'}">${r.n?r.pts:'—'}</span>`; if(unit==='holes') return `<span class="tp ${r.n&&r.holesUp>0?'pos':r.n?'':'muted'}">${r.n?(r.holesUp>0?'+':'')+r.holesUp:'—'}</span>`; const v=net?r.netToPar:r.toPar; return `<span class="tp ${r.n&&v<0?'pos':r.n?'':'muted'}">${r.n&&v!=null?toParTxt(v):'—'}</span>`; })()}</div>`).join('')||'<div class="lb"><span></span><span class="muted">No players yet.</span></div>'}
   </div><p class="muted" style="text-align:center;font-size:12.5px">${pub.status==='final'?'Final · ':''}${MATCH?formatSummary(pub):(net?'Net':'Gross')+' '+(BB&&lbView==='teams'?formatSummary(pub).toLowerCase():FORMAT_LABEL[playerFormatOf(pub)].toLowerCase())}${BIG?'':' · tap a row for the scorecard'}${lbFlight?' · Flight '+esc(lbFlight):''} · updates live</p>${fromJoin?'<p style="text-align:center"><button class="btn" id="backJoin">Back</button></p>':''}`;
   const bj=$('backJoin'); if(bj) bj.onclick=()=>renderJoin();
+  document.querySelectorAll('[data-comp]').forEach(b=>b.onclick=()=>{ lbComp=b.dataset.comp; renderBoard(fromJoin); });
   document.querySelectorAll('[data-fl]').forEach(b=>b.onclick=()=>{ lbFlight=b.dataset.fl; renderBoard.first=false; renderBoard(fromJoin); });
   document.querySelectorAll('[data-sort]').forEach(b=>b.onclick=()=>{ lbSort=b.dataset.sort; renderBoard(fromJoin); });
   document.querySelectorAll('[data-vw]').forEach(b=>b.onclick=()=>{ lbView=b.dataset.vw; renderBoard(fromJoin); });
   if(!BIG) document.querySelectorAll('[data-card]').forEach(r=>r.onclick=()=>{ const [gid,pid]=r.dataset.card.split('|'); showCardFor(gid,pid); });
+}
+/* one competition's board: the event cut down to it (compPub), scored by the shared engine */
+function renderCompBoard(comp,fromJoin){
+  const cp=compPub(pub,comp), unit=unitOf(cp), MATCH=unit==='match', BB=isTeamEvent(cp), net=(cp.scoring||'gross')==='net', mine=new Set((group()||{players:[]}).players.map(p=>p.id));
+  const lb=eventBoard(cp,scores,{sort:net?'net':'gross',view:'teams'});
+  const valTxt=r=>MATCH?r.status:unit==='points'?(r.n?r.pts:'—'):unit==='holes'?(r.n?(r.holesUp>0?'+':'')+r.holesUp:'—'):(r.n?toParTxt(net&&r.netToPar!=null?r.netToPar:r.toPar):'—');
+  const colHead=MATCH?'Match':unit==='points'?'Points':unit==='holes'?'Holes':(net?'Net':'To par');
+  const teamsPending=comp.teams==null&&(FORMATS[comp.format]||{}).team&&(+comp.teamSize||1)>=2;
+  $('main').innerHTML=`${BIG?`<h1 style="font-size:44px;margin:6px 4px 16px">${esc(pub.name)} · ${esc(comp.name)}</h1>`:''}${BIG?'':compChips()}
+   ${teamsPending?'<div class="banner">Partners are drawn after the round — individual standings until then.</div>':''}
+   <div class="card" style="overflow:hidden"><div class="lb h"><span>Pos</span><span>${MATCH?'Side':BB?'Team':'Player'}</span><span class="r">Thru</span><span class="r">${colHead}</span></div>
+   ${lb.map(r=>`<div class="lb num${mine.has(r.id)||(r.members||[]).some(id=>mine.has(id))?' me':''}"><b>${r.posTxt}</b><div style="min-width:0"><div style="font-weight:700;${r.team?'line-height:1.25':'overflow:hidden;text-overflow:ellipsis;white-space:nowrap'}" title="${esc(r.name)}">${r.team?r.name.split(' / ').map(esc).join('<br>'):esc(r.name)}</div></div><span class="r muted">${r.thru||'—'}</span><b class="r">${valTxt(r)}</b></div>`).join('')||'<div class="lb"><span></span><span class="muted">No scores yet.</span></div>'}
+   </div><p class="muted" style="text-align:center;font-size:12.5px">${esc(comp.name)} · ${MATCH?formatSummary(cp):(net?'Net':'Gross')+' '+formatSummary(cp).toLowerCase()} · updates live</p>${fromJoin?'<p style="text-align:center"><button class="btn" id="backJoin">Back</button></p>':''}`;
+  const bj=$('backJoin'); if(bj) bj.onclick=()=>renderJoin();
+  document.querySelectorAll('[data-comp]').forEach(b=>b.onclick=()=>{ lbComp=b.dataset.comp; renderBoard(fromJoin); });
 }
 boot();
 window.__canReload=()=>!queue.length;

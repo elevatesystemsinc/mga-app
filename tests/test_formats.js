@@ -65,6 +65,13 @@ check('321 pattern clamps to the team size',countOn({countPattern:'321'},'bestba
   const rows=matchBoard(pubM,scM,{});
   check('group v group Nassau: two sides, A +1 front, B +1 back, 18 all square → 1 point each',rows.length===2&&rows[0].holesUp===0&&rows.map(r=>r.pts).join()==='1.5,1.5'&&rows.some(r=>r.name.startsWith('a1')&&/F \+1/.test(r.status)&&/B [-−]1/.test(r.status)&&/18 0/.test(r.status)),rows.map(r=>[r.name,r.status,r.pts]));
 }
+// 6e. compPub: a competition cut out of a published event — players, teams, and individual standings until partners exist
+{ const mk=(ids,team)=>ids.map(id=>({id,name:id,set:'M',ph:0,team:''}));
+  const base={courses:{t:course},format:'stroke',teamSize:1,count:1,scoring:'gross',groups:[{id:'g1',course:'t',startHole:1,players:mk(['a','b','c','d'])}]};
+  const comp={id:'x',name:'Best ball',kind:'format',format:'bestball',teamSize:2,count:1,scoring:'net',players:['a','b','c'],teams:null};
+  const cp1=compPub(base,comp); check('compPub without teams: individual stroke play for the three in it',cp1.format==='stroke'&&cp1.groups[0].players.map(p=>p.id).join()==='a,b,c'&&cp1.scoring==='net');
+  const cp2=compPub(base,Object.assign({},comp,{teams:{a:'S1',b:'S1',c:'S2'}})); check('compPub with teams: best ball, team codes applied',cp2.format==='bestball'&&cp2.groups[0].players.map(p=>p.team).join()==='S1,S1,S2');
+}
 // 7. pending: next hole not scored yet; last hole needs no validation; shotgun start uses play order
 sc={A:Object.assign({},fill(4),{3:3}),B:fill(4)}; delete sc.A[4]; delete sc.B[4];
 r=skinsResult(pub([P('A',0),P('B',0)]),sc,{net:false,carry:false,validate:'gross'});

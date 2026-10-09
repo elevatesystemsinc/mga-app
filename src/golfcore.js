@@ -336,6 +336,18 @@ function allowKey(pub,fmt){ const n=teamSizeOf(pub);
 function allowOf(pub){ return Object.assign({},USGA_ALLOW,pub.allow||{}); }
 function pctFor(pub,key){ const A=pub.allow||{}; if(A[key]!=null) return A[key]; const base=key.replace(/\dof\d$/,''); if(A[base]!=null&&base!==key) return A[base]; return defaultAllow(key); }
 function holeFormat(pub,h){ return pub.format==='split'?(h<=9?pub.front:pub.back):(pub.format||'stroke'); }
+/* A published event may carry `comps`: the competitions of a small-group game that are shown live, each with its own
+   engine fields, players and (when known) teams. compPub() cuts the event down to one of them; a team competition
+   whose partners are not drawn yet is shown as individual stroke play. */
+const COMP_KEYS=['format','teamSize','count','countPattern','quotaBase','cap','matchScoring','matchForm','scoring'];
+function compPub(pub,comp){
+  const out=Object.assign({},pub,{allow:{},flights:[]}); COMP_KEYS.forEach(k=>{ if(comp[k]!==undefined) out[k]=comp[k]; });
+  const inP=new Set(comp.players||[]), teams=comp.teams||null, teamy=!!teams&&Object.keys(teams).length>0, isTeamFmt=!!((FORMATS[out.format]||{}).team)&&(+out.teamSize||1)>=2;
+  if(isTeamFmt&&!teamy) Object.assign(out,{format:'stroke',teamSize:1,count:1,countPattern:'',game:'stroke'});
+  out.groups=(pub.groups||[]).map(g=>Object.assign({},g,{players:(g.players||[]).filter(p=>inP.has(p.id)&&!(comp.sitOut||[]).includes(p.id)).map(p=>Object.assign({},p,{team:teamy?(teams[p.id]||''):'',flight:''}))})).filter(g=>g.players.length);
+  if(teamy) out.groups=out.groups.map(g=>Object.assign({},g,{players:g.players.filter(p=>p.team)})).filter(g=>g.players.length);
+  return out;
+}
 function eventFormats(pub){ return pub.format==='split'?[pub.front,pub.back]:[pub.format||'stroke']; }
 function isTeamEvent(pub){ return eventFormats(pub).some(f=>FORMATS[f]&&FORMATS[f].team===true); }
 function isMatchEvent(pub){ return eventFormats(pub).includes('match'); }

@@ -157,6 +157,7 @@ function vGameDesign(m){
     return `<div class="card pad gd-pot" data-pot="${pot.id}" style="display:flex;flex-direction:column;gap:12px"><div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><span class="chip navy">${i+1}</span><b style="font-size:15px">${esc(pot.name)}</b><span class="muted" style="font-size:13px">${esc(POT_KINDS[pot.kind])}</span><button class="ib" style="margin-left:auto" data-gdrm="${pot.id}" aria-label="Remove">${I.x}</button></div>
       <div class="frow2">${field('Competition','gdG_'+pot.id,pot.rules.game,{type:'select',options:[]}).replace('</select>',groups.map(gr=>`<optgroup label="${esc(gr)}">${lib.filter(x=>x.group===gr).map(x=>`<option value="${x.id}"${x.id===pot.rules.game?' selected':''}>${esc(x.name)}</option>`).join('')}</optgroup>`).join('')+'</select>')}${field('Name on the sheet','gdN_'+pot.id,pot.name)}</div>
       <p class="hint" style="margin:-6px 0 0">${esc(C.desc||'')}</p>
+      ${pot.kind==='format'?`<label class="check"><input type="checkbox" id="gdLive_${pot.id}"${pot.rules.live!==false?' checked':''}>Show on the live leaderboard</label>`:pot.kind==='dots'?'<p class="hint" style="margin:0">Dots are tallied by hand, so they never show on the live leaderboard.</p>':''}
       <div class="frow2">${pot.kind==='manual'?'<div></div>':field('Entry per player $','gdE_'+pot.id,pot.entry,{type:'number'})}
         ${pot.kind==='format'?`<div class="fld"><span class="lbl">Scored</span>${seg('gdS_'+pot.id,[['gross','Gross'],['net','Net']],pot.rules.scoring||'gross')}</div>`:pot.kind==='skins'?`<div class="fld"><span class="lbl">Scored</span>${seg('gdS_'+pot.id,[['gross','Gross'],['net','Net']],sk.net?'net':'gross')}</div>`:pot.kind==='dots'?`<div class="fld"><span class="lbl">Birdies &amp; eagles</span>${seg('gdS_'+pot.id,[['gross','Gross'],['net','Net']],dr.net?'net':'gross')}</div>`:'<div></div>'}</div>
       ${pot.kind==='format'?`<div class="frow2">${team||C.sizes?field('Players per team','gdT_'+pot.id,E.teamSize,{type:'select',options:(C.sizes||[E.teamSize]).map(n=>[n,n+' players'])}):field('Pays','gdP_'+pot.id,(pot.rules.places||[]).join(' / '),{ph:'e.g. 60 / 30 / 10',hint:'Percent per place, 1st / 2nd / 3rd… Blank = the usual split for the field.'})}
@@ -164,7 +165,7 @@ function vGameDesign(m){
         ${team&&E.format==='match'&&E.matchScoring==='nassau'?(()=>{ const ns=nassauStakes(pot); return `<div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px">${field('Front worth $','gdNF_'+pot.id,ns.front,{type:'number'})}${field('Back worth $','gdNB_'+pot.id,ns.back,{type:'number'})}${field('18 worth $','gdNT_'+pot.id,ns.total,{type:'number'})}</div><p class="hint" style="margin:-6px 0 0">Per player, each segment: the losing side pays the winning side; a halved segment is a push. The entry above is what each player has at stake in all three.</p>`; })()
           :team?`<div class="frow2">${field('Pays','gdP_'+pot.id,(pot.rules.places||[]).join(' / '),{ph:'e.g. 70 / 30',hint:'Percent per place. Blank = the usual split for the number of teams.'})}${C.count&&E.teamSize>1?field('Balls that count','gdC_'+pot.id,E.count,{type:'select',options:Array.from({length:Math.max(1,E.teamSize-1)},(_,k)=>[k+1,(k+1)+' of '+E.teamSize])}):'<div></div>'}</div>`:''}`:''}
       ${pot.kind==='skins'?`<div class="frow2">${field('Format','gdMode_'+pot.id,sk.mode,{type:'select',options:[['pot','Skins pot — divided by the skins won'],['hole','Per hole — the pot split over 18 holes, ties carry over']]})}${field('Validation on the next hole','gdV_'+pot.id,sk.validate||'none',{type:'select',options:Object.entries(SKIN_VALID_LABEL)})}</div>
-          <div class="fld"><span class="lbl">Rules</span><label class="check"><input type="checkbox" id="gdGBN_${pot.id}"${sk.grossBeatsNet?' checked':''}${sk.net?'':' disabled'}>Gross beats net on a tied hole</label><label class="check"><input type="checkbox" id="gdLive_${pot.id}"${sk.live?' checked':''}>Announce skins live during the round</label></div>
+          <div class="fld"><span class="lbl">Rules</span><label class="check"><input type="checkbox" id="gdGBN_${pot.id}"${sk.grossBeatsNet?' checked':''}${sk.net?'':' disabled'}>Gross beats net on a tied hole</label><label class="check"><input type="checkbox" id="gdLive_${pot.id}"${sk.live?' checked':''}>Show skins on the live leaderboard during the round</label></div>
           <p class="hint" style="margin:-6px 0 0">${sk.mode==='hole'?'Each hole is worth a share of the pot; a tied hole carries its share to the next, and holes unwon at the end are not paid.':'One pot for the day, divided by the skins won. A tied hole is nobody’s; a skin that fails validation is lost.'} A hole counts once everyone in the pot has scored it. Left quiet, skins stay off the game page during the round and are called out from the cards afterwards.</p>`:''}
       ${pot.kind==='dots'?`<div class="frow2">${field('Points for a birdie','gdDb_'+pot.id,dr.birdie,{type:'number'})}${field('Points for an eagle','gdDe_'+pot.id,dr.eagle,{type:'number'})}</div>${field('Hand-tallied dots','gdDk_'+pot.id,dr.kinds.join(', '),{hint:'Comma-separated: sandies, greenies, chip-ins, polies…'})}`:''}
     </div>`; };
@@ -193,7 +194,7 @@ function vGameDesign(m){
   const readAll=()=>{ d.name=fv('gdName'); d.course=fv('gdCourse'); d.date=fv('gdDate'); d.time=fv('gdTime'); d.notes=fv('gdNotes'); d.payWhen=$('gdWhen').dataset.val; d.settle=$('gdSettle').dataset.val;
     for(const pot of d.pots){ const v=id=>fv(id+'_'+pot.id); pot.name=v('gdN')||pot.name; if(pot.kind!=='manual') pot.entry=n0(v('gdE'));
       const S=$('gdS_'+pot.id); if(S){ const sc=S.dataset.val; if(pot.kind==='format') pot.rules.scoring=sc; if(pot.kind==='skins'){ skinsRulesOf(pot).net=sc==='net'; if(sc!=='net') skinsRulesOf(pot).grossBeatsNet=false; } if(pot.kind==='dots') dotsRules(pot).net=sc==='net'; }
-      if(pot.kind==='format'){ if($('gdT_'+pot.id)) pot.rules.teamSize=+v('gdT'); if($('gdC_'+pot.id)) pot.rules.count=+v('gdC'); if($('gdB_'+pot.id)) pot.rules.teamsBy=v('gdB'); if($('gdP_'+pot.id)) pot.rules.places=v('gdP').split(/[\/,\s]+/).map(Number).filter(x=>x>0);
+      if(pot.kind==='format'){ pot.rules.live=$('gdLive_'+pot.id)?$('gdLive_'+pot.id).checked:pot.rules.live!==false; if($('gdT_'+pot.id)) pot.rules.teamSize=+v('gdT'); if($('gdC_'+pot.id)) pot.rules.count=+v('gdC'); if($('gdB_'+pot.id)) pot.rules.teamsBy=v('gdB'); if($('gdP_'+pot.id)) pot.rules.places=v('gdP').split(/[\/,\s]+/).map(Number).filter(x=>x>0);
         if($('gdNF_'+pot.id)){ pot.rules.nassau={front:n0(v('gdNF')),back:n0(v('gdNB')),total:n0(v('gdNT'))}; pot.entry=pot.rules.nassau.front+pot.rules.nassau.back+pot.rules.nassau.total; } }
       if(pot.kind==='skins'){ const sk=skinsRulesOf(pot); sk.grossBeatsNet=$('gdGBN_'+pot.id).checked&&sk.net; sk.mode=v('gdMode')==='hole'?'hole':'pot'; sk.carry=sk.mode==='hole'; sk.live=$('gdLive_'+pot.id).checked; sk.validate=v('gdV')||'none'; }
       if(pot.kind==='dots'){ const dr=pot.rules.dots=dotsRules(pot); dr.birdie=n0(v('gdDb')); dr.eagle=n0(v('gdDe')); dr.kinds=v('gdDk').split(',').map(s=>s.trim()).filter(Boolean); } } };
@@ -236,10 +237,11 @@ function vGame(m,g){
   const potCard=pot=>{ const tot=potTotal(g,pot), paid=potPaid(pot), inN=potPlayers(g,pot).length, team=potIsTeam(pot), known=potTeamsKnown(pot), by=pot.rules.teamsBy||'hand';
     const act=pot.kind==='skins'?'Pay skins':pot.kind==='dots'?'Tally & pay':pot.kind==='manual'?'Add winner':(pot.rules.nassau?'Settle the match':'Pay out');
     const quiet=pot.kind==='skins'&&!skinsRulesOf(pot).live?(pot.calledOut?`<button class="btn sm" data-callout="${pot.id}">Call out again</button>`:''):'';
+    const liveChip=pot.kind==='dots'||pot.kind==='manual'?'':potLive(pot)?'<span class="chip ok" title="Shown on the live leaderboard">● live board</span>':'<span class="chip" title="Not on the live leaderboard">off the live board</span>';
     const teamBtn=team?(known?`<button class="btn sm" data-teams="${pot.id}">${by==='hand'?'Change teams':'Re-draw'}</button>`:by==='hand'?`<button class="btn sm pri" data-teams="${pot.id}">Pick teams</button>`:`<button class="btn sm pri" data-teams="${pot.id}">Draw partners</button>`):'';
     const payoutsTxt=pot.payouts.length?pot.payouts.slice().sort((a,b)=>b.amount-a.amount).map(x=>{ const p=g.players.find(y=>y.id===x.pid); return `<span class="chip ok">${esc(p?gpName(p):'—')} ${gMoney(x.amount)}</span>`; }).join(' '):'';
     return `<div class="card" style="overflow:hidden"><div class="cardhead"><div class="cell2" style="min-width:0"><h2 class="h2">${esc(pot.name)}</h2><span class="muted">${esc(potSummary(pot))}${pot.kind==='manual'?'':` · ${inN} in${pot.entry?' × '+gMoney(pot.entry)+' = '+gMoney(tot):''}`}${paid?` · <b class="pos">${gMoney(paid)} paid out</b>`:''}</span></div>
-        <div class="actions">${teamBtn}${quiet}<button class="btn sm${pot.payouts.length?'':' pri'}" data-pay="${pot.id}">${act}</button><button class="btn sm" data-potedit="${pot.id}">${I.edit}</button></div></div>
+        <div class="actions">${liveChip}${teamBtn}${quiet}<button class="btn sm${pot.payouts.length?'':' pri'}" data-pay="${pot.id}">${act}</button><button class="btn sm" data-potedit="${pot.id}">${I.edit}</button></div></div>
       ${team&&!known?`<div class="banner" style="border-radius:0;border-left:0;border-right:0">${by==='after'?'Partners are drawn after the round. Until then everyone is on their own ball — the standings below are individual.':by==='before'?'Draw the partners before play; the teams then stay together on the sheet.':'Pick the teams, then the standings show teams.'}</div>`:''}
       ${potStandingsHTML(g,pot,ev)}
       ${payoutsTxt?`<div style="padding:10px 22px;display:flex;gap:6px;flex-wrap:wrap;border-top:1px solid var(--line)">${payoutsTxt}</div>`:''}</div>`; };
@@ -424,16 +426,18 @@ function drawStage(g,pot){
 }
 
 /* ---------- scoring a competition from the day's cards ---------- */
-/* the public event cut down to one competition: its players, its format, its teams */
-function potPub(g,pot){
-  const ev=gameEvent(g); if(!ev) return null; const E=potEngine(pot), pub=publicEvent(ev);
-  Object.assign(pub,E,{allow:{},scoring:pot.rules.scoring||'gross'});
-  const inP=new Set(potPlayers(g,pot).map(p=>p.gpid)), teams=pot.teams||{}, teamy=potIsTeam(pot)&&potTeamsKnown(pot), out=new Set(pot.sitOut||[]);
-  if(!teamy&&potIsTeam(pot)){ Object.assign(pub,engineFrom(catalogById('stroke'),1,1)); }   // partners not drawn yet: individual standings
-  pub.groups=pub.groups.map(gr=>Object.assign({},gr,{players:gr.players.filter(p=>inP.has(p.id)&&!out.has(p.id)).map(p=>Object.assign({},p,{team:teamy?(teams[p.id]||''):''}))})).filter(gr=>gr.players.length);
-  if(teamy) pub.groups=pub.groups.map(gr=>Object.assign({},gr,{players:gr.players.filter(p=>p.team)})).filter(gr=>gr.players.length);
-  return pub;
+/* a competition as the scoring page sees it: engine fields, players, teams, and (skins) the rules */
+const potLive=pot=>pot.kind==='skins'?!!skinsRulesOf(pot).live:pot.rules.live!==false;
+function potComp(g,pot){
+  const E=potEngine(pot), c={id:pot.id,name:pot.name,kind:pot.kind,players:potPlayers(g,pot).map(p=>p.gpid).filter(Boolean),teams:potIsTeam(pot)&&potTeamsKnown(pot)?pot.teams:null,sitOut:pot.sitOut||[],scoring:pot.rules.scoring||'gross'};
+  COMP_KEYS.forEach(k=>{ if(k!=='scoring'&&E[k]!==undefined) c[k]=E[k]; });
+  if(pot.kind==='skins'){ const sk=skinsRulesOf(pot); c.skins={net:sk.net,grossBeatsNet:sk.grossBeatsNet,validate:sk.validate,carry:sk.carry,mode:sk.mode}; c.scoring=sk.net?'net':'gross'; }
+  return c;
 }
+/* the competitions shown on the live leaderboard for a game's event (dots are tallied by hand, so never) */
+function gameComps(ev){ const g=gamesData().find(x=>x.id===ev.gameId); if(!g) return []; return g.pots.filter(p=>(p.kind==='format'||p.kind==='skins')&&potLive(p)).map(p=>potComp(g,p)); }
+/* the public event cut down to one competition: its players, its format, its teams */
+function potPub(g,pot){ const ev=gameEvent(g); if(!ev) return null; return compPub(publicEvent(ev),potComp(g,pot)); }
 function defaultPcts(n){ return n<=5?[100]:n<=8?[60,40]:n<=15?[50,30,20]:[40,30,20,10]; }
 /* places × percentages, ties share the places they cover, cent-exact */
 function splitByFinish(amount,order,pcts){

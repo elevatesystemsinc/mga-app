@@ -170,6 +170,11 @@ Tournament = { id, name, season, days, startDate, field:[{id,memberId,team,paid,
     skins" opens `skinsCallout(g,pot)` (full-screen, one hole per tap in play order) and sets `pot.calledOut`. A won
     skin shows as pending until its validation hole is called; stepping onto that hole first flashes the verdict
     full-screen (`sk-flash`: red "Didn't validate" / green "Validated"), then shows the hole's result.
+  - **Live leaderboard per competition**: each format competition has "Show on the live leaderboard"
+    (`rules.live`, default on; skins use `rules.skins.live`, dots never show). `gameComps(ev)` → the live competitions
+    as `{id,name,kind,players,teams,sitOut,engine…}`; `publicEvent` publishes them as `comps`, and the scoring page
+    (score_src.html: `compChips`, `renderCompBoard`, `renderSkinsBoard`) shows one board per competition. `potPub(g,pot)`
+    = `compPub(publicEvent(ev), potComp(g,pot))` (golfcore) is the same cut-down used by the game page's standings.
   - **Deleting**: the designer's "Delete game" (`deleteGame`) removes the game and its scoring event. Deleting an
     event from Golf that belongs to a game or a tournament round removes that game / round too — otherwise
     `ensureGameEvent` / `ensureTournamentScoring` would rebuild it on the next render.
