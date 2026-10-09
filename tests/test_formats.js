@@ -69,6 +69,13 @@ check('321 pattern clamps to the team size',countOn({countPattern:'321'},'bestba
   const rowsH=matchBoard(pubM,scS,{}), rowsS=matchBoard(Object.assign({},pubM,{matchBy:'strokes'}),scS,{});
   const aH=rowsH.find(r=>r.name.startsWith('a1')), bS=rowsS.find(r=>r.name.startsWith('b1')), aS=rowsS.find(r=>r.name.startsWith('a1'));
   check('allowance: four-ball match 90%, reverse waltz 100% of the difference',pctFor({format:'match',teamSize:2},allowKey({format:'match',teamSize:2},'match'))===90&&pctFor(pubM,allowKey(pubM,'match'))===100&&pctFor({format:'match',teamSize:4,matchScoring:'nassau',matchBy:'strokes'},allowKey({format:'match',teamSize:4,matchScoring:'nassau',matchBy:'strokes'},'match'))===100,[allowKey({format:'match',teamSize:2},'match'),allowKey(pubM,'match')]);
+  // full handicaps by total score (test course: hole 1 is rated 1, hole 2 rated 2…): everyone 2, b4 3 → by total score every player strokes on holes 1 and 2
+  // (hole 1, 3 balls: both sides 9; hole 3: b4's extra stroke makes B's one ball a 3); by holes the same spread is relative to the low man → only b4 strokes, on hole 1
+  check('Nassau by total score plays full handicaps, not off the low man',(()=>{ const mkP=by=>{ const p=JSON.parse(JSON.stringify(Object.assign({},pubM,{matchBy:by}))); p.groups.forEach(g=>g.players.forEach(x=>{ x.ph=x.ch=(x.id==='b4'?3:2); })); return p; };
+    const sc={}; ['a1','a2','a3','a4','b1','b2','b3','b4'].forEach(id=>{ sc[id]=fill(4); });
+    const rS=matchBoard(mkP('strokes'),sc,{}).find(x=>x.name.startsWith('a1')), rH=matchBoard(mkP('holes'),sc,{}).find(x=>x.name.startsWith('a1'));
+    const S1=rS.holes.find(h=>h.h===1), S3=rS.holes.find(h=>h.h===3), H1=rH.holes.find(h=>h.h===1);
+    return S1.a===9&&S1.b===9&&S3.a===4&&S3.b===3&&H1.a===12&&H1.b===11; })());
   check('each side of a group-v-group match links its own group (scorecard)',rowsH.find(r=>r.name.startsWith('a1')).groupId==='g1'&&rowsH.find(r=>r.name.startsWith('b1')).groupId==='g2',rowsH.map(r=>[r.name,r.groupId]));
   check('Nassau by holes: A wins the front and the 18 (2 holes to 1)',aH.pts===2.5&&/F 1 up/.test(aH.status),rowsH.map(r=>[r.name,r.status,r.pts]));
   // each side reads its own counted balls to par: A −2 on the front (two birdies among 3- and 2-ball holes), B −6 (three 2s on a 3-ball hole); the lead (4 strokes) decides the bets

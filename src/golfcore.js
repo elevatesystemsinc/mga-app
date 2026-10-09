@@ -275,7 +275,7 @@ const GAME_CATALOG=[
   {id:'match',name:'Singles match play',group:'Match play',engine:{format:'match',teamSize:1},desc:'Two players in a group, hole by hole; the better net score wins the hole.',hcp:'100% of the difference'},
   {id:'nassau',name:'Nassau (front · back · 18)',group:'Match play',engine:{format:'match',teamSize:1,matchScoring:'nassau'},desc:'Three singles bets in one match: front nine, back nine and the eighteen — a point for each.',hcp:'100% of the difference'},
   {id:'fourballmatch',name:'Four-ball match play',group:'Match play',engine:{format:'match',teamSize:2},sizes:[2],desc:'Two against two, best net ball of each side on every hole.',hcp:'90%, everyone off the low man'},
-  {id:'waltz321',name:'Reverse waltz (3-2-1, all on 9 & 18)',group:'Match play',engine:{format:'match',teamSize:4,matchScoring:'nassau',countPattern:'321',matchBy:'strokes'},sizes:[2,3,4,5,6],desc:'Team against team, three bets: the front, the back and the 18 — each goes to the side with the lower total of its counted balls. Each hole counts the best three balls, then two, then one, repeating from the first hole — and every ball on 9 and 18.',hcp:'100% of the difference, everyone off the low man'},
+  {id:'waltz321',name:'Reverse waltz (3-2-1, all on 9 & 18)',group:'Match play',engine:{format:'match',teamSize:4,matchScoring:'nassau',countPattern:'321',matchBy:'strokes'},sizes:[2,3,4,5,6],desc:'Team against team, three bets: the front, the back and the 18 — each goes to the side with the lower total of its counted balls. Each hole counts the best three balls, then two, then one, repeating from the first hole — and every ball on 9 and 18.',hcp:'full handicaps (100%), strokes where they fall'},
   {id:'teamnassau',name:'Team Nassau (best ball)',group:'Match play',engine:{format:'match',teamSize:4,matchScoring:'nassau'},sizes:[2,3,4,5,6],desc:'Team against team, best ball of each side on every hole; points for the front, the back and the 18.',hcp:'100% of the difference, everyone off the low man'},
   {id:'hilo',name:'Hi-Lo (low ball · high ball)',group:'Match play',engine:{format:'match',teamSize:2,matchScoring:'hilo'},sizes:[2],desc:'Two against two, two points a hole: the better low ball and the better high ball.',hcp:'90%, everyone off the low man'},
   {id:'foursomesmatch',name:'Foursomes match play',group:'Match play',engine:{format:'match',teamSize:2,matchForm:'foursomes'},sizes:[2],desc:'Alternate shot, one ball per side, hole by hole.',hcp:'50% of combined, difference'},
@@ -438,7 +438,9 @@ function matchBoard(pub,scores,opt){
   opt=opt||{}; const rows=[];
   for(const M of matchPairs(pub)){ const {g,c,A,B,order}=M; if(!c) continue;
     { const all=A.members.concat(B.members);
-      const phs=all.map(p=>segPH(pub,p,'match')), low=phs.some(v=>v==null)?null:Math.min(...phs), rel=p=>{ const v=segPH(pub,p,'match'); return v==null||low==null?0:v-low; };
+      // match play: everyone off the low man. A Nassau by total score (the reverse waltz): full handicaps — the owner was clear it is not relative to the low
+      const totalScore=(pub.matchScoring||'holes')==='nassau'&&matchByOf(pub)==='strokes';
+      const phs=all.map(p=>segPH(pub,p,'match')), low=phs.some(v=>v==null)?null:Math.min(...phs), rel=p=>{ const v=segPH(pub,p,'match'); if(v==null) return 0; return totalScore?v:(low==null?0:v-low); };
       const four=pub.matchForm==='foursomes';   // alternate shot: one ball per side off the team handicap
       const tph=S=>teamPH(pub,'foursomes',S.members), lowT=four?Math.min(...[A,B].map(S=>tph(S)??0)):0;
       const hcpOf=p=>(((p._c||c).hcp)[p.set||'M']||(p._c||c).hcp.M);

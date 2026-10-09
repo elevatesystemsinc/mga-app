@@ -206,8 +206,10 @@ Tournament = { id, name, season, days, startDate, field:[{id,memberId,team,paid,
     to par** per segment — `status` "F −3 · B — · 18 −3" (the owner: "how many under par we are on the front, the back
     and total"), by holes "F 1 up · B AS · 18 1 up"; `nassauSegments`/`payNassau` settle from `segs[].v`. `matchByOf(pub)` falls back to 'strokes' for a Nassau with
     the 321 pattern (copies published before the field existed). Allowance: `allowKey` gives a team match that adds
-    balls up (count pattern, count>1 or total score) **100%** of the difference off the low man ('match'), four-ball
-    match play 90% ('match4') — a 90% waltz once mis-scored a live game by two strokes. Each side's row carries **its
+    balls up (count pattern, count>1 or total score) **100%** ('match'), four-ball match play 90% ('match4') — a 90%
+    waltz once mis-scored a live game by two strokes. A Nassau by total score plays **full handicaps** (`rel` = the
+    player's PH, not PH − low man; the owner: "it should not be relative to the low"); by-holes matches stay off the
+    low man. Each side's row carries **its
     own** `groupId` (its scorecard), not the match's first group. The phone board gives a match row the 18 in its value column and
     the front/back under the names (`.lb.m`). `matchPairs()`
     in golfcore pairs sides within a group as before, or — when teams span groups or no group holds two teams —
