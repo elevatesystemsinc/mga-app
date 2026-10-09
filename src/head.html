@@ -261,6 +261,10 @@ textarea.inp{height:auto;min-height:84px;padding:10px 12px;resize:vertical}
 .dw-done{display:flex;flex-direction:column;gap:8px;align-items:center;max-height:38vh;overflow:auto;width:100%}
 .gd-pot .frow2{gap:12px}
 @media (max-width:640px){ .dw-slot{min-width:0;width:100%;font-size:26px;padding:14px 18px} .dw-team{gap:10px} }
+.sk-list{display:flex;flex-direction:column;gap:6px;width:min(640px,94vw);max-height:52vh;overflow:auto;padding:4px}
+.sk-line{display:grid;grid-template-columns:44px minmax(0,1fr);gap:12px;align-items:center;text-align:left;padding:10px 14px;border-radius:12px;background:rgba(255,255,255,.06);border:1px solid rgba(216,183,95,.25)}
+.sk-line b{font-family:var(--serif,Georgia),serif;font-size:26px;color:#D8B75F} .sk-line span{font-size:17px;font-weight:700;color:#fff} .sk-line small{display:block;font-size:12.5px;color:#C9CFD2;margin-top:2px}
+.sk-line.won{background:rgba(31,107,74,.45);border-color:#6FBF8E} .sk-line.void{background:rgba(160,60,40,.35);border-color:#E07B62} .sk-line.muted span{color:#C9CFD2;font-weight:500}
 /* checklist */
 .ck-g{padding:10px 22px 4px;font-size:11.5px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--gold-dk,#7E5F1A);background:var(--ivory,#FBFAF5);border-top:1px solid var(--line)}
 .ck-row{display:grid;grid-template-columns:34px minmax(0,1fr) 210px;gap:10px;align-items:center;padding:10px 22px;border-top:1px solid var(--line);cursor:pointer}

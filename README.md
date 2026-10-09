@@ -79,7 +79,9 @@ same scores, each with its own entry, its own players and its own payout: stroke
 ball paying two with partners **drawn after the round**, skins, dots, closest to the pin… Team competitions set how
 the partners come about: picked by hand, drawn before the round, or drawn after it. **Skins** is one pot for the day
 divided by the skins won, with gross or net, gross-beats-net, carry-overs and a validation standard on the next hole
-(par, net par, bogey or net bogey) each a switch. The **who's-in grid** ticks every player into every competition
+(par, net par, bogey or net bogey) each a switch. Skins stay off the screen during the round unless you switch
+"announce live" on; afterwards **Call out the skins** walks the cards hole by hole, carry-overs and validations
+included, one hole per tap. The **who's-in grid** ticks every player into every competition
 they want, so nine can be in the skins while eight play the team game. A new game starts from the last one.
 
 **On the day.** Everyone plays their own ball; every competition is scored live from those cards. A team competition

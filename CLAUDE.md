@@ -161,6 +161,9 @@ Tournament = { id, name, season, days, startDate, field:[{id,memberId,team,paid,
     an odd player joins a team or sits out (`pot.sitOut`); the result is saved (`pot.teams`, `pot.draw`) **before** the
     staged reveal (full-screen, `rf-show` overlay + `dw-*` CSS, names cycling and landing team by team); a re-draw
     needs a reason, kept in `pot.draw.log`.
+  - **Quiet skins**: `rules.skins.live` (default off) keeps skins off the game page during the round; "Call out the
+    skins" opens `skinsCallout(g,pot)` (full-screen, one hole per tap in play order: winner, carry, validation
+    result, then the totals) and sets `pot.calledOut`, after which the standings show as usual.
   - Paying: `payFormat` (finish from `potPub` standings via `payByFinish`; `pot.rules.places` are the default splits;
     ties share places, cent-exact; hand-entered positions when there are no scores), `paySkins` (`skinsCalc` →
     `skinsResult`, one pot ÷ skins won; rules on the pot), `payDots`, `payManual`.

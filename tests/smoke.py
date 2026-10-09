@@ -115,6 +115,12 @@ async def main():
     ok=(r['pcts']=='60 / 40' and r['ann']==52 and r['bo']==92 and r['cy']==26 and r['di']==2 and r['bdAmt']=='20' and r['drawn']==4 and r['drawnSides']==2 and r['teams']==[2,2] and r['beforeDraw']==4 and r['afterDraw']==2 and r['draw']=='random' and sorted(r['bdPay'])==[['gp_p1',10],['gp_p2',10]]
         and r['left']==0 and r['rows'][0]==['Bo Baker',1,32,92,60] and r['rows'][-1]==['Di Dunn',1,32,2,-30]
         and r['settle'][0]==['Bo Baker',60] and r['settle'][-1]==['Di Dunn',-30] and r['tSum']==sum(x for _,x in r['settle'] if x>0) and all(t['amount']>0 for t in r['transfers']))
+    # quiet skins: nothing live on the game page until the call-out, which walks the cards hole by hole
+    r3=await pg.evaluate("""()=>{ const g=GAME(), pot=g.pots[1]; delete pot.calledOut; view.gameId=g.id; go('games'); const quiet=!!document.querySelector('[data-callout]')&&!document.body.textContent.includes('Hole 2'); skinsCallout(g,pot);
+      const ov=document.querySelector('.rf-show'); let n=0; while(document.getElementById('skNext')){ document.getElementById('skNext').click(); n++; } const lines=ov.querySelectorAll('.sk-line').length, won=ov.querySelectorAll('.sk-line.won').length, txt=ov.textContent; document.getElementById('skFin').click();
+      const after=!!document.querySelector('[data-callout]')&&document.body.textContent.includes('Hole 2'); return {quiet, n, lines, won, after, called:pot.calledOut, sum:txt.includes('8 skins')}; }""")
+    ok=ok and r3['quiet'] and r3['n']==18 and r3['lines']==18 and r3['won']==2 and r3['after'] and r3['called'] and r3['sum']
+    print('quiet skins + call-out', r3, 'OK' if r3['quiet'] and r3['lines']==18 and r3['won']==2 and r3['after'] else 'FAIL')
     # the game sheet PDF and the designer round-trip
     r2=await pg.evaluate("""async()=>{ const g=GAME(); const doc=await gameSheetPDF(g,{returnDoc:true}); const n=doc.getNumberOfPages(); designGame(g); const names=GD.draft.pots.map(p=>p.name); const grid=document.querySelectorAll('[data-gdin]').length; document.getElementById('gdSave').click(); return {pages:n, names, grid, back:!!document.getElementById('gmSheet')}; }""")
     ok=ok and r2['pages']>=1 and len(r2['names'])==4 and r2['grid']==6*4 and r2['back']

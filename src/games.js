@@ -156,8 +156,8 @@ function vGameDesign(m){
       ${pot.kind==='format'?`<div class="frow2">${team||C.sizes?field('Players per team','gdT_'+pot.id,E.teamSize,{type:'select',options:(C.sizes||[E.teamSize]).map(n=>[n,n+' players'])}):field('Pays','gdP_'+pot.id,(pot.rules.places||[]).join(' / '),{ph:'e.g. 60 / 30 / 10',hint:'Percent per place, 1st / 2nd / 3rd… Blank = the usual split for the field.'})}
           ${team?field('Partners','gdB_'+pot.id,pot.rules.teamsBy||'hand',{type:'select',options:[['hand','Picked by hand'],['before','Drawn before the round'],['after','Drawn after the round (blind draw)']]}):(C.count&&E.teamSize>1?field('Balls that count','gdC_'+pot.id,E.count,{type:'select',options:Array.from({length:Math.max(1,E.teamSize-1)},(_,k)=>[k+1,(k+1)+' of '+E.teamSize])}):'<div></div>')}</div>
         ${team?`<div class="frow2">${field('Pays','gdP_'+pot.id,(pot.rules.places||[]).join(' / '),{ph:'e.g. 70 / 30',hint:'Percent per place. Blank = the usual split for the number of teams.'})}${C.count&&E.teamSize>1?field('Balls that count','gdC_'+pot.id,E.count,{type:'select',options:Array.from({length:Math.max(1,E.teamSize-1)},(_,k)=>[k+1,(k+1)+' of '+E.teamSize])}):'<div></div>'}</div>`:''}`:''}
-      ${pot.kind==='skins'?`<div class="frow2"><div class="fld"><span class="lbl">Rules</span><label class="check"><input type="checkbox" id="gdGBN_${pot.id}"${sk.grossBeatsNet?' checked':''}${sk.net?'':' disabled'}>Gross beats net on a tied hole</label><label class="check"><input type="checkbox" id="gdCarry_${pot.id}"${sk.carry?' checked':''}>Carry-overs on tied holes</label></div>
-          ${field('Validation on the next hole','gdV_'+pot.id,sk.validate||'none',{type:'select',options:Object.entries(SKIN_VALID_LABEL)})}</div><p class="hint" style="margin:-6px 0 0">One pot for the day: the skins pot divided by the skins won. A hole counts once everyone in the pot has scored it; carried holes with no winner at the end are not paid.</p>`:''}
+      ${pot.kind==='skins'?`<div class="frow2"><div class="fld"><span class="lbl">Rules</span><label class="check"><input type="checkbox" id="gdGBN_${pot.id}"${sk.grossBeatsNet?' checked':''}${sk.net?'':' disabled'}>Gross beats net on a tied hole</label><label class="check"><input type="checkbox" id="gdCarry_${pot.id}"${sk.carry?' checked':''}>Carry-overs on tied holes</label><label class="check"><input type="checkbox" id="gdLive_${pot.id}"${sk.live?' checked':''}>Announce skins live during the round</label></div>
+          ${field('Validation on the next hole','gdV_'+pot.id,sk.validate||'none',{type:'select',options:Object.entries(SKIN_VALID_LABEL)})}</div><p class="hint" style="margin:-6px 0 0">One pot for the day: the skins pot divided by the skins won. A hole counts once everyone in the pot has scored it; carried holes with no winner at the end are not paid. Left quiet, skins stay off the game page during the round and are called out from the cards afterwards.</p>`:''}
       ${pot.kind==='dots'?`<div class="frow2">${field('Points for a birdie','gdDb_'+pot.id,dr.birdie,{type:'number'})}${field('Points for an eagle','gdDe_'+pot.id,dr.eagle,{type:'number'})}</div>${field('Hand-tallied dots','gdDk_'+pot.id,dr.kinds.join(', '),{hint:'Comma-separated: sandies, greenies, chip-ins, polies…'})}`:''}
     </div>`; };
   m.innerHTML=`<div class="crumb"><button id="gdBack">Games</button><span class="muted">/</span><span class="muted">${isNew?'New game':esc(gameTitle(d))}</span></div>
@@ -185,7 +185,7 @@ function vGameDesign(m){
     for(const pot of d.pots){ const v=id=>fv(id+'_'+pot.id); pot.name=v('gdN')||pot.name; if(pot.kind!=='manual') pot.entry=n0(v('gdE'));
       const S=$('gdS_'+pot.id); if(S){ const sc=S.dataset.val; if(pot.kind==='format') pot.rules.scoring=sc; if(pot.kind==='skins'){ skinsRulesOf(pot).net=sc==='net'; if(sc!=='net') skinsRulesOf(pot).grossBeatsNet=false; } if(pot.kind==='dots') dotsRules(pot).net=sc==='net'; }
       if(pot.kind==='format'){ if($('gdT_'+pot.id)) pot.rules.teamSize=+v('gdT'); if($('gdC_'+pot.id)) pot.rules.count=+v('gdC'); if($('gdB_'+pot.id)) pot.rules.teamsBy=v('gdB'); if($('gdP_'+pot.id)) pot.rules.places=v('gdP').split(/[\/,\s]+/).map(Number).filter(x=>x>0); }
-      if(pot.kind==='skins'){ const sk=skinsRulesOf(pot); sk.grossBeatsNet=$('gdGBN_'+pot.id).checked&&sk.net; sk.carry=$('gdCarry_'+pot.id).checked; sk.validate=v('gdV')||'none'; }
+      if(pot.kind==='skins'){ const sk=skinsRulesOf(pot); sk.grossBeatsNet=$('gdGBN_'+pot.id).checked&&sk.net; sk.carry=$('gdCarry_'+pot.id).checked; sk.live=$('gdLive_'+pot.id).checked; sk.validate=v('gdV')||'none'; }
       if(pot.kind==='dots'){ const dr=pot.rules.dots=dotsRules(pot); dr.birdie=n0(v('gdDb')); dr.eagle=n0(v('gdDe')); dr.kinds=v('gdDk').split(',').map(s=>s.trim()).filter(Boolean); } } };
   m.querySelectorAll('.gd-pot').forEach(card=>{ const pot=d.pots.find(x=>x.id===card.dataset.pot);
     card.querySelector('#gdG_'+pot.id).onchange=e=>{ readAll(); const np=newPot(e.target.value,null); np.id=pot.id; np.inn=pot.inn; np.entry=pot.entry||np.entry; Object.assign(pot,np); rerender(); };
@@ -225,10 +225,11 @@ function vGame(m,g){
     :'<div class="empty"><b>Nobody in yet</b><span>Add the regulars from the member list, or a guest by name.</span></div>'}</div>`;
   const potCard=pot=>{ const tot=potTotal(g,pot), paid=potPaid(pot), inN=potPlayers(g,pot).length, team=potIsTeam(pot), known=potTeamsKnown(pot), by=pot.rules.teamsBy||'hand';
     const act=pot.kind==='skins'?'Pay skins':pot.kind==='dots'?'Tally & pay':pot.kind==='manual'?'Add winner':'Pay out';
+    const quiet=pot.kind==='skins'&&!skinsRulesOf(pot).live?(pot.calledOut?`<button class="btn sm" data-callout="${pot.id}">Call out again</button>`:''):'';
     const teamBtn=team?(known?`<button class="btn sm" data-teams="${pot.id}">${by==='hand'?'Change teams':'Re-draw'}</button>`:by==='hand'?`<button class="btn sm pri" data-teams="${pot.id}">Pick teams</button>`:`<button class="btn sm pri" data-teams="${pot.id}">Draw partners</button>`):'';
     const payoutsTxt=pot.payouts.length?pot.payouts.slice().sort((a,b)=>b.amount-a.amount).map(x=>{ const p=g.players.find(y=>y.id===x.pid); return `<span class="chip ok">${esc(p?gpName(p):'—')} ${gMoney(x.amount)}</span>`; }).join(' '):'';
     return `<div class="card" style="overflow:hidden"><div class="cardhead"><div class="cell2" style="min-width:0"><h2 class="h2">${esc(pot.name)}</h2><span class="muted">${esc(potSummary(pot))}${pot.kind==='manual'?'':` · ${inN} in${pot.entry?' × '+gMoney(pot.entry)+' = '+gMoney(tot):''}`}${paid?` · <b class="pos">${gMoney(paid)} paid out</b>`:''}</span></div>
-        <div class="actions">${teamBtn}<button class="btn sm${pot.payouts.length?'':' pri'}" data-pay="${pot.id}">${act}</button><button class="btn sm" data-potedit="${pot.id}">${I.edit}</button></div></div>
+        <div class="actions">${teamBtn}${quiet}<button class="btn sm${pot.payouts.length?'':' pri'}" data-pay="${pot.id}">${act}</button><button class="btn sm" data-potedit="${pot.id}">${I.edit}</button></div></div>
       ${team&&!known?`<div class="banner" style="border-radius:0;border-left:0;border-right:0">${by==='after'?'Partners are drawn after the round. Until then everyone is on their own ball — the standings below are individual.':by==='before'?'Draw the partners before play; the teams then stay together on the sheet.':'Pick the teams, then the standings show teams.'}</div>`:''}
       ${potStandingsHTML(g,pot,ev)}
       ${payoutsTxt?`<div style="padding:10px 22px;display:flex;gap:6px;flex-wrap:wrap;border-top:1px solid var(--line)">${payoutsTxt}</div>`:''}</div>`; };
@@ -263,6 +264,7 @@ function vGame(m,g){
   m.querySelectorAll('[data-gin]').forEach(c=>c.onchange=()=>{ const [pid,plid]=c.dataset.gin.split('|'); const pot=g.pots.find(x=>x.id===pid); if(c.checked) pot.inn[plid]=true; else delete pot.inn[plid]; persist(); render(); });
   m.querySelectorAll('[data-gpaid]').forEach(c=>c.onchange=()=>{ const p=g.players.find(x=>x.id===c.dataset.gpaid); p.paid=c.checked; persist(); render(); });
   m.querySelectorAll('[data-potedit]').forEach(b=>b.onclick=()=>designGame(g));
+  m.querySelectorAll('[data-callout]').forEach(b=>b.onclick=()=>skinsCallout(g,g.pots.find(p=>p.id===b.dataset.callout)));
   m.querySelectorAll('[data-teams]').forEach(b=>b.onclick=()=>{ const pot=g.pots.find(p=>p.id===b.dataset.teams); if((pot.rules.teamsBy||'hand')==='hand') pickTeams(g,pot); else drawStage(g,pot); });
   m.querySelectorAll('[data-pay]').forEach(b=>b.onclick=()=>{ const pot=g.pots.find(p=>p.id===b.dataset.pay); ({skins:paySkins,dots:payDots,format:payFormat,manual:(g,pot)=>payManual(g,pot,null)})[pot.kind](g,pot); });
 }
@@ -271,6 +273,7 @@ function potStandingsHTML(g,pot,ev){
   const sc=scoresFor(ev); if(!Object.keys(sc||{}).length) return '<div style="padding:12px 22px" class="muted">No scores yet.</div>';
   if(pot.kind==='manual') return '';
   if(pot.kind==='skins'){ const r=skinsCalc(g,pot), rules=skinsRulesOf(pot), val=r&&r.total?potTotal(g,pot)/r.total:0;
+    if(!rules.live&&!pot.calledOut) return `<div style="padding:12px 22px;display:flex;gap:12px;align-items:center;flex-wrap:wrap"><span class="muted" style="flex:1 1 260px">Skins are kept quiet during the round and called out from the cards afterwards${r&&r.incomplete?` · ${18-r.incomplete} of 18 holes in`:''}.</span><button class="btn sm pri" data-callout="${pot.id}">Call out the skins</button></div>`;
     if(!r||!r.wins.length) return `<div style="padding:12px 22px" class="muted">No skins yet${r&&r.carried?` · ${r.carried} carried`:''}.</div>`;
     return `<div class="mini" style="margin:10px 22px 14px">${r.wins.map(w=>`<div class="mr num" style="grid-template-columns:62px minmax(0,1fr) 90px"><b>Hole ${w.hole}</b><div class="cell2"><span>${esc(w.name)} <span class="muted">${w.score}${rules.net&&w.net!==w.score?' (net '+w.net+')':''}${w.count>1?' · '+w.count+' skins':''}</span></span>${w.status==='void'?`<small class="neg">Void — missed ${esc((SKIN_VALID_LABEL[rules.validate]||'').replace(' or better on the next hole','').toLowerCase())} on ${w.checkHole}</small>`:w.status==='pending'?`<small class="muted">Validates on hole ${w.checkHole}</small>`:''}</div><b class="r ${w.status==='won'?'':'muted'}">${w.status==='won'?gMoney(val*w.count):'—'}</b></div>`).join('')}<div class="mr num" style="grid-template-columns:minmax(0,1fr) 90px"><span class="muted">${r.total} skin${r.total===1?'':'s'}${r.total?' at '+gMoney(val):''}${r.pending?` · ${r.pending} pending`:''}${r.carried?` · ${r.carried} carried`:''}${r.incomplete?` · ${r.incomplete} hole${r.incomplete===1?'':'s'} open`:''}</span><b class="r">${gMoney(r.total?potTotal(g,pot):0)}</b></div></div>`; }
   if(pot.kind==='dots'){ const rules=dotsRules(pot), auto=dotsAuto(g,pot,rules), T=potPlayers(g,pot).map(p=>{ const a=auto[p.id]||{birdies:0,eagles:0}, t=(pot.tally||{})[p.id]||{}; return {p,dots:a.birdies*rules.birdie+a.eagles*rules.eagle+sum(rules.kinds,k=>t[k]),a}; }).filter(x=>x.dots).sort((a,b)=>b.dots-a.dots);
@@ -337,7 +340,7 @@ function drawStage(g,pot){
   if(ps.length<size){ toast('Not enough players in this competition to draw'); return; }
   if(known){ const reason=prompt('Re-draw the partners? Say why — it goes on the record.'); if(reason==null) return; if(!reason.trim()){ toast('A reason is needed to re-draw'); return; } pot._redraw=reason.trim(); }
   const ov=document.createElement('div'); ov.className='rf-show'; document.body.appendChild(ov);
-  try{ ov.requestFullscreen&&ov.requestFullscreen(); }catch(_){}
+  try{ const fs=ov.requestFullscreen&&ov.requestFullscreen(); if(fs&&fs.catch) fs.catch(()=>{}); }catch(_){}
   let timer=null, running=false;
   const close=()=>{ clearTimeout(timer); if(document.fullscreenElement) document.exitFullscreen().catch(()=>{}); ov.remove(); document.removeEventListener('keydown',key); render(); };
   const wait=ms=>new Promise(r=>{ timer=setTimeout(r,ms); });
@@ -447,6 +450,37 @@ function paySkins(g,pot){
       const cents=Object.entries(r.per).map(([pid,n])=>({pid,n,c:Math.floor(amt*100*n/r.total)})); let rem=Math.round(amt*100)-cents.reduce((a,x)=>a+x.c,0); for(let i=0;rem>0;i++,rem--) cents[i%cents.length].c++;
       pot.payouts=cents.map(x=>({id:uid(),pid:x.pid,amount:x.c/100,note:`${x.n} skin${x.n===1?'':'s'} · ${skinsRuleText(rules)}`}));
       toast(`${r.total} skins paid at ${gMoney(val)}`); }});
+}
+/* the skins call-out: hole by hole from the cards, read out after the round — one hole per tap, validations shown as
+   they fall; opening it marks the pot as called out so the game page shows the standings from then on */
+function skinsCallout(g,pot){
+  const ev=gameEvent(g); if(!ev){ toast('No scoring event'); return; }
+  const rules=skinsRulesOf(pot), r=skinsCalc(g,pot,rules); if(!r){ toast('No scores yet'); return; }
+  const pub=publicEvent(ev), sc=scoresFor(ev), byG=new Map(potPlayers(g,pot).filter(p=>p.gpid).map(p=>[p.gpid,p]));
+  const order=(()=>{ const grp=pub.groups[0]; return grp?playOrder(grp.startHole):Array.from({length:18},(_,i)=>i+1); })();
+  // every hole in play order: the winner, or why it carried / tied; validation holes point back at the skin they decide
+  const winAt=Object.fromEntries(r.wins.map(w=>[w.hole,w]));
+  const lowAt=h=>{ const rows=[]; for(const gr of pub.groups){ const c=pub.courses[gr.course]; if(!c) continue; for(const p of gr.players){ if(!byG.has(p.id)) continue; const s=+((sc[p.id]||{})[h]); if(!s) continue; const hc=(c.hcp[p.set||'M']||c.hcp.M)[h-1], k=rules.net&&typeof p.ph==='number'?strokesOn(p.ph,hc):0; rows.push({name:byG.get(p.id)?gpName(byG.get(p.id)):p.name,s,net:s-k}); } }
+    if(!rows.length) return null; const key=x=>rules.net?x.net:x.s, low=Math.min(...rows.map(key)); return {low,who:rows.filter(x=>key(x)===low),n:rows.length}; };
+  const total=potTotal(g,pot), val=r.total?total/r.total:0;
+  const lines=order.map(h=>{ const w=winAt[h], L=lowAt(h); if(!L) return {h,txt:'No scores on this hole yet',cls:'muted'};
+    if(w){ const v=w.status==='won'?`${w.count>1?w.count+' skins':'1 skin'} · ${gMoney(val*w.count)}`:w.status==='void'?`void — missed the standard on hole ${w.checkHole}${rules.carry?', carried on':''}`:`waiting on hole ${w.checkHole}`;
+      return {h,txt:`${w.name} · ${w.score}${rules.net&&w.net!==w.score?' (net '+w.net+')':''}`,sub:v,cls:w.status==='won'?'won':w.status==='void'?'void':'pending'}; }
+    return {h,txt:L.who.length>1?`${L.who.map(x=>x.name.split(' ')[0]).join(', ')} tied at ${L.low}`:`${L.who[0].name} low, but not outright`,sub:rules.carry?'carries over':'no skin',cls:'muted'}; });
+  pot.calledOut=true; persist();
+  const ov=document.createElement('div'); ov.className='rf-show'; document.body.appendChild(ov);
+  try{ const fs=ov.requestFullscreen&&ov.requestFullscreen(); if(fs&&fs.catch) fs.catch(()=>{}); }catch(_){}
+  let i=0; const close=()=>{ if(document.fullscreenElement) document.exitFullscreen().catch(()=>{}); ov.remove(); document.removeEventListener('keydown',key); render(); };
+  const paint=()=>{ const shown=lines.slice(0,i); const done=i>=lines.length;
+    ov.innerHTML=`<div class="rf-top"><img src="${typeof crestSrc==='function'?crestSrc():'crest.png'}" alt=""><div><div class="rf-k">${esc(orgName())} · ${esc(gameTitle(g))}</div><div class="rf-h">${esc(pot.name)} — from the cards</div></div><button class="rf-x" id="skClose" aria-label="Close">✕</button></div>
+      <div class="rf-stage" style="justify-content:flex-start;padding-top:26px"><div class="rf-lbl">${done?'All 18 holes':'Hole by hole · '+skinsRuleText(rules)}</div>
+        <div class="sk-list">${shown.map(l=>`<div class="sk-line ${l.cls}"><b>${l.h}</b><div><span>${esc(l.txt)}</span>${l.sub?`<small>${esc(l.sub)}</small>`:''}</div></div>`).join('')}</div>
+        ${done?`<div class="rf-sum" style="margin-top:14px"><span>${r.total} skin${r.total===1?'':'s'} · ${gMoney(total)} pot</span><b>${r.total?gMoney(val)+' a skin':'No skins — pot carries'}</b><small>${Object.entries(r.per).map(([pid,n])=>{ const p=g.players.find(x=>x.id===pid); return `${p?gpName(p):'—'} ${n}`; }).join(' · ')}${r.pending?' · '+r.pending+' still pending':''}</small></div>`
+          :`<button class="rf-go" id="skNext">${i?'Next hole':'Start at hole '+order[0]}</button><div class="rf-hint">or press the space bar</div>`}</div>
+      <div class="rf-facts"><span><b>${byG.size}</b> in the skins</span><span><b>${gMoney(total)}</b> pot</span>${done?`<button class="rf-go" id="skFin" style="margin-left:auto">Done</button>`:''}</div>`;
+    ov.querySelector('#skClose').onclick=close; const nx=ov.querySelector('#skNext'); if(nx) nx.onclick=()=>{ i++; paint(); const el=ov.querySelector('.sk-list'); if(el) el.scrollTop=el.scrollHeight; }; const fin=ov.querySelector('#skFin'); if(fin) fin.onclick=close; };
+  const key=e=>{ if(e.key==='Escape') close(); if(e.code==='Space'){ e.preventDefault(); const b=ov.querySelector('#skNext')||ov.querySelector('#skFin'); if(b) b.click(); } };
+  document.addEventListener('keydown',key); paint();
 }
 /* ---------- dots / doodah ---------- */
 const DOTS_DEFAULT={birdie:1,eagle:3,net:false,kinds:['Sandy','Greenie','Chip-in','Polie']};
