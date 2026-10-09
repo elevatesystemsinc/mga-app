@@ -420,7 +420,7 @@ function editFieldPlayer(ev,x){
    Teams drawn across the event's players: at random, ABCD (one from each handicap tier), or balanced (snake by
    handicap). Before the round the groups are then built around the teams; after it, the draw is scored from the
    individual rounds (teams may span groups). Re-draw any time; the draw is remembered on the event. */
-function shuffled(a){ a=a.slice(); for(let i=a.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; } return a; }
+function shuffled(a){ a=a.slice(); for(let i=a.length-1;i>0;i--){ const j=secureInt(i+1); [a[i],a[j]]=[a[j],a[i]]; } return a; }
 function drawTeams(players,size,method,idxOf){
   size=Math.max(2,+size||2); const n=Math.ceil(players.length/size), teams=Array.from({length:n},()=>[]);
   if(method==='random'){ shuffled(players).forEach((p,i)=>teams[i%n].push(p)); return teams; }

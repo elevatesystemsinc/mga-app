@@ -110,9 +110,8 @@ holes on which it has a counting score.
   (editable, with the USGA default one click away). Groups and the printed scorecards, the public scoring page and
   the leaderboards all follow the event's format.
 - **Tournaments:** a tournament's scoring event carries the format; the field's teams come across as the teams.
-- **Small groups → Games:** the main game is any catalog entry (team games draw partners from the game's live
-  scoring card); every other competition in the same round is a **pot** with its own entry and players — skins (all
-  the rules above), dots / doodah (birdies and eagles counted automatically, sandies, greenies, chip-ins and polies
-  tallied by hand), a side pot scored as another game on the same scores (low net, blind-draw best ball drawn after
-  the round, Stableford…), or winners entered by hand (closest to the pin, long drive, hole-in-one). Each pot pays out
-  on its own; the Ledger adds them up.
+- **Small groups → Games:** a game is any number of competitions on one own-ball round, each a catalog entry with
+  its own entry, players and payout places — stroke play, a best ball with partners picked, drawn before or drawn
+  after the round, skins (one pot ÷ skins won, with gross/net, gross beats net, carry-overs and a validation standard
+  of par, net par, bogey or net bogey on the next hole), dots / doodah, or winners entered by hand. Only a one-ball
+  game (scramble, foursomes, greensome) changes how the round is played.

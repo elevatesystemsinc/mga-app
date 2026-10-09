@@ -253,6 +253,14 @@ textarea.inp{height:auto;min-height:84px;padding:10px 12px;resize:vertical}
   .drawer .frow2{grid-template-columns:minmax(0,1fr)}
   .pick-logo{max-width:220px}
 }
+/* small-group draw stage + game designer */
+.dw-opts{display:flex;gap:16px;flex-wrap:wrap;justify-content:center;margin:6px 0 10px} .dw-opts label{display:flex;flex-direction:column;gap:6px;color:#C9CFD2;font-size:13px;font-weight:700;text-align:left} .dw-opts .inp{min-width:240px;height:42px}
+.dw-team{display:flex;gap:18px;flex-wrap:wrap;justify-content:center;margin:10px 0 18px}
+.dw-slot{min-width:240px;padding:22px 26px;border-radius:14px;background:rgba(255,255,255,.08);border:2px solid rgba(216,183,95,.45);font-family:var(--serif,Georgia),serif;font-size:36px;font-weight:700;color:#fff;transition:transform .15s,background .3s}
+.dw-slot.rolling{color:#D8B75F} .dw-slot.won{background:#1F6B4A;border-color:#6FBF8E;transform:scale(1.04)} .dw-slot.empty{display:none}
+.dw-done{display:flex;flex-direction:column;gap:8px;align-items:center;max-height:38vh;overflow:auto;width:100%}
+.gd-pot .frow2{gap:12px}
+@media (max-width:640px){ .dw-slot{min-width:0;width:100%;font-size:26px;padding:14px 18px} .dw-team{gap:10px} }
 /* checklist */
 .ck-g{padding:10px 22px 4px;font-size:11.5px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--gold-dk,#7E5F1A);background:var(--ivory,#FBFAF5);border-top:1px solid var(--line)}
 .ck-row{display:grid;grid-template-columns:34px minmax(0,1fr) 210px;gap:10px;align-items:center;padding:10px 22px;border-top:1px solid var(--line);cursor:pointer}

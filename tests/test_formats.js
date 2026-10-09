@@ -40,6 +40,21 @@ check('net validation: B’s hole-1 skin is void after a net bogey on 2',r.wins[
 sc={A:fill(4),B:Object.assign(fill(4),{1:4,2:5})};
 r=skinsResult(pub([P('A',0),P('B',2)]),sc,{net:true,carry:true,validate:'net'});
 check('net validation passes when the stroke on the next hole makes it net par',r.wins[0].status==='won'&&r.wins[0].hole===1,r.wins[0]);
+// 6b. validation standards: bogey and net bogey on the next hole; the old names still work
+sc={A:Object.assign(fill(4),{5:3,6:5}),B:Object.assign(fill(4),{6:6})};   // A birdies 5, bogeys 6 (B doubles 6)
+r=skinsResult(pub([P('A',0),P('B',0)]),sc,{net:false,carry:true,validate:'par'});
+check('standard par: a bogey on the next hole voids the skin',r.wins[0].status==='void');
+r=skinsResult(pub([P('A',0),P('B',0)]),sc,{net:false,carry:true,validate:'bogey'});
+check('standard bogey: a bogey on the next hole keeps it',r.wins[0].status==='won');
+sc={A:fill(4),B:Object.assign(fill(4),{1:4,2:6})};   // B (stroke on 1 only) wins hole 1 net, then doubles hole 2 with no stroke
+r=skinsResult(pub([P('A',0),P('B',1)]),sc,{net:true,carry:true,validate:'netbogey'});
+check('net bogey: a net double bogey voids',r.wins[0].status==='void');
+sc={A:fill(4),B:Object.assign(fill(4),{1:4,2:6})};
+r=skinsResult(pub([P('A',0),P('B',2)]),sc,{net:true,carry:true,validate:'netbogey'});
+check('net bogey: a stroke on the next hole makes the double a net bogey — stands',r.wins[0].status==='won');
+sc={A:Object.assign(fill(4),{5:3,6:5}),B:Object.assign(fill(4),{6:6})};
+check('old names map: gross → par, net → net par',JSON.stringify(skinsResult(pub([P('A',0),P('B',0)]),sc,{net:false,carry:true,validate:'gross'}))===JSON.stringify(skinsResult(pub([P('A',0),P('B',0)]),sc,{net:false,carry:true,validate:'par'})));
+check('secureInt stays in range',Array.from({length:200},()=>secureInt(7)).every(x=>x>=0&&x<7));
 // 7. pending: next hole not scored yet; last hole needs no validation; shotgun start uses play order
 sc={A:Object.assign({},fill(4),{3:3}),B:fill(4)}; delete sc.A[4]; delete sc.B[4];
 r=skinsResult(pub([P('A',0),P('B',0)]),sc,{net:false,carry:false,validate:'gross'});

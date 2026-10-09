@@ -85,13 +85,14 @@ async def main():
     await pg.goto(page('index.html')+'?org=misfits'); await pg.wait_for_timeout(500)
     pages=await pg.evaluate("()=>{ ['p0','p1','p2','p3','p4'].forEach(id=>db.memberships.push({id,status:'Active',joined:'',notes:''})); persist(); return navItems().map(x=>x[0]); }")
     for v in pages: await pg.evaluate(f"()=>go('{v}')"); await pg.wait_for_timeout(60)
-    r=await pg.evaluate("""()=>{ go('games'); editGame(null); document.getElementById('gmN').value='Friday game'; document.getElementById('gmD').value='2026-05-01'; document.getElementById('gmE').value='20'; document.getElementById('gmS').value='5'; document.getElementById('dSave').click();
+    r=await pg.evaluate("""()=>{ go('games'); designGame(null); const d=GD.draft; d.name='Friday game'; d.date='2026-05-01'; d.pots[0].entry=20; d.pots[0].rules.scoring='gross';
+      const sk=newPot('skins',d,{entry:5}); sk.rules.skins={net:false,grossBeatsNet:false,carry:true,validate:'none'}; d.pots.push(sk); render(); const designer=!!document.getElementById('gdSave'); document.getElementById('gdSave').click();
       const g=GAME(); ['p0','p1','p2','p3','p4'].forEach(id=>{ const p=addPlayer(g,{memberId:id}); p.id='gp_'+id; g.pots.forEach(pot=>{ delete pot.inn[p.id]; }); }); const gu=addPlayer(g,{name:'Guest Gus'}); gu.id='gp_guest';
       g.players.forEach(p=>{ g.pots[0].inn[p.id]=true; if(!['gp_p4','gp_guest'].includes(p.id)) g.pots[1].inn[p.id]=true; }); g.players.forEach(p=>{ p.paid=p.id!=='gp_guest'; });
-      // a dots pot for everyone and a blind-draw side pot for four
-      g.pots.push(newPot('dots','Dots',2,g,{rules:{game:'dots'}})); const bd=newPot('format','Blind draw',5,null,{rules:{game:'blinddraw'}}); ['gp_p0','gp_p1','gp_p2','gp_p3'].forEach(id=>bd.inn[id]=true); g.pots.push(bd);
-      openScoring(g); const ev=gameEvent(g); return {nav:navItems().map(x=>x[0]), groups:ev.groups.map(x=>x.players.length), live:ev.status, pots:g.pots.map(p=>[p.kind,potTotal(g,p)]), total:gameMoney(g).total}; }""")
-    ok=r['nav']==['dash','games','ledger','tournaments','golf','members'] and r['groups']==[4,2] and r['live']=='live' and r['pots']==[['finish',120],['skins',20],['dots',12],['format',20]] and r['total']==172
+      // a dots pot for everyone and a blind-draw best ball for four, partners drawn after the round
+      g.pots.push(newPot('dots',g,{entry:2})); const bd=newPot('blinddraw',null,{entry:5}); ['gp_p0','gp_p1','gp_p2','gp_p3'].forEach(id=>bd.inn[id]=true); g.pots.push(bd);
+      openScoring(g); const ev=gameEvent(g); return {designer, nav:navItems().map(x=>x[0]), groups:ev.groups.map(x=>x.players.length), live:ev.status, pots:g.pots.map(p=>[p.kind,potTotal(g,p)]), total:gameMoney(g).total, by:bd.rules.teamsBy, evFormat:[ev.format,ev.teamSize], payWhen:g.payWhen, settle:g.settle}; }""")
+    ok=r['designer'] and r['nav']==['dash','games','ledger','tournaments','golf','members'] and r['groups']==[4,2] and r['live']=='live' and r['pots']==[['format',120],['skins',20],['dots',12],['format',20]] and r['total']==172 and r['by']=='after' and r['evFormat']==['stroke',1] and r['payWhen']=='after' and r['settle']=='pot'
     print('group game + pots + scoring event', r, 'OK' if ok else 'FAIL'); bad+=not ok
     # scores: Ann 4s everywhere; Bo 4s but a 3 on hole 2 (outright skin) ; Cy/Di/Ed 5s; hole 7: Ann 3, Bo 3 (tie → carry), hole 8: Cy 3 outright → 2 skins with carry
     r=await pg.evaluate("""async()=>{ const g=GAME(), ev=gameEvent(g); const gp=id=>g.players.find(p=>p.id===id).gpid; const S=async(id,h,v)=>setScore(ev,gp(id),h,v);
@@ -101,16 +102,23 @@ async def main():
     # hole 1 ties (carry 1) → Bo wins 2 on hole 2; holes 3–7 tie (carry 5) → Cy wins 6 on hole 8; the rest carry unpaid. Oak par 5-4-5-3…: Ann birdies 1, 3, 7, 12; Bo adds hole 2; Cy hole 8
     ok=r['skins']==[[2,'Bo Baker',2],[8,'Cy Cole',6]] and r['total']==8 and r['lb'][0]==['Bo Baker',1,70] and r['lb'][1]==['Ann Able',2,71] and r['dots']==['4/0','5/0','1/0','0/0']
     print('skins + leaderboard + dots', r, 'OK' if ok else 'FAIL'); bad+=not ok
-    r=await pg.evaluate("""async()=>{ const g=GAME(); const S=()=>document.getElementById('dSave').click(); payPlaces(g,g.pots[0]); const pcts=document.getElementById('pfP').value; S(); paySkins(g,g.pots[1]); S();
+    r=await pg.evaluate("""async()=>{ const g=GAME(); const S=()=>document.getElementById('dSave').click(); payFormat(g,g.pots[0]); const pcts=document.getElementById('pfP').value; S(); paySkins(g,g.pots[1]); S();
       payDots(g,g.pots[2]); const di=document.querySelector('[data-dt="gp_p3|Sandy"]'); di.value='2'; di.dispatchEvent(new Event('input')); S();
-      payFormat(g,g.pots[3]); document.getElementById('sdN').value='2'; S(); await new Promise(r=>setTimeout(r,250)); const drawn=Object.assign({},g.pots[3].teams); closeDrawer();
+      const beforeDraw=eventBoard(potPub(g,g.pots[3]),scoresFor(gameEvent(g)),{sort:'gross'}).filter(r=>r.n).length;   // individual standings until the draw
+      const teams=runDraw(g,g.pots[3],{method:'random'}); const drawn=Object.assign({},g.pots[3].teams); const afterDraw=eventBoard(potPub(g,g.pots[3]),scoresFor(gameEvent(g)),{sort:'gross'}).filter(r=>r.n).length;
       const gpid=id=>g.players.find(p=>p.id===id).gpid; g.pots[3].teams={[gpid('gp_p0')]:'S1',[gpid('gp_p3')]:'S1',[gpid('gp_p1')]:'S2',[gpid('gp_p2')]:'S2'}; payFormat(g,g.pots[3]); const bdAmt=document.getElementById('pfAmt').value; S();
-      const bd=g.pots[3], dv=Object.values(drawn);
+      const bd=g.pots[3], dv=Object.values(drawn), st=settlement(g);
       const by=id=>Math.round(gpOut(g,g.players.find(p=>p.id===id))*100)/100; go('ledger'); const rows=ledgerRows('season').map(r=>[r.name,r.games,r.inn,Math.round(r.out*100)/100,Math.round(r.net*100)/100]);
-      return {pcts, ann:by('gp_p0'), bo:by('gp_p1'), cy:by('gp_p2'), di:by('gp_p3'), bdAmt, drawn:dv.length, drawnSides:new Set(dv).size, bdPay:bd.payouts.map(x=>[x.pid,x.amount]), left:Math.round(gameMoney(g).left*100)/100, rows}; }""")
+      return {pcts, ann:by('gp_p0'), bo:by('gp_p1'), cy:by('gp_p2'), di:by('gp_p3'), bdAmt, drawn:dv.length, drawnSides:new Set(dv).size, teams:teams.map(t=>t.length), beforeDraw, afterDraw, bdPay:bd.payouts.map(x=>[x.pid,x.amount]), left:Math.round(gameMoney(g).left*100)/100, rows,
+        settle:st.rows.map(r=>[r.name,r.net]), transfers:st.transfers, tSum:Math.round(st.transfers.reduce((a,t)=>a+t.amount,0)*100)/100, draw:!!bd.draw&&bd.draw.method}; }""")
     # main 120 at 60/40: Bo 72, Ann 48; skins 20 over 8: Bo 5, Cy 15; dots 12 over 12 dots (Ann 4, Bo 5, Cy 1, Di 2 sandies) at $1; blind draw 20: Bo/Cy best ball 70 beats Ann/Di 71 → 10 each
-    ok=(r['pcts']=='60 / 40' and r['ann']==52 and r['bo']==92 and r['cy']==26 and r['di']==2 and r['bdAmt']=='20' and r['drawn']==4 and r['drawnSides']==2 and sorted(r['bdPay'])==[['gp_p1',10],['gp_p2',10]]
-        and r['left']==0 and r['rows'][0]==['Bo Baker',1,32,92,60] and r['rows'][-1]==['Di Dunn',1,32,2,-30])
+    ok=(r['pcts']=='60 / 40' and r['ann']==52 and r['bo']==92 and r['cy']==26 and r['di']==2 and r['bdAmt']=='20' and r['drawn']==4 and r['drawnSides']==2 and r['teams']==[2,2] and r['beforeDraw']==4 and r['afterDraw']==2 and r['draw']=='random' and sorted(r['bdPay'])==[['gp_p1',10],['gp_p2',10]]
+        and r['left']==0 and r['rows'][0]==['Bo Baker',1,32,92,60] and r['rows'][-1]==['Di Dunn',1,32,2,-30]
+        and r['settle'][0]==['Bo Baker',60] and r['settle'][-1]==['Di Dunn',-30] and r['tSum']==sum(x for _,x in r['settle'] if x>0) and all(t['amount']>0 for t in r['transfers']))
+    # the game sheet PDF and the designer round-trip
+    r2=await pg.evaluate("""async()=>{ const g=GAME(); const doc=await gameSheetPDF(g,{returnDoc:true}); const n=doc.getNumberOfPages(); designGame(g); const names=GD.draft.pots.map(p=>p.name); const grid=document.querySelectorAll('[data-gdin]').length; document.getElementById('gdSave').click(); return {pages:n, names, grid, back:!!document.getElementById('gmSheet')}; }""")
+    ok=ok and r2['pages']>=1 and len(r2['names'])==4 and r2['grid']==6*4 and r2['back']
+    print('game sheet + designer', r2, 'OK' if r2['pages']>=1 and r2['grid']==24 else 'FAIL')
     print('payouts + ledger', r, 'OK' if ok else 'FAIL'); bad+=not ok
     print('  group errors', errs); bad+=bool(errs)
     await b.close()

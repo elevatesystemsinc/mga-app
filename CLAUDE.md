@@ -135,20 +135,37 @@ Tournament = { id, name, season, days, startDate, field:[{id,memberId,team,paid,
   links use `hub_key_golf_event` / `hub_key_score` / `hub_key_golf_delete` / `hub_key_share` (`keyRPC(fn,args)`
   adds the key). No realtime in key mode — the 15 s poll carries updates. A revoked/unknown key → `keyRejected()`
   (sign-in card with a message, key forgotten). The link is for one organization: another path redirects to it.
-- **Small groups** (`games.js`, group documents only): `db.games` = [{id, season, date, time, name, course, net,
-  status, game (catalog id) + engine fields, players:[{id, memberId|name, paid, extraIn, gpid}], **pots**:[{id, kind:
-  'finish'|'skins'|'dots'|'format'|'manual', name, entry, inn:{[player id]:true}, rules:{game, skins?, dots?, teamSize?},
-  teams?:{[event player id]:'S1'…}, tally?:{[player id]:{Sandy:n…}}, payouts:[{id,pid,amount,note}]}], golfEventId}]
-  and `db.ledgerAdj` (side bets / settle-ups). Games from before pots are migrated in `gamesData()` (entry → finish
-  pot "Main game", skinsEntry → skins pot, old payouts by kind). Money is a record of what changed hands: a player's
-  in = Σ entries of the pots they are in (+ extras), out = Σ payouts across pots (`gpIn`/`gpOut`); the Ledger's net =
-  out − in + adjustments, per season or quarter. `openScoring(g)` creates a golf event for the game (players in groups
-  of four, `gpid` links game player → event player) and `syncGameEvent` keeps it in step. Paying a pot: `payPlaces`
-  (finish, from the event leaderboard via `payByFinish`, ties share places, cent-exact, or hand-entered positions),
-  `paySkins` (`skinsCalc(g,pot,rules)` → `skinsResult`; rules kept in `pot.rules.skins`), `payDots` (`dotsAuto` counts
-  birdies/eagles from the scores, hand tallies in `pot.tally`), `payFormat` (a side game scored as another catalog
-  entry on the same scores through `sidePub` — low net, blind-draw best ball with `pot.teams` drawn in the drawer),
-  `payManual`. `addPlayer(g,o)` joins every pot except manual ones; `editGamePlayer` has per-pot checkboxes.
+- **Small groups** (`games.js`, group documents only): a game is players + any number of **competitions** ("pots"),
+  all scored from one own-ball round. `db.games` = [{id, season, date, time, name, course, notes, status, **payWhen**
+  'after'|'before', **settle** 'pot'|'net', golfEventId, players:[{id, memberId|name, paid, extraIn, gpid}],
+  pots:[{id, kind:'format'|'skins'|'dots'|'manual', name, entry, inn:{[player id]:true}, rules:{game (catalog id),
+  scoring, teamSize, count, teamsBy:'hand'|'before'|'after', places:[pcts], skins:{net, grossBeatsNet, carry,
+  validate:'none'|'par'|'netpar'|'bogey'|'netbogey'}, dots:{…}}, teams?:{[event player id]:'S1'…}, draw?:{at, method,
+  size, log:[{at,reason}]}, sitOut?:[event player ids], tally?, payouts:[{id,pid,amount,note}]}]}] and `db.ledgerAdj`.
+  `gamesData()` migrates older shapes (the old "finish" main pot becomes a `format` pot; skins `validate` 'gross'/'net'
+  → 'par'/'netpar'). There is no distinguished main game. Money: a player's in = Σ entries of the pots they are in
+  (+ extras), out = Σ payouts across pots (`gpIn`/`gpOut`); `settlement(g)` gives per-player in/out/net and
+  `settleUp()` the fewest payments for net settlement; the Ledger's net = out − in + adjustments.
+  - **Designer** (`designGame(g|null)` → `vGameDesign`, draft in `GD`): the day (name, date, course, pay timing,
+    settlement), competitions (`newPot(catalogId,g)` + per-kind rule panels), who's in (member picker, guests, the
+    players × pots checkbox grid). A new game starts from the last one (players + competitions). One-ball games
+    (scramble/foursomes/greensome) cannot share a round with own-ball competitions.
+  - **Game page** (`vGame`): after-the-round games lead with competitions + settlement, before-the-round games with
+    the who's-in grid; each competition card shows live standings (`potStandingsHTML` via `potPub(g,pot)` — the event
+    cut down to the pot's players, format and teams; a team pot without teams shows individual standings), the
+    teams button (Pick teams → `pickTeams`; Draw partners → `drawStage`), Pay out and Design.
+  - **Scoring event**: `ensureGameEvent`/`syncGameEvent` keep one event per game; `gameEventEngine(g)` makes it
+    own-ball stroke play unless a one-ball pot exists (then that format, teams from `pot.teams`). Partner draws
+    never change the event — best ball is computed from the cards through `potPub`.
+  - **The draw** (`runDraw(g,pot,{method,odd,reason})` → `drawStage`): `drawTeams` with `secureInt` (crypto) randomness;
+    an odd player joins a team or sits out (`pot.sitOut`); the result is saved (`pot.teams`, `pot.draw`) **before** the
+    staged reveal (full-screen, `rf-show` overlay + `dw-*` CSS, names cycling and landing team by team); a re-draw
+    needs a reason, kept in `pot.draw.log`.
+  - Paying: `payFormat` (finish from `potPub` standings via `payByFinish`; `pot.rules.places` are the default splits;
+    ties share places, cent-exact; hand-entered positions when there are no scores), `paySkins` (`skinsCalc` →
+    `skinsResult`, one pot ÷ skins won; rules on the pot), `payDots`, `payManual`.
+  - **Game sheet PDF** (`gameSheetPDF(g,{strokes,returnDoc})`): competitions and denominations, teams when known
+    (an after-round draw says so), the groups as they play with each player's strokes.
 - Arrays of objects carry stable `id`s — the merge (§3) matches by id. Keep it that way for anything new.
 - `_rev` (revision), `_w` (writer/client id), `_at` are bookkeeping, excluded from comparisons.
 - **Device-local, never in the shared doc:** cashier/check-in link status (`SHARE_ST`, `CKI_ST`), the cashier-link merge base (`localStorage mga_cbase_<tid>`), check-in base (`mga_ckibase_<tid>`).

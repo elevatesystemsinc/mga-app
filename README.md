@@ -71,16 +71,24 @@ format's team score and handicap math, with worked examples.
 ## Small groups
 
 A small group's hub is the regular game, and small tournaments when it wants them (the same Tournaments page as an
-association, with the Calcutta, meals and the rest switched on per tournament). **Games**: date, course, the main game
-from the game library (stroke play, quota, Stableford, best ball with drawn partners…) and any number of **pots**, each
-with its own entry money and players: the main game paid by finish, **skins** (gross or net, gross beats net,
-carry-overs, validation on the next hole), **dots / doodah** (birdies and eagles counted from the scores, sandies and
-greenies tallied by hand), side pots scored as another game on the same scores (low net, **blind-draw partners after
-the round**), and winners entered by hand (closest to the pin, long drive). Add the regulars from the member list (or a
-guest), tick who is in which pot and who has paid. Every game has **live scoring** from the moment it is created: players land in groups of four, each with a
-group ID for the scoring page on their phones; scores can also be entered in the hub. The **Ledger** shows who is up or down for
-the season or any quarter (paid out − paid in across every pot, plus side bets or settle-ups recorded as adjustments),
-with a one-click settle-up.
+association, with the Calcutta, meals and the rest switched on per tournament).
+
+**Designing a game.** One screen: the day (date, course, tee time, whether money changes hands before or after the
+round, pot or net settlement), the **competitions**, and who's in. A game can run any number of competitions on the
+same scores, each with its own entry, its own players and its own payout: stroke play paying three places, a best
+ball paying two with partners **drawn after the round**, skins, dots, closest to the pin… Team competitions set how
+the partners come about: picked by hand, drawn before the round, or drawn after it. **Skins** is one pot for the day
+divided by the skins won, with gross or net, gross-beats-net, carry-overs and a validation standard on the next hole
+(par, net par, bogey or net bogey) each a switch. The **who's-in grid** ticks every player into every competition
+they want, so nine can be in the skins while eight play the team game. A new game starts from the last one.
+
+**On the day.** Everyone plays their own ball; every competition is scored live from those cards. A team competition
+whose partners are not drawn yet shows individual standings until the **drawing**: a full-screen stage that draws
+with real randomness, saves the result first, then reveals the teams one at a time. The **settlement** shows what
+each player put in, pulled out and nets, and for net settlement the fewest payments that square it. The **game sheet
+PDF** carries the competitions and denominations, the teams when they are known, and the groups as they play with
+each player's strokes. The **Ledger** shows who is up or down for the season or any quarter, with a one-click
+settle-up.
 
 **Admin links.** A small group (or an association) can be run without the board password: in the club hub, open the
 organization under Organizations and create an **admin link** (`app.wcccmga.org/misfits#key=…`). Whoever opens it gets

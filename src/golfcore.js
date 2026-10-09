@@ -85,6 +85,12 @@ function strokesOn(ph,holeHcp){ if(!ph) return 0; if(ph>0) return Math.floor(ph/
    carry (ties carry to the next hole), validate: 'none' | 'gross' (par or better on the next hole) | 'net' (net par or
    better). A hole counts once everyone in the game has scored it. A void skin goes back into the carry (or is lost
    when ties don't carry); a skin on a player's last hole needs no validation; one that can't be checked yet is pending. */
+/* what a skin winner must make on the next hole: [strokes over par allowed, judged on net score?]. 'gross'/'net' are the
+   older names for par / net par. */
+const SKIN_VALID={par:[0,false],gross:[0,false],netpar:[0,true],net:[0,true],bogey:[1,false],netbogey:[1,true]};
+const SKIN_VALID_LABEL={none:'None — a skin stands on its own',par:'Par or better on the next hole',netpar:'Net par or better on the next hole',bogey:'Bogey or better on the next hole',netbogey:'Net bogey or better on the next hole'};
+/* a uniformly random integer in [0,n) from the browser's cryptographic generator (rejection sampling, no modulo bias) */
+function secureInt(n){ if(n<=1) return 0; const buf=new Uint32Array(1), lim=Math.floor(4294967296/n)*n; let x; do{ crypto.getRandomValues(buf); x=buf[0]; }while(x>=lim); return x%n; }
 function skinsResult(pub,scores,rules,playerIds){
   rules=rules||{}; const inG=playerIds?new Set(playerIds):null, pl=[];
   for(const g of pub.groups||[]){ const c=pub.courses[g.course]; if(!c) continue; const order=playOrder(g.startHole);
@@ -102,7 +108,7 @@ function skinsResult(pub,scores,rules,playerIds){
     if(rules.validate&&rules.validate!=='none'){ const nh=x.next(h);
       if(nh!=null){ w.checkHole=nh; const r2=at(x,nh);
         if(!r2) w.status='pending';
-        else if(!(rules.validate==='net'?r2.net<=r2.par:r2.s<=r2.par)){ w.status='void'; if(rules.carry) carried+=w.count; else lost+=w.count; } } }
+        else { const [over,useNet]=SKIN_VALID[rules.validate]||[0,false]; if(!((useNet?r2.net:r2.s)<=r2.par+over)){ w.status='void'; if(rules.carry) carried+=w.count; else lost+=w.count; } } } }
     wins.push(w); if(w.status==='won') per[w.pid]=(per[w.pid]||0)+w.count;
   }
   return {wins,per,total:wins.filter(w=>w.status==='won').reduce((a,w)=>a+w.count,0),carried,lost,incomplete,pending:wins.filter(w=>w.status==='pending').length,players:pl.length};
