@@ -339,14 +339,16 @@ function allowKey(pub,fmt){ const n=teamSizeOf(pub);
   if(fmt==='match') return n>=2&&!pub.countPattern&&!(+pub.count>1)&&matchByOf(pub)!=='strokes'?'match4':'match';
   if(FORMATS[fmt]&&FORMATS[fmt].count) return fmt+countOf(pub)+'of'+n; return fmt; }
 function allowOf(pub){ return Object.assign({},USGA_ALLOW,pub.allow||{}); }
-function pctFor(pub,key){ const A=pub.allow||{}; if(A[key]!=null) return A[key]; const base=key.replace(/\dof\d$/,''); if(A[base]!=null&&base!==key) return A[base]; return defaultAllow(key); }
+/* allowance for a key: an explicit override, else '*' (one figure for every player format — small groups play 100%
+   across the board), else the format's base key, else the USGA table. '*' never touches the per-player scramble tables. */
+function pctFor(pub,key){ const A=pub.allow||{}; if(A[key]!=null) return A[key]; const d=defaultAllow(key); if(A['*']!=null&&!Array.isArray(d)) return A['*']; const base=key.replace(/\dof\d$/,''); if(A[base]!=null&&base!==key) return A[base]; return d; }
 function holeFormat(pub,h){ return pub.format==='split'?(h<=9?pub.front:pub.back):(pub.format||'stroke'); }
 /* A published event may carry `comps`: the competitions of a small-group game that are shown live, each with its own
    engine fields, players and (when known) teams. compPub() cuts the event down to one of them; a team competition
    whose partners are not drawn yet is shown as individual stroke play. */
 const COMP_KEYS=['format','teamSize','count','countPattern','quotaBase','cap','matchScoring','matchForm','matchBy','scoring'];
 function compPub(pub,comp){
-  const out=Object.assign({},pub,{allow:{},flights:[]}); COMP_KEYS.forEach(k=>{ if(comp[k]!==undefined) out[k]=comp[k]; });
+  const out=Object.assign({},pub,{allow:pub.allow&&pub.allow['*']!=null?{'*':pub.allow['*']}:{},flights:[]}); COMP_KEYS.forEach(k=>{ if(comp[k]!==undefined) out[k]=comp[k]; });
   const inP=new Set(comp.players||[]), teams=comp.teams||null, teamy=!!teams&&Object.keys(teams).length>0, isTeamFmt=!!((FORMATS[out.format]||{}).team)&&(+out.teamSize||1)>=2;
   if(isTeamFmt&&!teamy) Object.assign(out,{format:'stroke',teamSize:1,count:1,countPattern:'',game:'stroke'});
   out.groups=(pub.groups||[]).map(g=>Object.assign({},g,{players:(g.players||[]).filter(p=>inP.has(p.id)&&!(comp.sitOut||[]).includes(p.id)).map(p=>Object.assign({},p,{team:teamy?(teams[p.id]||''):'',flight:''}))})).filter(g=>g.players.length);

@@ -76,6 +76,8 @@ check('321 pattern clamps to the team size',countOn({countPattern:'321'},'bestba
     const rS=matchBoard(mkP('strokes'),sc,{}).find(x=>x.name.startsWith('a1')), rH=matchBoard(mkP('holes'),sc,{}).find(x=>x.name.startsWith('a1'));
     const S1=rS.holes.find(h=>h.h===1), S3=rS.holes.find(h=>h.h===3), H1=rH.holes.find(h=>h.h===1);
     return S1.a===9&&S1.b===9&&S3.a===4&&S3.b===3&&H1.a===12&&H1.b===11; })());
+  check("allow '*': 100% for every player format, scramble tables untouched, kept by compPub",(()=>{ const p={format:'bestball',teamSize:2,count:1,allow:{'*':100}}; const cp=compPub(Object.assign({groups:[],comps:[]},p),{id:'x',players:[],format:'stroke',teamSize:1});
+    return pctFor(p,allowKey(p,'bestball'))===100&&pctFor({format:'stroke',allow:{'*':100}},'stroke')===100&&pctFor({format:'stroke'},'stroke')===95&&Array.isArray(pctFor({allow:{'*':100}},'scramble4'))&&pctFor({allow:{'*':100,stroke:90}},'stroke')===90&&cp.allow['*']===100; })());
   check('each side of a group-v-group match links its own group (scorecard)',rowsH.find(r=>r.name.startsWith('a1')).groupId==='g1'&&rowsH.find(r=>r.name.startsWith('b1')).groupId==='g2',rowsH.map(r=>[r.name,r.groupId]));
   check('Nassau by holes: A wins the front and the 18 (2 holes to 1)',aH.pts===2.5&&/F 1 up/.test(aH.status),rowsH.map(r=>[r.name,r.status,r.pts]));
   // each side reads its own counted balls to par: A −2 on the front (two birdies among 3- and 2-ball holes), B −6 (three 2s on a 3-ball hole); the lead (4 strokes) decides the bets

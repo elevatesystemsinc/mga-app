@@ -87,7 +87,7 @@ flashes "Didn't validate" before that hole's result. Every other competition has
 leaderboard** switch in the designer, and the live scoring page shows one board per competition that is switched on
 (dots are tallied by hand and never show). Removing a player, from the game page or the designer, takes them out
 of every competition, the scoring event, the leaderboard and live scoring, scores and all. Games are deleted from the designer; deleting a scoring event
-that belongs to a game or a tournament round removes that game or round with it. The **who's-in grid** ticks every player into every competition
+that belongs to a game or a tournament round removes that game or round with it. A game plays **full handicaps, 100% across the board** unless the designer switches to the USGA allowances. The **who's-in grid** ticks every player into every competition
 they want, so nine can be in the skins while eight play the team game. A new game starts from the last one.
 
 **On the day.** Everyone plays their own ball; every competition is scored live from those cards. A team competition

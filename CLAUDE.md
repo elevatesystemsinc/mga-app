@@ -218,6 +218,10 @@ Tournament = { id, name, season, days, startDate, field:[{id,memberId,team,paid,
     designer's stake fields; entry = their sum); `payNassau` settles segment by segment (losers' stakes to the
     winners, a halve is a push, an unfinished segment returns the stake). `pickTeams` has "Teams = the groups".
     A competition can be added to a game at any point from Design; standings pick up the scores already on the cards.
+  - **Handicaps are 100% across the board** in a group's game (`g.hcp` 'full', the default; 'usga' switches the USGA
+    table back on — designer, "Handicaps"): `syncGameEvent` sets `ev.allow={'*':100}`, `pctFor` honours `'*'` for every
+    player format (never the per-player scramble tables), `compPub` keeps it, so stroke play, best ball, skins and the
+    matches all play full handicaps on the hub and the phones.
   - **Groups & handicaps** (`gameGroupsCard`/`wireGameGroups` on the game page): per group the course, starting hole
     and tee time; per player an index for the day (`p.index` on the event player, blank = the directory index), the
     tee, and CH / PH from `playerHcp`; a Group select moves a player (or starts a new group). **All of it works
