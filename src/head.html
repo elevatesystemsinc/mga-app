@@ -3,8 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>MGA Hub · Walnut Creek Country Club</title>
-<link rel="icon" href="crest.png?v=2">
+<script>if(/^https?:/.test(location.protocol))document.write('<base href="/">');</script><!-- the page is served at /, /mga, /lga, … (Render rewrites every path to index.html); relative files always come from the root -->
+<title>Club Hub · Walnut Creek Country Club</title>
+<link rel="icon" href="favicon.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;0,700;1,700&family=Public+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
@@ -32,6 +33,18 @@ body{font-variant-numeric:lining-nums}
 .side{width:248px;flex-shrink:0;background:var(--navy);color:#E9E4D6;display:flex;flex-direction:column;padding:24px 16px;position:sticky;top:0;height:100vh}
 .brand{display:flex;align-items:center;gap:12px;padding:0 8px 22px;border-bottom:1px solid rgba(216,183,95,.3)}
 .brand img{width:44px;height:57px;object-fit:contain}
+.brand img.lockup{width:100%;max-width:190px;height:auto;display:block;margin:2px 0 4px} .brand #brandCrest{display:block;flex:1;min-width:0}
+.brand:has(#brandText:not([hidden])) #brandCrest{flex:0 0 auto}
+.login img.lockup{width:220px;max-width:80%}
+.pick-logo{width:260px;max-width:100%;height:auto;display:block;margin-bottom:6px}
+.mono{display:inline-flex;align-items:center;justify-content:center;width:44px;height:57px;border-radius:8px;background:var(--deep);border:1px solid rgba(216,183,95,.45);color:var(--goldl);font-family:var(--serif);font-weight:700;font-size:15px;letter-spacing:.02em;flex-shrink:0}
+.mono.sm,.crest.sm{width:28px;height:36px;font-size:11px;border-radius:6px}
+.topbar .crest.sm{width:24px;height:30px}
+.orgs{display:flex;flex-direction:column;gap:12px;max-width:640px}
+.orgcard{display:flex;align-items:center;gap:14px;width:100%;text-align:left;padding:14px 16px;border:1px solid var(--line);border-radius:12px;background:var(--card);cursor:pointer;font:inherit;color:var(--ink)}
+.orgcard:hover{border-color:var(--gold);box-shadow:0 2px 10px rgba(15,42,56,.08)}
+.orgcard .crest{width:40px;height:52px;object-fit:contain} .orgcard .mono{background:var(--navy)} .orgcard .cell2{flex:1;min-width:0} .orgcard b{font-size:16px;color:var(--navy)} .orgcard svg{width:18px;height:18px;color:var(--muted)}
+.tr .crest.sm,.tr .mono.sm{justify-self:start}
 .brand b{font-family:var(--serif);font-size:26px;color:#fff;line-height:1;display:block}
 .brand small{font-size:12px;color:var(--goldl);display:block;margin-top:4px}
 .season{padding:18px 8px 10px}
@@ -214,6 +227,47 @@ textarea.inp{height:auto;min-height:84px;padding:10px 12px;resize:vertical}
   .dhead,.dbody,.dfoot{padding-left:18px;padding-right:18px}
 }
 @media (max-width:640px){ .grid.board{grid-template-columns:minmax(0,1fr)} .seat{min-height:0} }
+/* phones: smaller type and furniture; tables stack — the name block on top, the other cells wrap under it, and the
+   header row becomes a one-line legend. Tables marked .keep (Calcutta lots) or .bt keep their own layout. */
+@media (max-width:640px){
+  .main{padding:16px 12px 40px;gap:16px}
+  .h1{font-size:30px;line-height:1.05} .h2{font-size:20px} .sub{font-size:13px} .kpi .v{font-size:26px}
+  .grid.g4{grid-template-columns:repeat(2,minmax(0,1fr))} .grid{gap:10px} .card.pad{padding:14px}
+  .phead{gap:12px} .phead .actions{width:100%} .phead .actions .btn{flex:1 1 auto;justify-content:center;min-width:0}
+  .btn{height:38px;font-size:13px;padding:0 12px} .btn.sm{height:32px;font-size:12.5px}
+  .toolbar .search{flex:1 1 100%} .toolbar .seg{max-width:100%;overflow-x:auto;-webkit-overflow-scrolling:touch} .toolbar>.muted{flex:1 1 100%}
+  .topbar b{font-size:20px} .cardhead{flex-wrap:wrap;gap:10px} .cardhead .actions{flex-wrap:wrap}
+  .tabs button,.tab{flex:none}
+  .tw{overflow:visible} .t:not(.keep):not(.bt){min-width:0!important}
+  .t:not(.keep):not(.bt) .tr{display:flex;flex-wrap:wrap;align-items:center;gap:2px 10px;padding:10px 14px;min-height:0}
+  .t:not(.keep):not(.bt) .tr>*{font-size:13px;text-align:left;min-width:0}
+  .t:not(.keep):not(.bt) .tr>.av{order:-2}
+  .t:not(.keep):not(.bt) .tr>.cell2:first-child{flex:1 1 100%;order:-1}
+  .t:not(.keep):not(.bt) .tr>.av+.cell2{flex:1 1 calc(100% - 50px);order:-1}
+  .t:not(.keep):not(.bt) .tr>.cell2 b{font-size:14.5px} .t:not(.keep):not(.bt) .tr>.cell2 small{font-size:12px}
+  .t:not(.keep):not(.bt) .tr>span:empty,.t:not(.keep):not(.bt) .tr>.ib{display:none}
+  .t:not(.keep):not(.bt) .tr>.actions{flex:1 1 100%;justify-content:flex-start;margin-top:4px}
+  .t:not(.keep):not(.bt) .tr.th{gap:0 4px;padding:8px 14px 6px} .t:not(.keep):not(.bt) .tr.th>*{font-size:11px;letter-spacing:.04em}
+  .t:not(.keep):not(.bt) .tr.th>*:not(:empty)~*:not(:empty)::before{content:'· ';color:var(--muted)}
+  .t:not(.keep):not(.bt) .tr.tot>*{font-weight:600}
+  .drawer .frow2{grid-template-columns:minmax(0,1fr)}
+  .pick-logo{max-width:220px}
+}
+/* small-group draw stage + game designer */
+.dw-opts{display:flex;gap:16px;flex-wrap:wrap;justify-content:center;margin:6px 0 10px} .dw-opts label{display:flex;flex-direction:column;gap:6px;color:#C9CFD2;font-size:13px;font-weight:700;text-align:left} .dw-opts .inp{min-width:240px;height:42px}
+.dw-team{display:flex;gap:18px;flex-wrap:wrap;justify-content:center;margin:10px 0 18px}
+.dw-slot{min-width:240px;padding:22px 26px;border-radius:14px;background:rgba(255,255,255,.08);border:2px solid rgba(216,183,95,.45);font-family:var(--serif,Georgia),serif;font-size:36px;font-weight:700;color:#fff;transition:transform .15s,background .3s}
+.dw-slot.rolling{color:#D8B75F} .dw-slot.won{background:#1F6B4A;border-color:#6FBF8E;transform:scale(1.04)} .dw-slot.empty{display:none}
+.dw-done{display:flex;flex-direction:column;gap:8px;align-items:center;max-height:38vh;overflow:auto;width:100%}
+.gd-pot .frow2{gap:12px}
+@media (max-width:640px){ .dw-slot{min-width:0;width:100%;font-size:26px;padding:14px 18px} .dw-team{gap:10px} }
+.sk-list{display:flex;flex-direction:column;gap:6px;width:min(640px,94vw);max-height:52vh;overflow:auto;padding:4px}
+.sk-line{display:grid;grid-template-columns:44px minmax(0,1fr);gap:12px;align-items:center;text-align:left;padding:10px 14px;border-radius:12px;background:rgba(255,255,255,.06);border:1px solid rgba(216,183,95,.25)}
+.sk-line b{font-family:var(--serif,Georgia),serif;font-size:26px;color:#D8B75F} .sk-line span{font-size:17px;font-weight:700;color:#fff} .sk-line small{display:block;font-size:12.5px;color:#C9CFD2;margin-top:2px}
+.sk-line.won{background:rgba(31,107,74,.45);border-color:#6FBF8E} .sk-line.void{background:rgba(160,60,40,.35);border-color:#E07B62} .sk-line.muted span{color:#C9CFD2;font-weight:500} .sk-line.pending{border-style:dashed}
+.sk-flash{justify-content:center;gap:10px} .sk-flash-h{font-size:16px;font-weight:800;letter-spacing:.2em;text-transform:uppercase;color:#D8B75F}
+.sk-flash-big{font-family:var(--serif,Georgia),serif;font-size:min(13vw,120px);font-weight:700;line-height:1;margin:6px 0 10px;animation:skpop .5s cubic-bezier(.2,1.4,.4,1)} .sk-flash.bad .sk-flash-big{color:#E07B62} .sk-flash.ok .sk-flash-big{color:#6FBF8E}
+.sk-flash-s{font-size:18px;color:#E9E4D6;max-width:720px} @keyframes skpop{from{transform:scale(.6);opacity:0}to{transform:scale(1);opacity:1}}
 /* checklist */
 .ck-g{padding:10px 22px 4px;font-size:11.5px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--gold-dk,#7E5F1A);background:var(--ivory,#FBFAF5);border-top:1px solid var(--line)}
 .ck-row{display:grid;grid-template-columns:34px minmax(0,1fr) 210px;gap:10px;align-items:center;padding:10px 22px;border-top:1px solid var(--line);cursor:pointer}
@@ -306,17 +360,18 @@ textarea.inp{height:auto;min-height:84px;padding:10px 12px;resize:vertical}
 <body>
 <div class="app">
   <aside class="side" id="side">
-    <div class="brand"><img src="crest.png?v=2" alt="Walnut Creek Country Club MGA crest"><div><b>MGA Hub</b><small>Walnut Creek Country Club</small></div></div>
-    <div class="season"><label for="seasonSel">Season</label><select id="seasonSel"></select></div>
+    <div class="brand"><span id="brandCrest"><img class="lockup" src="club-logo-light.png" alt="Walnut Creek Country Club"></span><div id="brandText" hidden><b id="brandName">Club Hub</b><small id="brandSub">Walnut Creek Country Club</small></div></div>
+    <div class="season" id="seasonBox"><label for="seasonSel">Season</label><select id="seasonSel"></select></div>
     <nav class="navlist" id="nav" aria-label="Main"></nav>
     <div class="sidefoot">
       <button class="sync linkbtn" id="syncBtn" style="text-decoration:none"><span class="dot local" id="syncDot"></span><span id="syncTxt">This device only</span></button>
       <p id="syncErr" hidden style="margin:0;font-size:11.5px;color:#F0B8A8;word-break:break-word"></p>
-      <div style="display:flex;gap:14px;flex-wrap:wrap"><button class="linkbtn" id="btnBackup">Backup</button><button class="linkbtn" id="btnRestore">Restore</button><button class="linkbtn" id="btnSignOut" hidden>Sign out</button></div>
+      <div id="hubSync" style="display:none;align-items:center;gap:8px;font-size:12px;color:#C9C5B8;flex-wrap:wrap"></div>
+      <div style="display:flex;gap:14px;flex-wrap:wrap"><button class="linkbtn" id="btnSwitch" hidden>Switch hub</button><button class="linkbtn" id="btnBackup">Backup</button><button class="linkbtn" id="btnRestore">Restore</button><button class="linkbtn" id="btnSignOut" hidden>Sign out</button></div>
       <input type="file" id="fileRestore" accept="application/json" hidden>
     </div>
   </aside>
-  <header class="topbar"><button class="ib" id="btnMenu" aria-label="Open menu"></button><img src="crest.png?v=2" alt=""><b>MGA Hub</b></header>
+  <header class="topbar"><button class="ib" id="btnMenu" aria-label="Open menu"></button><span id="topCrest"><img src="mga-crest.png" alt=""></span><b id="topName">Club Hub</b></header>
   <main class="main" id="main"></main>
 </div>
 <div class="scrim" id="scrim"></div>
@@ -328,8 +383,8 @@ textarea.inp{height:auto;min-height:84px;padding:10px 12px;resize:vertical}
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 <div class="login" id="login">
   <div class="card">
-    <img src="crest.png?v=2" alt="Walnut Creek Country Club MGA crest">
-    <h1 class="h2" style="font-size:30px">MGA Hub</h1>
+    <img class="lockup" src="club-logo.png" alt="Walnut Creek Country Club">
+    <h1 class="h2" style="font-size:26px">Club Hub</h1>
     <p class="muted" style="margin:0">Board sign-in</p>
     <input class="inp" type="password" id="loginPw" placeholder="Board password" autocomplete="current-password" aria-label="Board password">
     <button class="btn pri" id="loginBtn" style="width:100%">Sign in</button>
