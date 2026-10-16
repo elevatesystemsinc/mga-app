@@ -9,6 +9,11 @@ own hub) and **small groups** (a roster, games with entry fees and payouts, live
 One static `index.html` (plus the cashier, check-in and scoring pages), Supabase, Render. The hub keeps its
 own table (`mga_hub`), one row per organization.
 
+
+The product is **Flagstick** (golf software). The crest with its white-and-gold trim leads the sidebar on every hub, with
+the club or organization you are in named beneath it; the login card, the live scoring, cashier and check-in pages and the
+app icons carry the same mark. Printed sheets keep the club's or association's own crest.
+
 ## Branches and sites
 
 - `main` → **app.wcccmga.org** — the club hub, the product going forward. The club is at `/`; each organization has its

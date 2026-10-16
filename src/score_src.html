@@ -4,8 +4,9 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#0F2A38">
-<title>Live Scoring · Walnut Creek MGA</title>
-<link rel="icon" href="crest.png?v=2">
+<title>Live Scoring · Flagstick</title>
+<link rel="icon" href="favicon.png?v=3">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,600;0,700;1,700&family=Public+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
@@ -20,7 +21,7 @@ button,input{font:inherit;color:inherit} button{cursor:pointer}
 body{font-variant-numeric:lining-nums}
 .num{font-variant-numeric:lining-nums tabular-nums}
 .top{background:var(--navy);color:#fff;padding:calc(12px + env(safe-area-inset-top,0px)) 16px 14px;display:flex;align-items:center;gap:12px;position:sticky;top:0;z-index:10}
-.top img{width:34px;height:44px;object-fit:contain}
+.top img{width:42px;height:42px;object-fit:contain}
 .top .t{display:flex;flex-direction:column;min-width:0;flex:1}
 .top b{font-family:var(--serif);font-size:22px;line-height:1.05;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .top small{color:var(--goldl);font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -75,7 +76,7 @@ h1{font-family:var(--serif);font-weight:700;color:var(--navy);font-size:32px;mar
 </style>
 </head>
 <body>
-<header class="top"><img src="crest.png?v=2" alt="Walnut Creek MGA crest"><div class="t"><b id="evName">Live Scoring</b><small id="evSub">Walnut Creek Country Club</small></div><span class="pill" id="sync" hidden></span></header>
+<header class="top"><img src="flagstick-crest-light.svg" alt="Flagstick"><div class="t"><b id="evName">Live Scoring</b><small id="evSub">Walnut Creek Country Club</small></div><span class="pill" id="sync" hidden></span></header>
 <main id="main"><div class="card pad"><p class="muted">Loading…</p></div></main>
 <nav class="tabbar" id="tabs" hidden aria-label="Scoring"><button data-t="score">Score</button><button data-t="board">Leaderboard</button><button data-t="card">Scorecard</button></nav>
 <script>

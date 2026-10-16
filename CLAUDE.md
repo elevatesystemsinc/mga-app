@@ -377,7 +377,15 @@ groups, printed scorecards — the printed cards include a live-scoring QR that 
 
 ## 5. Conventions
 
-- **Brand:** navy `#0F2A38`, gold `#C7A13A` / light gold `#D8B75F` / dark gold `#7E5F1A`, ivory `#FBFAF5`,
+- **Product mark: Flagstick** (chosen Oct 2026; identity deck and SVG/PNG masters were delivered in chat). The crest
+  carries a two-tone trim: on navy a white outer line with a gold inner rule, white stick and cup, gold pennant
+  (`flagstick-crest-light.svg`); on light grounds navy and gold (`flagstick-crest.svg`). The word is live text in Public
+  Sans 800, tracked, with "GOLF SOFTWARE" in gold caps beneath (`.fs` in head.html). The sidebar leads with it on every
+  hub; the organization you are in (club mark or org crest + name) is the `.org` line beneath. The login card, the
+  scoring/cashier/check-in headers, `favicon.png`, `apple-touch-icon.png`, `icon-192/512.png` and `flagstick-icon.svg`
+  use it. Printed sheets still lead with the club's or organization's own crest (`crestSrc()`); Flagstick is the product,
+  not the club. Trademark search on FLAGSTICK (Classes 9 and 41) still to be done before print.
+- **Brand colours:** navy `#0F2A38`, gold `#C7A13A` / light gold `#D8B75F` / dark gold `#7E5F1A`, ivory `#FBFAF5`,
   line `#E1D9C6`. Cormorant Garamond for display, Public Sans for UI. Crest: `crest.png` (Member-Member) /
   `mga-crest.png`. **Club logo** (derived from the club's artwork — tree gold `#D69929`, text teal `#254C5B`):
   `club-logo.png` (color, for white surfaces: login card, picker), `club-logo-light.png` (light gold tree + white

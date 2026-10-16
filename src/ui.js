@@ -89,9 +89,10 @@ function render(){
 function renderInner(){
   const o=curOrg(), clubName=CLUB&&CLUB.name||CLUB_META.name;
   const title=o?(isClub()?'Club Hub':orgShort()+' Hub'):'Club Hub';
-  const lock=!o||isClub();   // the club hub (and the picker) wear the club's lockup; an organization shows its crest + name
-  $('brandCrest').innerHTML=lock?'<img class="lockup" src="club-logo-light.png" alt="'+esc(clubName)+'">':crestHTML(o); $('brandText').hidden=lock; $('brandName').textContent=title; $('brandSub').textContent=clubName;
-  $('topCrest').innerHTML=crestHTML(o||CLUB_META,'sm'); $('topName').textContent=title; document.title=title+' · '+clubName;
+  // the sidebar leads with the Flagstick mark (head.html); this line names the hub you are in: the club, or an organization with its crest
+  const lock=!o||isClub();
+  $('brandCrest').innerHTML=lock?'<img class="crest" src="club-mark.png" alt="">':crestHTML(o); $('brandName').textContent=lock?clubName:(o.name||o.short); $('brandSub').textContent=lock?(o?'Club hub':'Choose a hub'):clubName;
+  $('topCrest').innerHTML=crestHTML(o||CLUB_META,'sm'); $('topName').textContent=title; document.title=(o?(isClub()?clubName:orgShort()+' · '+clubName):clubName)+' · Flagstick';
   $('btnSwitch').hidden=!CLUB||(!db&&!setupNeeded)||KEYMODE; if(typeof paintHubSync==='function') paintHubSync();
   if(!db){ $('nav').innerHTML=''; $('seasonBox').hidden=true; (setupNeeded?vSetup:vPicker)($('main')); return; }
   $('seasonBox').hidden=false;

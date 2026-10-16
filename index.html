@@ -4,8 +4,9 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <script>if(/^https?:/.test(location.protocol))document.write('<base href="/">');</script><!-- the page is served at /, /mga, /lga, … (Render rewrites every path to index.html); relative files always come from the root -->
-<title>Club Hub · Walnut Creek Country Club</title>
-<link rel="icon" href="favicon.png">
+<title>Flagstick · Walnut Creek Country Club</title>
+<link rel="icon" href="favicon.png?v=3">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;0,700;1,700&family=Public+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
@@ -31,10 +32,19 @@ body{font-variant-numeric:lining-nums}
 /* layout */
 .app{display:flex;min-height:100vh}
 .side{width:248px;flex-shrink:0;background:var(--navy);color:#E9E4D6;display:flex;flex-direction:column;padding:24px 16px;position:sticky;top:0;height:100vh}
-.brand{display:flex;align-items:center;gap:12px;padding:0 8px 22px;border-bottom:1px solid rgba(216,183,95,.3)}
-.brand img{width:44px;height:57px;object-fit:contain}
-.brand img.lockup{width:100%;max-width:190px;height:auto;display:block;margin:2px 0 4px} .brand #brandCrest{display:block;flex:1;min-width:0}
-.brand:has(#brandText:not([hidden])) #brandCrest{flex:0 0 auto}
+.brand{display:block;padding:0 8px 16px;border-bottom:1px solid rgba(216,183,95,.3)}
+/* Flagstick: the product mark. The crest file carries the two-tone trim; the word is live text in Public Sans */
+.fs{display:flex;align-items:center;gap:12px;min-width:0}
+.fs img{width:42px;height:42px;flex:0 0 auto;object-fit:contain}
+.fs b{font-family:var(--sans);font-weight:800;font-size:19px;letter-spacing:.2em;color:#fff;line-height:1;display:block;white-space:nowrap}
+.fs small{font-family:var(--sans);font-weight:600;font-size:9.5px;letter-spacing:.3em;color:var(--goldl);display:block;margin-top:5px;white-space:nowrap}
+.fs.light b{color:var(--navy)} .fs.light small{color:var(--gold)}
+.org{display:flex;align-items:center;gap:10px;padding:14px 8px 0;min-width:0}
+.org .crest,.org .mono{width:30px;height:38px;flex:0 0 auto;object-fit:contain} .org .mono{font-size:11px;border-radius:6px}
+.org b{font-family:var(--serif);font-size:18px;color:#fff;line-height:1.1;display:block;overflow:hidden;text-overflow:ellipsis}
+.org small{font-size:11.5px;color:var(--goldl);display:block;margin-top:2px}
+.login .fs{justify-content:center;margin-bottom:6px} .login img.lockup.sm{width:150px;max-width:70%;margin-top:4px}
+
 .login img.lockup{width:220px;max-width:80%}
 .pick-logo{width:260px;max-width:100%;height:auto;display:block;margin-bottom:6px}
 .mono{display:inline-flex;align-items:center;justify-content:center;width:44px;height:57px;border-radius:8px;background:var(--deep);border:1px solid rgba(216,183,95,.45);color:var(--goldl);font-family:var(--serif);font-weight:700;font-size:15px;letter-spacing:.02em;flex-shrink:0}
@@ -45,8 +55,6 @@ body{font-variant-numeric:lining-nums}
 .orgcard:hover{border-color:var(--gold);box-shadow:0 2px 10px rgba(15,42,56,.08)}
 .orgcard .crest{width:40px;height:52px;object-fit:contain} .orgcard .mono{background:var(--navy)} .orgcard .cell2{flex:1;min-width:0} .orgcard b{font-size:16px;color:var(--navy)} .orgcard svg{width:18px;height:18px;color:var(--muted)}
 .tr .crest.sm,.tr .mono.sm{justify-self:start}
-.brand b{font-family:var(--serif);font-size:26px;color:#fff;line-height:1;display:block}
-.brand small{font-size:12px;color:var(--goldl);display:block;margin-top:4px}
 .season{padding:18px 8px 10px}
 .season label{font-size:12px;font-weight:600;color:#A9A595}
 .season select{margin-top:6px;width:100%;height:38px;border-radius:8px;border:1px solid rgba(216,183,95,.4);background:var(--deep);color:#fff;padding:0 10px;font-weight:600}
@@ -360,7 +368,8 @@ textarea.inp{height:auto;min-height:84px;padding:10px 12px;resize:vertical}
 <body>
 <div class="app">
   <aside class="side" id="side">
-    <div class="brand"><span id="brandCrest"><img class="lockup" src="club-logo-light.png" alt="Walnut Creek Country Club"></span><div id="brandText" hidden><b id="brandName">Club Hub</b><small id="brandSub">Walnut Creek Country Club</small></div></div>
+    <div class="brand"><div class="fs"><img src="flagstick-crest-light.svg" alt=""><div><b>FLAGSTICK</b><small>GOLF SOFTWARE</small></div></div></div>
+    <div class="org"><span id="brandCrest"></span><div id="brandText" style="min-width:0"><b id="brandName">Walnut Creek Country Club</b><small id="brandSub"></small></div></div>
     <div class="season" id="seasonBox"><label for="seasonSel">Season</label><select id="seasonSel"></select></div>
     <nav class="navlist" id="nav" aria-label="Main"></nav>
     <div class="sidefoot">
@@ -383,8 +392,8 @@ textarea.inp{height:auto;min-height:84px;padding:10px 12px;resize:vertical}
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 <div class="login" id="login">
   <div class="card">
-    <img class="lockup" src="club-logo.png" alt="Walnut Creek Country Club">
-    <h1 class="h2" style="font-size:26px">Club Hub</h1>
+    <div class="fs light"><img src="flagstick-crest.svg" alt=""><div><b>FLAGSTICK</b><small>GOLF SOFTWARE</small></div></div>
+    <img class="lockup sm" src="club-logo.png" alt="Walnut Creek Country Club">
     <p class="muted" style="margin:0">Board sign-in</p>
     <input class="inp" type="password" id="loginPw" placeholder="Board password" autocomplete="current-password" aria-label="Board password">
     <button class="btn pri" id="loginBtn" style="width:100%">Sign in</button>
@@ -1030,9 +1039,10 @@ function render(){
 function renderInner(){
   const o=curOrg(), clubName=CLUB&&CLUB.name||CLUB_META.name;
   const title=o?(isClub()?'Club Hub':orgShort()+' Hub'):'Club Hub';
-  const lock=!o||isClub();   // the club hub (and the picker) wear the club's lockup; an organization shows its crest + name
-  $('brandCrest').innerHTML=lock?'<img class="lockup" src="club-logo-light.png" alt="'+esc(clubName)+'">':crestHTML(o); $('brandText').hidden=lock; $('brandName').textContent=title; $('brandSub').textContent=clubName;
-  $('topCrest').innerHTML=crestHTML(o||CLUB_META,'sm'); $('topName').textContent=title; document.title=title+' · '+clubName;
+  // the sidebar leads with the Flagstick mark (head.html); this line names the hub you are in: the club, or an organization with its crest
+  const lock=!o||isClub();
+  $('brandCrest').innerHTML=lock?'<img class="crest" src="club-mark.png" alt="">':crestHTML(o); $('brandName').textContent=lock?clubName:(o.name||o.short); $('brandSub').textContent=lock?(o?'Club hub':'Choose a hub'):clubName;
+  $('topCrest').innerHTML=crestHTML(o||CLUB_META,'sm'); $('topName').textContent=title; document.title=(o?(isClub()?clubName:orgShort()+' · '+clubName):clubName)+' · Flagstick';
   $('btnSwitch').hidden=!CLUB||(!db&&!setupNeeded)||KEYMODE; if(typeof paintHubSync==='function') paintHubSync();
   if(!db){ $('nav').innerHTML=''; $('seasonBox').hidden=true; (setupNeeded?vSetup:vPicker)($('main')); return; }
   $('seasonBox').hidden=false;
@@ -6122,7 +6132,7 @@ async function resultsPDF(t,opt){
 /* Keeps every open device on the latest version: checks version.json about once a minute and, when a
    newer build is live, reloads at a safe moment (nothing unsaved, no editor open, not mid-typing). */
 (function(){
-  const ME='20261009204505'; let ready=false, lastCheck=0;
+  const ME='20261016224143'; let ready=false, lastCheck=0;
   const typing=()=>{ const a=document.activeElement; return a&&/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)&&a.value&&a.type!=='search'; };
   const safe=()=>!typing()&&(typeof window.__canReload!=='function'||window.__canReload());
   async function check(){ lastCheck=Date.now(); if(location.protocol==='file:') return;
