@@ -32,7 +32,9 @@ function navItems(){ const allow=ORG_NAV[db.kind]; return NAV.filter(([k])=>!all
 const curOrg=()=>!db?null:isClub()?Object.assign({},CLUB_META,{name:CLUB.name||CLUB_META.name,crest:CLUB.crest||CLUB_META.crest}):(orgMeta()||{id:db.id,kind:db.kind,name:db.name,short:db.short});
 const orgShort=()=>{ const o=curOrg(); return o?(o.short||o.name||'club'):'club'; };
 const orgName=()=>{ const o=curOrg(); return o?(o.name||o.short||''):''; };
-function crestHTML(o,cls=''){ const short=(o&&(o.short||o.name)||'?').replace(/[^A-Za-z0-9]/g,'').slice(0,4)||'?'; return o&&o.crest?`<img class="crest ${cls}" src="${esc(o.crest)}" alt="">`:`<span class="mono ${cls}"${short.length>3?' style="font-size:.8em;letter-spacing:0"':''}>${esc(short)}</span>`; }
+/* Flagstick is the only mark in the app (the owner's call, Oct 2026): cards and rows wear the navy-and-gold crest, never
+   a club or association logo. `o.crest` in stored documents is ignored. */
+function crestHTML(o,cls=''){ return `<img class="crest ${cls}" src="flagstick-crest.svg" alt="">`; }
 let view={page:'dash',tid:null,ttab:'budget',mfilter:'All',mq:'',tfilter:'All'};
 const Y=()=>db?db.activeSeason:String(new Date().getFullYear());
 const T=()=>db.tournaments.find(t=>t.id===view.tid);
@@ -89,10 +91,11 @@ function render(){
 function renderInner(){
   const o=curOrg(), clubName=CLUB&&CLUB.name||CLUB_META.name;
   const title=o?(isClub()?'Club Hub':orgShort()+' Hub'):'Club Hub';
-  // the sidebar leads with the Flagstick mark (head.html); this line names the hub you are in: the club, or an organization with its crest
+  // the sidebar leads with the Flagstick mark (head.html); this line names the hub you are in, in words only
   const lock=!o||isClub();
-  $('brandCrest').innerHTML=lock?'<img class="crest" src="club-mark.png" alt="">':crestHTML(o); $('brandName').textContent=lock?clubName:(o.name||o.short); $('brandSub').textContent=lock?(o?'Club hub':'Choose a hub'):clubName;
-  $('topCrest').innerHTML=crestHTML(o||CLUB_META,'sm'); $('topName').textContent=title; document.title=(o?(isClub()?clubName:orgShort()+' · '+clubName):clubName)+' · Flagstick';
+  $('brandName').textContent=lock?clubName:(o.name||o.short); $('brandSub').textContent=lock?(o?'Club hub':'Choose a hub'):clubName;
+  $('topName').textContent=title; document.title=(o?(isClub()?clubName:orgShort()+' · '+clubName):clubName)+' · Flagstick';
+  const lc=$('loginClub'); if(lc) lc.textContent=clubName;
   $('btnSwitch').hidden=!CLUB||(!db&&!setupNeeded)||KEYMODE; if(typeof paintHubSync==='function') paintHubSync();
   if(!db){ $('nav').innerHTML=''; $('seasonBox').hidden=true; (setupNeeded?vSetup:vPicker)($('main')); return; }
   $('seasonBox').hidden=false;
@@ -113,7 +116,7 @@ function vPicker(m){
   const card=(id,x,sub)=>`<button class="orgcard" data-org="${esc(id)}">${crestHTML(x)}<div class="cell2"><b>${esc(x.name)}</b><small>${esc(sub)} · ${esc(orgURL(id))}</small></div>${I.chev}</button>`;
   const unknown=ORG_ID&&ORG_ID!=='club'&&!orgMeta(ORG_ID)&&!db?`<div class="banner">There is no organization at ${esc(orgURL(ORG_ID))}. Pick one below.</div>`:'';
   const grp=(k,empty)=>{ const l=orgs.filter(x=>x.kind===k); return l.length?l.map(x=>card(x.id,x,ORG_KINDS[k]+(x.short?' · '+x.short:''))).join(''):`<p class="muted" style="margin:0;font-size:13.5px">${empty}</p>`; };
-  m.innerHTML=`<div class="phead"><div><img class="pick-logo" src="club-logo.png" alt="${esc(club.name)}"><p class="sub">Choose what to work on. Each organization has its own hub; the club keeps the member directory.</p></div></div><div class="rule"></div>
+  m.innerHTML=`<div class="phead"><div><div class="fs light"><img src="flagstick-crest.svg" alt=""><div><b>FLAGSTICK</b><small>GOLF SOFTWARE</small></div></div><h1 class="h2" style="margin:0 0 4px">${esc(club.name)}</h1><p class="sub">Choose what to work on. Each organization has its own hub; the club keeps the member directory.</p></div></div><div class="rule"></div>
   ${unknown}<div class="orgs">${card('club',club,'Club hub · member directory · club tournaments · organizations')}
     <h2 class="h2" style="margin-top:10px">Associations</h2>${grp('association','No associations yet — create one in the club hub under Organizations.')}
     <h2 class="h2" style="margin-top:10px">Small groups</h2>${grp('group','No small groups yet — create one in the club hub under Organizations.')}</div>`;
@@ -165,7 +168,7 @@ function editOrg(o,kind){
   kind=o?o.kind:kind;
   openDrawer({kicker:ORG_KINDS[kind],title:o?o.name:'New '+ORG_KINDS[kind].toLowerCase(),
     body:field('Name','ogN',o?.name||'',{ph:kind==='group'?'e.g. The Misfits':'e.g. Ladies’ Golf Association'})+pair(field('Short name','ogS',o?.short||'',{ph:kind==='group'?'e.g. Misfits':'e.g. LGA'}),o?field('Address id','ogI',o.id,{disabled:true}):field('Address id','ogI','',{ph:'letters and digits, e.g. misfits'}))+
-      (o?'':`<p class="hint">The id becomes the address (${esc(orgURL('misfits'))}) and can’t change later. Leave it blank to use the short name.</p>`)+field('Crest image','ogC',o?.crest||'',{ph:'file name in the site, e.g. mga-crest.png (optional)'})+
+      (o?'':`<p class="hint">The id becomes the address (${esc(orgURL('misfits'))}) and can’t change later. Leave it blank to use the short name.</p>`)+
       (o?`<label class="check"><input type="checkbox" id="ogA"${o.archived?' checked':''}>Archived — hidden from the picker; its data is kept</label>`:'')+
       (o&&kind==='association'?`<label class="check"><input type="checkbox" id="ogH"${o.hubRow?' checked':''}>Keep in two-way sync with the MGA Hub (hub.wcccmga.org)</label><p class="hint">Edits on either site reach the other within about half a minute while someone has this hub or the club hub open.</p>`:'')+
       (o&&CLOUD&&sessionOK&&!KEYMODE?`<div class="fld" style="margin-top:6px"><span class="lbl">Admin links</span><div class="mini" id="ogKeys"><div class="mr"><span class="muted">Loading…</span></div></div>
@@ -173,10 +176,10 @@ function editOrg(o,kind){
         <div id="ogKeyNew"></div><p class="hint">Whoever opens an admin link runs the ${esc(o.short||o.name)} hub without the board password — and can reach nothing else in the club (they see the directory and can add people to it). Revoke a link here at any time.</p></div>`:''),
     wire:r=>{ if(o&&CLOUD&&sessionOK&&!KEYMODE) adminLinks(r,o); },
     save:()=>{ const name=fv('ogN'); if(!name){ toast('Give it a name'); return false; }
-      if(o){ Object.assign(o,{name,short:fv('ogS'),crest:fv('ogC'),archived:$('ogA').checked}); if($('ogH')) o.hubRow=$('ogH').checked?'main':''; return; }
+      if(o){ Object.assign(o,{name,short:fv('ogS'),archived:$('ogA').checked}); if($('ogH')) o.hubRow=$('ogH').checked?'main':''; return; }
       let id=(fv('ogI')||fv('ogS')||name).toLowerCase().replace(/[^a-z0-9-]/g,'').slice(0,24);
       if(!id||id==='club'||id==='main'||CLUB.orgs.some(x=>x.id===id)){ toast('That address id is taken — choose another'); return false; }
-      CLUB.orgs.push({id,kind,name,short:fv('ogS'),crest:fv('ogC')}); toast(name+' created — open it from the organization picker'); }});
+      CLUB.orgs.push({id,kind,name,short:fv('ogS')}); toast(name+' created — open it from the organization picker'); }});
 }
 
 /* admin links for one organization: the list (from hub_keys), revoke, and create — the key itself is shown once */

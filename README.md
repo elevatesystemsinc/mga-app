@@ -10,9 +10,10 @@ One static `index.html` (plus the cashier, check-in and scoring pages), Supabase
 own table (`mga_hub`), one row per organization.
 
 
-The product is **Flagstick** (golf software). The crest with its white-and-gold trim leads the sidebar on every hub, with
-the club or organization you are in named beneath it; the login card, the live scoring, cashier and check-in pages and the
-app icons carry the same mark. Printed sheets keep the club's or association's own crest.
+The product is **Flagstick** (golf software), and its crest is the only logo in the app: the white-and-gold crest leads the
+sidebar on every hub and the scoring, cashier and check-in pages; the navy-and-gold crest marks every organization card
+and row, the login card and the picker; printed scorecards, PDFs and the drawing overlays carry it too. The hub you are
+in is named in words beneath the mark.
 
 ## Branches and sites
 

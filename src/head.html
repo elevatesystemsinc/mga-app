@@ -40,13 +40,11 @@ body{font-variant-numeric:lining-nums}
 .fs small{font-family:var(--sans);font-weight:600;font-size:9.5px;letter-spacing:.3em;color:var(--goldl);display:block;margin-top:5px;white-space:nowrap}
 .fs.light b{color:var(--navy)} .fs.light small{color:var(--gold)}
 .org{display:flex;align-items:center;gap:10px;padding:14px 8px 0;min-width:0}
-.org .crest,.org .mono{width:30px;height:38px;flex:0 0 auto;object-fit:contain} .org .mono{font-size:11px;border-radius:6px}
 .org b{font-family:var(--serif);font-size:18px;color:#fff;line-height:1.1;display:block;overflow:hidden;text-overflow:ellipsis}
 .org small{font-size:11.5px;color:var(--goldl);display:block;margin-top:2px}
-.login .fs{justify-content:center;margin-bottom:6px} .login img.lockup.sm{width:150px;max-width:70%;margin-top:4px}
+.login .fs{justify-content:center;margin-bottom:6px} .login .club{font-family:var(--serif);font-size:21px;color:var(--navy);margin:0;line-height:1.15}
 
-.login img.lockup{width:220px;max-width:80%}
-.pick-logo{width:260px;max-width:100%;height:auto;display:block;margin-bottom:6px}
+.phead .fs{margin-bottom:10px}
 .mono{display:inline-flex;align-items:center;justify-content:center;width:44px;height:57px;border-radius:8px;background:var(--deep);border:1px solid rgba(216,183,95,.45);color:var(--goldl);font-family:var(--serif);font-weight:700;font-size:15px;letter-spacing:.02em;flex-shrink:0}
 .mono.sm,.crest.sm{width:28px;height:36px;font-size:11px;border-radius:6px}
 .topbar .crest.sm{width:24px;height:30px}
@@ -209,7 +207,6 @@ textarea.inp{height:auto;min-height:84px;padding:10px 12px;resize:vertical}
 .login{position:fixed;inset:0;background:var(--navy);display:none;align-items:center;justify-content:center;z-index:90;padding:20px}
 .login.show{display:flex}
 .login .card{width:380px;max-width:100%;padding:32px;display:flex;flex-direction:column;gap:16px;align-items:center;text-align:center}
-.login img{width:96px}
 .banner{background:#F6ECCF;border:1px solid #E5CF8E;color:#5C4410;border-radius:10px;padding:12px 16px;font-size:13.5px;display:flex;gap:12px;align-items:center;flex-wrap:wrap}
 
 /* responsive: web first, still usable on a phone */
@@ -259,7 +256,6 @@ textarea.inp{height:auto;min-height:84px;padding:10px 12px;resize:vertical}
   .t:not(.keep):not(.bt) .tr.th>*:not(:empty)~*:not(:empty)::before{content:'· ';color:var(--muted)}
   .t:not(.keep):not(.bt) .tr.tot>*{font-weight:600}
   .drawer .frow2{grid-template-columns:minmax(0,1fr)}
-  .pick-logo{max-width:220px}
 }
 /* small-group draw stage + game designer */
 .dw-opts{display:flex;gap:16px;flex-wrap:wrap;justify-content:center;margin:6px 0 10px} .dw-opts label{display:flex;flex-direction:column;gap:6px;color:#C9CFD2;font-size:13px;font-weight:700;text-align:left} .dw-opts .inp{min-width:240px;height:42px}
@@ -369,7 +365,7 @@ textarea.inp{height:auto;min-height:84px;padding:10px 12px;resize:vertical}
 <div class="app">
   <aside class="side" id="side">
     <div class="brand"><div class="fs"><img src="flagstick-crest-light.svg" alt=""><div><b>FLAGSTICK</b><small>GOLF SOFTWARE</small></div></div></div>
-    <div class="org"><span id="brandCrest"></span><div id="brandText" style="min-width:0"><b id="brandName">Walnut Creek Country Club</b><small id="brandSub"></small></div></div>
+    <div class="org"><div id="brandText" style="min-width:0"><b id="brandName">Walnut Creek Country Club</b><small id="brandSub"></small></div></div>
     <div class="season" id="seasonBox"><label for="seasonSel">Season</label><select id="seasonSel"></select></div>
     <nav class="navlist" id="nav" aria-label="Main"></nav>
     <div class="sidefoot">
@@ -380,7 +376,7 @@ textarea.inp{height:auto;min-height:84px;padding:10px 12px;resize:vertical}
       <input type="file" id="fileRestore" accept="application/json" hidden>
     </div>
   </aside>
-  <header class="topbar"><button class="ib" id="btnMenu" aria-label="Open menu"></button><span id="topCrest"><img src="mga-crest.png" alt=""></span><b id="topName">Club Hub</b></header>
+  <header class="topbar"><button class="ib" id="btnMenu" aria-label="Open menu"></button><img class="crest sm" src="flagstick-crest-light.svg" alt=""><b id="topName">Flagstick</b></header>
   <main class="main" id="main"></main>
 </div>
 <div class="scrim" id="scrim"></div>
@@ -393,7 +389,7 @@ textarea.inp{height:auto;min-height:84px;padding:10px 12px;resize:vertical}
 <div class="login" id="login">
   <div class="card">
     <div class="fs light"><img src="flagstick-crest.svg" alt=""><div><b>FLAGSTICK</b><small>GOLF SOFTWARE</small></div></div>
-    <img class="lockup sm" src="club-logo.png" alt="Walnut Creek Country Club">
+    <p class="club" id="loginClub">Walnut Creek Country Club</p>
     <p class="muted" style="margin:0">Board sign-in</p>
     <input class="inp" type="password" id="loginPw" placeholder="Board password" autocomplete="current-password" aria-label="Board password">
     <button class="btn pri" id="loginBtn" style="width:100%">Sign in</button>

@@ -40,13 +40,11 @@ body{font-variant-numeric:lining-nums}
 .fs small{font-family:var(--sans);font-weight:600;font-size:9.5px;letter-spacing:.3em;color:var(--goldl);display:block;margin-top:5px;white-space:nowrap}
 .fs.light b{color:var(--navy)} .fs.light small{color:var(--gold)}
 .org{display:flex;align-items:center;gap:10px;padding:14px 8px 0;min-width:0}
-.org .crest,.org .mono{width:30px;height:38px;flex:0 0 auto;object-fit:contain} .org .mono{font-size:11px;border-radius:6px}
 .org b{font-family:var(--serif);font-size:18px;color:#fff;line-height:1.1;display:block;overflow:hidden;text-overflow:ellipsis}
 .org small{font-size:11.5px;color:var(--goldl);display:block;margin-top:2px}
-.login .fs{justify-content:center;margin-bottom:6px} .login img.lockup.sm{width:150px;max-width:70%;margin-top:4px}
+.login .fs{justify-content:center;margin-bottom:6px} .login .club{font-family:var(--serif);font-size:21px;color:var(--navy);margin:0;line-height:1.15}
 
-.login img.lockup{width:220px;max-width:80%}
-.pick-logo{width:260px;max-width:100%;height:auto;display:block;margin-bottom:6px}
+.phead .fs{margin-bottom:10px}
 .mono{display:inline-flex;align-items:center;justify-content:center;width:44px;height:57px;border-radius:8px;background:var(--deep);border:1px solid rgba(216,183,95,.45);color:var(--goldl);font-family:var(--serif);font-weight:700;font-size:15px;letter-spacing:.02em;flex-shrink:0}
 .mono.sm,.crest.sm{width:28px;height:36px;font-size:11px;border-radius:6px}
 .topbar .crest.sm{width:24px;height:30px}
@@ -209,7 +207,6 @@ textarea.inp{height:auto;min-height:84px;padding:10px 12px;resize:vertical}
 .login{position:fixed;inset:0;background:var(--navy);display:none;align-items:center;justify-content:center;z-index:90;padding:20px}
 .login.show{display:flex}
 .login .card{width:380px;max-width:100%;padding:32px;display:flex;flex-direction:column;gap:16px;align-items:center;text-align:center}
-.login img{width:96px}
 .banner{background:#F6ECCF;border:1px solid #E5CF8E;color:#5C4410;border-radius:10px;padding:12px 16px;font-size:13.5px;display:flex;gap:12px;align-items:center;flex-wrap:wrap}
 
 /* responsive: web first, still usable on a phone */
@@ -259,7 +256,6 @@ textarea.inp{height:auto;min-height:84px;padding:10px 12px;resize:vertical}
   .t:not(.keep):not(.bt) .tr.th>*:not(:empty)~*:not(:empty)::before{content:'· ';color:var(--muted)}
   .t:not(.keep):not(.bt) .tr.tot>*{font-weight:600}
   .drawer .frow2{grid-template-columns:minmax(0,1fr)}
-  .pick-logo{max-width:220px}
 }
 /* small-group draw stage + game designer */
 .dw-opts{display:flex;gap:16px;flex-wrap:wrap;justify-content:center;margin:6px 0 10px} .dw-opts label{display:flex;flex-direction:column;gap:6px;color:#C9CFD2;font-size:13px;font-weight:700;text-align:left} .dw-opts .inp{min-width:240px;height:42px}
@@ -369,7 +365,7 @@ textarea.inp{height:auto;min-height:84px;padding:10px 12px;resize:vertical}
 <div class="app">
   <aside class="side" id="side">
     <div class="brand"><div class="fs"><img src="flagstick-crest-light.svg" alt=""><div><b>FLAGSTICK</b><small>GOLF SOFTWARE</small></div></div></div>
-    <div class="org"><span id="brandCrest"></span><div id="brandText" style="min-width:0"><b id="brandName">Walnut Creek Country Club</b><small id="brandSub"></small></div></div>
+    <div class="org"><div id="brandText" style="min-width:0"><b id="brandName">Walnut Creek Country Club</b><small id="brandSub"></small></div></div>
     <div class="season" id="seasonBox"><label for="seasonSel">Season</label><select id="seasonSel"></select></div>
     <nav class="navlist" id="nav" aria-label="Main"></nav>
     <div class="sidefoot">
@@ -380,7 +376,7 @@ textarea.inp{height:auto;min-height:84px;padding:10px 12px;resize:vertical}
       <input type="file" id="fileRestore" accept="application/json" hidden>
     </div>
   </aside>
-  <header class="topbar"><button class="ib" id="btnMenu" aria-label="Open menu"></button><span id="topCrest"><img src="mga-crest.png" alt=""></span><b id="topName">Club Hub</b></header>
+  <header class="topbar"><button class="ib" id="btnMenu" aria-label="Open menu"></button><img class="crest sm" src="flagstick-crest-light.svg" alt=""><b id="topName">Flagstick</b></header>
   <main class="main" id="main"></main>
 </div>
 <div class="scrim" id="scrim"></div>
@@ -393,7 +389,7 @@ textarea.inp{height:auto;min-height:84px;padding:10px 12px;resize:vertical}
 <div class="login" id="login">
   <div class="card">
     <div class="fs light"><img src="flagstick-crest.svg" alt=""><div><b>FLAGSTICK</b><small>GOLF SOFTWARE</small></div></div>
-    <img class="lockup sm" src="club-logo.png" alt="Walnut Creek Country Club">
+    <p class="club" id="loginClub">Walnut Creek Country Club</p>
     <p class="muted" style="margin:0">Board sign-in</p>
     <input class="inp" type="password" id="loginPw" placeholder="Board password" autocomplete="current-password" aria-label="Board password">
     <button class="btn pri" id="loginBtn" style="width:100%">Sign in</button>
@@ -442,8 +438,8 @@ function daysOut(t){ const d=parseD(t.startDate); if(!d) return null; const now=
    A person is one record club-wide; each organization's membership adds its own status / joined / notes. */
 const HUB_VERSION=2;
 const ORG_KINDS={club:'Club',association:'Association',group:'Small group'};
-const CLUB_META={id:'club',kind:'club',name:'Walnut Creek Country Club',short:'Club',crest:'club-mark.png'};
-const DEFAULT_ORGS=[{id:'mga',kind:'association',name:'Men’s Golf Association',short:'MGA',crest:'mga-crest.png',hubRow:'main'},
+const CLUB_META={id:'club',kind:'club',name:'Walnut Creek Country Club',short:'Club'};
+const DEFAULT_ORGS=[{id:'mga',kind:'association',name:'Men’s Golf Association',short:'MGA',hubRow:'main'},
                     {id:'lga',kind:'association',name:'Ladies’ Golf Association',short:'LGA'},
                     {id:'smga',kind:'association',name:'Senior Men’s Golf Association',short:'SMGA'}];
 const DEFAULT_ROLES=['President','Vice President','Treasurer','Secretary','Tournament Chair','Member at Large','Member at Large'];
@@ -613,7 +609,7 @@ const CFG=window.MM_CONFIG||{};
 const CLOUD=!!(CFG.url&&CFG.anonKey&&window.supabase);
 const sb=CLOUD?window.supabase.createClient(CFG.url,CFG.anonKey):null;
 const CLIENT=uid();
-/* The site root (app.wcccmga.org/). Links to the cashier, check-in and scoring pages and to crest.png are built from
+/* The site root (app.wcccmga.org/). Links to the cashier, check-in and scoring pages and to the Flagstick crest are built from
    it, so they work from any organization's path. */
 const HTTP=/^https?:/.test(location.protocol);
 const SITE_BASE=HTTP?location.origin+'/':location.href.split('#')[0].split('?')[0].replace(/[^/]*$/,'');
@@ -982,7 +978,9 @@ function navItems(){ const allow=ORG_NAV[db.kind]; return NAV.filter(([k])=>!all
 const curOrg=()=>!db?null:isClub()?Object.assign({},CLUB_META,{name:CLUB.name||CLUB_META.name,crest:CLUB.crest||CLUB_META.crest}):(orgMeta()||{id:db.id,kind:db.kind,name:db.name,short:db.short});
 const orgShort=()=>{ const o=curOrg(); return o?(o.short||o.name||'club'):'club'; };
 const orgName=()=>{ const o=curOrg(); return o?(o.name||o.short||''):''; };
-function crestHTML(o,cls=''){ const short=(o&&(o.short||o.name)||'?').replace(/[^A-Za-z0-9]/g,'').slice(0,4)||'?'; return o&&o.crest?`<img class="crest ${cls}" src="${esc(o.crest)}" alt="">`:`<span class="mono ${cls}"${short.length>3?' style="font-size:.8em;letter-spacing:0"':''}>${esc(short)}</span>`; }
+/* Flagstick is the only mark in the app (the owner's call, Oct 2026): cards and rows wear the navy-and-gold crest, never
+   a club or association logo. `o.crest` in stored documents is ignored. */
+function crestHTML(o,cls=''){ return `<img class="crest ${cls}" src="flagstick-crest.svg" alt="">`; }
 let view={page:'dash',tid:null,ttab:'budget',mfilter:'All',mq:'',tfilter:'All'};
 const Y=()=>db?db.activeSeason:String(new Date().getFullYear());
 const T=()=>db.tournaments.find(t=>t.id===view.tid);
@@ -1039,10 +1037,11 @@ function render(){
 function renderInner(){
   const o=curOrg(), clubName=CLUB&&CLUB.name||CLUB_META.name;
   const title=o?(isClub()?'Club Hub':orgShort()+' Hub'):'Club Hub';
-  // the sidebar leads with the Flagstick mark (head.html); this line names the hub you are in: the club, or an organization with its crest
+  // the sidebar leads with the Flagstick mark (head.html); this line names the hub you are in, in words only
   const lock=!o||isClub();
-  $('brandCrest').innerHTML=lock?'<img class="crest" src="club-mark.png" alt="">':crestHTML(o); $('brandName').textContent=lock?clubName:(o.name||o.short); $('brandSub').textContent=lock?(o?'Club hub':'Choose a hub'):clubName;
-  $('topCrest').innerHTML=crestHTML(o||CLUB_META,'sm'); $('topName').textContent=title; document.title=(o?(isClub()?clubName:orgShort()+' · '+clubName):clubName)+' · Flagstick';
+  $('brandName').textContent=lock?clubName:(o.name||o.short); $('brandSub').textContent=lock?(o?'Club hub':'Choose a hub'):clubName;
+  $('topName').textContent=title; document.title=(o?(isClub()?clubName:orgShort()+' · '+clubName):clubName)+' · Flagstick';
+  const lc=$('loginClub'); if(lc) lc.textContent=clubName;
   $('btnSwitch').hidden=!CLUB||(!db&&!setupNeeded)||KEYMODE; if(typeof paintHubSync==='function') paintHubSync();
   if(!db){ $('nav').innerHTML=''; $('seasonBox').hidden=true; (setupNeeded?vSetup:vPicker)($('main')); return; }
   $('seasonBox').hidden=false;
@@ -1063,7 +1062,7 @@ function vPicker(m){
   const card=(id,x,sub)=>`<button class="orgcard" data-org="${esc(id)}">${crestHTML(x)}<div class="cell2"><b>${esc(x.name)}</b><small>${esc(sub)} · ${esc(orgURL(id))}</small></div>${I.chev}</button>`;
   const unknown=ORG_ID&&ORG_ID!=='club'&&!orgMeta(ORG_ID)&&!db?`<div class="banner">There is no organization at ${esc(orgURL(ORG_ID))}. Pick one below.</div>`:'';
   const grp=(k,empty)=>{ const l=orgs.filter(x=>x.kind===k); return l.length?l.map(x=>card(x.id,x,ORG_KINDS[k]+(x.short?' · '+x.short:''))).join(''):`<p class="muted" style="margin:0;font-size:13.5px">${empty}</p>`; };
-  m.innerHTML=`<div class="phead"><div><img class="pick-logo" src="club-logo.png" alt="${esc(club.name)}"><p class="sub">Choose what to work on. Each organization has its own hub; the club keeps the member directory.</p></div></div><div class="rule"></div>
+  m.innerHTML=`<div class="phead"><div><div class="fs light"><img src="flagstick-crest.svg" alt=""><div><b>FLAGSTICK</b><small>GOLF SOFTWARE</small></div></div><h1 class="h2" style="margin:0 0 4px">${esc(club.name)}</h1><p class="sub">Choose what to work on. Each organization has its own hub; the club keeps the member directory.</p></div></div><div class="rule"></div>
   ${unknown}<div class="orgs">${card('club',club,'Club hub · member directory · club tournaments · organizations')}
     <h2 class="h2" style="margin-top:10px">Associations</h2>${grp('association','No associations yet — create one in the club hub under Organizations.')}
     <h2 class="h2" style="margin-top:10px">Small groups</h2>${grp('group','No small groups yet — create one in the club hub under Organizations.')}</div>`;
@@ -1115,7 +1114,7 @@ function editOrg(o,kind){
   kind=o?o.kind:kind;
   openDrawer({kicker:ORG_KINDS[kind],title:o?o.name:'New '+ORG_KINDS[kind].toLowerCase(),
     body:field('Name','ogN',o?.name||'',{ph:kind==='group'?'e.g. The Misfits':'e.g. Ladies’ Golf Association'})+pair(field('Short name','ogS',o?.short||'',{ph:kind==='group'?'e.g. Misfits':'e.g. LGA'}),o?field('Address id','ogI',o.id,{disabled:true}):field('Address id','ogI','',{ph:'letters and digits, e.g. misfits'}))+
-      (o?'':`<p class="hint">The id becomes the address (${esc(orgURL('misfits'))}) and can’t change later. Leave it blank to use the short name.</p>`)+field('Crest image','ogC',o?.crest||'',{ph:'file name in the site, e.g. mga-crest.png (optional)'})+
+      (o?'':`<p class="hint">The id becomes the address (${esc(orgURL('misfits'))}) and can’t change later. Leave it blank to use the short name.</p>`)+
       (o?`<label class="check"><input type="checkbox" id="ogA"${o.archived?' checked':''}>Archived — hidden from the picker; its data is kept</label>`:'')+
       (o&&kind==='association'?`<label class="check"><input type="checkbox" id="ogH"${o.hubRow?' checked':''}>Keep in two-way sync with the MGA Hub (hub.wcccmga.org)</label><p class="hint">Edits on either site reach the other within about half a minute while someone has this hub or the club hub open.</p>`:'')+
       (o&&CLOUD&&sessionOK&&!KEYMODE?`<div class="fld" style="margin-top:6px"><span class="lbl">Admin links</span><div class="mini" id="ogKeys"><div class="mr"><span class="muted">Loading…</span></div></div>
@@ -1123,10 +1122,10 @@ function editOrg(o,kind){
         <div id="ogKeyNew"></div><p class="hint">Whoever opens an admin link runs the ${esc(o.short||o.name)} hub without the board password — and can reach nothing else in the club (they see the directory and can add people to it). Revoke a link here at any time.</p></div>`:''),
     wire:r=>{ if(o&&CLOUD&&sessionOK&&!KEYMODE) adminLinks(r,o); },
     save:()=>{ const name=fv('ogN'); if(!name){ toast('Give it a name'); return false; }
-      if(o){ Object.assign(o,{name,short:fv('ogS'),crest:fv('ogC'),archived:$('ogA').checked}); if($('ogH')) o.hubRow=$('ogH').checked?'main':''; return; }
+      if(o){ Object.assign(o,{name,short:fv('ogS'),archived:$('ogA').checked}); if($('ogH')) o.hubRow=$('ogH').checked?'main':''; return; }
       let id=(fv('ogI')||fv('ogS')||name).toLowerCase().replace(/[^a-z0-9-]/g,'').slice(0,24);
       if(!id||id==='club'||id==='main'||CLUB.orgs.some(x=>x.id===id)){ toast('That address id is taken — choose another'); return false; }
-      CLUB.orgs.push({id,kind,name,short:fv('ogS'),crest:fv('ogC')}); toast(name+' created — open it from the organization picker'); }});
+      CLUB.orgs.push({id,kind,name,short:fv('ogS')}); toast(name+' created — open it from the organization picker'); }});
 }
 
 /* admin links for one organization: the list (from hub_keys), revoke, and create — the key itself is shown once */
@@ -3462,11 +3461,14 @@ function viewCard(ev,grp,highlight){
 /* ============ Printed tournament scorecards (one per group, QR for live scoring) ============ */
 const QR_SRC=['https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js','https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.js'];
 const groupLink=(ev,grp)=>scoringLink(ev)+'&g='+encodeURIComponent(grp.code);
-/* the crest embedded as data so the print page never depends on loading a file */
-let CREST_DATA='';
-function crestSrc(){ if(CREST_DATA) return CREST_DATA; const abs=SITE_BASE+'crest.png?v=2';
-  try{ const im=document.querySelector('.brand img'); if(im&&im.complete&&im.naturalWidth){ const c=document.createElement('canvas'); c.width=im.naturalWidth; c.height=im.naturalHeight; c.getContext('2d').drawImage(im,0,0); CREST_DATA=c.toDataURL('image/png'); return CREST_DATA; } }catch(_){}
-  return abs; }
+/* The Flagstick crest for navy grounds (white and gold), embedded as data so print pages, overlays and PDFs never wait on
+   a file. The PNG is loaded once at start-up; until it has arrived (or on file://, where the canvas is tainted) callers
+   get its address instead. */
+const CREST_URL=SITE_BASE+'flagstick-crest-light.png', CREST_IMG=new Image(); let CREST_DATA='';
+try{ CREST_IMG.src=CREST_URL; }catch(_){}
+function crestSrc(){ if(CREST_DATA) return CREST_DATA;
+  try{ if(CREST_IMG.complete&&CREST_IMG.naturalWidth){ const c=document.createElement('canvas'); c.width=CREST_IMG.naturalWidth; c.height=CREST_IMG.naturalHeight; c.getContext('2d').drawImage(CREST_IMG,0,0); CREST_DATA=c.toDataURL('image/png'); return CREST_DATA; } }catch(_){}
+  return CREST_URL; }
 function printCardHTML(ev,pub,grp,teamKeyOnly){
   const pg0=pub.groups.find(x=>x.id===grp.id), c=pub.courses[grp.course]; if(!pg0||!c) return '';
   const allTeams=isTeamEvent(pub)?groupTeams(pg0):[], mine=teamKeyOnly?allTeams.find(t=>t.key===teamKeyOnly):null;
@@ -3521,7 +3523,7 @@ const PRINT_CSS=`
 .one .pc{height:auto;min-height:7.4in} .one .pc{break-after:page;page-break-after:always;margin:0}
 .two .pc:nth-of-type(2n){break-after:page;page-break-after:always}
 .pc header{display:flex;align-items:center;gap:10px;background:#0F2A38;color:#fff;padding:7px 12px;border-bottom:3px solid #C7A13A}
-.pc header img{width:30px;height:39px;object-fit:contain;background:#fff;border-radius:3px;padding:1px}
+.pc header img{width:30px;height:36px;object-fit:contain}
 .pc .ttl{flex:1;min-width:0;display:flex;flex-direction:column;line-height:1.2}
 .pc .ttl b{font-family:'Cormorant Garamond',Georgia,serif;font-size:20px;font-weight:700;letter-spacing:.01em}
 .pc .ttl span{font-size:9.5px;color:#D8C79A}
@@ -4012,7 +4014,7 @@ function drawStage(g,pot){
   let timer=null, running=false;
   const close=()=>{ clearTimeout(timer); if(document.fullscreenElement) document.exitFullscreen().catch(()=>{}); ov.remove(); document.removeEventListener('keydown',key); render(); };
   const wait=ms=>new Promise(r=>{ timer=setTimeout(r,ms); });
-  const header=`<div class="rf-top"><img src="${typeof crestSrc==='function'?crestSrc():'crest.png'}" alt=""><div><div class="rf-k">${esc(orgName())} · ${esc(gameTitle(g))}</div><div class="rf-h">${esc(pot.name)} — the draw</div></div><button class="rf-x" id="dwClose" aria-label="Close">✕</button></div>`;
+  const header=`<div class="rf-top"><img src="${typeof crestSrc==='function'?crestSrc():'flagstick-crest-light.svg'}" alt=""><div><div class="rf-k">${esc(orgName())} · ${esc(gameTitle(g))}</div><div class="rf-h">${esc(pot.name)} — the draw</div></div><button class="rf-x" id="dwClose" aria-label="Close">✕</button></div>`;
   const tools=enabledGames().filter(x=>x.tool);
   const setup=()=>{ ov.innerHTML=header+`<div class="rf-stage"><div class="rf-lbl">${ps.length} players · teams of ${size}</div>
       <div class="dw-opts"><label>How<select class="inp" id="dwM">${tools.map(x=>`<option value="${x.id.replace('draw','')}">${esc(x.name)}</option>`).join('')||'<option value="random">Random</option>'}</select></label>
@@ -4184,7 +4186,7 @@ function skinsCallout(g,pot){
   let i=0, flash=null;   // flash: the verdict interstitial shown before the next hole's result
   const close=()=>{ if(document.fullscreenElement) document.exitFullscreen().catch(()=>{}); ov.remove(); document.removeEventListener('keydown',key); render(); };
   const paint=()=>{ const shown=order.slice(0,i).map(h=>lineFor(h,i)); const done=i>=order.length;
-    ov.innerHTML=`<div class="rf-top"><img src="${typeof crestSrc==='function'?crestSrc():'crest.png'}" alt=""><div><div class="rf-k">${esc(orgName())} · ${esc(gameTitle(g))}</div><div class="rf-h">${esc(pot.name)} — from the cards</div></div><button class="rf-x" id="skClose" aria-label="Close">✕</button></div>
+    ov.innerHTML=`<div class="rf-top"><img src="${typeof crestSrc==='function'?crestSrc():'flagstick-crest-light.svg'}" alt=""><div><div class="rf-k">${esc(orgName())} · ${esc(gameTitle(g))}</div><div class="rf-h">${esc(pot.name)} — from the cards</div></div><button class="rf-x" id="skClose" aria-label="Close">✕</button></div>
       ${flash?`<div class="rf-stage sk-flash ${flash.ok?'ok':'bad'}"><div class="sk-flash-h">Hole ${flash.w.hole} · ${esc(flash.w.name)}</div><div class="sk-flash-big">${flash.ok?'Validated':'Didn’t validate'}</div><div class="sk-flash-s">${flash.ok?`${esc((SKIN_VALID_LABEL[rules.validate]||'').replace(' or better on the next hole','').toLowerCase())} or better on hole ${flash.w.checkHole} — the skin stands`:`missed ${esc((SKIN_VALID_LABEL[rules.validate]||'').replace(' or better on the next hole','').toLowerCase())} on hole ${flash.w.checkHole}${per?' — carried on':' — no skin'}`}</div><button class="rf-go" id="skNext">Hole ${flash.w.checkHole}</button><div class="rf-hint">or press the space bar</div></div>`
       :`<div class="rf-stage" style="justify-content:flex-start;padding-top:26px"><div class="rf-lbl">${done?'All 18 holes':'Hole by hole · '+skinsRuleText(rules)}</div>
         <div class="sk-list">${shown.map(l=>`<div class="sk-line ${l.cls}"><b>${l.h}</b><div><span>${esc(l.txt)}</span>${l.sub?`<small>${esc(l.sub)}</small>`:''}</div></div>`).join('')}</div>
@@ -4281,7 +4283,7 @@ async function gameSheetPDF(g,opt){
   const pots=g.pots.filter(p=>p.kind!=='manual'), allIn=sum(pots,p=>n0(p.entry)), course=courseById(g.course);
   font('PublicSans','normal',8.4,[214,218,220]); const sub=doc.splitTextToSize(`${gameWhen(g)} · ${course?course.name:''} · ${g.players.length} players · ${allIn?gMoney(allIn)+' all in':''}`,R2-L-90); const bandH=74+Math.max(0,sub.length-1)*11;
   doc.setFillColor(...GOLD); doc.roundedRect(L,32,R2-L,bandH+4,8,8,'F'); doc.setFillColor(...NAVY); doc.roundedRect(L,32,R2-L,bandH,8,8,'F'); doc.rect(L,32+bandH-12,R2-L,8,'F');
-  if(crest) doc.addImage(crest,'PNG',L+16,42,54*914/1180,54);
+  if(crest) doc.addImage(crest,'PNG',L+16,42,54*850/1024,54);
   font('PublicSansXB','normal',6.8,GOLDL); doc.text(`${(orgName()||'').toUpperCase()} · ${g.season||''}`,L+76,56,{charSpace:1.2});
   font('Cormorant','bold',24,[255,255,255]); doc.text(gameTitle(g),L+76,80);
   font('PublicSans','normal',8.4,[214,218,220]); doc.text(sub,L+76,96);
@@ -5060,7 +5062,7 @@ async function exportOrder(t){
 function loadJsPDF(){ if(window.jspdf) return Promise.resolve();
   return new Promise((res,rej)=>{ const sc=document.createElement('script'); sc.src='https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js'; sc.onload=()=>res(); sc.onerror=()=>rej(new Error('Couldn’t load the PDF maker — check the connection')); document.head.appendChild(sc); }); }
 async function crestPNG(){ const s=typeof crestSrc==='function'?crestSrc():''; if(s&&s.startsWith('data:')) return s;
-  const r=await fetch(SITE_BASE+'crest.png'); const b=await r.blob(); return await new Promise(ok=>{ const fr=new FileReader(); fr.onload=()=>ok(fr.result); fr.readAsDataURL(b); }); }
+  const r=await fetch(CREST_URL); const b=await r.blob(); return await new Promise(ok=>{ const fr=new FileReader(); fr.onload=()=>ok(fr.result); fr.readAsDataURL(b); }); }
 async function downloadBidSheet(t){
   const c=calc(t);
   try{ await loadJsPDF(); }catch(e){ toast(e.message); return; }
@@ -5081,7 +5083,7 @@ async function downloadBidSheet(t){
     const y=32, h=compact?46:76;
     doc.setFillColor(...GOLD); doc.roundedRect(L,y,CW,h,8,8,'F');
     doc.setFillColor(...NAVY); doc.roundedRect(L,y,CW,h-4,8,8,'F'); doc.rect(L,y+h-12,CW,8,'F');
-    const ch=compact?30:52, cw=ch*914/1180, cx=L+16, cy=y+(h-4-ch)/2;
+    const ch=compact?30:52, cw=ch*850/1024, cx=L+16, cy=y+(h-4-ch)/2;
     if(crest) doc.addImage(crest,'PNG',cx,cy,cw,ch);
     const tx=cx+cw+14;
     font('PublicSansXB','normal',compact?6:6.6,GOLDL); doc.text(kicker,tx,y+(compact?17:22),{charSpace:1.25});
@@ -5613,7 +5615,7 @@ function rfShow(t){
   const close=()=>{ clearTimeout(anim); clearInterval(anim); running=false; if(document.fullscreenElement) document.exitFullscreen().catch(()=>{}); ov.remove(); document.removeEventListener('keydown',key); render(); };
   const draw=()=>{
     const live=R.draws.filter(d=>!d.void), no=live.length+1, elig=rfEligible(R), last=live[live.length-1];
-    const header=`<div class="rf-top"><img src="${typeof crestSrc==='function'?crestSrc():'crest.png'}" alt=""><div><div class="rf-k">${esc(t.name)} · ${esc(String(t.season||''))} MGA 50/50</div><div class="rf-h">Final Drawing</div></div><button class="rf-x rf-snd" title="Sound on/off">${window.__rfSound?'🔊':'🔈'}</button><button class="rf-x" id="rfClose" title="Close (Esc)">✕</button></div>`;
+    const header=`<div class="rf-top"><img src="${typeof crestSrc==='function'?crestSrc():'flagstick-crest-light.svg'}" alt=""><div><div class="rf-k">${esc(t.name)} · ${esc(String(t.season||''))} MGA 50/50</div><div class="rf-h">Final Drawing</div></div><button class="rf-x rf-snd" title="Sound on/off">${window.__rfSound?'🔊':'🔈'}</button><button class="rf-x" id="rfClose" title="Close (Esc)">✕</button></div>`;
     const facts=`<div class="rf-facts"><span><b>${elig.length.toLocaleString()}</b> tickets in the drum</span><span><b>${new Set(elig.map(x=>x.key)).size}</b> players</span><span>List fingerprint <b class="mono">${fpShort(R.locked.fp)}</b></span>${live.length?`<span>Previous winners’ tickets removed</span>`:''}</div>`;
     const done=live.length>=R.prizes.length;
     ov.innerHTML=header+`<div class="rf-stage">
@@ -5673,7 +5675,7 @@ async function rfRecord(t){
   const page=()=>{ doc.setFillColor(...IVORY); doc.rect(0,0,W,H,'F'); };
   page();
   doc.setFillColor(...GOLD); doc.roundedRect(L,32,R2-L,78,8,8,'F'); doc.setFillColor(...NAVY); doc.roundedRect(L,32,R2-L,74,8,8,'F'); doc.rect(L,94,R2-L,8,'F');
-  if(crest) doc.addImage(crest,'PNG',L+16,42,54*914/1180,54);
+  if(crest) doc.addImage(crest,'PNG',L+16,42,54*850/1024,54);
   font('PublicSansXB','normal',6.8,GOLDL); doc.text(`${(t.name||'').toUpperCase()} · ${t.season||''} · MGA 50/50`,L+76,56,{charSpace:1.2});
   font('Cormorant','bold',24,[255,255,255]); doc.text('Final Drawing — Official Record',L+76,80);
   font('PublicSans','normal',8.4,[214,218,220]); doc.text(`Generated ${new Date().toLocaleString()}`,L+76,96);
@@ -5826,7 +5828,7 @@ async function payoutsPDF(t,opt){
   const subTxt=`${dateRange(t)}${AM?` · ${fmt(P.total)} to ${P.people.length} ${P.people.length===1?'person':'people'}`:''}${complete?'':' · results not complete — as of '+new Date().toLocaleString()}`;
   font('PublicSans','normal',8.4,[214,218,220]); const sub=doc.splitTextToSize(subTxt,R2-L-90); const bandH=74+Math.max(0,sub.length-1)*11;
   doc.setFillColor(...GOLD); doc.roundedRect(L,32,R2-L,bandH+4,8,8,'F'); doc.setFillColor(...NAVY); doc.roundedRect(L,32,R2-L,bandH,8,8,'F'); doc.rect(L,32+bandH-12,R2-L,8,'F');
-  if(crest) doc.addImage(crest,'PNG',L+16,42,54*914/1180,54);
+  if(crest) doc.addImage(crest,'PNG',L+16,42,54*850/1024,54);
   font('PublicSansXB','normal',6.8,GOLDL); doc.text(`${(orgName()||'').toUpperCase()} · ${t.season||''}`,L+76,56,{charSpace:1.2});
   font('Cormorant','bold',24,[255,255,255]); doc.text(`${t.name} — ${title}`,L+76,80);
   font('PublicSans','normal',8.4,[214,218,220]); doc.text(sub,L+76,96);
@@ -6109,7 +6111,7 @@ async function resultsPDF(t,opt){
   font('PublicSans','normal',8.4,[214,218,220]); const sub=doc.splitTextToSize(`${dateRange(t)} · ${rounds.map(r=>`${dayLabel(t,r.day).split(' · ')[0]}: ${formatSummary(r)}`).join(' · ')} · ${R.unit==='strokes'?(t.resultsBasis||'net')+' to par':R.unit}${R.final?'':' · as of '+new Date().toLocaleString()}`,R2-L-90);
   const bandH=74+Math.max(0,sub.length-1)*11;
   doc.setFillColor(...GOLD); doc.roundedRect(L,32,R2-L,bandH+4,8,8,'F'); doc.setFillColor(...NAVY); doc.roundedRect(L,32,R2-L,bandH,8,8,'F'); doc.rect(L,32+bandH-12,R2-L,8,'F');
-  if(crest) doc.addImage(crest,'PNG',L+16,42,54*914/1180,54);
+  if(crest) doc.addImage(crest,'PNG',L+16,42,54*850/1024,54);
   font('PublicSansXB','normal',6.8,GOLDL); doc.text(`${(orgName()||'').toUpperCase()} · ${t.season||''}`,L+76,56,{charSpace:1.2});
   font('Cormorant','bold',24,[255,255,255]); doc.text(`${t.name} — ${R.final?'Final Results':'Results'}`,L+76,80);
   font('PublicSans','normal',8.4,[214,218,220]); doc.text(sub,L+76,96);
@@ -6132,7 +6134,7 @@ async function resultsPDF(t,opt){
 /* Keeps every open device on the latest version: checks version.json about once a minute and, when a
    newer build is live, reloads at a safe moment (nothing unsaved, no editor open, not mid-typing). */
 (function(){
-  const ME='20261016224143'; let ready=false, lastCheck=0;
+  const ME='20261016224851'; let ready=false, lastCheck=0;
   const typing=()=>{ const a=document.activeElement; return a&&/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)&&a.value&&a.type!=='search'; };
   const safe=()=>!typing()&&(typeof window.__canReload!=='function'||window.__canReload());
   async function check(){ lastCheck=Date.now(); if(location.protocol==='file:') return;

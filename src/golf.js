@@ -606,11 +606,14 @@ function viewCard(ev,grp,highlight){
 /* ============ Printed tournament scorecards (one per group, QR for live scoring) ============ */
 const QR_SRC=['https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js','https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.js'];
 const groupLink=(ev,grp)=>scoringLink(ev)+'&g='+encodeURIComponent(grp.code);
-/* the crest embedded as data so the print page never depends on loading a file */
-let CREST_DATA='';
-function crestSrc(){ if(CREST_DATA) return CREST_DATA; const abs=SITE_BASE+'crest.png?v=2';
-  try{ const im=document.querySelector('.brand img'); if(im&&im.complete&&im.naturalWidth){ const c=document.createElement('canvas'); c.width=im.naturalWidth; c.height=im.naturalHeight; c.getContext('2d').drawImage(im,0,0); CREST_DATA=c.toDataURL('image/png'); return CREST_DATA; } }catch(_){}
-  return abs; }
+/* The Flagstick crest for navy grounds (white and gold), embedded as data so print pages, overlays and PDFs never wait on
+   a file. The PNG is loaded once at start-up; until it has arrived (or on file://, where the canvas is tainted) callers
+   get its address instead. */
+const CREST_URL=SITE_BASE+'flagstick-crest-light.png', CREST_IMG=new Image(); let CREST_DATA='';
+try{ CREST_IMG.src=CREST_URL; }catch(_){}
+function crestSrc(){ if(CREST_DATA) return CREST_DATA;
+  try{ if(CREST_IMG.complete&&CREST_IMG.naturalWidth){ const c=document.createElement('canvas'); c.width=CREST_IMG.naturalWidth; c.height=CREST_IMG.naturalHeight; c.getContext('2d').drawImage(CREST_IMG,0,0); CREST_DATA=c.toDataURL('image/png'); return CREST_DATA; } }catch(_){}
+  return CREST_URL; }
 function printCardHTML(ev,pub,grp,teamKeyOnly){
   const pg0=pub.groups.find(x=>x.id===grp.id), c=pub.courses[grp.course]; if(!pg0||!c) return '';
   const allTeams=isTeamEvent(pub)?groupTeams(pg0):[], mine=teamKeyOnly?allTeams.find(t=>t.key===teamKeyOnly):null;
@@ -665,7 +668,7 @@ const PRINT_CSS=`
 .one .pc{height:auto;min-height:7.4in} .one .pc{break-after:page;page-break-after:always;margin:0}
 .two .pc:nth-of-type(2n){break-after:page;page-break-after:always}
 .pc header{display:flex;align-items:center;gap:10px;background:#0F2A38;color:#fff;padding:7px 12px;border-bottom:3px solid #C7A13A}
-.pc header img{width:30px;height:39px;object-fit:contain;background:#fff;border-radius:3px;padding:1px}
+.pc header img{width:30px;height:36px;object-fit:contain}
 .pc .ttl{flex:1;min-width:0;display:flex;flex-direction:column;line-height:1.2}
 .pc .ttl b{font-family:'Cormorant Garamond',Georgia,serif;font-size:20px;font-weight:700;letter-spacing:.01em}
 .pc .ttl span{font-size:9.5px;color:#D8C79A}

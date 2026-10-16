@@ -403,7 +403,7 @@ function drawStage(g,pot){
   let timer=null, running=false;
   const close=()=>{ clearTimeout(timer); if(document.fullscreenElement) document.exitFullscreen().catch(()=>{}); ov.remove(); document.removeEventListener('keydown',key); render(); };
   const wait=ms=>new Promise(r=>{ timer=setTimeout(r,ms); });
-  const header=`<div class="rf-top"><img src="${typeof crestSrc==='function'?crestSrc():'crest.png'}" alt=""><div><div class="rf-k">${esc(orgName())} · ${esc(gameTitle(g))}</div><div class="rf-h">${esc(pot.name)} — the draw</div></div><button class="rf-x" id="dwClose" aria-label="Close">✕</button></div>`;
+  const header=`<div class="rf-top"><img src="${typeof crestSrc==='function'?crestSrc():'flagstick-crest-light.svg'}" alt=""><div><div class="rf-k">${esc(orgName())} · ${esc(gameTitle(g))}</div><div class="rf-h">${esc(pot.name)} — the draw</div></div><button class="rf-x" id="dwClose" aria-label="Close">✕</button></div>`;
   const tools=enabledGames().filter(x=>x.tool);
   const setup=()=>{ ov.innerHTML=header+`<div class="rf-stage"><div class="rf-lbl">${ps.length} players · teams of ${size}</div>
       <div class="dw-opts"><label>How<select class="inp" id="dwM">${tools.map(x=>`<option value="${x.id.replace('draw','')}">${esc(x.name)}</option>`).join('')||'<option value="random">Random</option>'}</select></label>
@@ -575,7 +575,7 @@ function skinsCallout(g,pot){
   let i=0, flash=null;   // flash: the verdict interstitial shown before the next hole's result
   const close=()=>{ if(document.fullscreenElement) document.exitFullscreen().catch(()=>{}); ov.remove(); document.removeEventListener('keydown',key); render(); };
   const paint=()=>{ const shown=order.slice(0,i).map(h=>lineFor(h,i)); const done=i>=order.length;
-    ov.innerHTML=`<div class="rf-top"><img src="${typeof crestSrc==='function'?crestSrc():'crest.png'}" alt=""><div><div class="rf-k">${esc(orgName())} · ${esc(gameTitle(g))}</div><div class="rf-h">${esc(pot.name)} — from the cards</div></div><button class="rf-x" id="skClose" aria-label="Close">✕</button></div>
+    ov.innerHTML=`<div class="rf-top"><img src="${typeof crestSrc==='function'?crestSrc():'flagstick-crest-light.svg'}" alt=""><div><div class="rf-k">${esc(orgName())} · ${esc(gameTitle(g))}</div><div class="rf-h">${esc(pot.name)} — from the cards</div></div><button class="rf-x" id="skClose" aria-label="Close">✕</button></div>
       ${flash?`<div class="rf-stage sk-flash ${flash.ok?'ok':'bad'}"><div class="sk-flash-h">Hole ${flash.w.hole} · ${esc(flash.w.name)}</div><div class="sk-flash-big">${flash.ok?'Validated':'Didn’t validate'}</div><div class="sk-flash-s">${flash.ok?`${esc((SKIN_VALID_LABEL[rules.validate]||'').replace(' or better on the next hole','').toLowerCase())} or better on hole ${flash.w.checkHole} — the skin stands`:`missed ${esc((SKIN_VALID_LABEL[rules.validate]||'').replace(' or better on the next hole','').toLowerCase())} on hole ${flash.w.checkHole}${per?' — carried on':' — no skin'}`}</div><button class="rf-go" id="skNext">Hole ${flash.w.checkHole}</button><div class="rf-hint">or press the space bar</div></div>`
       :`<div class="rf-stage" style="justify-content:flex-start;padding-top:26px"><div class="rf-lbl">${done?'All 18 holes':'Hole by hole · '+skinsRuleText(rules)}</div>
         <div class="sk-list">${shown.map(l=>`<div class="sk-line ${l.cls}"><b>${l.h}</b><div><span>${esc(l.txt)}</span>${l.sub?`<small>${esc(l.sub)}</small>`:''}</div></div>`).join('')}</div>
@@ -672,7 +672,7 @@ async function gameSheetPDF(g,opt){
   const pots=g.pots.filter(p=>p.kind!=='manual'), allIn=sum(pots,p=>n0(p.entry)), course=courseById(g.course);
   font('PublicSans','normal',8.4,[214,218,220]); const sub=doc.splitTextToSize(`${gameWhen(g)} · ${course?course.name:''} · ${g.players.length} players · ${allIn?gMoney(allIn)+' all in':''}`,R2-L-90); const bandH=74+Math.max(0,sub.length-1)*11;
   doc.setFillColor(...GOLD); doc.roundedRect(L,32,R2-L,bandH+4,8,8,'F'); doc.setFillColor(...NAVY); doc.roundedRect(L,32,R2-L,bandH,8,8,'F'); doc.rect(L,32+bandH-12,R2-L,8,'F');
-  if(crest) doc.addImage(crest,'PNG',L+16,42,54*914/1180,54);
+  if(crest) doc.addImage(crest,'PNG',L+16,42,54*850/1024,54);
   font('PublicSansXB','normal',6.8,GOLDL); doc.text(`${(orgName()||'').toUpperCase()} · ${g.season||''}`,L+76,56,{charSpace:1.2});
   font('Cormorant','bold',24,[255,255,255]); doc.text(gameTitle(g),L+76,80);
   font('PublicSans','normal',8.4,[214,218,220]); doc.text(sub,L+76,96);

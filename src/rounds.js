@@ -246,7 +246,7 @@ async function resultsPDF(t,opt){
   font('PublicSans','normal',8.4,[214,218,220]); const sub=doc.splitTextToSize(`${dateRange(t)} · ${rounds.map(r=>`${dayLabel(t,r.day).split(' · ')[0]}: ${formatSummary(r)}`).join(' · ')} · ${R.unit==='strokes'?(t.resultsBasis||'net')+' to par':R.unit}${R.final?'':' · as of '+new Date().toLocaleString()}`,R2-L-90);
   const bandH=74+Math.max(0,sub.length-1)*11;
   doc.setFillColor(...GOLD); doc.roundedRect(L,32,R2-L,bandH+4,8,8,'F'); doc.setFillColor(...NAVY); doc.roundedRect(L,32,R2-L,bandH,8,8,'F'); doc.rect(L,32+bandH-12,R2-L,8,'F');
-  if(crest) doc.addImage(crest,'PNG',L+16,42,54*914/1180,54);
+  if(crest) doc.addImage(crest,'PNG',L+16,42,54*850/1024,54);
   font('PublicSansXB','normal',6.8,GOLDL); doc.text(`${(orgName()||'').toUpperCase()} · ${t.season||''}`,L+76,56,{charSpace:1.2});
   font('Cormorant','bold',24,[255,255,255]); doc.text(`${t.name} — ${R.final?'Final Results':'Results'}`,L+76,80);
   font('PublicSans','normal',8.4,[214,218,220]); doc.text(sub,L+76,96);

@@ -29,7 +29,7 @@ Read this file first. Then read `README.md` (user-facing feature guide) as neede
   (`ORG_ID` = first path segment; `?org=` is the fallback used by the file:// tests). This needs **one Render rule** on
   the app.wcccmga.org site: Redirects/Rewrites → source `/*`, destination `/index.html`, action **Rewrite** (existing
   files such as cashier.html still win). `head.html` writes `<base href="/">` on http so relative files load from the
-  root; links to the cashier / check-in / scoring pages and to crest.png are built from `SITE_BASE`.
+  root; links to the cashier / check-in / scoring pages and to the Flagstick crest are built from `SITE_BASE`.
 - **Backend:** Supabase (Postgres + RLS + Realtime). Connection in `config.js` (anon key; protected by RLS — the
   board signs in with one shared login, `boardEmail` in config).
 - **External scripts (CDN, loaded on demand):** supabase-js 2.45.4 (jsDelivr), SheetJS (cdnjs, `loadXLSX()`),
@@ -377,20 +377,21 @@ groups, printed scorecards — the printed cards include a live-scoring QR that 
 
 ## 5. Conventions
 
-- **Product mark: Flagstick** (chosen Oct 2026; identity deck and SVG/PNG masters were delivered in chat). The crest
-  carries a two-tone trim: on navy a white outer line with a gold inner rule, white stick and cup, gold pennant
-  (`flagstick-crest-light.svg`); on light grounds navy and gold (`flagstick-crest.svg`). The word is live text in Public
-  Sans 800, tracked, with "GOLF SOFTWARE" in gold caps beneath (`.fs` in head.html). The sidebar leads with it on every
-  hub; the organization you are in (club mark or org crest + name) is the `.org` line beneath. The login card, the
-  scoring/cashier/check-in headers, `favicon.png`, `apple-touch-icon.png`, `icon-192/512.png` and `flagstick-icon.svg`
-  use it. Printed sheets still lead with the club's or organization's own crest (`crestSrc()`); Flagstick is the product,
-  not the club. Trademark search on FLAGSTICK (Classes 9 and 41) still to be done before print.
+- **Product mark: Flagstick — the only logo in the app** (the owner's call, Oct 2026: "our logo will be present
+  throughout"; identity deck and SVG/PNG masters were delivered in chat). The crest carries a two-tone trim: on navy a
+  white outer line with a gold inner rule, white stick and cup, gold pennant (`flagstick-crest-light.svg` / `.png`); on
+  light grounds navy and gold (`flagstick-crest.svg` / `.png`). The word is live text in Public Sans 800, tracked, with
+  "GOLF SOFTWARE" in gold caps beneath (`.fs` in head.html; `.fs.light` on white). Where it appears: the sidebar lockup
+  on every hub (the `.org` line beneath names the club or organization in words only), the mobile top bar, the picker
+  and the login card (club name as text), every organization card and row (`crestHTML()` always returns the navy crest;
+  `o.crest` in stored documents is ignored and the editor no longer offers it), the draw / skins call-out / 50-50
+  overlays, the printed scorecards and every PDF band (`crestSrc()` in golf.js = the light PNG as a data URL, loaded
+  once at start-up; `crestPNG()` in calcutta.js for jsPDF, ratio 850/1024), the scoring/cashier/check-in headers,
+  `favicon.png`, `apple-touch-icon.png`, `icon-192/512.png`, `flagstick-icon.svg`. The old club and MGA artwork
+  (`club-logo*.png`, `club-mark.png`, `mga-crest.png`, `crest.png`) is gone from the tree (in git history if ever
+  needed). Trademark search on FLAGSTICK (Classes 9 and 41) still to be done before print.
 - **Brand colours:** navy `#0F2A38`, gold `#C7A13A` / light gold `#D8B75F` / dark gold `#7E5F1A`, ivory `#FBFAF5`,
-  line `#E1D9C6`. Cormorant Garamond for display, Public Sans for UI. Crest: `crest.png` (Member-Member) /
-  `mga-crest.png`. **Club logo** (derived from the club's artwork — tree gold `#D69929`, text teal `#254C5B`):
-  `club-logo.png` (color, for white surfaces: login card, picker), `club-logo-light.png` (light gold tree + white
-  script, for the navy sidebar — the club hub and the picker wear it instead of crest + name), `club-mark.png`
-  (tree only, square: the club's `crest` in cards, rows and the top bar), `favicon.png`. **Always lining numerals** (`font-variant-numeric: lining-nums`) — Cormorant's default old-style
+  line `#E1D9C6`. Cormorant Garamond for display, Public Sans for UI. **Always lining numerals** (`font-variant-numeric: lining-nums`) — Cormorant's default old-style
   "1" reads as "I"; the PDF font in `pdffonts.js` has lining digits baked in.
 - **UI pattern:** screens are read-only; edits happen in the drawer (`openDrawer({title, body, wire, save, del})`),
   `save` returns `false` to keep it open. After mutating `db`: `persist(); render();`.

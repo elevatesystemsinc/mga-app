@@ -39,8 +39,8 @@ function daysOut(t){ const d=parseD(t.startDate); if(!d) return null; const now=
    A person is one record club-wide; each organization's membership adds its own status / joined / notes. */
 const HUB_VERSION=2;
 const ORG_KINDS={club:'Club',association:'Association',group:'Small group'};
-const CLUB_META={id:'club',kind:'club',name:'Walnut Creek Country Club',short:'Club',crest:'club-mark.png'};
-const DEFAULT_ORGS=[{id:'mga',kind:'association',name:'Men’s Golf Association',short:'MGA',crest:'mga-crest.png',hubRow:'main'},
+const CLUB_META={id:'club',kind:'club',name:'Walnut Creek Country Club',short:'Club'};
+const DEFAULT_ORGS=[{id:'mga',kind:'association',name:'Men’s Golf Association',short:'MGA',hubRow:'main'},
                     {id:'lga',kind:'association',name:'Ladies’ Golf Association',short:'LGA'},
                     {id:'smga',kind:'association',name:'Senior Men’s Golf Association',short:'SMGA'}];
 const DEFAULT_ROLES=['President','Vice President','Treasurer','Secretary','Tournament Chair','Member at Large','Member at Large'];
@@ -210,7 +210,7 @@ const CFG=window.MM_CONFIG||{};
 const CLOUD=!!(CFG.url&&CFG.anonKey&&window.supabase);
 const sb=CLOUD?window.supabase.createClient(CFG.url,CFG.anonKey):null;
 const CLIENT=uid();
-/* The site root (app.wcccmga.org/). Links to the cashier, check-in and scoring pages and to crest.png are built from
+/* The site root (app.wcccmga.org/). Links to the cashier, check-in and scoring pages and to the Flagstick crest are built from
    it, so they work from any organization's path. */
 const HTTP=/^https?:/.test(location.protocol);
 const SITE_BASE=HTTP?location.origin+'/':location.href.split('#')[0].split('?')[0].replace(/[^/]*$/,'');
