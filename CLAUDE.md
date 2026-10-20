@@ -104,7 +104,7 @@ row query, `checkAccess()` → `my_access()` after sign-in, `MODULE_CATALOG` + `
 groups, club = Dues collection + club Treasury/Budget; billing and pos reserved). Until the migration has run the RPC is
 missing and `TENANCY=false` = the old single-club behaviour. **New tables get a `tenant` column and a `can_tenant`
 policy; new features belong to a module and check `hasModule()` at their entry points; switching a module off never
-deletes data.** The portal (Flagstick admins only, app./portal./www./bare domain or `?portal=1`) lists clients, creates
+deletes data.** The portal (Flagstick admins only, `app.<domain>` or `?portal=1`; www and the bare domain are the marketing website) lists clients, creates
 one (tenant row + empty club document + first board login via a side supabase client's `signUp` → `tenant_users`),
 edits modules / status / hosts / logins.
 

@@ -259,13 +259,13 @@ const orgURL=id=>HTTP?SITE_BASE.replace(/^https?:\/\//,'')+(id===HOST_ORG?'':id)
    A tenant is a client. Its slug is its address (wccc.flagstickhub.com) and every row it owns carries `tenant`
    (tenants-setup.sql: tables, row level security, the tenant-aware functions). The host name decides the tenant
    through tenant_lookup(): the subdomain under BASE_DOMAIN, one of the tenant's extra hosts (app.wcccmga.org), or
-   ?tenant=slug when developing. app. / portal. / www. and the bare domain open Flagstick's own portal (portal.js),
+   ?tenant=slug when developing. app.<domain> opens Flagstick's own portal (portal.js; www and the bare domain are the website),
    where tenants are created and their modules switched. Until tenants-setup.sql has run, tenant_lookup does not
    exist and the app runs exactly as before (TENANCY=false: no tenant filter, every module on). */
 const BASE_DOMAIN=String(CFG.baseDomain||'flagstickhub.com').toLowerCase();
 const HOSTNAME=HTTP?location.hostname.toLowerCase():'';
 const PORTAL=(()=>{ const q=new URLSearchParams(location.search); if(q.get('portal')) return true; if(!HTTP) return false;
-  return HOSTNAME===BASE_DOMAIN||new RegExp('^(app|portal|www)\\.'+BASE_DOMAIN.replace(/\./g,'\\.')+'$').test(HOSTNAME); })();
+  return HOSTNAME==='app.'+BASE_DOMAIN; })();   // only app.<domain>: the bare domain and www belong to the marketing website
 const TENANT_HINT=new URLSearchParams(location.search).get('tenant')||HOSTNAME||'';
 let TENANCY=false, TENANT=null, TENANT_INFO=null, ACCESS=null;   // ACCESS = my_access() once signed in
 /* The module switchboard: what a tenant's subscription turns on. `golf` is the base every tenant has; the rest are

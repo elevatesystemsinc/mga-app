@@ -1,8 +1,8 @@
 /* ============ Flagstick portal (app.flagstickhub.com) + the module gates every hub honours ============
    The portal is Flagstick's own back office: the list of tenants (clients), a new tenant in one form (name, slug =
    subdomain, plan preset, the module boxes, the first board login), and per tenant: the switches, status, extra
-   hosts, more board logins. It runs on the same static site: PORTAL (core.js) is true on app./portal./www. and the
-   bare domain, or with ?portal=1. Only a Flagstick admin (flagstick_admins) gets in; row level security enforces
+   hosts, more board logins. It runs on the same static site: PORTAL (core.js) is true on app.<domain> only (www and the
+   bare domain are the marketing website), or with ?portal=1. Only a Flagstick admin (flagstick_admins) gets in; row level security enforces
    it (tenants-setup.sql), the screens just mirror it.
    Creating a board login needs no server: a second supabase-js client with no persisted session signs the new user
    up (email + a generated password), and the admin's own session is untouched; the user is then linked to the tenant

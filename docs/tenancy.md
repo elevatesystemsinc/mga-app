@@ -7,7 +7,8 @@ has to happen outside the code to bring flagstickhub.com live. Built Oct 2026; `
 ## 1. The shape
 
 ```
-flagstickhub.com, www., app., portal.   →  the Flagstick portal (Flagstick admins only): clients, modules, logins
+app.flagstickhub.com                    →  the Flagstick portal (Flagstick admins only): clients, modules, logins
+flagstickhub.com, www.                  →  the marketing website (not this app; hosted wherever the site lives)
 <slug>.flagstickhub.com                 →  one client's hubs: /  the club hub, /mga /lga /<group> its organizations,
                                            score.html / cashier.html / checkin.html its public pages
 app.wcccmga.org, hub.wcccmga.org        →  extra host names on the wccc tenant (kept working until DNS moves)
@@ -37,7 +38,8 @@ The public pages keep working through their token / slug functions (`golf_event`
 
 `core.js`, before anything loads:
 
-1. `PORTAL` — the host is the bare domain or `app.` / `portal.` / `www.` (or `?portal=1`): the portal, no tenant.
+1. `PORTAL` — the host is `app.<domain>` (or `?portal=1`): the portal, no tenant. `www` and the bare domain are the
+   website, not this app; if they ever reach it they show "No club at this address".
 2. Otherwise `tenant_lookup(host)` (an anonymous RPC): matches `<slug>.flagstickhub.com`, one of the tenant's extra
    hosts, or the bare slug (`?tenant=wccc` when developing). It returns the public part of the tenant row: slug, name,
    short, plan, modules, status, login_email → `TENANT`, `TENANT_INFO`; `CLUB_META.name` takes the tenant's name.
@@ -96,19 +98,23 @@ and RLS enforces the same thing on the tables.
    as admin. Everything that exists is now tenant `wccc`; app.wcccmga.org keeps working.
 2. **Supabase → Authentication → Providers → Email**: turn **Confirm email off** (the portal creates board logins by
    sign-up). Leave everything else.
-3. **DNS for flagstickhub.com** (at the registrar): `CNAME *` → your Render site's `*.onrender.com` host;
-   `CNAME www` → the same; the apex (`@`) → Render's apex record (an `ALIAS`/`ANAME` to the onrender host where the
-   DNS provider supports it, otherwise the A record Render shows under the custom-domain dialog).
-4. **Render → the app site → Settings → Custom Domains**: add `flagstickhub.com`, `www.flagstickhub.com` and the
-   wildcard `*.flagstickhub.com`; wait for "Verified" and the certificates. The existing `/*` → `/index.html` rewrite
-   rule already covers every tenant path. Keep `app.wcccmga.org` on the site until the club has moved.
+3. **DNS for flagstickhub.com**: `@` and `www` → the marketing website's host (not this app). For the app, either
+   (a) `CNAME *` → the Render site's `*.onrender.com` host plus the two `_acme-challenge` / `_cf-custom-hostname`
+   CNAMEs Render shows when the wildcard is added — Render requires the root domain to point at Render for a
+   wildcard, so this works when the website is also a Render static site; or (b) no wildcard: one `CNAME` per host
+   (`app`, `wccc`, and each new client's slug) → the Render host. Remove AAAA records.
+4. **Render → the app site → Settings → Custom Domains**: add `*.flagstickhub.com` (option a) or `app.flagstickhub.com`
+   + `wccc.flagstickhub.com` (option b; each later client gets its own entry, two minutes); wait for "Verified" and
+   the certificates. The existing `/*` → `/index.html` rewrite rule already covers every tenant path. Keep
+   `app.wcccmga.org` on the site until the club has moved.
 5. **Open `https://app.flagstickhub.com`** → sign in with your Flagstick e-mail → the Clients page lists Walnut Creek.
    Open `https://wccc.flagstickhub.com` → the club hub, same data as app.wcccmga.org.
 6. **Move Walnut Creek**: tell the board the new address; when ready, set a redirect on the old site
    (Render → Redirects: `app.wcccmga.org/*` → `https://wccc.flagstickhub.com/*`, 301) or just leave the extra host in
    place. Also set `hub.wcccmga.org` the same way once PR #2 is merged and the two-way sync is off.
 7. **Create the next client** from the portal: name, slug, plan, the first board login; hand over the address and the
-   one-time password. Their hub is live immediately at `<slug>.flagstickhub.com`.
+   one-time password. Their hub is live immediately at `<slug>.flagstickhub.com` (with option b, add that host name
+   on Render and a CNAME first).
 
 Optional: `config.js` → `baseDomain` if the product domain ever changes (defaults to `flagstickhub.com`).
 

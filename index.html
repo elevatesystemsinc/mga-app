@@ -659,13 +659,13 @@ const orgURL=id=>HTTP?SITE_BASE.replace(/^https?:\/\//,'')+(id===HOST_ORG?'':id)
    A tenant is a client. Its slug is its address (wccc.flagstickhub.com) and every row it owns carries `tenant`
    (tenants-setup.sql: tables, row level security, the tenant-aware functions). The host name decides the tenant
    through tenant_lookup(): the subdomain under BASE_DOMAIN, one of the tenant's extra hosts (app.wcccmga.org), or
-   ?tenant=slug when developing. app. / portal. / www. and the bare domain open Flagstick's own portal (portal.js),
+   ?tenant=slug when developing. app.<domain> opens Flagstick's own portal (portal.js; www and the bare domain are the website),
    where tenants are created and their modules switched. Until tenants-setup.sql has run, tenant_lookup does not
    exist and the app runs exactly as before (TENANCY=false: no tenant filter, every module on). */
 const BASE_DOMAIN=String(CFG.baseDomain||'flagstickhub.com').toLowerCase();
 const HOSTNAME=HTTP?location.hostname.toLowerCase():'';
 const PORTAL=(()=>{ const q=new URLSearchParams(location.search); if(q.get('portal')) return true; if(!HTTP) return false;
-  return HOSTNAME===BASE_DOMAIN||new RegExp('^(app|portal|www)\\.'+BASE_DOMAIN.replace(/\./g,'\\.')+'$').test(HOSTNAME); })();
+  return HOSTNAME==='app.'+BASE_DOMAIN; })();   // only app.<domain>: the bare domain and www belong to the marketing website
 const TENANT_HINT=new URLSearchParams(location.search).get('tenant')||HOSTNAME||'';
 let TENANCY=false, TENANT=null, TENANT_INFO=null, ACCESS=null;   // ACCESS = my_access() once signed in
 /* The module switchboard: what a tenant's subscription turns on. `golf` is the base every tenant has; the rest are
@@ -2051,8 +2051,8 @@ function keyRejected(){ KEYMODE=false; sessionOK=false; $('btnSignOut').hidden=t
 /* ============ Flagstick portal (app.flagstickhub.com) + the module gates every hub honours ============
    The portal is Flagstick's own back office: the list of tenants (clients), a new tenant in one form (name, slug =
    subdomain, plan preset, the module boxes, the first board login), and per tenant: the switches, status, extra
-   hosts, more board logins. It runs on the same static site: PORTAL (core.js) is true on app./portal./www. and the
-   bare domain, or with ?portal=1. Only a Flagstick admin (flagstick_admins) gets in; row level security enforces
+   hosts, more board logins. It runs on the same static site: PORTAL (core.js) is true on app.<domain> only (www and the
+   bare domain are the marketing website), or with ?portal=1. Only a Flagstick admin (flagstick_admins) gets in; row level security enforces
    it (tenants-setup.sql), the screens just mirror it.
    Creating a board login needs no server: a second supabase-js client with no persisted session signs the new user
    up (email + a generated password), and the admin's own session is untouched; the user is then linked to the tenant
@@ -6323,7 +6323,7 @@ async function resultsPDF(t,opt){
 /* Keeps every open device on the latest version: checks version.json about once a minute and, when a
    newer build is live, reloads at a safe moment (nothing unsaved, no editor open, not mid-typing). */
 (function(){
-  const ME='20261020212611'; let ready=false, lastCheck=0;
+  const ME='20261020220611'; let ready=false, lastCheck=0;
   const typing=()=>{ const a=document.activeElement; return a&&/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)&&a.value&&a.type!=='search'; };
   const safe=()=>!typing()&&(typeof window.__canReload!=='function'||window.__canReload());
   async function check(){ lastCheck=Date.now(); if(location.protocol==='file:') return;
