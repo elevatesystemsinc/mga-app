@@ -23,6 +23,12 @@ a{color:#7E5F1A}a:hover{color:#0F2A38}
 @media (max-width:760px){header .wrap{height:64px}header .btn{height:38px!important;padding:0 14px!important;font-size:14px!important}section{padding-top:48px!important;padding-bottom:48px!important}.feat{padding:40px 0!important}.kicker{letter-spacing:.16em}.two,.grid3{grid-template-columns:minmax(0,1fr)}.nav{display:none!important}html,body{overflow-x:hidden}.h1{font-size:46px!important}.wrap{padding:0 20px}}
 .card{background:#fff;border:1px solid #E1D9C6;border-radius:16px;padding:26px;display:flex;flex-direction:column;gap:10px}
 .foot a{color:#C9CFD2;text-decoration:none;font-size:13.5px}.foot a:hover{color:#D8B75F}
+.burger{display:none;width:44px;height:44px;border:none;background:transparent;padding:10px;flex-direction:column;justify-content:center;gap:5px;cursor:pointer;margin-left:auto}
+.burger span{display:block;height:2px;background:#fff;border-radius:2px;transition:transform .2s,opacity .2s}
+.burger.x span:nth-child(1){transform:translateY(7px) rotate(45deg)}.burger.x span:nth-child(2){opacity:0}.burger.x span:nth-child(3){transform:translateY(-7px) rotate(-45deg)}
+.mnav{display:none;flex-direction:column;background:#0F2A38;border-top:1px solid rgba(216,183,95,.3);padding:8px 20px 16px}
+.mnav.open{display:flex}.mnav a{color:#fff;text-decoration:none;font-weight:700;font-size:17px;padding:12px 0;border-bottom:1px solid rgba(255,255,255,.08)}
+@media (max-width:700px){.burger{display:flex}header .btn.gold.top{display:none}}
 </style>
 </head>
 <body>
@@ -30,8 +36,9 @@ a{color:#7E5F1A}a:hover{color:#0F2A38}
   <div class="wrap" style="display:flex;align-items:center;justify-content:space-between;gap:24px;height:76px">
     <a href="index.html" aria-label="Flagstick home" style="display:flex;align-items:center;gap:12px;text-decoration:none"><img src="flagstick-crest-light.svg" alt="" style="width:40px;height:40px"><span style="display:flex;flex-direction:column"><b style="font-weight:800;font-size:18px;letter-spacing:.2em;color:#fff;line-height:1">FLAGSTICK</b><small style="font-size:9px;letter-spacing:.3em;color:#D8B75F;font-weight:600;margin-top:5px">GOLF SOFTWARE</small></span></a>
     <nav class="nav" style="display:flex;gap:28px;align-items:center" aria-label="Site"><a href="features.html">Features</a><a href="about.html" style="color:#D8B75F">About</a><a href="https://app.flagstickhub.com">Sign in</a></nav>
-    <a class="btn gold" href="index.html#demo" style="height:44px;padding:0 20px;font-size:15px">Book a demo</a>
+    <a class="btn gold top" href="index.html#demo" style="height:44px;padding:0 20px;font-size:15px">Book a demo</a><button class="burger" type="button" aria-label="Open menu" aria-expanded="false" aria-controls="mnav" onclick="var m=document.getElementById('mnav');var o=m.classList.toggle('open');this.setAttribute('aria-expanded',o);this.classList.toggle('x',o)"><span></span><span></span><span></span></button>
   </div>
+  <nav id="mnav" class="mnav" aria-label="Menu"><a href="index.html">Home</a><a href="features.html">Features</a><a href="about.html" style="color:#D8B75F">About</a><a href="index.html#horizon">What’s next</a><a href="https://app.flagstickhub.com">Sign in</a><a class="btn gold" href="index.html#demo" style="margin:10px 0 4px;align-self:stretch">Book a demo</a></nav>
 </header>
 <section style="background:#0F2A38;color:#fff;padding:64px 0 72px"><div class="wrap" style="display:flex;flex-direction:column;gap:14px"><span class="kicker">About</span><h1 class="serif h1" style="margin:0;font-size:64px;line-height:1;font-weight:700">Built by the people who run club golf.</h1></div></section>
 <section style="padding:80px 0"><div class="wrap two">
