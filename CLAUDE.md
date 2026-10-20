@@ -10,9 +10,12 @@ Owner: Zach Walls.
 
 Read this file first. Then read `README.md` (user-facing feature guide) as needed.
 
-> **Branches and hosts.** `main` (this branch) is the product — work here. It is deployed at **app.wcccmga.org**
-> (bare host = the club hub) and, once Render's hub.wcccmga.org site is switched from the `Hub` branch to `main`, at
-> **hub.wcccmga.org** too (bare host = the MGA hub: `HOST_ORG` in core.js; the club hub is then `/club` there).
+> **Branches and hosts.** `main` (this branch) is the product — work here. The product is **Flagstick**
+> (flagstickhub.com): one static site + one Supabase project serve many clubs (**tenants**, `docs/tenancy.md`):
+> `<slug>.flagstickhub.com` is a client's hub, `app.flagstickhub.com` the Flagstick portal. Walnut Creek is tenant
+> `wccc`; it is also reached at **app.wcccmga.org** (bare host = the club hub) and, once Render's hub.wcccmga.org site
+> is switched from the `Hub` branch to `main`, at **hub.wcccmga.org** (bare host = the MGA hub: `HOST_ORG` in core.js;
+> the club hub is then `/club` there).
 > `Hub` is the old frozen MGA Hub code; it owned the `mga_hub` row `main`. While hub.wcccmga.org still serves the
 > `Hub` branch, the MGA's row and `main` are kept in **two-way sync** (`hubSync()`, §3) — the only writes this branch
 > makes to `main`, always a compare-and-swap merge. After the host switch, turn the sync off (Organizations → MGA)
@@ -80,6 +83,7 @@ python3 tests/smoke.py        # every page + every hub screen/tab renders with n
 python3 tests/test_payouts.py # Calcutta tie-splitting / owner payouts end to end
 python3 tests/test_sync.py    # migration + two devices on a shared fake database (see §3)
 python3 tests/test_score.py   # the public scoring page against the fake: mid-round changes reach open phones/boards
+python3 tests/test_tenants.py # tenants: host → tenant, per-tenant rows, module gates, refusals, the portal creating a client
 git add -A && git commit && git push origin main  # Render deploys main to app.wcccmga.org
 ```
 Tests need `pip install playwright && playwright install chromium` and `cd tests && npm i xlsx@0.18.5`.
@@ -90,6 +94,19 @@ compare-and-swap, 250 ms polling "realtime"). If you change `core.js` saving/mer
 ---
 
 ## 2. Data model
+
+**Tenants first** (`tenants-setup.sql`, `docs/tenancy.md`, `src/portal.js`, `tests/test_tenants.py`): a client is a row
+in `tenants` (`slug` = subdomain, `plan` preset, **`modules`** switchboard, `status`, extra `hosts`, `login_email`);
+every row in `mga_hub` / `golf_events` / `golf_scores` / `calcutta_share` / `hub_keys` carries `tenant`, `mga_hub`'s key
+is `(tenant, id)`, and row level security (`can_tenant()`, `tenant_users`, `flagstick_admins`) does the isolation.
+core.js: `PORTAL`, `resolveTenant()` → `tenant_lookup(host)` → `TENANT` / `TENANT_INFO`, `tq(q)` / `trow(o)` on every
+row query, `checkAccess()` → `my_access()` after sign-in, `MODULE_CATALOG` + `hasModule(id)` (golf always; associations,
+groups, club = Dues collection + club Treasury/Budget; billing and pos reserved). Until the migration has run the RPC is
+missing and `TENANCY=false` = the old single-club behaviour. **New tables get a `tenant` column and a `can_tenant`
+policy; new features belong to a module and check `hasModule()` at their entry points; switching a module off never
+deletes data.** The portal (Flagstick admins only, app./portal./www./bare domain or `?portal=1`) lists clients, creates
+one (tenant row + empty club document + first board login via a side supabase client's `signUp` → `tenant_users`),
+edits modules / status / hosts / logins.
 
 **One JSONB document per organization**, all in `mga_hub`, each normalized by `normalize(doc, meta)` in core.js:
 ```
@@ -243,7 +260,8 @@ Tournament = { id, name, season, days, startDate, field:[{id,memberId,team,paid,
 ### Supabase objects
 | object | purpose |
 |---|---|
-| `mga_hub` (id, data jsonb) | one row per organization: `club`, `mga`, `lga`, `smga`, `<group id>` — plus `main`, the MGA Hub's row (two-way synced with `mga`), and `sync:<org>`, the sync base. `hub-setup.sql`, `hub-fix-permissions.sql` |
+| `tenants`, `tenant_users`, `flagstick_admins` + RPC `tenant_lookup(p_host)`, `my_access()` | clients, their board logins, Flagstick's admins (`tenants-setup.sql`); every table below has a `tenant` column |
+| `mga_hub` (tenant, id, data jsonb) | one row per organization per tenant: `club`, `mga`, `lga`, `smga`, `<group id>` — plus `main`, the MGA Hub's row (two-way synced with `mga`), and `sync:<org>`, the sync base. `hub-setup.sql`, `hub-fix-permissions.sql` |
 | `calcutta_share` (tid, token, name, doc, version) + RPC `calcutta_get(p_token)`, `calcutta_put(p_token,p_doc,p_version)` | token links for people without the board login: the **cashier** page (tid = tournament id) and the **registration/check-in** page (tid = tournament id + `:checkin`). `calcutta_put` is version-checked (conflict → retry). `calcutta-setup.sql` |
 | `golf_events`, `golf_scores` + RPC `golf_event`, `golf_join`, `golf_submit` | public live scoring (`golf-setup.sql`). `public.org` names the owning organization. |
 | `hub_keys` (org_id, key_hash, label, revoked_at) + RPC `hub_key_org/read/write/people/golf_event/golf_delete/score/share` | admin links (`admin-links-setup.sql`): security-definer functions that act for exactly one organization. |
@@ -404,6 +422,10 @@ groups, printed scorecards — the printed cards include a live-scoring QR that 
 - No payout or handicap-allowance details on player handouts.
 
 ## 6. Status / history
+
+- **Built Oct 2026 (tenants + portal):** `tenants-setup.sql`, `src/portal.js`, module gates, per-tenant sign-in; the
+  owner's go-live steps (Supabase SQL, auth setting, DNS wildcard, Render custom domains) are in `docs/tenancy.md` §5.
+  Roadmap there: billing / POS as modules, per-user sign-in on `tenant_users.role`, Flagstick's own subscriptions.
 
 - **Legacy app (retired):** the original Member-Member app used to live on `main` (its history is still in git);
   its `mm_tournament` table is still in Supabase as an archive, to be dropped when that system is deprecated. The

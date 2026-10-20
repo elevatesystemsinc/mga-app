@@ -390,8 +390,9 @@ textarea.inp{height:auto;min-height:84px;padding:10px 12px;resize:vertical}
   <div class="card">
     <div class="fs light"><img src="flagstick-crest.svg" alt=""><div><b>FLAGSTICK</b><small>GOLF SOFTWARE</small></div></div>
     <p class="club" id="loginClub">Walnut Creek Country Club</p>
-    <p class="muted" style="margin:0">Board sign-in</p>
-    <input class="inp" type="password" id="loginPw" placeholder="Board password" autocomplete="current-password" aria-label="Board password">
+    <p class="muted" style="margin:0" id="loginSub">Board sign-in</p>
+    <input class="inp" type="email" id="loginEmail" placeholder="E-mail" autocomplete="username" aria-label="E-mail" hidden>
+    <input class="inp" type="password" id="loginPw" placeholder="Password" autocomplete="current-password" aria-label="Password">
     <button class="btn pri" id="loginBtn" style="width:100%">Sign in</button>
     <p class="hint" id="loginErr" style="color:var(--neg);min-height:18px"></p>
   </div>
@@ -654,6 +655,53 @@ async function openOrgDocs(){ if(ORG_ID!=='club'||!CLUB) return; for(const o of 
 function chooseOrg(id){ if(HTTP){ location.href=SITE_BASE+(id&&id!==HOST_ORG?encodeURIComponent(id):''); return; } const u=new URL(location.href); if(id) u.searchParams.set('org',id); else u.searchParams.delete('org'); location.href=u.toString(); }
 const orgURL=id=>HTTP?SITE_BASE.replace(/^https?:\/\//,'')+(id===HOST_ORG?'':id):'?org='+id;
 
+/* ---------- tenants: one database, many clubs ----------
+   A tenant is a client. Its slug is its address (wccc.flagstickhub.com) and every row it owns carries `tenant`
+   (tenants-setup.sql: tables, row level security, the tenant-aware functions). The host name decides the tenant
+   through tenant_lookup(): the subdomain under BASE_DOMAIN, one of the tenant's extra hosts (app.wcccmga.org), or
+   ?tenant=slug when developing. app. / portal. / www. and the bare domain open Flagstick's own portal (portal.js),
+   where tenants are created and their modules switched. Until tenants-setup.sql has run, tenant_lookup does not
+   exist and the app runs exactly as before (TENANCY=false: no tenant filter, every module on). */
+const BASE_DOMAIN=String(CFG.baseDomain||'flagstickhub.com').toLowerCase();
+const HOSTNAME=HTTP?location.hostname.toLowerCase():'';
+const PORTAL=(()=>{ const q=new URLSearchParams(location.search); if(q.get('portal')) return true; if(!HTTP) return false;
+  return HOSTNAME===BASE_DOMAIN||new RegExp('^(app|portal|www)\\.'+BASE_DOMAIN.replace(/\./g,'\\.')+'$').test(HOSTNAME); })();
+const TENANT_HINT=new URLSearchParams(location.search).get('tenant')||HOSTNAME||'';
+let TENANCY=false, TENANT=null, TENANT_INFO=null, ACCESS=null;   // ACCESS = my_access() once signed in
+/* The module switchboard: what a tenant's subscription turns on. `golf` is the base every tenant has; the rest are
+   boxes ticked per tenant in the portal. Gates live in hasModule(): nav items, organization kinds, whole hubs. */
+const MODULE_CATALOG=[
+  {id:'golf',         name:'Golf management',  base:true, desc:'Tournaments, rounds and results, live scoring and formats, the game library, the club directory'},
+  {id:'associations', name:'Associations',     desc:'Hubs for the MGA, LGA, SMGA…: schedules, tournaments, budget and treasury, dues billed to the club'},
+  {id:'groups',       name:'Small groups',     desc:'Rosters, money games with pots, live scoring, the season ledger, admin links for organizers'},
+  {id:'club',         name:'Club management',  desc:'The club tier: dues collection, the club’s treasury and budget, member numbers and statements as they are built'},
+  {id:'billing',      name:'Member billing',   soon:true, desc:'Member accounts, charges, statements and payment collection'},
+  {id:'pos',          name:'Point of sale',    soon:true, desc:'Food & beverage and pro shop charges to member accounts'},
+];
+const PLAN_PRESETS={club:{golf:true,associations:true,groups:true,club:true},golf:{golf:true,associations:true,groups:true}};
+function hasModule(k){ if(!TENANCY||!TENANT_INFO) return true; if(k==='golf') return true; return !!(TENANT_INFO.modules||{})[k]; }
+const tenantStatus=()=>TENANT_INFO&&TENANT_INFO.status||'active';
+/* tenant filter / tenant column on row queries (no-ops until tenants-setup.sql has run) */
+const tq=q=>TENANCY&&TENANT?q.eq('tenant',TENANT):q;
+const trow=o=>TENANCY&&TENANT?Object.assign({tenant:TENANT},o):o;
+async function resolveTenant(){
+  if(!CLOUD) return;
+  try{ const {data,error}=await sb.rpc('tenant_lookup',{p_host:TENANT_HINT});
+    if(error){ if(/does not exist|PGRST202|schema cache|42883|404/i.test((error.message||'')+' '+(error.code||'')+' '+(error.status||''))) return; throw error; }
+    TENANCY=true;
+    if(data&&data.slug){ TENANT=data.slug; TENANT_INFO=data; CLUB_META.name=data.name||CLUB_META.name; if(data.short) CLUB_META.short=data.short; }
+  }catch(e){ console.warn('tenant lookup failed',e); }
+}
+/* after sign-in: may this login open this tenant (or the portal)? */
+async function checkAccess(){
+  if(!TENANCY) return {ok:true};
+  const {data,error}=await sb.rpc('my_access'); if(error) return {ok:false,msg:error.message};
+  ACCESS=data||{admin:false,tenants:[]};
+  if(PORTAL) return ACCESS.admin?{ok:true}:{ok:false,msg:'This login is not a Flagstick administrator.'};
+  if(ACCESS.admin||(ACCESS.tenants||[]).includes(TENANT)) return {ok:true};
+  return {ok:false,msg:'This login does not belong to '+(TENANT_INFO&&TENANT_INFO.name||'this club')+'.'};
+}
+
 /* Stable stringify: Postgres jsonb reorders keys, so plain JSON.stringify can't tell "same data" apart. */
 function stable(o){ if(Array.isArray(o)) return '['+o.map(stable).join(',')+']';
   if(o&&typeof o==='object') return '{'+Object.keys(o).filter(k=>k!=='_w'&&k!=='_at'&&o[k]!==undefined).sort().map(k=>JSON.stringify(k)+':'+stable(o[k])).join(',')+'}';
@@ -724,6 +772,7 @@ let lastRemoteAt=0;
 const bare=x=>stable(Object.assign({},x,{_w:0,_at:0,_rev:0}));
 const docChanged=D=>!D.base||bare(D.db)!==bare(D.base);
 function persist(){
+  if(PORTAL) return;   // the portal edits tenant rows directly; there is no document to save
   if(typeof calcStampNow==='function') calcStampNow();   // mark what changed in shared Calcuttas before this save goes out
   for(const D of openDocs()){ D.db._w=CLIENT; D.db._at=Date.now(); store.save(D.id,D.db); }
   if(typeof afterPersist==='function') afterPersist();
@@ -736,7 +785,7 @@ function pushAll(){ openDocs().forEach(D=>pushCloud(D)); }
 window.__canReload=()=>!(typeof drawerOpen==='function'&&drawerOpen())&&openDocs().every(D=>!D.pushing&&(!CLOUD||!sessionOK||!D.base||!docChanged(D)));
 async function fetchRow(id){
   if(KEYMODE){ const {data,error}=await keyRPC('hub_key_read',{p_id:id}); if(error) throw error; return data||null; }
-  const {data:row,error}=await sb.from('mga_hub').select('data').eq('id',id).maybeSingle(); if(error) throw error; return row&&row.data; }
+  const {data:row,error}=await tq(sb.from('mga_hub').select('data')).eq('id',id).maybeSingle(); if(error) throw error; return row&&row.data; }
 /* key mode: the group may add people to the directory, never change them; the club document itself is read-only */
 async function pushPeople(D){
   const have=new Set((D.base&&D.base.members||[]).map(p=>p.id)), add=(D.db.members||[]).filter(p=>!have.has(p.id));
@@ -756,7 +805,7 @@ async function pushCloud(D){
       const next=JSON.parse(JSON.stringify(Object.assign({},D.db,{_rev:(rev||0)+1,_w:CLIENT,_at:Date.now()})));
       let landed;
       if(KEYMODE){ const {data,error}=await keyRPC('hub_key_write',{p_id:D.id,p_data:next,p_rev:rev}); if(error){ setSyncD(D,'offline',error); return; } landed=!!data; }
-      else { let q=sb.from('mga_hub').update({data:next,updated_at:new Date().toISOString()}).eq('id',D.id);
+      else { let q=tq(sb.from('mga_hub').update({data:next,updated_at:new Date().toISOString()})).eq('id',D.id);
         q=rev==null?q.is('data->>_rev',null):q.eq('data->>_rev',String(rev));
         const {data:rows,error}=await q.select('id');
         if(error){ setSyncD(D,'offline',error); return; }
@@ -766,7 +815,7 @@ async function pushCloud(D){
       // someone saved since we last looked (or the row doesn't exist yet): merge theirs into ours and try again
       const remote=await fetchRow(D.id);
       if(!remote&&KEYMODE){ setSyncD(D,'offline',{message:'This organization has not been set up by the club yet'}); return; }
-      if(!remote){ const {error:e2}=await sb.from('mga_hub').upsert({id:D.id,data:next,updated_at:new Date().toISOString()}); if(e2){ setSyncD(D,'offline',e2); return; }
+      if(!remote){ const {error:e2}=await sb.from('mga_hub').upsert(trow({id:D.id,data:next,updated_at:new Date().toISOString()})); if(e2){ setSyncD(D,'offline',e2); return; }
         D.base=JSON.parse(JSON.stringify(next)); D.db._rev=next._rev; store.save(D.id,D.db); setSyncD(D,'synced'); return; }
       mergeIn(D,remote,{quiet:true});
     }
@@ -805,6 +854,7 @@ async function loadDoc(id,meta,opt){
 function watchDoc(D){
   if(D.chan||!CLOUD||KEYMODE) return;   // key mode has no realtime (anonymous): the poll below carries updates
   D.chan=sb.channel('hub-'+D.id).on('postgres_changes',{event:'*',schema:'public',table:'mga_hub',filter:'id=eq.'+D.id},p=>{
+    if(TENANCY&&TENANT&&p.new&&p.new.tenant&&p.new.tenant!==TENANT) return;   // another club's row of the same id
     const r=p.new&&p.new.data; if(!r||r._w===CLIENT&&D.base&&r._rev===D.base._rev) return; applyRemote(D,r);
   }).subscribe();
 }
@@ -841,8 +891,8 @@ async function putDoc(id,data){
   for(let n=0;n<6;n++){
     const cur=await fetchRow(id), rev=cur&&cur._rev!=null?+cur._rev:null;
     const next=Object.assign({},data,{_rev:(rev||0)+1,_w:CLIENT,_at:Date.now()}), stamp=new Date().toISOString();
-    if(!cur){ const {error}=await sb.from('mga_hub').upsert({id,data:next,updated_at:stamp}); if(error) throw error; }
-    else { let q=sb.from('mga_hub').update({data:next,updated_at:stamp}).eq('id',id); q=rev==null?q.is('data->>_rev',null):q.eq('data->>_rev',String(rev));
+    if(!cur){ const {error}=await sb.from('mga_hub').upsert(trow({id,data:next,updated_at:stamp})); if(error) throw error; }
+    else { let q=tq(sb.from('mga_hub').update({data:next,updated_at:stamp})).eq('id',id); q=rev==null?q.is('data->>_rev',null):q.eq('data->>_rev',String(rev));
       const {data:rows,error}=await q.select('id'); if(error) throw error; if(!rows||!rows.length) continue; }
     const D=DOCS[id]; if(D&&D.db){ D.base=JSON.parse(JSON.stringify(next)); syncTo(D.db,normalize(JSON.parse(JSON.stringify(next)),D.meta)); D.db._rev=next._rev; store.save(id,D.db); }
     return next;
@@ -877,7 +927,7 @@ function paintHubSync(){ const el=$('hubSync'); if(!el) return; const o=linkedOr
   $('hubSyncNow').onclick=()=>hubSync({force:true}); }
 async function casWrite(id,data,rev){
   const next=Object.assign({},data,{_rev:(rev||0)+1,_w:CLIENT,_at:Date.now()});
-  let q=sb.from('mga_hub').update({data:next,updated_at:new Date().toISOString()}).eq('id',id); q=rev==null?q.is('data->>_rev',null):q.eq('data->>_rev',String(rev));
+  let q=tq(sb.from('mga_hub').update({data:next,updated_at:new Date().toISOString()})).eq('id',id); q=rev==null?q.is('data->>_rev',null):q.eq('data->>_rev',String(rev));
   const {data:rows,error}=await q.select('id'); if(error) throw error; return rows&&rows.length?next:null;
 }
 async function hubSync(opt){
@@ -973,7 +1023,8 @@ I.coins=svg('<ellipse cx="12" cy="6" rx="7" ry="3"/><path d="M5 6v12c0 1.7 3.1 3
 const NAV=[['dash','Dashboard',I.home],['tournaments','Tournaments',I.flag],['members','Members',I.users],['collections','Dues collection',I.coins],['board','Board',I.shield],['budget','Season budget',I.ledger],['orgs','Organizations',I.org],['library','Game library',I.lib]];
 /* which pages each kind of organization gets (associations get everything) */
 const ORG_NAV={club:['dash','tournaments','golf','members','collections','orgs','library','budget','treasury'],association:['dash','tournaments','golf','members','board','treasury','budget'],group:['dash','tournaments','golf','members']};
-function navItems(){ const allow=ORG_NAV[db.kind]; return NAV.filter(([k])=>!allow||allow.includes(k)).map(([k,l,ic])=>[k,k==='members'&&isClub()?'Directory':l,ic]); }
+const CLUB_TIER_NAV={collections:1,treasury:1,budget:1};   // the club hub's money pages belong to the Club management module
+function navItems(){ const allow=ORG_NAV[db.kind]; return NAV.filter(([k])=>(!allow||allow.includes(k))&&!(isClub()&&CLUB_TIER_NAV[k]&&!hasModule('club'))).map(([k,l,ic])=>[k,k==='members'&&isClub()?'Directory':l,ic]); }
 /* the organization on screen: the club's record from CLUB.orgs wins over what the document says */
 const curOrg=()=>!db?null:isClub()?Object.assign({},CLUB_META,{name:CLUB.name||CLUB_META.name,crest:CLUB.crest||CLUB_META.crest}):(orgMeta()||{id:db.id,kind:db.kind,name:db.name,short:db.short});
 const orgShort=()=>{ const o=curOrg(); return o?(o.short||o.name||'club'):'club'; };
@@ -1035,15 +1086,19 @@ function render(){
   if(Math.abs(window.scrollY-sy)>2) window.scrollTo(0,sy);
 }
 function renderInner(){
+  if(PORTAL){ if(sessionOK&&TENANCY&&typeof vPortal==='function') vPortal($('main')); return; }
+  if(TENANCY&&!TENANT){ vNoTenant($('main')); return; }
+  if(tenantStatus()==='suspended'&&!(ACCESS&&ACCESS.admin)){ vSuspended($('main')); return; }
   const o=curOrg(), clubName=CLUB&&CLUB.name||CLUB_META.name;
   const title=o?(isClub()?'Club Hub':orgShort()+' Hub'):'Club Hub';
   // the sidebar leads with the Flagstick mark (head.html); this line names the hub you are in, in words only
   const lock=!o||isClub();
   $('brandName').textContent=lock?clubName:(o.name||o.short); $('brandSub').textContent=lock?(o?'Club hub':'Choose a hub'):clubName;
   $('topName').textContent=title; document.title=(o?(isClub()?clubName:orgShort()+' · '+clubName):clubName)+' · Flagstick';
-  const lc=$('loginClub'); if(lc) lc.textContent=clubName;
+  const lc=$('loginClub'); if(lc) lc.textContent=TENANT_INFO&&TENANT_INFO.name||clubName;   // the sign-in card names the tenant, even before its document is open
   $('btnSwitch').hidden=!CLUB||(!db&&!setupNeeded)||KEYMODE; if(typeof paintHubSync==='function') paintHubSync();
   if(!db){ $('nav').innerHTML=''; $('seasonBox').hidden=true; (setupNeeded?vSetup:vPicker)($('main')); return; }
+  if(!isClub()&&!hasModule(db.kind==='group'?'groups':'associations')){ $('nav').innerHTML=''; $('seasonBox').hidden=true; vLocked($('main'),db.kind); return; }
   $('seasonBox').hidden=false;
   const ys=Object.keys(db.seasons).sort((a,b)=>b-a);
   $('seasonSel').innerHTML=ys.map(y=>`<option value="${y}"${y===Y()?' selected':''}>${y} season</option>`).join('')+'<option value="__new">+ New season…</option>';
@@ -1064,8 +1119,8 @@ function vPicker(m){
   const grp=(k,empty)=>{ const l=orgs.filter(x=>x.kind===k); return l.length?l.map(x=>card(x.id,x,ORG_KINDS[k]+(x.short?' · '+x.short:''))).join(''):`<p class="muted" style="margin:0;font-size:13.5px">${empty}</p>`; };
   m.innerHTML=`<div class="phead"><div><div class="fs light"><img src="flagstick-crest.svg" alt=""><div><b>FLAGSTICK</b><small>GOLF SOFTWARE</small></div></div><h1 class="h2" style="margin:0 0 4px">${esc(club.name)}</h1><p class="sub">Choose what to work on. Each organization has its own hub; the club keeps the member directory.</p></div></div><div class="rule"></div>
   ${unknown}<div class="orgs">${card('club',club,'Club hub · member directory · club tournaments · organizations')}
-    <h2 class="h2" style="margin-top:10px">Associations</h2>${grp('association','No associations yet — create one in the club hub under Organizations.')}
-    <h2 class="h2" style="margin-top:10px">Small groups</h2>${grp('group','No small groups yet — create one in the club hub under Organizations.')}</div>`;
+    ${hasModule('associations')?`<h2 class="h2" style="margin-top:10px">Associations</h2>${grp('association','No associations yet — create one in the club hub under Organizations.')}`:''}
+    ${hasModule('groups')?`<h2 class="h2" style="margin-top:10px">Small groups</h2>${grp('group','No small groups yet — create one in the club hub under Organizations.')}`:''}</div>`;
   m.querySelectorAll('[data-org]').forEach(b=>b.onclick=()=>chooseOrg(b.dataset.org));
 }
 function vSetup(m){
@@ -1087,7 +1142,9 @@ function vOrgs(m){
   const cols='grid-template-columns:48px minmax(0,1fr) 120px 100px 40px';
   const row=x=>`<div class="tr click" data-o="${esc(x.id)}" style="${cols}">${crestHTML(x,'sm')}<div class="cell2"><b>${esc(x.name)}</b><small>${esc(x.short||'')} · ${esc(orgURL(x.id))}</small></div><span class="muted">${ORG_KINDS[x.kind]||x.kind}</span><span>${x.archived?'<span class="chip">Archived</span>':'<span class="chip ok">Active</span>'}</span><span class="ib">${I.edit}</span></div>`;
   const grp=k=>CLUB.orgs.filter(x=>x.kind===k).map(row).join('')||'<div class="tr"><span class="muted">None yet.</span></div>';
-  m.innerHTML=head('Organizations','Associations and small groups inside the club. Each has its own hub; their members come from the club directory.',btn('New small group','oGrp','',I.plus)+btn('New association','oAssoc','pri',I.plus))+`
+  const offNote=k=>` <span class="chip inact">not in your plan</span>`;
+  m.innerHTML=head('Organizations','Associations and small groups inside the club. Each has its own hub; their members come from the club directory.',(hasModule('groups')?btn('New small group','oGrp','',I.plus):'')+(hasModule('associations')?btn('New association','oAssoc','pri',I.plus):''))+`
+  ${!hasModule('associations')||!hasModule('groups')?`<div class="banner">${[!hasModule('associations')?'Associations':'',!hasModule('groups')?'Small groups':''].filter(Boolean).join(' and ')} are not part of this club’s Flagstick subscription; their hubs are closed and their data kept. Contact Flagstick to add the module.</div>`:''}`+`
   <div class="card" style="overflow:hidden"><div class="cardhead"><h2 class="h2">Associations</h2></div><div class="t">${grp('association')}</div></div>
   <div class="card" style="overflow:hidden"><div class="cardhead"><h2 class="h2">Small groups</h2></div><div class="t">${grp('group')}</div></div>
   ${CLOUD?`<div class="card pad" style="display:flex;flex-direction:column;gap:10px"><h2 class="h2">MGA Hub (hub.wcccmga.org)</h2>
@@ -1095,7 +1152,7 @@ function vOrgs(m){
     <div class="actions">${linkedOrg()?'<button class="btn" id="oSync">Sync now</button>':''}<button class="btn" id="oMig">Re-import from the MGA Hub</button></div></div>`:''}`;
   const os=$('oSync'); if(os) os.onclick=async()=>{ os.disabled=true; await hubSync({force:true}); os.disabled=false; render(); toast(HUB_SYNC.state==='ok'?'In sync with the MGA Hub':'Sync failed: '+(HUB_SYNC.msg||'')); };
   m.querySelectorAll('[data-o]').forEach(r=>r.onclick=()=>editOrg(CLUB.orgs.find(x=>x.id===r.dataset.o)));
-  $('oGrp').onclick=()=>editOrg(null,'group'); $('oAssoc').onclick=()=>editOrg(null,'association');
+  if($('oGrp')) $('oGrp').onclick=()=>editOrg(null,'group'); if($('oAssoc')) $('oAssoc').onclick=()=>editOrg(null,'association');
   const mg=$('oMig'); if(mg) mg.onclick=async()=>{ if(!confirm('Replace the MGA’s hub here with the MGA Hub’s current data, and update the directory from its member list?')) return; mg.disabled=true;
     try{ const r=await migrateFromHub(); toast(`Imported · ${r.people} people · ${r.tournaments} tournaments`); render(); }catch(e){ mg.disabled=false; toast(e.message||'Import failed'); } };
 }
@@ -1131,7 +1188,7 @@ function editOrg(o,kind){
 /* admin links for one organization: the list (from hub_keys), revoke, and create — the key itself is shown once */
 async function adminLinks(r,o){
   const L=r.querySelector('#ogKeys'), N=r.querySelector('#ogKeyNew');
-  const list=async()=>{ const {data,error}=await sb.from('hub_keys').select('id,label,created_at,revoked_at').eq('org_id',o.id);
+  const list=async()=>{ const {data,error}=await tq(sb.from('hub_keys').select('id,label,created_at,revoked_at')).eq('org_id',o.id);
     if(error){ L.innerHTML=`<div class="mr"><span class="muted">${/relation|does not exist/i.test(error.message)?'Run admin-links-setup.sql in Supabase to turn on admin links.':esc(error.message)}</span></div>`; return; }
     const live=(data||[]).filter(k=>!k.revoked_at).sort((a,b)=>(a.created_at||'').localeCompare(b.created_at||''));
     L.innerHTML=live.length?live.map(k=>`<div class="mr" style="grid-template-columns:minmax(0,1fr) auto"><span>${esc(k.label||'Admin link')} <span class="muted">· ${new Date(k.created_at).toLocaleDateString()}</span></span><button class="btn sm" type="button" data-revoke="${k.id}">Revoke</button></div>`).join(''):'<div class="mr"><span class="muted">No admin links yet.</span></div>';
@@ -1148,7 +1205,7 @@ async function newAdminLink(o,label){
   if(!crypto.subtle) throw new Error('This browser cannot create links (needs https)');
   const token=newToken()+newToken().slice(0,8), hash=await sha256hex(token);
   if(!(await fetchRow(o.id))) await putDoc(o.id,normalize(null,o));              // the organizer's hub must exist before the link is used
-  const {error}=await sb.from('hub_keys').insert({org_id:o.id,key_hash:hash,label:label||''});
+  const {error}=await sb.from('hub_keys').insert(trow({org_id:o.id,key_hash:hash,label:label||''}));
   if(error) throw new Error(/relation|does not exist/i.test(error.message)?'Run admin-links-setup.sql in Supabase first':error.message);
   return {token,url:(HTTP?SITE_BASE+encodeURIComponent(o.id):location.href.split('#')[0].split('?')[0]+'?org='+o.id)+'#key='+token};
 }
@@ -1962,18 +2019,28 @@ function wireChrome(){
   $('syncBtn').onclick=()=>{ if(!CLOUD||!sessionOK) return; if(!cloudReady) startCloud(); else pushAll(); };
   $('btnSignOut').onclick=async()=>{ if(KEYMODE){ if(!confirm('Leave this hub? You will need the admin link again to come back.')) return; dropKey(); location.reload(); return; } await sb.auth.signOut(); location.reload(); };
 }
+const loginEmail=()=>{ const e=$('loginEmail'); const v=e&&!e.hidden?e.value.trim():''; return v||(TENANT_INFO&&TENANT_INFO.login_email)||CFG.boardEmail||''; };
+/* the sign-in card: the tenant's board e-mail (editable, so a Flagstick admin can sign in anywhere); the portal always asks */
+function paintLogin(){ const lc=$('loginClub'); if(lc&&TENANT_INFO) lc.textContent=TENANT_INFO.name; const e=$('loginEmail'); if(!e) return; const show=PORTAL||TENANCY||!CFG.boardEmail; e.hidden=!show; if(!e.value) e.value=PORTAL?'':((TENANT_INFO&&TENANT_INFO.login_email)||CFG.boardEmail||''); }
 async function doLogin(){
-  const pw=$('loginPw').value; if(!pw) return; $('loginBtn').disabled=true; $('loginErr').textContent='';
-  const {error}=await sb.auth.signInWithPassword({email:CFG.boardEmail,password:pw});
-  $('loginBtn').disabled=false;
-  if(error){ $('loginErr').textContent='That password didn’t work.'; return; }
-  $('login').classList.remove('show'); sessionOK=true; $('btnSignOut').hidden=false; startCloud();
+  const pw=$('loginPw').value, email=loginEmail(); if(!pw) return; if(!email){ $('loginErr').textContent='Enter the e-mail address.'; return; } $('loginBtn').disabled=true; $('loginErr').textContent='';
+  const {error}=await sb.auth.signInWithPassword({email,password:pw});
+  if(error){ $('loginBtn').disabled=false; $('loginErr').textContent='That sign-in didn’t work.'; return; }
+  const ok=await checkAccess(); $('loginBtn').disabled=false;
+  if(!ok.ok){ await sb.auth.signOut(); $('loginErr').textContent=ok.msg||'No access.'; return; }
+  $('login').classList.remove('show'); sessionOK=true; $('btnSignOut').hidden=false;
+  if(PORTAL){ portalBoot(); return; }
+  startCloud();
 }
 async function boot(){
   wireChrome(); render();
   if(!CLOUD){ setSync('local'); return; }
-  $('loginBtn').onclick=doLogin; $('loginPw').onkeydown=e=>{ if(e.key==='Enter') doLogin(); };
+  $('loginBtn').onclick=doLogin; $('loginPw').onkeydown=e=>{ if(e.key==='Enter') doLogin(); }; const le=$('loginEmail'); if(le) le.onkeydown=e=>{ if(e.key==='Enter') $('loginPw').focus(); };
+  await resolveTenant(); paintLogin();
+  if(TENANCY&&!TENANT&&!PORTAL){ setSync('local'); render(); return; }          // no club at this address
   const {data}=await sb.auth.getSession();
+  if(data&&data.session){ const ok=await checkAccess(); if(!ok.ok){ await sb.auth.signOut(); $('login').classList.add('show'); $('loginErr').textContent=ok.msg||''; if(PORTAL) portalBoot(); return; } }
+  if(PORTAL){ sessionOK=!!(data&&data.session); portalBoot(); return; }
   if(data&&data.session){ sessionOK=true; $('btnSignOut').hidden=false; startCloud(); }
   else if(HUBKEY){ KEYMODE=true; sessionOK=true; $('btnSignOut').hidden=false; $('btnSignOut').textContent='Leave this hub'; $('btnRestore').hidden=true; startCloud(); }
   else { $('login').classList.add('show'); setTimeout(()=>$('loginPw').focus(),100); }
@@ -1981,6 +2048,128 @@ async function boot(){
 /* the admin link was revoked or never existed: back to the board sign-in, with a word about why */
 function keyRejected(){ KEYMODE=false; sessionOK=false; $('btnSignOut').hidden=true; setSync('local'); $('login').classList.add('show'); $('loginErr').textContent='That admin link is no longer valid — ask the club for a new one.'; }
 
+/* ============ Flagstick portal (app.flagstickhub.com) + the module gates every hub honours ============
+   The portal is Flagstick's own back office: the list of tenants (clients), a new tenant in one form (name, slug =
+   subdomain, plan preset, the module boxes, the first board login), and per tenant: the switches, status, extra
+   hosts, more board logins. It runs on the same static site: PORTAL (core.js) is true on app./portal./www. and the
+   bare domain, or with ?portal=1. Only a Flagstick admin (flagstick_admins) gets in; row level security enforces
+   it (tenants-setup.sql), the screens just mirror it.
+   Creating a board login needs no server: a second supabase-js client with no persisted session signs the new user
+   up (email + a generated password), and the admin's own session is untouched; the user is then linked to the tenant
+   in tenant_users. Supabase → Authentication → Providers → Email → "Confirm email" must be OFF for this (or the
+   new login waits for a confirmation mail). */
+const PORTAL_STATE={tenants:null,loading:false,err:null};
+const planLabel=p=>({club:'Club management',golf:'Golf management'}[p]||p||'—');
+const tenantURL=slug=>'https://'+slug+'.'+BASE_DOMAIN+'/';
+const modulesOf=t=>Object.assign({},(t&&t.modules)||{},{golf:true});
+const modChips=t=>{ const m=modulesOf(t); return MODULE_CATALOG.filter(x=>m[x.id]).map(x=>`<span class="chip${x.id==='club'?' gold':''}">${esc(x.name)}</span>`).join(' '); };
+function portalBoot(){
+  $('side').classList.add('portal'); $('nav').innerHTML=''; $('seasonBox').hidden=true; $('btnSwitch').hidden=true;
+  $('brandName').textContent='Flagstick'; $('brandSub').textContent='Client portal'; $('topName').textContent='Flagstick'; document.title='Portal · Flagstick';
+  const lc=$('loginClub'); if(lc) lc.textContent='Flagstick'; const ls=$('loginSub'); if(ls) ls.textContent='Administrator sign-in';
+  $('btnBackup').hidden=true; $('btnRestore').hidden=true;
+  if(!TENANCY){ $('main').innerHTML=head('Flagstick portal','')+`<div class="banner">The database has not been prepared for tenants yet — run <b>tenants-setup.sql</b> in the Supabase SQL editor, then reload.</div>`; return; }
+  if(!sessionOK){ $('login').classList.add('show'); setTimeout(()=>{ const e=$('loginEmail'); if(e&&!e.value) e.focus(); else $('loginPw').focus(); },100); return; }
+  $('btnSignOut').hidden=false; vPortal($('main')); loadTenants();
+}
+async function loadTenants(){
+  PORTAL_STATE.loading=true; PORTAL_STATE.err=null; vPortal($('main'));
+  const {data,error}=await sb.from('tenants').select('*').order('created_at');
+  PORTAL_STATE.loading=false; if(error) PORTAL_STATE.err=error.message; else PORTAL_STATE.tenants=data||[];
+  if(PORTAL_STATE.tenants){ const {data:u}=await sb.from('tenant_users').select('tenant,email,role,created_at'); PORTAL_STATE.users=u||[]; }
+  vPortal($('main'));
+}
+function vPortal(m){
+  const T=PORTAL_STATE.tenants, U=PORTAL_STATE.users||[];
+  const st=s=>s==='active'?'<span class="chip ok">Active</span>':s==='trial'?'<span class="chip gold">Trial</span>':'<span class="chip warn">Suspended</span>';
+  const row=t=>`<div class="tr click" data-t="${esc(t.slug)}" style="grid-template-columns:minmax(0,1.6fr) 150px minmax(0,2fr) 110px 40px">
+      <div class="cell2"><b>${esc(t.name)}</b><small>${esc(t.slug)}.${esc(BASE_DOMAIN)}${(t.hosts||[]).length?' · '+(t.hosts||[]).map(esc).join(', '):''}</small></div>
+      <span>${esc(planLabel(t.plan))}</span><span style="display:flex;flex-wrap:wrap;gap:4px">${modChips(t)}</span><span>${st(t.status)}</span><span class="ib">${I.edit}</span></div>`;
+  m.innerHTML=head('Clients',`Every club on Flagstick. A client is a tenant: its own address, its own board logins, and the modules its subscription turns on. ${T?T.length+' client'+(T.length===1?'':'s'):''}`,
+      btn('New client','ptNew','pri',I.plus))+
+    (PORTAL_STATE.err?`<div class="banner">${esc(PORTAL_STATE.err)}</div>`:'')+
+    `<div class="card" style="overflow:hidden"><div class="t">${T?(T.map(row).join('')||'<div class="tr"><span class="muted">No clients yet.</span></div>'):'<div class="tr"><span class="muted">Loading…</span></div>'}</div></div>
+    <div class="card pad" style="display:flex;flex-direction:column;gap:8px"><h2 class="h2">Modules</h2>
+      ${MODULE_CATALOG.map(x=>`<div style="display:flex;gap:10px;align-items:baseline"><b style="min-width:150px">${esc(x.name)}</b><span class="muted" style="font-size:13.5px">${esc(x.desc)}${x.base?' · every client has it':''}${x.soon?' · not built yet; the box is here so plans can be set up ahead of it':''}</span></div>`).join('')}
+      <p class="hint" style="margin:0">Presets: <b>Club management</b> turns everything on; <b>Golf management</b> is golf + associations + small groups (the course keeps its directory). Boxes can be changed any time; the club's hub picks it up on its next load.</p></div>
+    <div class="card pad" style="display:flex;flex-direction:column;gap:6px"><h2 class="h2">Board logins</h2>
+      ${U.length?`<div class="mini">${U.map(u=>`<div class="mr" style="grid-template-columns:minmax(0,1fr) 120px 110px"><span>${esc(u.email||'')}</span><span class="muted">${esc(u.tenant)}</span><span class="muted">${esc(u.role||'')}</span></div>`).join('')}</div>`:'<p class="muted" style="margin:0">None listed yet.</p>'}
+      <p class="hint" style="margin:0">A board login opens one club's hubs only. Passwords are set when a login is created; to change one later, use Supabase → Authentication → Users → Reset password.</p></div>`;
+  $('ptNew').onclick=()=>editTenant(null);
+  m.querySelectorAll('[data-t]').forEach(r=>r.onclick=()=>editTenant((T||[]).find(t=>t.slug===r.dataset.t)));
+}
+const genPassword=()=>{ const a='abcdefghjkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789'; const u=new Uint32Array(14); crypto.getRandomValues(u); return [...u].map(n=>a[n%a.length]).join('').replace(/(.{5})(?=.)/g,'$1-'); };
+function moduleBoxes(m){ return `<div class="fld"><span class="lbl">Modules</span><div class="mini" id="ptMods">${MODULE_CATALOG.map(x=>`<label class="mr" style="grid-template-columns:28px minmax(0,1fr);cursor:pointer"><input type="checkbox" data-mod="${x.id}"${m[x.id]||x.base?' checked':''}${x.base?' disabled':''}><span><b>${esc(x.name)}</b>${x.soon?' <span class="chip inact">soon</span>':''}<br><span class="muted" style="font-size:12.5px">${esc(x.desc)}</span></span></label>`).join('')}</div></div>`; }
+function readModules(root){ const m={golf:true}; root.querySelectorAll('[data-mod]').forEach(c=>{ if(c.checked) m[c.dataset.mod]=true; }); return m; }
+function editTenant(t){
+  const m=modulesOf(t), users=(PORTAL_STATE.users||[]).filter(u=>t&&u.tenant===t.slug);
+  openDrawer({kicker:t?'Client':'New client',title:t?t.name:'New client',wide:true,saveLabel:t?'Save':'Create client',
+    body:pair(field('Club name','ptN',t?.name||'',{ph:'e.g. Walnut Creek Country Club'}),field('Short name','ptS',t?.short||'',{ph:'e.g. WCCC'}))+
+      field('Address (subdomain)','ptSlug',t?.slug||'',{ph:'e.g. wccc  →  wccc.'+BASE_DOMAIN,disabled:!!t})+
+      (t?'':'<p class="hint">Lower-case letters, digits and dashes. It becomes the club’s address and can’t change later.</p>')+
+      `<div class="fld"><span class="lbl">Plan</span>${seg('ptPlan',[['club','Club management'],['golf','Golf management']],t?.plan||'golf')}<p class="hint">A preset for the boxes below — tick or untick anything after.</p></div>`+
+      moduleBoxes(m)+
+      (t?`<div class="fld"><span class="lbl">Status</span>${seg('ptSt',[['active','Active'],['trial','Trial'],['suspended','Suspended']],t.status||'active')}<p class="hint">Suspended: the club’s hubs show a notice and nothing else; data is kept.</p></div>`:'')+
+      field('Extra host names','ptH',(t?.hosts||[]).join(', '),{ph:'e.g. app.wcccmga.org, hub.wcccmga.org'})+
+      '<p class="hint">Other addresses that open this club (their own domain). Each needs a CNAME to the site and a custom domain on Render.</p>'+
+      field('Notes','ptNo',t?.notes||'',{type:'textarea'})+
+      (t?`<div class="fld"><span class="lbl">Board logins</span><div class="mini">${users.length?users.map(u=>`<div class="mr" style="grid-template-columns:minmax(0,1fr) 100px"><span>${esc(u.email||'')}</span><span class="muted">${esc(u.role||'')}</span></div>`).join(''):'<div class="mr"><span class="muted">None yet.</span></div>'}</div>
+          <div style="display:flex;gap:8px;align-items:center;margin-top:8px;flex-wrap:wrap"><input class="inp" id="ptUE" type="email" placeholder="board@club.org" aria-label="New login e-mail" style="flex:1;min-width:200px"><button class="btn" id="ptUAdd">Add board login</button></div>
+          <div id="ptUNew"></div><p class="hint">The sign-in card at ${esc(tenantURL(t.slug))} shows the primary login below; any login linked here works.</p></div>`+
+        field('Primary login e-mail (shown on the sign-in card)','ptLE',t.login_email||'',{type:'email'})
+       :field('First board login (e-mail)','ptLE','',{type:'email',ph:'board@club.org'})+'<p class="hint">A password is generated and shown once after the client is created. Leave it blank to add logins later.</p>'),
+    wire:r=>{ wireSeg(r,'ptPlan',v=>{ const p=PLAN_PRESETS[v]||{}; r.querySelectorAll('[data-mod]').forEach(c=>{ if(!c.disabled) c.checked=!!p[c.dataset.mod]; }); }); wireSeg(r,'ptSt');
+      const add=r.querySelector('#ptUAdd'); if(add) add.onclick=async()=>{ const em=fv('ptUE'); if(!em||!/@/.test(em)){ toast('Enter the e-mail address'); return; } add.disabled=true;
+        try{ const pw=await addBoardLogin(t.slug,em); r.querySelector('#ptUNew').innerHTML=`<div class="banner" style="margin-top:8px"><b>Login created.</b> ${esc(em)} · password <code>${esc(pw)}</code> — copy it now; it is not shown again.</div>`; toast('Board login added'); loadTenants(); }
+        catch(e){ toast(e.message||'Could not add the login'); } add.disabled=false; }; },
+    save:()=>{ const name=fv('ptN'); if(!name){ toast('Give the club a name'); return false; }
+      const slug=(t?t.slug:fv('ptSlug')).toLowerCase(); if(!/^[a-z0-9][a-z0-9-]{1,30}$/.test(slug)||['app','portal','www','api','admin','mail'].includes(slug)){ toast('Choose a different address: letters, digits and dashes'); return false; }
+      const body=$('dBody'), rec={name,short:fv('ptS'),plan:body.querySelector('#ptPlan').dataset.val,modules:readModules(body),hosts:fv('ptH').split(/[,\s]+/).map(h=>h.trim().toLowerCase()).filter(Boolean),notes:fv('ptNo'),login_email:fv('ptLE')||null,updated_at:new Date().toISOString()};
+      if(t) rec.status=body.querySelector('#ptSt').dataset.val;
+      saveTenant(t,slug,rec); }});
+}
+async function saveTenant(t,slug,rec){
+  try{
+    if(t){ const {error}=await sb.from('tenants').update(rec).eq('slug',slug); if(error) throw error; toast('Saved'); }
+    else {
+      const {error}=await sb.from('tenants').insert(Object.assign({slug,status:'active'},rec)); if(error) throw error;
+      // the club's own document, so the hub opens straight onto an empty directory rather than first-run set-up
+      const club=normalize(null,{id:'club',kind:'club',name:rec.name,short:rec.short||''}); club.name=rec.name; club.short=rec.short||''; club.orgs=[];
+      const {error:e2}=await sb.from('mga_hub').insert({tenant:slug,id:'club',data:Object.assign(club,{_rev:1,_w:CLIENT,_at:Date.now()}),updated_at:new Date().toISOString()}); if(e2) throw e2;
+      let pw=null; if(rec.login_email){ pw=await addBoardLogin(slug,rec.login_email); }
+      toast(rec.name+' created');
+      if(pw) setTimeout(()=>openDrawer({kicker:'New client',title:rec.name+' is ready',body:`<p>Address: <a href="${esc(tenantURL(slug))}" target="_blank" rel="noopener">${esc(tenantURL(slug))}</a></p><div class="banner"><b>Board login</b><br>${esc(rec.login_email)}<br>password <code>${esc(pw)}</code><br><small>Copy it now — it is not shown again. The club can change it from Supabase → Authentication, or you can add another login any time.</small></div>`}),50);
+    }
+  }catch(e){ toast(e.message||'That did not save'); }
+  loadTenants();
+}
+/* a new board login: sign the user up on a side client (the admin stays signed in), then link them to the tenant */
+async function addBoardLogin(slug,email){
+  const side=window.supabase.createClient(CFG.url,CFG.anonKey,{auth:{persistSession:false,autoRefreshToken:false,detectSessionInUrl:false}});
+  const password=genPassword();
+  const {data,error}=await side.auth.signUp({email,password,options:{data:{tenant:slug}}});
+  if(error) throw new Error(error.message);
+  const uid=data&&data.user&&data.user.id; if(!uid) throw new Error('Supabase did not return the new user — is e-mail confirmation off?');
+  const {error:e2}=await sb.from('tenant_users').insert({user_id:uid,tenant:slug,role:'board',email});
+  if(e2) throw new Error(e2.message);
+  try{ await side.auth.signOut(); }catch(_){}
+  return password;
+}
+/* ---------- the screens a tenant's hub shows instead of a hub ---------- */
+function vNoTenant(m){
+  $('nav').innerHTML=''; $('seasonBox').hidden=true; $('btnSwitch').hidden=true;
+  m.innerHTML=head('No club at this address','')+`<div class="card pad" style="max-width:640px"><p style="margin:0 0 8px">Nothing is set up at <b>${esc(HOSTNAME||TENANT_HINT)}</b>.</p><p class="hint" style="margin:0">A club’s hub lives at <i>club</i>.${esc(BASE_DOMAIN)}. If this is your club’s address, ask Flagstick to add it under the client’s host names.</p></div>`;
+}
+function vSuspended(m){
+  $('nav').innerHTML=''; $('seasonBox').hidden=true; $('btnSwitch').hidden=true;
+  m.innerHTML=head(TENANT_INFO&&TENANT_INFO.name||'This club','')+`<div class="card pad" style="max-width:640px"><p style="margin:0 0 8px"><b>This hub is paused.</b></p><p class="hint" style="margin:0">Your data is safe. Please contact Flagstick to reactivate the subscription.</p></div>`;
+}
+/* an organization whose kind the subscription does not include */
+function vLocked(m,kind){
+  const mod=kind==='group'?'groups':'associations', name=(MODULE_CATALOG.find(x=>x.id===mod)||{}).name||mod;
+  m.innerHTML=head('Not included in your plan','')+`<div class="card pad" style="max-width:640px"><p style="margin:0 0 8px"><b>${esc(name)}</b> is not part of ${esc(CLUB&&CLUB.name||CLUB_META.name)}’s Flagstick subscription.</p><p class="hint" style="margin:0">Its data is kept. Contact Flagstick to add the module.</p><div class="actions" style="margin-top:12px"><button class="btn" id="lkBack">Back to the club hub</button></div></div>`;
+  $('lkBack').onclick=()=>chooseOrg('club');
+}
 /* =====================================================================
    MGA Hub — Treasury: one ledger for the season, budget vs actual across
    every tournament, and bank reconciliation against uploaded statements.
@@ -2913,7 +3102,7 @@ const hcpOf=(ev,p,grp)=>playerHcp(ev,{course:courseFor(ev,p,grp)},p);
 function publicEvent(ev){
   const courses={}; const tt=db.tournaments.find(x=>x.id===ev.tournamentId); const ftm=new Map(tt?tt.field.map(p=>[p.memberId,'T'+(p.team||0)]):[]);
   for(const g of ev.groups){ if(!courses[g.course]){ const c=courseById(g.course); if(c) courses[g.course]={name:c.name,par:c.par,hcp:c.hcp,tees:Object.fromEntries(c.tees.map(t=>[t.name,t.yards||null]))}; } }
-  return {slug:ev.slug,name:ev.name,date:ev.date,status:ev.status,club:'Walnut Creek Country Club',org:ORG_ID,courses,
+  return {slug:ev.slug,name:ev.name,date:ev.date,status:ev.status,club:(CLUB&&CLUB.name)||CLUB_META.name,org:ORG_ID,courses,
     groups:ev.groups.map(g=>({id:g.id,label:g.label||'',course:g.course,startHole:+g.startHole||1,teeTime:g.teeTime||'',players:g.players.map(p=>{ const h=playerHcp(ev,g,p); return {id:p.id,name:p.name,tee:p.tee||ev.defaultTee||'White',set:p.set||'M',ch:h.ch,ph:h.ph,flight:p.flight||'',team:evTeam(ev)?(p.team||ftm.get(p.memberId)||''):''}; })})),
     format:ev.format||'stroke',front:ev.front,back:ev.back,teamSize:ev.teamSize||(isTeamEvent(ev)||ev.format==='match'&&ev.teamSize>=2?2:1),count:ev.count||1,countPattern:ev.countPattern||'',quotaBase:ev.quotaBase||36,cap:ev.cap||'',matchScoring:ev.matchScoring||'holes',matchForm:ev.matchForm||'',matchBy:ev.matchBy||'holes',game:ev.game||'',allow:Object.assign({},ev.allow||{}),scoring:ev.scoring||'gross',flights:(ev.flights&&ev.flights.names)||[],
     comps:ev.gameId&&typeof gameComps==='function'?gameComps(ev):[]};
@@ -2925,7 +3114,7 @@ async function publishEvent(ev){
   if(!CLOUD||!sessionOK) return; try{ PUB_SIG[ev.id]=JSON.stringify(publicEvent(ev)); }catch(_){}
   const codes=Object.fromEntries(ev.groups.map(g=>[String(g.code).toUpperCase(),g.id]));
   const {error}=KEYMODE?await keyRPC('hub_key_golf_event',{p_id:ev.id,p_slug:ev.slug.toLowerCase(),p_public:publicEvent(ev),p_codes:codes})
-    :await sb.from('golf_events').upsert({id:ev.id,slug:ev.slug.toLowerCase(),public:publicEvent(ev),codes,updated_at:new Date().toISOString()});
+    :await sb.from('golf_events').upsert(trow({id:ev.id,slug:ev.slug.toLowerCase(),public:publicEvent(ev),codes,updated_at:new Date().toISOString()}));
   if(error) toast(/duplicate|unique/i.test(error.message)?'That link is already used by another event — pick a different one':/relation|does not exist/i.test(error.message)?'Run golf-setup.sql in Supabase to turn on live scoring':'Couldn’t publish the event: '+error.message);
 }
 function golfSave(ev){ persist(); publishEvent(ev); }
@@ -2962,7 +3151,7 @@ async function loadScores(ev){
 async function setScore(ev,pid,hole,strokes){
   if(CLOUD&&sessionOK){
     const q=KEYMODE?keyRPC('hub_key_score',{p_event:ev.id,p_player:pid,p_hole:hole,p_strokes:strokes||null})
-      :strokes?sb.from('golf_scores').upsert({event_id:ev.id,player_id:pid,hole,strokes,updated_at:new Date().toISOString()}):sb.from('golf_scores').delete().eq('event_id',ev.id).eq('player_id',pid).eq('hole',hole);
+      :strokes?sb.from('golf_scores').upsert(trow({event_id:ev.id,player_id:pid,hole,strokes,updated_at:new Date().toISOString()})):sb.from('golf_scores').delete().eq('event_id',ev.id).eq('player_id',pid).eq('hole',hole);
     const {error}=await q; if(error){ toast('Couldn’t save score: '+error.message); return false; }
     const m=(golfScores[ev.id]=golfScores[ev.id]||{}); m[pid]=m[pid]||{}; if(strokes) m[pid][hole]=strokes; else delete m[pid][hole]; return true;
   }
@@ -4935,7 +5124,7 @@ const cashierLink=t=>SITE_BASE+'cashier.html?k='+encodeURIComponent(calc(t).shar
 const newToken=()=>Array.from(crypto.getRandomValues(new Uint8Array(24)),b=>'abcdefghijkmnpqrstuvwxyz23456789'[b%32]).join('');
 /* create, replace or (token null) turn off a shared cashier / check-in row; admin links go through the database function */
 function shareRow(tid,token,name,doc){ return KEYMODE?keyRPC('hub_key_share',{p_tid:tid,p_token:token,p_name:name,p_doc:doc})
-  :token?sb.from('calcutta_share').upsert({tid,token,name,doc,version:1,updated_at:new Date().toISOString()}):sb.from('calcutta_share').update({token:null}).eq('tid',tid); }
+  :token?sb.from('calcutta_share').upsert(trow({tid,token,name,doc,version:1,updated_at:new Date().toISOString()})):tq(sb.from('calcutta_share').update({token:null})).eq('tid',tid); }
 function calcPeople(t){ return (t.field||[]).map(p=>{ const m=memberById(p.memberId); return m?{id:m.id,name:tidyName(memberName(m))}:null; }).filter(Boolean).sort((a,b)=>a.name.localeCompare(b.name)); }
 const SHARE_ST={};
 /* the last cashier copy this device merged with — needed to tell what changed here; kept per device */
@@ -6134,7 +6323,7 @@ async function resultsPDF(t,opt){
 /* Keeps every open device on the latest version: checks version.json about once a minute and, when a
    newer build is live, reloads at a safe moment (nothing unsaved, no editor open, not mid-typing). */
 (function(){
-  const ME='20261016224851'; let ready=false, lastCheck=0;
+  const ME='20261020212611'; let ready=false, lastCheck=0;
   const typing=()=>{ const a=document.activeElement; return a&&/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)&&a.value&&a.type!=='search'; };
   const safe=()=>!typing()&&(typeof window.__canReload!=='function'||window.__canReload());
   async function check(){ lastCheck=Date.now(); if(location.protocol==='file:') return;

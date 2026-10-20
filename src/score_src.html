@@ -106,9 +106,12 @@ async function loadScores(){
 /* the event itself (groups, tees, handicaps, competitions) is re-read every 30 s and whenever the page comes back
    into view, so a mid-round change in the hub — an index corrected, a player moved, a competition added — reaches
    every phone and board without a reload */
-let pubSig='';
+let pubSig='', TENANT=null;
+/* which club this address belongs to (tenants-setup.sql); nothing until that has run, and the look-up then matches the slug alone */
+async function resolveTenant(){ try{ const {data,error}=await sb.rpc('tenant_lookup',{p_host:qs.get('tenant')||location.hostname}); if(!error&&data&&data.slug) TENANT=data.slug; }catch(_){} }
+const evArgs=o=>TENANT?Object.assign({p_tenant:TENANT},o):o;
 async function loadEvent(){
-  const {data,error}=await sb.rpc('golf_event',{p_slug:SLUG});
+  const {data,error}=await sb.rpc('golf_event',evArgs({p_slug:SLUG}));
   if(error) return 'error'; if(!data) return 'none';
   const sig=JSON.stringify(data), changed=sig!==pubSig; pubSig=sig; pub=data;
   if(changed){ const comps=(pub.comps||[]).length, name=String(pub.name||'').replace(/\s·\s[A-Z][a-z]{2} \d{1,2}(, \d{4})?$/,'');
@@ -126,6 +129,7 @@ async function refresh(){
 async function boot(){
   if(!SLUG) return fail('This link is missing its event. Ask the committee for the scoring link.');
   if(!sb) return fail('Live scoring isn’t connected yet.');
+  await resolveTenant();
   const r=await loadEvent();
   if(r==='error') return fail('Couldn’t reach live scoring. Check your signal and reload.');
   if(r==='none') return fail('No event found for this link. Check the link with the committee.');
@@ -143,7 +147,7 @@ async function boot(){
 }
 async function join(c,silent){
   c=String(c||'').trim().toUpperCase(); if(!c) return;
-  const {data,error}=await sb.rpc('golf_join',{p_slug:SLUG,p_code:c});
+  const {data,error}=await sb.rpc('golf_join',evArgs({p_slug:SLUG,p_code:c}));
   if(error||!data||!pub.groups.find(g=>g.id===data)){ if(!silent){ $('joinErr').textContent=error?'Couldn’t check that — try again.':'That group ID isn’t in this event.'; } else localStorage.removeItem(KEY); return false; }
   groupId=data; code=c; try{ localStorage.setItem(KEY,JSON.stringify({code:c})); }catch(_){}
   const g=group(), order=playOrder(g.startHole);

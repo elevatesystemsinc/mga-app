@@ -27,7 +27,8 @@ I.coins=svg('<ellipse cx="12" cy="6" rx="7" ry="3"/><path d="M5 6v12c0 1.7 3.1 3
 const NAV=[['dash','Dashboard',I.home],['tournaments','Tournaments',I.flag],['members','Members',I.users],['collections','Dues collection',I.coins],['board','Board',I.shield],['budget','Season budget',I.ledger],['orgs','Organizations',I.org],['library','Game library',I.lib]];
 /* which pages each kind of organization gets (associations get everything) */
 const ORG_NAV={club:['dash','tournaments','golf','members','collections','orgs','library','budget','treasury'],association:['dash','tournaments','golf','members','board','treasury','budget'],group:['dash','tournaments','golf','members']};
-function navItems(){ const allow=ORG_NAV[db.kind]; return NAV.filter(([k])=>!allow||allow.includes(k)).map(([k,l,ic])=>[k,k==='members'&&isClub()?'Directory':l,ic]); }
+const CLUB_TIER_NAV={collections:1,treasury:1,budget:1};   // the club hub's money pages belong to the Club management module
+function navItems(){ const allow=ORG_NAV[db.kind]; return NAV.filter(([k])=>(!allow||allow.includes(k))&&!(isClub()&&CLUB_TIER_NAV[k]&&!hasModule('club'))).map(([k,l,ic])=>[k,k==='members'&&isClub()?'Directory':l,ic]); }
 /* the organization on screen: the club's record from CLUB.orgs wins over what the document says */
 const curOrg=()=>!db?null:isClub()?Object.assign({},CLUB_META,{name:CLUB.name||CLUB_META.name,crest:CLUB.crest||CLUB_META.crest}):(orgMeta()||{id:db.id,kind:db.kind,name:db.name,short:db.short});
 const orgShort=()=>{ const o=curOrg(); return o?(o.short||o.name||'club'):'club'; };
@@ -89,15 +90,19 @@ function render(){
   if(Math.abs(window.scrollY-sy)>2) window.scrollTo(0,sy);
 }
 function renderInner(){
+  if(PORTAL){ if(sessionOK&&TENANCY&&typeof vPortal==='function') vPortal($('main')); return; }
+  if(TENANCY&&!TENANT){ vNoTenant($('main')); return; }
+  if(tenantStatus()==='suspended'&&!(ACCESS&&ACCESS.admin)){ vSuspended($('main')); return; }
   const o=curOrg(), clubName=CLUB&&CLUB.name||CLUB_META.name;
   const title=o?(isClub()?'Club Hub':orgShort()+' Hub'):'Club Hub';
   // the sidebar leads with the Flagstick mark (head.html); this line names the hub you are in, in words only
   const lock=!o||isClub();
   $('brandName').textContent=lock?clubName:(o.name||o.short); $('brandSub').textContent=lock?(o?'Club hub':'Choose a hub'):clubName;
   $('topName').textContent=title; document.title=(o?(isClub()?clubName:orgShort()+' · '+clubName):clubName)+' · Flagstick';
-  const lc=$('loginClub'); if(lc) lc.textContent=clubName;
+  const lc=$('loginClub'); if(lc) lc.textContent=TENANT_INFO&&TENANT_INFO.name||clubName;   // the sign-in card names the tenant, even before its document is open
   $('btnSwitch').hidden=!CLUB||(!db&&!setupNeeded)||KEYMODE; if(typeof paintHubSync==='function') paintHubSync();
   if(!db){ $('nav').innerHTML=''; $('seasonBox').hidden=true; (setupNeeded?vSetup:vPicker)($('main')); return; }
+  if(!isClub()&&!hasModule(db.kind==='group'?'groups':'associations')){ $('nav').innerHTML=''; $('seasonBox').hidden=true; vLocked($('main'),db.kind); return; }
   $('seasonBox').hidden=false;
   const ys=Object.keys(db.seasons).sort((a,b)=>b-a);
   $('seasonSel').innerHTML=ys.map(y=>`<option value="${y}"${y===Y()?' selected':''}>${y} season</option>`).join('')+'<option value="__new">+ New season…</option>';
@@ -118,8 +123,8 @@ function vPicker(m){
   const grp=(k,empty)=>{ const l=orgs.filter(x=>x.kind===k); return l.length?l.map(x=>card(x.id,x,ORG_KINDS[k]+(x.short?' · '+x.short:''))).join(''):`<p class="muted" style="margin:0;font-size:13.5px">${empty}</p>`; };
   m.innerHTML=`<div class="phead"><div><div class="fs light"><img src="flagstick-crest.svg" alt=""><div><b>FLAGSTICK</b><small>GOLF SOFTWARE</small></div></div><h1 class="h2" style="margin:0 0 4px">${esc(club.name)}</h1><p class="sub">Choose what to work on. Each organization has its own hub; the club keeps the member directory.</p></div></div><div class="rule"></div>
   ${unknown}<div class="orgs">${card('club',club,'Club hub · member directory · club tournaments · organizations')}
-    <h2 class="h2" style="margin-top:10px">Associations</h2>${grp('association','No associations yet — create one in the club hub under Organizations.')}
-    <h2 class="h2" style="margin-top:10px">Small groups</h2>${grp('group','No small groups yet — create one in the club hub under Organizations.')}</div>`;
+    ${hasModule('associations')?`<h2 class="h2" style="margin-top:10px">Associations</h2>${grp('association','No associations yet — create one in the club hub under Organizations.')}`:''}
+    ${hasModule('groups')?`<h2 class="h2" style="margin-top:10px">Small groups</h2>${grp('group','No small groups yet — create one in the club hub under Organizations.')}`:''}</div>`;
   m.querySelectorAll('[data-org]').forEach(b=>b.onclick=()=>chooseOrg(b.dataset.org));
 }
 function vSetup(m){
@@ -141,7 +146,9 @@ function vOrgs(m){
   const cols='grid-template-columns:48px minmax(0,1fr) 120px 100px 40px';
   const row=x=>`<div class="tr click" data-o="${esc(x.id)}" style="${cols}">${crestHTML(x,'sm')}<div class="cell2"><b>${esc(x.name)}</b><small>${esc(x.short||'')} · ${esc(orgURL(x.id))}</small></div><span class="muted">${ORG_KINDS[x.kind]||x.kind}</span><span>${x.archived?'<span class="chip">Archived</span>':'<span class="chip ok">Active</span>'}</span><span class="ib">${I.edit}</span></div>`;
   const grp=k=>CLUB.orgs.filter(x=>x.kind===k).map(row).join('')||'<div class="tr"><span class="muted">None yet.</span></div>';
-  m.innerHTML=head('Organizations','Associations and small groups inside the club. Each has its own hub; their members come from the club directory.',btn('New small group','oGrp','',I.plus)+btn('New association','oAssoc','pri',I.plus))+`
+  const offNote=k=>` <span class="chip inact">not in your plan</span>`;
+  m.innerHTML=head('Organizations','Associations and small groups inside the club. Each has its own hub; their members come from the club directory.',(hasModule('groups')?btn('New small group','oGrp','',I.plus):'')+(hasModule('associations')?btn('New association','oAssoc','pri',I.plus):''))+`
+  ${!hasModule('associations')||!hasModule('groups')?`<div class="banner">${[!hasModule('associations')?'Associations':'',!hasModule('groups')?'Small groups':''].filter(Boolean).join(' and ')} are not part of this club’s Flagstick subscription; their hubs are closed and their data kept. Contact Flagstick to add the module.</div>`:''}`+`
   <div class="card" style="overflow:hidden"><div class="cardhead"><h2 class="h2">Associations</h2></div><div class="t">${grp('association')}</div></div>
   <div class="card" style="overflow:hidden"><div class="cardhead"><h2 class="h2">Small groups</h2></div><div class="t">${grp('group')}</div></div>
   ${CLOUD?`<div class="card pad" style="display:flex;flex-direction:column;gap:10px"><h2 class="h2">MGA Hub (hub.wcccmga.org)</h2>
@@ -149,7 +156,7 @@ function vOrgs(m){
     <div class="actions">${linkedOrg()?'<button class="btn" id="oSync">Sync now</button>':''}<button class="btn" id="oMig">Re-import from the MGA Hub</button></div></div>`:''}`;
   const os=$('oSync'); if(os) os.onclick=async()=>{ os.disabled=true; await hubSync({force:true}); os.disabled=false; render(); toast(HUB_SYNC.state==='ok'?'In sync with the MGA Hub':'Sync failed: '+(HUB_SYNC.msg||'')); };
   m.querySelectorAll('[data-o]').forEach(r=>r.onclick=()=>editOrg(CLUB.orgs.find(x=>x.id===r.dataset.o)));
-  $('oGrp').onclick=()=>editOrg(null,'group'); $('oAssoc').onclick=()=>editOrg(null,'association');
+  if($('oGrp')) $('oGrp').onclick=()=>editOrg(null,'group'); if($('oAssoc')) $('oAssoc').onclick=()=>editOrg(null,'association');
   const mg=$('oMig'); if(mg) mg.onclick=async()=>{ if(!confirm('Replace the MGA’s hub here with the MGA Hub’s current data, and update the directory from its member list?')) return; mg.disabled=true;
     try{ const r=await migrateFromHub(); toast(`Imported · ${r.people} people · ${r.tournaments} tournaments`); render(); }catch(e){ mg.disabled=false; toast(e.message||'Import failed'); } };
 }
@@ -185,7 +192,7 @@ function editOrg(o,kind){
 /* admin links for one organization: the list (from hub_keys), revoke, and create — the key itself is shown once */
 async function adminLinks(r,o){
   const L=r.querySelector('#ogKeys'), N=r.querySelector('#ogKeyNew');
-  const list=async()=>{ const {data,error}=await sb.from('hub_keys').select('id,label,created_at,revoked_at').eq('org_id',o.id);
+  const list=async()=>{ const {data,error}=await tq(sb.from('hub_keys').select('id,label,created_at,revoked_at')).eq('org_id',o.id);
     if(error){ L.innerHTML=`<div class="mr"><span class="muted">${/relation|does not exist/i.test(error.message)?'Run admin-links-setup.sql in Supabase to turn on admin links.':esc(error.message)}</span></div>`; return; }
     const live=(data||[]).filter(k=>!k.revoked_at).sort((a,b)=>(a.created_at||'').localeCompare(b.created_at||''));
     L.innerHTML=live.length?live.map(k=>`<div class="mr" style="grid-template-columns:minmax(0,1fr) auto"><span>${esc(k.label||'Admin link')} <span class="muted">· ${new Date(k.created_at).toLocaleDateString()}</span></span><button class="btn sm" type="button" data-revoke="${k.id}">Revoke</button></div>`).join(''):'<div class="mr"><span class="muted">No admin links yet.</span></div>';
@@ -202,7 +209,7 @@ async function newAdminLink(o,label){
   if(!crypto.subtle) throw new Error('This browser cannot create links (needs https)');
   const token=newToken()+newToken().slice(0,8), hash=await sha256hex(token);
   if(!(await fetchRow(o.id))) await putDoc(o.id,normalize(null,o));              // the organizer's hub must exist before the link is used
-  const {error}=await sb.from('hub_keys').insert({org_id:o.id,key_hash:hash,label:label||''});
+  const {error}=await sb.from('hub_keys').insert(trow({org_id:o.id,key_hash:hash,label:label||''}));
   if(error) throw new Error(/relation|does not exist/i.test(error.message)?'Run admin-links-setup.sql in Supabase first':error.message);
   return {token,url:(HTTP?SITE_BASE+encodeURIComponent(o.id):location.href.split('#')[0].split('?')[0]+'?org='+o.id)+'#key='+token};
 }
@@ -1016,18 +1023,28 @@ function wireChrome(){
   $('syncBtn').onclick=()=>{ if(!CLOUD||!sessionOK) return; if(!cloudReady) startCloud(); else pushAll(); };
   $('btnSignOut').onclick=async()=>{ if(KEYMODE){ if(!confirm('Leave this hub? You will need the admin link again to come back.')) return; dropKey(); location.reload(); return; } await sb.auth.signOut(); location.reload(); };
 }
+const loginEmail=()=>{ const e=$('loginEmail'); const v=e&&!e.hidden?e.value.trim():''; return v||(TENANT_INFO&&TENANT_INFO.login_email)||CFG.boardEmail||''; };
+/* the sign-in card: the tenant's board e-mail (editable, so a Flagstick admin can sign in anywhere); the portal always asks */
+function paintLogin(){ const lc=$('loginClub'); if(lc&&TENANT_INFO) lc.textContent=TENANT_INFO.name; const e=$('loginEmail'); if(!e) return; const show=PORTAL||TENANCY||!CFG.boardEmail; e.hidden=!show; if(!e.value) e.value=PORTAL?'':((TENANT_INFO&&TENANT_INFO.login_email)||CFG.boardEmail||''); }
 async function doLogin(){
-  const pw=$('loginPw').value; if(!pw) return; $('loginBtn').disabled=true; $('loginErr').textContent='';
-  const {error}=await sb.auth.signInWithPassword({email:CFG.boardEmail,password:pw});
-  $('loginBtn').disabled=false;
-  if(error){ $('loginErr').textContent='That password didn’t work.'; return; }
-  $('login').classList.remove('show'); sessionOK=true; $('btnSignOut').hidden=false; startCloud();
+  const pw=$('loginPw').value, email=loginEmail(); if(!pw) return; if(!email){ $('loginErr').textContent='Enter the e-mail address.'; return; } $('loginBtn').disabled=true; $('loginErr').textContent='';
+  const {error}=await sb.auth.signInWithPassword({email,password:pw});
+  if(error){ $('loginBtn').disabled=false; $('loginErr').textContent='That sign-in didn’t work.'; return; }
+  const ok=await checkAccess(); $('loginBtn').disabled=false;
+  if(!ok.ok){ await sb.auth.signOut(); $('loginErr').textContent=ok.msg||'No access.'; return; }
+  $('login').classList.remove('show'); sessionOK=true; $('btnSignOut').hidden=false;
+  if(PORTAL){ portalBoot(); return; }
+  startCloud();
 }
 async function boot(){
   wireChrome(); render();
   if(!CLOUD){ setSync('local'); return; }
-  $('loginBtn').onclick=doLogin; $('loginPw').onkeydown=e=>{ if(e.key==='Enter') doLogin(); };
+  $('loginBtn').onclick=doLogin; $('loginPw').onkeydown=e=>{ if(e.key==='Enter') doLogin(); }; const le=$('loginEmail'); if(le) le.onkeydown=e=>{ if(e.key==='Enter') $('loginPw').focus(); };
+  await resolveTenant(); paintLogin();
+  if(TENANCY&&!TENANT&&!PORTAL){ setSync('local'); render(); return; }          // no club at this address
   const {data}=await sb.auth.getSession();
+  if(data&&data.session){ const ok=await checkAccess(); if(!ok.ok){ await sb.auth.signOut(); $('login').classList.add('show'); $('loginErr').textContent=ok.msg||''; if(PORTAL) portalBoot(); return; } }
+  if(PORTAL){ sessionOK=!!(data&&data.session); portalBoot(); return; }
   if(data&&data.session){ sessionOK=true; $('btnSignOut').hidden=false; startCloud(); }
   else if(HUBKEY){ KEYMODE=true; sessionOK=true; $('btnSignOut').hidden=false; $('btnSignOut').textContent='Leave this hub'; $('btnRestore').hidden=true; startCloud(); }
   else { $('login').classList.add('show'); setTimeout(()=>$('loginPw').focus(),100); }

@@ -58,7 +58,7 @@ const hcpOf=(ev,p,grp)=>playerHcp(ev,{course:courseFor(ev,p,grp)},p);
 function publicEvent(ev){
   const courses={}; const tt=db.tournaments.find(x=>x.id===ev.tournamentId); const ftm=new Map(tt?tt.field.map(p=>[p.memberId,'T'+(p.team||0)]):[]);
   for(const g of ev.groups){ if(!courses[g.course]){ const c=courseById(g.course); if(c) courses[g.course]={name:c.name,par:c.par,hcp:c.hcp,tees:Object.fromEntries(c.tees.map(t=>[t.name,t.yards||null]))}; } }
-  return {slug:ev.slug,name:ev.name,date:ev.date,status:ev.status,club:'Walnut Creek Country Club',org:ORG_ID,courses,
+  return {slug:ev.slug,name:ev.name,date:ev.date,status:ev.status,club:(CLUB&&CLUB.name)||CLUB_META.name,org:ORG_ID,courses,
     groups:ev.groups.map(g=>({id:g.id,label:g.label||'',course:g.course,startHole:+g.startHole||1,teeTime:g.teeTime||'',players:g.players.map(p=>{ const h=playerHcp(ev,g,p); return {id:p.id,name:p.name,tee:p.tee||ev.defaultTee||'White',set:p.set||'M',ch:h.ch,ph:h.ph,flight:p.flight||'',team:evTeam(ev)?(p.team||ftm.get(p.memberId)||''):''}; })})),
     format:ev.format||'stroke',front:ev.front,back:ev.back,teamSize:ev.teamSize||(isTeamEvent(ev)||ev.format==='match'&&ev.teamSize>=2?2:1),count:ev.count||1,countPattern:ev.countPattern||'',quotaBase:ev.quotaBase||36,cap:ev.cap||'',matchScoring:ev.matchScoring||'holes',matchForm:ev.matchForm||'',matchBy:ev.matchBy||'holes',game:ev.game||'',allow:Object.assign({},ev.allow||{}),scoring:ev.scoring||'gross',flights:(ev.flights&&ev.flights.names)||[],
     comps:ev.gameId&&typeof gameComps==='function'?gameComps(ev):[]};
@@ -70,7 +70,7 @@ async function publishEvent(ev){
   if(!CLOUD||!sessionOK) return; try{ PUB_SIG[ev.id]=JSON.stringify(publicEvent(ev)); }catch(_){}
   const codes=Object.fromEntries(ev.groups.map(g=>[String(g.code).toUpperCase(),g.id]));
   const {error}=KEYMODE?await keyRPC('hub_key_golf_event',{p_id:ev.id,p_slug:ev.slug.toLowerCase(),p_public:publicEvent(ev),p_codes:codes})
-    :await sb.from('golf_events').upsert({id:ev.id,slug:ev.slug.toLowerCase(),public:publicEvent(ev),codes,updated_at:new Date().toISOString()});
+    :await sb.from('golf_events').upsert(trow({id:ev.id,slug:ev.slug.toLowerCase(),public:publicEvent(ev),codes,updated_at:new Date().toISOString()}));
   if(error) toast(/duplicate|unique/i.test(error.message)?'That link is already used by another event — pick a different one':/relation|does not exist/i.test(error.message)?'Run golf-setup.sql in Supabase to turn on live scoring':'Couldn’t publish the event: '+error.message);
 }
 function golfSave(ev){ persist(); publishEvent(ev); }
@@ -107,7 +107,7 @@ async function loadScores(ev){
 async function setScore(ev,pid,hole,strokes){
   if(CLOUD&&sessionOK){
     const q=KEYMODE?keyRPC('hub_key_score',{p_event:ev.id,p_player:pid,p_hole:hole,p_strokes:strokes||null})
-      :strokes?sb.from('golf_scores').upsert({event_id:ev.id,player_id:pid,hole,strokes,updated_at:new Date().toISOString()}):sb.from('golf_scores').delete().eq('event_id',ev.id).eq('player_id',pid).eq('hole',hole);
+      :strokes?sb.from('golf_scores').upsert(trow({event_id:ev.id,player_id:pid,hole,strokes,updated_at:new Date().toISOString()})):sb.from('golf_scores').delete().eq('event_id',ev.id).eq('player_id',pid).eq('hole',hole);
     const {error}=await q; if(error){ toast('Couldn’t save score: '+error.message); return false; }
     const m=(golfScores[ev.id]=golfScores[ev.id]||{}); m[pid]=m[pid]||{}; if(strokes) m[pid][hole]=strokes; else delete m[pid][hole]; return true;
   }

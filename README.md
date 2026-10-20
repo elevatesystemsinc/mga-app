@@ -15,6 +15,10 @@ sidebar on every hub and the scoring, cashier and check-in pages; the navy-and-g
 and row, the login card and the picker; printed scorecards, PDFs and the drawing overlays carry it too. The hub you are
 in is named in words beneath the mark.
 
+Flagstick serves many clubs from one installation: each client has its own address (`<club>.flagstickhub.com`), its own
+board logins and the modules its subscription turns on (golf management for every client; associations, small groups
+and club management as boxes Flagstick ticks in its portal at app.flagstickhub.com). See `docs/tenancy.md`.
+
 ## Branches and sites
 
 - `main` → **app.wcccmga.org** — the club hub, the product going forward. The club is at `/`; each organization has its

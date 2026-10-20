@@ -255,6 +255,53 @@ async function openOrgDocs(){ if(ORG_ID!=='club'||!CLUB) return; for(const o of 
 function chooseOrg(id){ if(HTTP){ location.href=SITE_BASE+(id&&id!==HOST_ORG?encodeURIComponent(id):''); return; } const u=new URL(location.href); if(id) u.searchParams.set('org',id); else u.searchParams.delete('org'); location.href=u.toString(); }
 const orgURL=id=>HTTP?SITE_BASE.replace(/^https?:\/\//,'')+(id===HOST_ORG?'':id):'?org='+id;
 
+/* ---------- tenants: one database, many clubs ----------
+   A tenant is a client. Its slug is its address (wccc.flagstickhub.com) and every row it owns carries `tenant`
+   (tenants-setup.sql: tables, row level security, the tenant-aware functions). The host name decides the tenant
+   through tenant_lookup(): the subdomain under BASE_DOMAIN, one of the tenant's extra hosts (app.wcccmga.org), or
+   ?tenant=slug when developing. app. / portal. / www. and the bare domain open Flagstick's own portal (portal.js),
+   where tenants are created and their modules switched. Until tenants-setup.sql has run, tenant_lookup does not
+   exist and the app runs exactly as before (TENANCY=false: no tenant filter, every module on). */
+const BASE_DOMAIN=String(CFG.baseDomain||'flagstickhub.com').toLowerCase();
+const HOSTNAME=HTTP?location.hostname.toLowerCase():'';
+const PORTAL=(()=>{ const q=new URLSearchParams(location.search); if(q.get('portal')) return true; if(!HTTP) return false;
+  return HOSTNAME===BASE_DOMAIN||new RegExp('^(app|portal|www)\\.'+BASE_DOMAIN.replace(/\./g,'\\.')+'$').test(HOSTNAME); })();
+const TENANT_HINT=new URLSearchParams(location.search).get('tenant')||HOSTNAME||'';
+let TENANCY=false, TENANT=null, TENANT_INFO=null, ACCESS=null;   // ACCESS = my_access() once signed in
+/* The module switchboard: what a tenant's subscription turns on. `golf` is the base every tenant has; the rest are
+   boxes ticked per tenant in the portal. Gates live in hasModule(): nav items, organization kinds, whole hubs. */
+const MODULE_CATALOG=[
+  {id:'golf',         name:'Golf management',  base:true, desc:'Tournaments, rounds and results, live scoring and formats, the game library, the club directory'},
+  {id:'associations', name:'Associations',     desc:'Hubs for the MGA, LGA, SMGA…: schedules, tournaments, budget and treasury, dues billed to the club'},
+  {id:'groups',       name:'Small groups',     desc:'Rosters, money games with pots, live scoring, the season ledger, admin links for organizers'},
+  {id:'club',         name:'Club management',  desc:'The club tier: dues collection, the club’s treasury and budget, member numbers and statements as they are built'},
+  {id:'billing',      name:'Member billing',   soon:true, desc:'Member accounts, charges, statements and payment collection'},
+  {id:'pos',          name:'Point of sale',    soon:true, desc:'Food & beverage and pro shop charges to member accounts'},
+];
+const PLAN_PRESETS={club:{golf:true,associations:true,groups:true,club:true},golf:{golf:true,associations:true,groups:true}};
+function hasModule(k){ if(!TENANCY||!TENANT_INFO) return true; if(k==='golf') return true; return !!(TENANT_INFO.modules||{})[k]; }
+const tenantStatus=()=>TENANT_INFO&&TENANT_INFO.status||'active';
+/* tenant filter / tenant column on row queries (no-ops until tenants-setup.sql has run) */
+const tq=q=>TENANCY&&TENANT?q.eq('tenant',TENANT):q;
+const trow=o=>TENANCY&&TENANT?Object.assign({tenant:TENANT},o):o;
+async function resolveTenant(){
+  if(!CLOUD) return;
+  try{ const {data,error}=await sb.rpc('tenant_lookup',{p_host:TENANT_HINT});
+    if(error){ if(/does not exist|PGRST202|schema cache|42883|404/i.test((error.message||'')+' '+(error.code||'')+' '+(error.status||''))) return; throw error; }
+    TENANCY=true;
+    if(data&&data.slug){ TENANT=data.slug; TENANT_INFO=data; CLUB_META.name=data.name||CLUB_META.name; if(data.short) CLUB_META.short=data.short; }
+  }catch(e){ console.warn('tenant lookup failed',e); }
+}
+/* after sign-in: may this login open this tenant (or the portal)? */
+async function checkAccess(){
+  if(!TENANCY) return {ok:true};
+  const {data,error}=await sb.rpc('my_access'); if(error) return {ok:false,msg:error.message};
+  ACCESS=data||{admin:false,tenants:[]};
+  if(PORTAL) return ACCESS.admin?{ok:true}:{ok:false,msg:'This login is not a Flagstick administrator.'};
+  if(ACCESS.admin||(ACCESS.tenants||[]).includes(TENANT)) return {ok:true};
+  return {ok:false,msg:'This login does not belong to '+(TENANT_INFO&&TENANT_INFO.name||'this club')+'.'};
+}
+
 /* Stable stringify: Postgres jsonb reorders keys, so plain JSON.stringify can't tell "same data" apart. */
 function stable(o){ if(Array.isArray(o)) return '['+o.map(stable).join(',')+']';
   if(o&&typeof o==='object') return '{'+Object.keys(o).filter(k=>k!=='_w'&&k!=='_at'&&o[k]!==undefined).sort().map(k=>JSON.stringify(k)+':'+stable(o[k])).join(',')+'}';
@@ -325,6 +372,7 @@ let lastRemoteAt=0;
 const bare=x=>stable(Object.assign({},x,{_w:0,_at:0,_rev:0}));
 const docChanged=D=>!D.base||bare(D.db)!==bare(D.base);
 function persist(){
+  if(PORTAL) return;   // the portal edits tenant rows directly; there is no document to save
   if(typeof calcStampNow==='function') calcStampNow();   // mark what changed in shared Calcuttas before this save goes out
   for(const D of openDocs()){ D.db._w=CLIENT; D.db._at=Date.now(); store.save(D.id,D.db); }
   if(typeof afterPersist==='function') afterPersist();
@@ -337,7 +385,7 @@ function pushAll(){ openDocs().forEach(D=>pushCloud(D)); }
 window.__canReload=()=>!(typeof drawerOpen==='function'&&drawerOpen())&&openDocs().every(D=>!D.pushing&&(!CLOUD||!sessionOK||!D.base||!docChanged(D)));
 async function fetchRow(id){
   if(KEYMODE){ const {data,error}=await keyRPC('hub_key_read',{p_id:id}); if(error) throw error; return data||null; }
-  const {data:row,error}=await sb.from('mga_hub').select('data').eq('id',id).maybeSingle(); if(error) throw error; return row&&row.data; }
+  const {data:row,error}=await tq(sb.from('mga_hub').select('data')).eq('id',id).maybeSingle(); if(error) throw error; return row&&row.data; }
 /* key mode: the group may add people to the directory, never change them; the club document itself is read-only */
 async function pushPeople(D){
   const have=new Set((D.base&&D.base.members||[]).map(p=>p.id)), add=(D.db.members||[]).filter(p=>!have.has(p.id));
@@ -357,7 +405,7 @@ async function pushCloud(D){
       const next=JSON.parse(JSON.stringify(Object.assign({},D.db,{_rev:(rev||0)+1,_w:CLIENT,_at:Date.now()})));
       let landed;
       if(KEYMODE){ const {data,error}=await keyRPC('hub_key_write',{p_id:D.id,p_data:next,p_rev:rev}); if(error){ setSyncD(D,'offline',error); return; } landed=!!data; }
-      else { let q=sb.from('mga_hub').update({data:next,updated_at:new Date().toISOString()}).eq('id',D.id);
+      else { let q=tq(sb.from('mga_hub').update({data:next,updated_at:new Date().toISOString()})).eq('id',D.id);
         q=rev==null?q.is('data->>_rev',null):q.eq('data->>_rev',String(rev));
         const {data:rows,error}=await q.select('id');
         if(error){ setSyncD(D,'offline',error); return; }
@@ -367,7 +415,7 @@ async function pushCloud(D){
       // someone saved since we last looked (or the row doesn't exist yet): merge theirs into ours and try again
       const remote=await fetchRow(D.id);
       if(!remote&&KEYMODE){ setSyncD(D,'offline',{message:'This organization has not been set up by the club yet'}); return; }
-      if(!remote){ const {error:e2}=await sb.from('mga_hub').upsert({id:D.id,data:next,updated_at:new Date().toISOString()}); if(e2){ setSyncD(D,'offline',e2); return; }
+      if(!remote){ const {error:e2}=await sb.from('mga_hub').upsert(trow({id:D.id,data:next,updated_at:new Date().toISOString()})); if(e2){ setSyncD(D,'offline',e2); return; }
         D.base=JSON.parse(JSON.stringify(next)); D.db._rev=next._rev; store.save(D.id,D.db); setSyncD(D,'synced'); return; }
       mergeIn(D,remote,{quiet:true});
     }
@@ -406,6 +454,7 @@ async function loadDoc(id,meta,opt){
 function watchDoc(D){
   if(D.chan||!CLOUD||KEYMODE) return;   // key mode has no realtime (anonymous): the poll below carries updates
   D.chan=sb.channel('hub-'+D.id).on('postgres_changes',{event:'*',schema:'public',table:'mga_hub',filter:'id=eq.'+D.id},p=>{
+    if(TENANCY&&TENANT&&p.new&&p.new.tenant&&p.new.tenant!==TENANT) return;   // another club's row of the same id
     const r=p.new&&p.new.data; if(!r||r._w===CLIENT&&D.base&&r._rev===D.base._rev) return; applyRemote(D,r);
   }).subscribe();
 }
@@ -442,8 +491,8 @@ async function putDoc(id,data){
   for(let n=0;n<6;n++){
     const cur=await fetchRow(id), rev=cur&&cur._rev!=null?+cur._rev:null;
     const next=Object.assign({},data,{_rev:(rev||0)+1,_w:CLIENT,_at:Date.now()}), stamp=new Date().toISOString();
-    if(!cur){ const {error}=await sb.from('mga_hub').upsert({id,data:next,updated_at:stamp}); if(error) throw error; }
-    else { let q=sb.from('mga_hub').update({data:next,updated_at:stamp}).eq('id',id); q=rev==null?q.is('data->>_rev',null):q.eq('data->>_rev',String(rev));
+    if(!cur){ const {error}=await sb.from('mga_hub').upsert(trow({id,data:next,updated_at:stamp})); if(error) throw error; }
+    else { let q=tq(sb.from('mga_hub').update({data:next,updated_at:stamp})).eq('id',id); q=rev==null?q.is('data->>_rev',null):q.eq('data->>_rev',String(rev));
       const {data:rows,error}=await q.select('id'); if(error) throw error; if(!rows||!rows.length) continue; }
     const D=DOCS[id]; if(D&&D.db){ D.base=JSON.parse(JSON.stringify(next)); syncTo(D.db,normalize(JSON.parse(JSON.stringify(next)),D.meta)); D.db._rev=next._rev; store.save(id,D.db); }
     return next;
@@ -478,7 +527,7 @@ function paintHubSync(){ const el=$('hubSync'); if(!el) return; const o=linkedOr
   $('hubSyncNow').onclick=()=>hubSync({force:true}); }
 async function casWrite(id,data,rev){
   const next=Object.assign({},data,{_rev:(rev||0)+1,_w:CLIENT,_at:Date.now()});
-  let q=sb.from('mga_hub').update({data:next,updated_at:new Date().toISOString()}).eq('id',id); q=rev==null?q.is('data->>_rev',null):q.eq('data->>_rev',String(rev));
+  let q=tq(sb.from('mga_hub').update({data:next,updated_at:new Date().toISOString()})).eq('id',id); q=rev==null?q.is('data->>_rev',null):q.eq('data->>_rev',String(rev));
   const {data:rows,error}=await q.select('id'); if(error) throw error; return rows&&rows.length?next:null;
 }
 async function hubSync(opt){
