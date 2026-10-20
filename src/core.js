@@ -208,6 +208,7 @@ const store={ load(id){ try{ return JSON.parse(localStorage.getItem(LS_KEY+':'+i
               save(id,d){ try{ localStorage.setItem(LS_KEY+':'+id,JSON.stringify(d)); }catch(_){} } };
 const CFG=window.MM_CONFIG||{};
 const CLOUD=!!(CFG.url&&CFG.anonKey&&window.supabase);
+const AUTH_HASH=location.hash;   // kept before supabase-js consumes an invite / reset / one-click sign-in link (logins.js authLanding)
 const sb=CLOUD?window.supabase.createClient(CFG.url,CFG.anonKey):null;
 const CLIENT=uid();
 /* The site root (app.wcccmga.org/). Links to the cashier, check-in and scoring pages and to the Flagstick crest are built from
@@ -270,16 +271,22 @@ const TENANT_HINT=new URLSearchParams(location.search).get('tenant')||HOSTNAME||
 let TENANCY=false, TENANT=null, TENANT_INFO=null, ACCESS=null;   // ACCESS = my_access() once signed in
 /* The module switchboard: what a tenant's subscription turns on. `golf` is the base every tenant has; the rest are
    boxes ticked per tenant in the portal. Gates live in hasModule(): nav items, organization kinds, whole hubs. */
+/* Golf management is THE package — everything built so far: the directory, tournaments, golf, the game library,
+   associations and small groups, dues collection, the club's treasury. Club management is the coming tier for running
+   the whole club through Flagstick, with its own toggles (member billing, point of sale). */
 const MODULE_CATALOG=[
-  {id:'golf',         name:'Golf management',  base:true, desc:'Tournaments, rounds and results, live scoring and formats, the game library, the club directory'},
-  {id:'associations', name:'Associations',     desc:'Hubs for the MGA, LGA, SMGA…: schedules, tournaments, budget and treasury, dues billed to the club'},
-  {id:'groups',       name:'Small groups',     desc:'Rosters, money games with pots, live scoring, the season ledger, admin links for organizers'},
-  {id:'club',         name:'Club management',  desc:'The club tier: dues collection, the club’s treasury and budget, member numbers and statements as they are built'},
-  {id:'billing',      name:'Member billing',   soon:true, desc:'Member accounts, charges, statements and payment collection'},
-  {id:'pos',          name:'Point of sale',    soon:true, desc:'Food & beverage and pro shop charges to member accounts'},
+  {id:'golf',    name:'Golf management', base:true, desc:'The package: the club directory, tournaments, rounds and results, live scoring and formats, the game library, associations (MGA, LGA, SMGA…), small groups, dues collection, the club’s treasury and budget'},
+  {id:'club',    name:'Club management', soon:true, desc:'Run the whole club through Flagstick: membership, member numbers, statements and the club’s operations — with the toggles below'},
+  {id:'billing', name:'Member billing',  soon:true, desc:'Member accounts, charges, statements and payment collection'},
+  {id:'pos',     name:'Point of sale',   soon:true, desc:'Food & beverage and pro shop charges to member accounts'},
 ];
-const PLAN_PRESETS={club:{golf:true,associations:true,groups:true,club:true},golf:{golf:true,associations:true,groups:true}};
-function hasModule(k){ if(!TENANCY||!TENANT_INFO) return true; if(k==='golf') return true; return !!(TENANT_INFO.modules||{})[k]; }
+const PLAN_PRESETS={golf:{golf:true},club:{golf:true,club:true,billing:true,pos:true}};
+function hasModule(k){ if(k==='golf'||k==='associations'||k==='groups') return true; if(!TENANCY||!TENANT_INFO) return true; return !!(TENANT_INFO.modules||{})[k]; }
+/* a login's scope inside the tenant (portal-setup.sql): staff see the whole club; an 'org' login only its organizations */
+let SCOPED=false, SCOPE_ORGS=[], GRANT=null;
+const scopedDB=()=>!!(ACCESS&&ACCESS.grants);          // portal-setup.sql has run
+const allowedOrg=id=>!SCOPED||SCOPE_ORGS.includes(id);
+const canManageLogins=orgId=>!!(ACCESS&&scopedDB()&&(ACCESS.admin||(GRANT&&(GRANT.role==='staff'||(GRANT.role==='org'&&GRANT.manage&&(!orgId||(GRANT.orgs||[]).includes(orgId)))))));
 const tenantStatus=()=>TENANT_INFO&&TENANT_INFO.status||'active';
 /* tenant filter / tenant column on row queries (no-ops until tenants-setup.sql has run) */
 const tq=q=>TENANCY&&TENANT?q.eq('tenant',TENANT):q;
@@ -297,6 +304,7 @@ async function checkAccess(){
   if(!TENANCY) return {ok:true};
   const {data,error}=await sb.rpc('my_access'); if(error) return {ok:false,msg:error.message};
   ACCESS=data||{admin:false,tenants:[]};
+  GRANT=(ACCESS.grants||[]).find(g=>g.tenant===TENANT)||null; SCOPED=!ACCESS.admin&&!!GRANT&&GRANT.role==='org'; SCOPE_ORGS=SCOPED?(GRANT.orgs||[]):[];
   if(PORTAL) return ACCESS.admin?{ok:true}:{ok:false,msg:'This login is not a Flagstick administrator.'};
   if(ACCESS.admin||(ACCESS.tenants||[]).includes(TENANT)) return {ok:true};
   return {ok:false,msg:'This login does not belong to '+(TENANT_INFO&&TENANT_INFO.name||'this club')+'.'};
@@ -387,11 +395,12 @@ function pushAll(){ openDocs().forEach(D=>pushCloud(D)); }
 window.__canReload=()=>!(typeof drawerOpen==='function'&&drawerOpen())&&openDocs().every(D=>!D.pushing&&(!CLOUD||!sessionOK||!D.base||!docChanged(D)));
 async function fetchRow(id){
   if(KEYMODE){ const {data,error}=await keyRPC('hub_key_read',{p_id:id}); if(error) throw error; return data||null; }
+  if(SCOPED&&id==='club'){ const {data,error}=await sb.rpc('scoped_read',{p_tenant:TENANT,p_id:id}); if(error) throw error; return data||null; }   // the cut-down club document
   const {data:row,error}=await tq(sb.from('mga_hub').select('data')).eq('id',id).maybeSingle(); if(error) throw error; return row&&row.data; }
 /* key mode: the group may add people to the directory, never change them; the club document itself is read-only */
 async function pushPeople(D){
   const have=new Set((D.base&&D.base.members||[]).map(p=>p.id)), add=(D.db.members||[]).filter(p=>!have.has(p.id));
-  if(add.length){ const {error}=await keyRPC('hub_key_people',{p_people:add}); if(error){ setSyncD(D,'offline',error); return; } }
+  if(add.length){ const {error}=KEYMODE?await keyRPC('hub_key_people',{p_people:add}):await sb.rpc('scoped_people',{p_tenant:TENANT,p_people:add}); if(error){ setSyncD(D,'offline',error); return; } }
   const remote=await fetchRow('club'); if(remote){ D.base=JSON.parse(JSON.stringify(remote)); syncTo(D.db,normalize(JSON.parse(JSON.stringify(remote)),D.meta)); D.db._rev=remote._rev; store.save(D.id,D.db); }
   setSyncD(D,'synced');
 }
@@ -400,7 +409,7 @@ async function pushCloud(D){
   if(D.base&&!docChanged(D)){ setSyncD(D,'synced'); return; }        // nothing actually changed: don't write (or ping anyone)
   D.pushing=true;
   try{
-    if(KEYMODE&&D.id==='club'){ await pushPeople(D); return; }
+    if((KEYMODE||SCOPED)&&D.id==='club'){ await pushPeople(D); return; }   // an admin link or a board login may only add people
     for(let n=0;n<6;n++){
       const rev=D.base&&D.base._rev!=null?+D.base._rev:null;
       // a frozen copy of exactly what we send — edits made while it's in flight must not be mistaken for saved
@@ -454,7 +463,7 @@ async function loadDoc(id,meta,opt){
   watchDoc(D); return D.db;
 }
 function watchDoc(D){
-  if(D.chan||!CLOUD||KEYMODE) return;   // key mode has no realtime (anonymous): the poll below carries updates
+  if(D.chan||!CLOUD||KEYMODE||(SCOPED&&D.id==='club')) return;   // key mode has no realtime (anonymous); a board login gets the club row by RPC: the poll carries both
   D.chan=sb.channel('hub-'+D.id).on('postgres_changes',{event:'*',schema:'public',table:'mga_hub',filter:'id=eq.'+D.id},p=>{
     if(TENANCY&&TENANT&&p.new&&p.new.tenant&&p.new.tenant!==TENANT) return;   // another club's row of the same id
     const r=p.new&&p.new.data; if(!r||r._w===CLIENT&&D.base&&r._rev===D.base._rev) return; applyRemote(D,r);
@@ -463,7 +472,7 @@ function watchDoc(D){
 let pollStarted=false;
 function startPoll(){
   if(pollStarted) return; pollStarted=true;
-  const check=async()=>{ for(const D of openDocs()){ if(D.pushing||!(D.chan||KEYMODE)) continue; try{ const r=await fetchRow(D.id); if(r&&(!D.base||r._rev!==D.base._rev)) applyRemote(D,r); }catch(_){} } };
+  const check=async()=>{ for(const D of openDocs()){ if(D.pushing||!(D.chan||KEYMODE||SCOPED)) continue; try{ const r=await fetchRow(D.id); if(r&&(!D.base||r._rev!==D.base._rev)) applyRemote(D,r); }catch(_){} } };
   document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='visible') check(); });
   setInterval(()=>{ if(document.visibilityState==='visible') check(); },15000);   // a safety net if a live update is missed
   setInterval(()=>{ if(document.visibilityState==='visible') hubSync(); },30000);  // two-way sync with the MGA Hub's row
@@ -473,12 +482,13 @@ async function startCloud(){
   paintSync('saving');
   try{
     if(KEYMODE&&ORG_ID!==HUBKEY.org){ chooseOrg(HUBKEY.org); return; }       // the link is for one organization only
+    if(SCOPED&&ORG_ID==='club'&&SCOPE_ORGS.length){ chooseOrg(SCOPE_ORGS[0]); return; }   // a board login lands on its own hub
     const club=await loadDoc('club',CLUB_META);
     cloudReady=true;
     if(!club){ setupNeeded=true; CLUB=null; db=null; render(); return; }          // first run: the club hasn't been set up yet
     setupNeeded=false; CLUB=club;
-    if(ORG_ID==='club'){ db=CLUB; await openOrgDocs(); }
-    else if(ORG_ID){ const meta=orgMeta(ORG_ID); if(meta&&!meta.archived) db=await loadDoc(ORG_ID,meta,{create:!KEYMODE}); else db=null; }
+    if(ORG_ID==='club'&&!SCOPED){ db=CLUB; await openOrgDocs(); }
+    else if(ORG_ID&&ORG_ID!=='club'){ const meta=orgMeta(ORG_ID); if(meta&&!meta.archived&&allowedOrg(ORG_ID)) db=await loadDoc(ORG_ID,meta,{create:!KEYMODE}); else db=null; }
     else db=null;
     render(); startPoll();
   }catch(error){

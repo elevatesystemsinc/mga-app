@@ -393,6 +393,7 @@ textarea.inp{height:auto;min-height:84px;padding:10px 12px;resize:vertical}
     <p class="muted" style="margin:0" id="loginSub">Board sign-in</p>
     <input class="inp" type="email" id="loginEmail" placeholder="E-mail" autocomplete="username" aria-label="E-mail" hidden>
     <input class="inp" type="password" id="loginPw" placeholder="Password" autocomplete="current-password" aria-label="Password">
+    <input class="inp" type="password" id="loginPw2" placeholder="Repeat the new password" autocomplete="new-password" aria-label="Repeat the new password" hidden>
     <button class="btn pri" id="loginBtn" style="width:100%">Sign in</button>
     <p class="hint" id="loginErr" style="color:var(--neg);min-height:18px"></p>
   </div>
@@ -608,6 +609,7 @@ const store={ load(id){ try{ return JSON.parse(localStorage.getItem(LS_KEY+':'+i
               save(id,d){ try{ localStorage.setItem(LS_KEY+':'+id,JSON.stringify(d)); }catch(_){} } };
 const CFG=window.MM_CONFIG||{};
 const CLOUD=!!(CFG.url&&CFG.anonKey&&window.supabase);
+const AUTH_HASH=location.hash;   // kept before supabase-js consumes an invite / reset / one-click sign-in link (logins.js authLanding)
 const sb=CLOUD?window.supabase.createClient(CFG.url,CFG.anonKey):null;
 const CLIENT=uid();
 /* The site root (app.wcccmga.org/). Links to the cashier, check-in and scoring pages and to the Flagstick crest are built from
@@ -670,16 +672,22 @@ const TENANT_HINT=new URLSearchParams(location.search).get('tenant')||HOSTNAME||
 let TENANCY=false, TENANT=null, TENANT_INFO=null, ACCESS=null;   // ACCESS = my_access() once signed in
 /* The module switchboard: what a tenant's subscription turns on. `golf` is the base every tenant has; the rest are
    boxes ticked per tenant in the portal. Gates live in hasModule(): nav items, organization kinds, whole hubs. */
+/* Golf management is THE package — everything built so far: the directory, tournaments, golf, the game library,
+   associations and small groups, dues collection, the club's treasury. Club management is the coming tier for running
+   the whole club through Flagstick, with its own toggles (member billing, point of sale). */
 const MODULE_CATALOG=[
-  {id:'golf',         name:'Golf management',  base:true, desc:'Tournaments, rounds and results, live scoring and formats, the game library, the club directory'},
-  {id:'associations', name:'Associations',     desc:'Hubs for the MGA, LGA, SMGA…: schedules, tournaments, budget and treasury, dues billed to the club'},
-  {id:'groups',       name:'Small groups',     desc:'Rosters, money games with pots, live scoring, the season ledger, admin links for organizers'},
-  {id:'club',         name:'Club management',  desc:'The club tier: dues collection, the club’s treasury and budget, member numbers and statements as they are built'},
-  {id:'billing',      name:'Member billing',   soon:true, desc:'Member accounts, charges, statements and payment collection'},
-  {id:'pos',          name:'Point of sale',    soon:true, desc:'Food & beverage and pro shop charges to member accounts'},
+  {id:'golf',    name:'Golf management', base:true, desc:'The package: the club directory, tournaments, rounds and results, live scoring and formats, the game library, associations (MGA, LGA, SMGA…), small groups, dues collection, the club’s treasury and budget'},
+  {id:'club',    name:'Club management', soon:true, desc:'Run the whole club through Flagstick: membership, member numbers, statements and the club’s operations — with the toggles below'},
+  {id:'billing', name:'Member billing',  soon:true, desc:'Member accounts, charges, statements and payment collection'},
+  {id:'pos',     name:'Point of sale',   soon:true, desc:'Food & beverage and pro shop charges to member accounts'},
 ];
-const PLAN_PRESETS={club:{golf:true,associations:true,groups:true,club:true},golf:{golf:true,associations:true,groups:true}};
-function hasModule(k){ if(!TENANCY||!TENANT_INFO) return true; if(k==='golf') return true; return !!(TENANT_INFO.modules||{})[k]; }
+const PLAN_PRESETS={golf:{golf:true},club:{golf:true,club:true,billing:true,pos:true}};
+function hasModule(k){ if(k==='golf'||k==='associations'||k==='groups') return true; if(!TENANCY||!TENANT_INFO) return true; return !!(TENANT_INFO.modules||{})[k]; }
+/* a login's scope inside the tenant (portal-setup.sql): staff see the whole club; an 'org' login only its organizations */
+let SCOPED=false, SCOPE_ORGS=[], GRANT=null;
+const scopedDB=()=>!!(ACCESS&&ACCESS.grants);          // portal-setup.sql has run
+const allowedOrg=id=>!SCOPED||SCOPE_ORGS.includes(id);
+const canManageLogins=orgId=>!!(ACCESS&&scopedDB()&&(ACCESS.admin||(GRANT&&(GRANT.role==='staff'||(GRANT.role==='org'&&GRANT.manage&&(!orgId||(GRANT.orgs||[]).includes(orgId)))))));
 const tenantStatus=()=>TENANT_INFO&&TENANT_INFO.status||'active';
 /* tenant filter / tenant column on row queries (no-ops until tenants-setup.sql has run) */
 const tq=q=>TENANCY&&TENANT?q.eq('tenant',TENANT):q;
@@ -697,6 +705,7 @@ async function checkAccess(){
   if(!TENANCY) return {ok:true};
   const {data,error}=await sb.rpc('my_access'); if(error) return {ok:false,msg:error.message};
   ACCESS=data||{admin:false,tenants:[]};
+  GRANT=(ACCESS.grants||[]).find(g=>g.tenant===TENANT)||null; SCOPED=!ACCESS.admin&&!!GRANT&&GRANT.role==='org'; SCOPE_ORGS=SCOPED?(GRANT.orgs||[]):[];
   if(PORTAL) return ACCESS.admin?{ok:true}:{ok:false,msg:'This login is not a Flagstick administrator.'};
   if(ACCESS.admin||(ACCESS.tenants||[]).includes(TENANT)) return {ok:true};
   return {ok:false,msg:'This login does not belong to '+(TENANT_INFO&&TENANT_INFO.name||'this club')+'.'};
@@ -787,11 +796,12 @@ function pushAll(){ openDocs().forEach(D=>pushCloud(D)); }
 window.__canReload=()=>!(typeof drawerOpen==='function'&&drawerOpen())&&openDocs().every(D=>!D.pushing&&(!CLOUD||!sessionOK||!D.base||!docChanged(D)));
 async function fetchRow(id){
   if(KEYMODE){ const {data,error}=await keyRPC('hub_key_read',{p_id:id}); if(error) throw error; return data||null; }
+  if(SCOPED&&id==='club'){ const {data,error}=await sb.rpc('scoped_read',{p_tenant:TENANT,p_id:id}); if(error) throw error; return data||null; }   // the cut-down club document
   const {data:row,error}=await tq(sb.from('mga_hub').select('data')).eq('id',id).maybeSingle(); if(error) throw error; return row&&row.data; }
 /* key mode: the group may add people to the directory, never change them; the club document itself is read-only */
 async function pushPeople(D){
   const have=new Set((D.base&&D.base.members||[]).map(p=>p.id)), add=(D.db.members||[]).filter(p=>!have.has(p.id));
-  if(add.length){ const {error}=await keyRPC('hub_key_people',{p_people:add}); if(error){ setSyncD(D,'offline',error); return; } }
+  if(add.length){ const {error}=KEYMODE?await keyRPC('hub_key_people',{p_people:add}):await sb.rpc('scoped_people',{p_tenant:TENANT,p_people:add}); if(error){ setSyncD(D,'offline',error); return; } }
   const remote=await fetchRow('club'); if(remote){ D.base=JSON.parse(JSON.stringify(remote)); syncTo(D.db,normalize(JSON.parse(JSON.stringify(remote)),D.meta)); D.db._rev=remote._rev; store.save(D.id,D.db); }
   setSyncD(D,'synced');
 }
@@ -800,7 +810,7 @@ async function pushCloud(D){
   if(D.base&&!docChanged(D)){ setSyncD(D,'synced'); return; }        // nothing actually changed: don't write (or ping anyone)
   D.pushing=true;
   try{
-    if(KEYMODE&&D.id==='club'){ await pushPeople(D); return; }
+    if((KEYMODE||SCOPED)&&D.id==='club'){ await pushPeople(D); return; }   // an admin link or a board login may only add people
     for(let n=0;n<6;n++){
       const rev=D.base&&D.base._rev!=null?+D.base._rev:null;
       // a frozen copy of exactly what we send — edits made while it's in flight must not be mistaken for saved
@@ -854,7 +864,7 @@ async function loadDoc(id,meta,opt){
   watchDoc(D); return D.db;
 }
 function watchDoc(D){
-  if(D.chan||!CLOUD||KEYMODE) return;   // key mode has no realtime (anonymous): the poll below carries updates
+  if(D.chan||!CLOUD||KEYMODE||(SCOPED&&D.id==='club')) return;   // key mode has no realtime (anonymous); a board login gets the club row by RPC: the poll carries both
   D.chan=sb.channel('hub-'+D.id).on('postgres_changes',{event:'*',schema:'public',table:'mga_hub',filter:'id=eq.'+D.id},p=>{
     if(TENANCY&&TENANT&&p.new&&p.new.tenant&&p.new.tenant!==TENANT) return;   // another club's row of the same id
     const r=p.new&&p.new.data; if(!r||r._w===CLIENT&&D.base&&r._rev===D.base._rev) return; applyRemote(D,r);
@@ -863,7 +873,7 @@ function watchDoc(D){
 let pollStarted=false;
 function startPoll(){
   if(pollStarted) return; pollStarted=true;
-  const check=async()=>{ for(const D of openDocs()){ if(D.pushing||!(D.chan||KEYMODE)) continue; try{ const r=await fetchRow(D.id); if(r&&(!D.base||r._rev!==D.base._rev)) applyRemote(D,r); }catch(_){} } };
+  const check=async()=>{ for(const D of openDocs()){ if(D.pushing||!(D.chan||KEYMODE||SCOPED)) continue; try{ const r=await fetchRow(D.id); if(r&&(!D.base||r._rev!==D.base._rev)) applyRemote(D,r); }catch(_){} } };
   document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='visible') check(); });
   setInterval(()=>{ if(document.visibilityState==='visible') check(); },15000);   // a safety net if a live update is missed
   setInterval(()=>{ if(document.visibilityState==='visible') hubSync(); },30000);  // two-way sync with the MGA Hub's row
@@ -873,12 +883,13 @@ async function startCloud(){
   paintSync('saving');
   try{
     if(KEYMODE&&ORG_ID!==HUBKEY.org){ chooseOrg(HUBKEY.org); return; }       // the link is for one organization only
+    if(SCOPED&&ORG_ID==='club'&&SCOPE_ORGS.length){ chooseOrg(SCOPE_ORGS[0]); return; }   // a board login lands on its own hub
     const club=await loadDoc('club',CLUB_META);
     cloudReady=true;
     if(!club){ setupNeeded=true; CLUB=null; db=null; render(); return; }          // first run: the club hasn't been set up yet
     setupNeeded=false; CLUB=club;
-    if(ORG_ID==='club'){ db=CLUB; await openOrgDocs(); }
-    else if(ORG_ID){ const meta=orgMeta(ORG_ID); if(meta&&!meta.archived) db=await loadDoc(ORG_ID,meta,{create:!KEYMODE}); else db=null; }
+    if(ORG_ID==='club'&&!SCOPED){ db=CLUB; await openOrgDocs(); }
+    else if(ORG_ID&&ORG_ID!=='club'){ const meta=orgMeta(ORG_ID); if(meta&&!meta.archived&&allowedOrg(ORG_ID)) db=await loadDoc(ORG_ID,meta,{create:!KEYMODE}); else db=null; }
     else db=null;
     render(); startPoll();
   }catch(error){
@@ -1022,11 +1033,10 @@ const I={
 I.org=svg('<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18M9 20v-6h6v6"/>');
 I.lib=svg('<path d="M4 5h5a3 3 0 013 3v12a2 2 0 00-2-2H4z"/><path d="M20 5h-5a3 3 0 00-3 3v12a2 2 0 012-2h6z"/>');
 I.coins=svg('<ellipse cx="12" cy="6" rx="7" ry="3"/><path d="M5 6v12c0 1.7 3.1 3 7 3s7-1.3 7-3V6"/><path d="M5 12c0 1.7 3.1 3 7 3s7-1.3 7-3"/>');
-const NAV=[['dash','Dashboard',I.home],['tournaments','Tournaments',I.flag],['members','Members',I.users],['collections','Dues collection',I.coins],['board','Board',I.shield],['budget','Season budget',I.ledger],['orgs','Organizations',I.org],['library','Game library',I.lib]];
+const NAV=[['dash','Dashboard',I.home],['tournaments','Tournaments',I.flag],['members','Members',I.users],['collections','Dues collection',I.coins],['board','Board',I.shield],['budget','Season budget',I.ledger],['orgs','Organizations',I.org],['library','Game library',I.lib],['logins','Logins',I.shield]];
 /* which pages each kind of organization gets (associations get everything) */
-const ORG_NAV={club:['dash','tournaments','golf','members','collections','orgs','library','budget','treasury'],association:['dash','tournaments','golf','members','board','treasury','budget'],group:['dash','tournaments','golf','members']};
-const CLUB_TIER_NAV={collections:1,treasury:1,budget:1};   // the club hub's money pages belong to the Club management module
-function navItems(){ const allow=ORG_NAV[db.kind]; return NAV.filter(([k])=>(!allow||allow.includes(k))&&!(isClub()&&CLUB_TIER_NAV[k]&&!hasModule('club'))).map(([k,l,ic])=>[k,k==='members'&&isClub()?'Directory':l,ic]); }
+const ORG_NAV={club:['dash','tournaments','golf','members','collections','orgs','library','budget','treasury','logins'],association:['dash','tournaments','golf','members','board','treasury','budget'],group:['dash','tournaments','golf','members']};
+function navItems(){ const allow=ORG_NAV[db.kind]; return NAV.filter(([k])=>(!allow||allow.includes(k))&&(k!=='logins'||canManageLogins())).map(([k,l,ic])=>[k,k==='members'&&isClub()?'Directory':l,ic]); }
 /* the organization on screen: the club's record from CLUB.orgs wins over what the document says */
 const curOrg=()=>!db?null:isClub()?Object.assign({},CLUB_META,{name:CLUB.name||CLUB_META.name,crest:CLUB.crest||CLUB_META.crest}):(orgMeta()||{id:db.id,kind:db.kind,name:db.name,short:db.short});
 const orgShort=()=>{ const o=curOrg(); return o?(o.short||o.name||'club'):'club'; };
@@ -1090,7 +1100,7 @@ function render(){
 function renderInner(){
   if(PORTAL){ if(sessionOK&&TENANCY&&typeof vPortal==='function') vPortal($('main')); return; }
   if(TENANCY&&!TENANT){ vNoTenant($('main')); return; }
-  if(tenantStatus()==='suspended'&&!(ACCESS&&ACCESS.admin)){ vSuspended($('main')); return; }
+  if((tenantStatus()==='suspended'||tenantStatus()==='inactive')&&!(ACCESS&&ACCESS.admin)){ vSuspended($('main')); return; }
   const o=curOrg(), clubName=CLUB&&CLUB.name||CLUB_META.name;
   const title=o?(isClub()?'Club Hub':orgShort()+' Hub'):'Club Hub';
   // the sidebar leads with the Flagstick mark (head.html); this line names the hub you are in, in words only
@@ -1098,8 +1108,8 @@ function renderInner(){
   $('brandName').textContent=lock?clubName:(o.name||o.short); $('brandSub').textContent=lock?(o?'Club hub':'Choose a hub'):clubName;
   $('topName').textContent=title; document.title=(o?(isClub()?clubName:orgShort()+' · '+clubName):clubName)+' · Flagstick';
   const lc=$('loginClub'); if(lc) lc.textContent=TENANT_INFO&&TENANT_INFO.name||clubName;   // the sign-in card names the tenant, even before its document is open
-  $('btnSwitch').hidden=!CLUB||(!db&&!setupNeeded)||KEYMODE; if(typeof paintHubSync==='function') paintHubSync();
-  if(!db){ $('nav').innerHTML=''; $('seasonBox').hidden=true; (setupNeeded?vSetup:vPicker)($('main')); return; }
+  $('btnSwitch').hidden=!CLUB||(!db&&!setupNeeded)||KEYMODE||(SCOPED&&SCOPE_ORGS.length<2); if(typeof paintHubSync==='function') paintHubSync();
+  if(!db){ $('nav').innerHTML=''; $('seasonBox').hidden=true; (setupNeeded?vSetup:SCOPED&&cloudReady&&(ORG_ID==='club'||!allowedOrg(ORG_ID))?vNotYours:vPicker)($('main')); return; }
   if(!isClub()&&!hasModule(db.kind==='group'?'groups':'associations')){ $('nav').innerHTML=''; $('seasonBox').hidden=true; vLocked($('main'),db.kind); return; }
   $('seasonBox').hidden=false;
   const ys=Object.keys(db.seasons).sort((a,b)=>b-a);
@@ -1110,17 +1120,18 @@ function renderInner(){
     live.map(e=>`<button class="nav livelink" data-golfev="${e.id}"><span class="livedot"></span><span class="trunc">Leaderboard · ${esc(e.name)}</span></button>`).join('');
   $('nav').querySelectorAll('[data-go]').forEach(b=>b.onclick=()=>{ if(b.dataset.go==='golf') view.geid=null; go(b.dataset.go); });
   const m=$('main');
-  ({dash:vDash,tournaments:vTournaments,tournament:vTournament,members:vMembers,board:vBoard,budget:vBudget,treasury:vTreasury,golf:vGolf,orgs:vOrgs,pick:vPicker,collections:vCollections,games:vGames,ledger:vLedger,library:vLibrary}[view.page]||vDash)(m);
+  ({dash:vDash,tournaments:vTournaments,tournament:vTournament,members:vMembers,board:vBoard,budget:vBudget,treasury:vTreasury,golf:vGolf,orgs:vOrgs,pick:vPicker,collections:vCollections,games:vGames,ledger:vLedger,library:vLibrary,logins:vLogins}[view.page]||vDash)(m);
+  if(view.page==='board'&&!isClub()&&typeof loginsCard==='function') loginsCard(m,ORG_ID);
 }
 
 /* ---------- Organization picker / first-run set-up (shown when no organization is open) ---------- */
 function vPicker(m){
-  const orgs=(CLUB&&CLUB.orgs||[]).filter(x=>!x.archived), club=Object.assign({},CLUB_META,{name:CLUB&&CLUB.name||CLUB_META.name,crest:CLUB&&CLUB.crest||CLUB_META.crest});
+  const orgs=(CLUB&&CLUB.orgs||[]).filter(x=>!x.archived&&allowedOrg(x.id)), club=Object.assign({},CLUB_META,{name:CLUB&&CLUB.name||CLUB_META.name,crest:CLUB&&CLUB.crest||CLUB_META.crest});
   const card=(id,x,sub)=>`<button class="orgcard" data-org="${esc(id)}">${crestHTML(x)}<div class="cell2"><b>${esc(x.name)}</b><small>${esc(sub)} · ${esc(orgURL(id))}</small></div>${I.chev}</button>`;
   const unknown=ORG_ID&&ORG_ID!=='club'&&!orgMeta(ORG_ID)&&!db?`<div class="banner">There is no organization at ${esc(orgURL(ORG_ID))}. Pick one below.</div>`:'';
   const grp=(k,empty)=>{ const l=orgs.filter(x=>x.kind===k); return l.length?l.map(x=>card(x.id,x,ORG_KINDS[k]+(x.short?' · '+x.short:''))).join(''):`<p class="muted" style="margin:0;font-size:13.5px">${empty}</p>`; };
   m.innerHTML=`<div class="phead"><div><div class="fs light"><img src="flagstick-crest.svg" alt=""><div><b>FLAGSTICK</b><small>GOLF SOFTWARE</small></div></div><h1 class="h2" style="margin:0 0 4px">${esc(club.name)}</h1><p class="sub">Choose what to work on. Each organization has its own hub; the club keeps the member directory.</p></div></div><div class="rule"></div>
-  ${unknown}<div class="orgs">${card('club',club,'Club hub · member directory · club tournaments · organizations')}
+  ${unknown}<div class="orgs">${SCOPED?'':card('club',club,'Club hub · member directory · club tournaments · organizations')}
     ${hasModule('associations')?`<h2 class="h2" style="margin-top:10px">Associations</h2>${grp('association','No associations yet — create one in the club hub under Organizations.')}`:''}
     ${hasModule('groups')?`<h2 class="h2" style="margin-top:10px">Small groups</h2>${grp('group','No small groups yet — create one in the club hub under Organizations.')}`:''}</div>`;
   m.querySelectorAll('[data-org]').forEach(b=>b.onclick=()=>chooseOrg(b.dataset.org));
@@ -1640,7 +1651,7 @@ function vMembers(m){
     const mid=simple?`<span class="muted">${esc(x.memberNo||'')}</span><span class="muted">${esc(x.ghin||'')}</span>`:`<span>${br.map(r=>`<span class="chip navy">${esc(r)}</span>`).join(' ')}</span><span><span class="chip ${du[1]}">${du[0]}</span></span>`;
     return `<div class="tr num click" data-m="${x.id}" style="${cols}"><span class="av">${initials(x)}</span><div class="cell2"><b class="trunc">${esc(memberName(x))}</b>${!simple&&(x.ghin||x.memberNo)?`<small>${x.ghin?'GHIN '+esc(x.ghin):'#'+esc(x.memberNo)}</small>`:''}</div><span class="trunc muted">${esc(x.email||'')}</span><span class="muted">${esc(x.phone||'')}</span><span>${esc(x.hcp??'')}</span>${mid}<span><span class="chip ${x.status==='Inactive'?'':'ok'}">${esc(x.status||'Active')}</span></span><span class="ib">${I.edit}</span></div>`; };
   m.innerHTML=head(club?'Directory':'Members',club?`Every member of ${esc(CLUB.name||CLUB_META.name)}. Associations and small groups pick their members from this list.`:`Everyone in the ${esc(short)}. Board seats and tournament fields are picked from this list.`,
-      (simple?'':btn('Dues settings','mDues','')+btn('Bill dues','mBill',''))+(KEYMODE?'':btn(club?'Import club roster':'Import member list','mCsv','',I.down))+btn('Add member','mAdd','pri',I.plus))+`
+      (simple?'':btn('Dues settings','mDues','')+btn('Bill dues','mBill',''))+(KEYMODE||SCOPED?'':btn(club?'Import club roster':'Import member list','mCsv','',I.down))+btn('Add member','mAdd','pri',I.plus))+`
   <div class="toolbar"><div class="search">${I.search}<input class="inp" id="mq" placeholder="Search name, email, phone, member # or GHIN" value="${esc(view.mq)}" aria-label="Search members"></div>
     <div class="seg">${filters.map(x=>`<button class="${f===x?'on':''}" data-mf="${x}">${x}</button>`).join('')}</div>
     <span class="muted" style="margin-left:auto;font-size:13px">${active} active${simple?` of ${total}`:` · ${y} dues ${fmt(amt)}${n0(s.dues.installments)>1?` (${s.dues.installments} × ${fmt(amt/s.dues.installments)})`:''}`}</span></div>
@@ -1657,7 +1668,7 @@ function vMembers(m){
 function editMember(mm){
   const y=Y(), s=db.seasons[y], club=isClub(), simple=club||db.kind==='group', short=orgShort(); const pays=mm&&!simple?clone(s.duesPayments.filter(p=>p.memberId===mm.id)):[];
   let pickedId=mm?mm.id:'';
-  const locked=KEYMODE&&!!(mm&&personById(mm.id)), L={disabled:locked};   // an admin link may add people to the directory, not change them
+  const locked=(KEYMODE||SCOPED)&&!!(mm&&personById(mm.id)), L={disabled:locked};   // an admin link or a board login may add people to the directory, not change them
   const payHTML=()=>pays.map((p,i)=>`<div class="mr num" style="grid-template-columns:90px minmax(0,1fr) 28px"><input class="inp r" data-di="${i}" data-k="amount" inputmode="decimal" value="${esc(p.amount)}" aria-label="Dues amount"><input class="inp" data-di="${i}" data-k="date" value="${esc(p.date)}" placeholder="Date" aria-label="Dues date"><button class="ib" data-ddel="${i}" aria-label="Remove">${I.x}</button></div>`).join('')||'<div class="mr"><span class="muted">No dues recorded for '+y+'.</span></div>';
   const inT=mm?db.tournaments.filter(t=>t.field.some(p=>p.memberId===mm.id)):[];
   const candidates=!mm&&!club?persons().filter(p=>!membershipOf(p.id)):[];   // club members who aren't in this organization yet
@@ -2040,6 +2051,7 @@ async function boot(){
   $('loginBtn').onclick=doLogin; $('loginPw').onkeydown=e=>{ if(e.key==='Enter') doLogin(); }; const le=$('loginEmail'); if(le) le.onkeydown=e=>{ if(e.key==='Enter') $('loginPw').focus(); };
   await resolveTenant(); paintLogin();
   if(TENANCY&&!TENANT&&!PORTAL){ setSync('local'); render(); return; }          // no club at this address
+  if(AUTH_HASH&&typeof authLanding==='function') await authLanding();          // arrived by a sign-in, invite or reset link
   const {data}=await sb.auth.getSession();
   if(data&&data.session){ const ok=await checkAccess(); if(!ok.ok){ await sb.auth.signOut(); $('login').classList.add('show'); $('loginErr').textContent=ok.msg||''; if(PORTAL) portalBoot(); return; } }
   if(PORTAL){ sessionOK=!!(data&&data.session); portalBoot(); return; }
@@ -2050,114 +2062,424 @@ async function boot(){
 /* the admin link was revoked or never existed: back to the board sign-in, with a word about why */
 function keyRejected(){ KEYMODE=false; sessionOK=false; $('btnSignOut').hidden=true; setSync('local'); $('login').classList.add('show'); $('loginErr').textContent='That admin link is no longer valid — ask the club for a new one.'; }
 
-/* ============ Flagstick portal (app.flagstickhub.com) + the module gates every hub honours ============
-   The portal is Flagstick's own back office: the list of tenants (clients), a new tenant in one form (name, slug =
-   subdomain, plan preset, the module boxes, the first board login), and per tenant: the switches, status, extra
-   hosts, more board logins. It runs on the same static site: PORTAL (core.js) is true on app.<domain> only (www and the
-   bare domain are the marketing website), or with ?portal=1. Only a Flagstick admin (flagstick_admins) gets in; row level security enforces
-   it (tenants-setup.sql), the screens just mirror it.
-   Creating a board login needs no server: a second supabase-js client with no persisted session signs the new user
-   up (email + a generated password), and the admin's own session is untouched; the user is then linked to the tenant
-   in tenant_users. Supabase → Authentication → Providers → Email → "Confirm email" must be OFF for this (or the
-   new login waits for a confirmation mail). */
-const PORTAL_STATE={tenants:null,loading:false,err:null};
+/* ============ Logins: who may sign in to a club, and what they see ============
+   tenant_users rows (portal-setup.sql). role 'staff' = the club's staff — the whole club; Flagstick creates these
+   from the portal. role 'org' = a board login that opens only the organizations in `orgs`; `manage` makes it a
+   board administrator who may invite / remove that board's logins. Staff manage every board login of their club
+   (club hub → Logins); a board administrator manages their own board's (association hub → Board).
+   Privileged steps (a login with a password someone sets, an invite e-mail, a password reset, deleting) run in the
+   Edge Function admin-users with the caller's own session; without it the browser falls back to a side-client
+   sign-up (needs "Confirm email" off in Supabase) and reset e-mails. Shared by the hub pages here and portal.js. */
+let FN_STATE=null;   // null unknown · true deployed · false missing
+const genPassword=()=>{ const a='abcdefghjkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789'; const u=new Uint32Array(14); crypto.getRandomValues(u); return [...u].map(n=>a[n%a.length]).join('').replace(/(.{5})(?=.)/g,'$1-'); };
+const fwhen=d=>d?new Date(d).toLocaleString('en-US',{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'}):'—';
+const fdate=d=>d?new Date(String(d).length===10?d+'T12:00':d).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}):'—';
+/* the Edge Function; FN_MISSING when it is not deployed (callers fall back where they can) */
+async function adminFn(action,body){
+  if(!sb||!sb.functions||typeof sb.functions.invoke!=='function'){ FN_STATE=false; throw new Error('FN_MISSING'); }
+  let res; try{ res=await sb.functions.invoke('admin-users',{body:Object.assign({action},body||{})}); }catch(e){ FN_STATE=false; throw new Error('FN_MISSING'); }
+  const {data,error}=res;
+  if(error){ let msg=error.message||String(error), status=0;
+    try{ if(error.context){ status=error.context.status||0; const j=await error.context.json(); if(j&&j.error) msg=j.error; } }catch(_){}
+    if(status===404||/FunctionsFetchError|Failed to send a request|not found/i.test((error.name||'')+' '+msg)){ FN_STATE=false; throw new Error('FN_MISSING'); }
+    throw new Error(msg); }
+  if(data&&data.error) throw new Error(data.error);
+  FN_STATE=true; return data&&data.data;
+}
+const fnNote=()=>FN_STATE===false?`<div class="banner" style="margin-top:8px">The <b>admin-users</b> function is not deployed yet: passwords can’t be set from here and invites go out as password-reset e-mails. Deploy <code>supabase/functions/admin-users</code> (docs/tenancy.md) to unlock the rest.</div>`:'';
+/* link a login to a club (or the Flagstick team) straight from the browser — row level security decides who may */
+async function linkUser(userId,o){
+  if(o.tenant){ const {error}=await sb.from('tenant_users').upsert({user_id:userId,tenant:o.tenant,role:o.role==='org'?'org':'staff',orgs:o.orgs||[],manage:o.role==='org'&&!!o.manage,email:o.email,name:o.name||''},{onConflict:'user_id,tenant'}); if(error) throw new Error(error.message); }
+  if(o.admin){ const {error}=await sb.from('flagstick_admins').upsert({user_id:userId,email:o.email}); if(error) throw new Error(error.message); }
+}
+/* sign a new user up on a side client (the caller's own session is untouched) */
+async function signUpSide(email,password,name){
+  const side=window.supabase.createClient(CFG.url,CFG.anonKey,{auth:{persistSession:false,autoRefreshToken:false,detectSessionInUrl:false}});
+  const {data,error}=await side.auth.signUp({email,password,options:{data:{name:name||''}}});
+  if(error) throw new Error(error.message);
+  const id=data&&data.user&&data.user.id; if(!id) throw new Error('Supabase did not return the new user — is e-mail confirmation off?');
+  try{ await side.auth.signOut(); }catch(_){}
+  return {id,email};
+}
+/* create a login: with a password we set, or by invite (they set their own). Returns {id,email,password?,invited?} */
+async function createLogin(o){
+  const email=String(o.email||'').trim().toLowerCase(); if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) throw new Error('Enter a valid e-mail address');
+  const base={email,name:o.name||'',tenant:o.tenant||null,role:o.role||'staff',orgs:o.orgs||[],manage:!!o.manage,admin:!!o.admin};
+  if(o.mode==='invite'){
+    try{ const r=await adminFn('invite',Object.assign({redirect:o.redirect},base)); return Object.assign({},r,{invited:true}); }
+    catch(e){ if(e.message!=='FN_MISSING') throw e;
+      const u=await signUpSide(email,genPassword(),o.name); await linkUser(u.id,base);
+      try{ await sb.auth.resetPasswordForEmail(email,{redirectTo:o.redirect}); }catch(_){}
+      return Object.assign(u,{invited:true,fallback:true}); }
+  }
+  const password=o.password||genPassword(); if(password.length<8) throw new Error('The password needs at least 8 characters');
+  try{ const r=await adminFn('create',Object.assign({password},base)); return Object.assign({},r,{password}); }
+  catch(e){ if(e.message!=='FN_MISSING') throw e; const u=await signUpSide(email,password,o.name); await linkUser(u.id,base); return Object.assign(u,{password,fallback:true}); }
+}
+function loginResult(r,url){
+  openDrawer({kicker:'Login',title:r.invited?'Invite sent':'Login created',body:r.invited
+    ?`<p>${esc(r.email)} will receive an e-mail${r.fallback?' to set a password':' with an invitation'}; the link opens ${esc(url)} where they choose their password.</p>`
+    :`<div class="banner" style="flex-direction:column;align-items:flex-start"><b>${esc(r.email)}</b><span>Password: <code style="font-size:15px">${esc(r.password)}</code></span><small>Copy it now — it is not shown again. They sign in at ${esc(url)}.</small></div>${r.fallback?fnNote():''}`});
+}
+/* ---------- the hub side: staff manage board logins; a board administrator manages their own board's ---------- */
+const HL={rows:null,auth:{},busy:false};
+async function loadLogins(){
+  if(!CLOUD||!sessionOK||!TENANCY) return [];
+  const {data,error}=await sb.from('tenant_users').select('*').eq('tenant',TENANT); if(error){ toast(error.message); return []; }
+  HL.rows=data||[];
+  const ids=HL.rows.map(u=>u.user_id);
+  if(ids.length){ try{ const {data:ai}=await sb.rpc('admin_users_info',{p_ids:ids}); HL.auth={}; (ai||[]).forEach(x=>HL.auth[x.id]=x); }catch(_){} }
+  return HL.rows;
+}
+const loginsForOrg=id=>(HL.rows||[]).filter(u=>u.role==='org'&&(u.orgs||[]).includes(id));
+const loginLine=u=>{ const a=HL.auth[u.user_id]||{}; return `<div class="tr click" data-lu="${esc(u.user_id)}" style="grid-template-columns:minmax(0,1.6fr) minmax(0,1fr) 130px 32px"><div class="cell2"><b>${esc(u.name||a.name||u.email||'')}</b><small>${esc(u.email||a.email||'')}</small></div><span class="muted" style="font-size:13px">${a.last_sign_in_at?'Signed in '+fwhen(a.last_sign_in_at):u.invited_at?'Invited '+fdate(u.invited_at):'Never signed in'}</span><span>${u.role==='staff'?'<span class="chip gold">Staff</span>':u.manage?'<span class="chip navy">Board admin</span>':'<span class="chip">Board</span>'}</span><span class="ib">${I.edit}</span></div>`; };
+/* one organization's board logins, as a card appended to a page */
+function loginsCard(m,orgId,opt){
+  const o=orgMeta(orgId); if(!o||!canManageLogins(orgId)) return;
+  const box=document.createElement('div'); box.className='card'; box.style.overflow='hidden'; m.appendChild(box);
+  const paint=()=>{ const rows=loginsForOrg(orgId);
+    box.innerHTML=`<div class="cardhead"><h2 class="h2">${esc(opt&&opt.title||'Board logins')}</h2><div class="actions">${btn('Invite','lgInv_'+orgId,'pri',I.plus)}</div></div>
+      <div class="t">${HL.rows?(rows.length?rows.map(loginLine).join(''):'<div class="tr"><span class="muted">No board logins yet. Invite the board: each login opens this hub and nothing else.</span></div>'):'<div class="tr"><span class="muted">Loading…</span></div>'}</div>
+      <div style="padding:10px 22px 16px"><p class="hint" style="margin:0">A board login sees ${esc(o.short||o.name)} only: its tournaments, money and members, the club directory read-only. Tick <b>board administrator</b> to let someone invite and remove the board’s logins themselves.</p>${fnNote()}</div>`;
+    box.querySelector('#lgInv_'+orgId).onclick=()=>loginEditor(null,orgId,paintAll);
+    box.querySelectorAll('[data-lu]').forEach(r=>r.onclick=()=>loginEditor(HL.rows.find(u=>u.user_id===r.dataset.lu),orgId,paintAll)); };
+  const paintAll=async()=>{ await loadLogins(); paint(); };
+  paint(); if(!HL.rows) paintAll();
+}
+/* the club hub's Logins page (staff): the staff list, then every organization's board logins */
+function vLogins(m){
+  if(!isClub()||!canManageLogins()){ go('dash'); return; }
+  const staff=(HL.rows||[]).filter(u=>u.role==='staff');
+  m.innerHTML=head('Logins','Who can sign in to '+esc(CLUB.name)+' and what they see. Staff see the whole club; a board login sees its own organization only.')+
+    `<div class="card" style="overflow:hidden"><div class="cardhead"><h2 class="h2">Staff</h2><span class="muted" style="font-size:13px">Managed by Flagstick — ask them to add or remove staff</span></div>
+      <div class="t">${HL.rows?(staff.length?staff.map(loginLine).join(''):'<div class="tr"><span class="muted">No staff logins listed.</span></div>'):'<div class="tr"><span class="muted">Loading…</span></div>'}</div></div>`;
+  for(const o of CLUB.orgs.filter(x=>!x.archived)) loginsCard(m,o.id,{title:(o.short||o.name)+' · board logins'});
+  m.querySelectorAll('[data-lu]').forEach(r=>{ const u=(HL.rows||[]).find(x=>x.user_id===r.dataset.lu); if(u&&u.role==='staff') r.onclick=()=>loginEditor(u,null,()=>loadLogins().then(()=>render())); });
+  if(!HL.rows) loadLogins().then(()=>render());
+}
+/* invite / edit one login for one organization (staff may also edit a staff row's name) */
+function loginEditor(u,orgId,done){
+  const o=orgId?orgMeta(orgId):null, a=u?(HL.auth[u.user_id]||{}):{}, isStaff=u&&u.role==='staff';
+  const iAmStaff=!!(ACCESS&&(ACCESS.admin||(GRANT&&GRANT.role==='staff')));
+  const otherOrgs=u?(u.orgs||[]).filter(x=>x!==orgId):[];
+  openDrawer({kicker:o?(o.short||o.name):CLUB.name,title:u?(u.name||u.email||'Login'):'Invite to the '+(o?(o.short||o.name):'club')+' board',saveLabel:u?'Save':'Invite',
+    body:(u?`<p class="muted" style="margin:0 0 10px">${esc(u.email||a.email||'')} · ${a.last_sign_in_at?'last signed in '+fwhen(a.last_sign_in_at):'never signed in'}</p>`+field('Name','lgN',u.name||a.name||'')
+       :pair(field('E-mail','lgE','',{type:'email',ph:'name@example.com'}),field('Name','lgN','')))+
+      (isStaff?'<p class="hint">A staff login sees the whole club. Flagstick manages staff; only the name can be changed here.</p>':
+        `<label class="check"><input type="checkbox" id="lgMan"${u&&u.manage?' checked':''}>Board administrator — may invite and remove ${esc(o?(o.short||o.name):'this board')}’s logins</label>`+
+        (otherOrgs.length?`<p class="hint">Also has: ${otherOrgs.map(esc).join(', ')}.</p>`:'')+
+        (u?'':`<div class="fld" style="margin-top:6px"><span class="lbl">How they get in</span>${seg('lgMode',[['invite','E-mail an invite'],['set','Set a password now']],'invite')}<div id="lgSetBox" style="display:none;gap:8px;align-items:center;margin-top:8px"><input class="inp" id="lgPw" placeholder="Leave blank to generate one" style="flex:1" autocomplete="new-password"><button class="btn" id="lgGen">Generate</button></div><p class="hint">Invite: they get an e-mail with a link to ${esc(SITE_BASE)} and choose their password. Set now: the password is shown once and you hand it over.</p>${fnNote()}</div>`)+
+        (u?`<div class="fld" style="margin-top:6px"><span class="lbl">Password</span><div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center"><input class="inp" id="lgPw" placeholder="New password (8+ characters)" style="flex:1;min-width:200px" autocomplete="new-password"><button class="btn" id="lgGen">Generate</button><button class="btn" id="lgSet">Set password</button></div><div class="actions" style="margin-top:8px"><button class="btn" id="lgReset">E-mail a reset link</button></div><div id="lgMsg"></div>${fnNote()}</div>`:'')),
+    del:u&&!isStaff?()=>{ (async()=>{ const rest=(u.orgs||[]).filter(x=>x!==orgId);
+        const r=rest.length?await sb.from('tenant_users').update({orgs:rest}).eq('user_id',u.user_id).eq('tenant',TENANT):await sb.from('tenant_users').delete().eq('user_id',u.user_id).eq('tenant',TENANT);
+        if(r.error){ toast(r.error.message); return; } toast('Removed from '+(o?(o.short||o.name):'the board')); done&&done(); })(); }:null, delLabel:'Remove from this board',
+    wire:r=>{ wireSeg(r,'lgMode',v=>{ r.querySelector('#lgSetBox').style.display=v==='set'?'flex':'none'; }); const g=r.querySelector('#lgGen'); if(g) g.onclick=()=>{ r.querySelector('#lgPw').value=genPassword(); };
+      if(u&&!isStaff){ const msg=r.querySelector('#lgMsg');
+        r.querySelector('#lgSet').onclick=async()=>{ const pw=r.querySelector('#lgPw').value; if(pw.length<8){ toast('8 characters or more'); return; } try{ await adminFn('set_password',{user_id:u.user_id,password:pw,tenant:TENANT}); msg.innerHTML=`<div class="banner" style="margin-top:8px">Password set for ${esc(u.email||'')}: <code>${esc(pw)}</code> — copy it now.</div>`; }catch(e){ msg.innerHTML=e.message==='FN_MISSING'?fnNote():`<p class="hint" style="color:var(--neg)">${esc(e.message)}</p>`; } };
+        r.querySelector('#lgReset').onclick=async()=>{ const {error}=await sb.auth.resetPasswordForEmail(u.email||a.email,{redirectTo:SITE_BASE}); msg.innerHTML=error?`<p class="hint" style="color:var(--neg)">${esc(error.message)}</p>`:`<div class="banner" style="margin-top:8px">Reset e-mail sent to ${esc(u.email||a.email||'')}.</div>`; }; } },
+    save:()=>{ const name=fv('lgN');
+      if(u){ (async()=>{ const rec=isStaff?{name}:{name,manage:$('lgMan').checked}; const {error}=await sb.from('tenant_users').update(rec).eq('user_id',u.user_id).eq('tenant',TENANT); if(error){ toast(error.message); return; } toast('Saved'); done&&done(); })(); return; }
+      const email=fv('lgE'), mode=$('dBody').querySelector('#lgMode').dataset.val, pw=$('dBody').querySelector('#lgPw').value, manage=$('lgMan').checked; if(!email){ toast('Enter the e-mail address'); return false; }
+      (async()=>{ try{
+          // an existing login of this club gains this organization instead of a second account
+          const have=(HL.rows||[]).find(x=>(x.email||'').toLowerCase()===email.toLowerCase());
+          if(have&&have.role==='org'){ const {error}=await sb.from('tenant_users').update({orgs:[...new Set([...(have.orgs||[]),orgId])],manage:have.manage||manage}).eq('user_id',have.user_id).eq('tenant',TENANT); if(error) throw new Error(error.message); toast(email+' now also opens '+(o?(o.short||o.name):'this board')); done&&done(); return; }
+          if(have&&have.role==='staff'){ toast(email+' is staff and already sees the whole club'); return; }
+          const r=await createLogin({tenant:TENANT,email,name,role:'org',orgs:[orgId],manage,mode,password:pw||undefined,redirect:SITE_BASE});
+          done&&done(); loginResult(r,SITE_BASE); }catch(e){ toast(e.message); } })(); }});
+}
+/* ---------- arriving by link: one-click sign-in (Flagstick), invites and resets (set a password) ---------- */
+async function authLanding(){
+  const m=AUTH_HASH.match(/[#&]sso=([A-Za-z0-9_.-]+)/);
+  if(m){ try{ history.replaceState(null,'',location.href.split('#')[0]); }catch(_){}
+    const {error}=await sb.auth.verifyOtp({token_hash:decodeURIComponent(m[1]),type:'magiclink'}); if(error) $('loginErr').textContent='That sign-in link is no longer valid — sign in below.'; return; }
+  if(/type=(invite|recovery|signup|magiclink)/.test(AUTH_HASH)||/[#&]access_token=/.test(AUTH_HASH)){
+    // supabase-js consumes the hash itself; wait for the session it creates, then ask for a password
+    let s=null; for(let i=0;i<24&&!s;i++){ s=(await sb.auth.getSession()).data.session; if(!s) await new Promise(r=>setTimeout(r,250)); }
+    if(!s){ $('loginErr').textContent='That link has expired — ask for a new one.'; return; }
+    if(/type=(invite|recovery)/.test(AUTH_HASH)) await setPasswordScreen();
+  }
+}
+function setPasswordScreen(){
+  return new Promise(done=>{
+    const card=$('login'), sub=$('loginSub'), em=$('loginEmail'), pw=$('loginPw'), pw2=$('loginPw2'), b=$('loginBtn'), err=$('loginErr');
+    const was={sub:sub.textContent,ph:pw.placeholder,btn:b.textContent,em:em.hidden,click:b.onclick,key:pw.onkeydown};
+    sub.textContent='Welcome — choose your password'; em.hidden=true; pw.placeholder='New password (8+ characters)'; pw.value=''; pw2.hidden=false; pw2.value=''; b.textContent='Save password'; err.textContent='';
+    card.classList.add('show'); setTimeout(()=>pw.focus(),80);
+    const go=async()=>{ if(pw.value.length<8){ err.textContent='Use at least 8 characters.'; return; } if(pw.value!==pw2.value){ err.textContent='The two passwords differ.'; return; } b.disabled=true;
+      const {error}=await sb.auth.updateUser({password:pw.value}); b.disabled=false; if(error){ err.textContent=error.message; return; }
+      sub.textContent=was.sub; pw.placeholder=was.ph; pw.value=''; pw2.hidden=true; b.textContent=was.btn; em.hidden=was.em; b.onclick=was.click; pw.onkeydown=was.key; card.classList.remove('show'); toast('Password saved'); done(); };
+    b.onclick=go; pw.onkeydown=e=>{ if(e.key==='Enter') pw2.focus(); }; pw2.onkeydown=e=>{ if(e.key==='Enter') go(); };
+  });
+}
+/* ============ Flagstick client portal (app.flagstickhub.com) + the screens a tenant shows instead of a hub ============
+   Flagstick's back office, on the same static site. PORTAL (core.js) is true on app.<domain> only (www and the bare
+   domain are the marketing website), or with ?portal=1. Only a Flagstick admin (flagstick_admins) gets past the
+   sign-in; row level security enforces the same thing on every table, the screens just mirror it.
+   Pages: Clients (every tenant, by status, with search) → a client record (subscription + modules, club details,
+   points of contact, STAFF logins, the board logins the club manages itself, hosts, notes, activity) · Team
+   (Flagstick's own administrators) · Activity (the log the portal writes to tenant_events).
+   Flagstick administers a client's staff logins only (role 'staff' = the whole club); the club's staff invite
+   board logins for their associations from the club hub, and board administrators manage their own board's
+   (logins.js). Account actions that need the service role go through the Edge Function admin-users; without it
+   the portal falls back to what the browser can do alone and says so. Tables: tenants-setup.sql, portal-setup.sql. */
+const PS={view:'clients',slug:null,filter:'active',q:'',tenants:null,users:[],contacts:[],events:[],admins:[],auth:{},clubs:{},err:null};
+const PORTAL_STATE=PS;
+const STATUS_LABEL={prospect:'Prospect',trial:'Trial',active:'Active',suspended:'Suspended',inactive:'Inactive'};
+const STATUS_CHIP={prospect:'',trial:'gold',active:'ok',suspended:'warn',inactive:'inact'};
+const tStatusChip=s=>`<span class="chip ${STATUS_CHIP[s]||''}">${esc(STATUS_LABEL[s]||s||'')}</span>`;
 const planLabel=p=>({club:'Club management',golf:'Golf management'}[p]||p||'—');
 const tenantURL=slug=>'https://'+slug+'.'+BASE_DOMAIN+'/';
 const modulesOf=t=>Object.assign({},(t&&t.modules)||{},{golf:true});
-const modChips=t=>{ const m=modulesOf(t); return MODULE_CATALOG.filter(x=>m[x.id]).map(x=>`<span class="chip${x.id==='club'?' gold':''}">${esc(x.name)}</span>`).join(' '); };
+const modChips=t=>{ const m=modulesOf(t); return MODULE_CATALOG.filter(x=>m[x.id]).map(x=>`<span class="chip${x.id==='golf'?'':' gold'}">${esc(x.name)}</span>`).join(' '); };
+const addrLine=a=>{ a=a||{}; return [a.line1,a.line2,[a.city,a.state].filter(Boolean).join(', ')+(a.zip?' '+a.zip:''),a.country].map(x=>String(x||'').trim()).filter(Boolean); };
+const tenantOf=slug=>(PS.tenants||[]).find(t=>t.slug===slug)||null;
+const usersOf=slug=>PS.users.filter(u=>u.tenant===slug);
+const contactsOf=slug=>PS.contacts.filter(c=>c.tenant===slug).sort((a,b)=>(b.is_primary?1:0)-(a.is_primary?1:0)||a.name.localeCompare(b.name));
+const eventsOf=slug=>PS.events.filter(e=>e.tenant===slug);
+const orgsOf=slug=>((PS.clubs[slug]||{}).orgs||[]).filter(o=>!o.archived);
+const orgNames=(slug,ids)=>(ids||[]).map(id=>{ const o=orgsOf(slug).find(x=>x.id===id); return o?(o.short||o.name):id; }).join(', ');
+
+/* ---------- boot / data ---------- */
 function portalBoot(){
-  $('side').classList.add('portal'); $('nav').innerHTML=''; $('seasonBox').hidden=true; $('btnSwitch').hidden=true;
+  $('side').classList.add('portal'); $('seasonBox').hidden=true; $('btnSwitch').hidden=true; $('btnBackup').hidden=true; $('btnRestore').hidden=true;
   $('brandName').textContent='Flagstick'; $('brandSub').textContent='Client portal'; $('topName').textContent='Flagstick'; document.title='Portal · Flagstick';
   const lc=$('loginClub'); if(lc) lc.textContent='Flagstick'; const ls=$('loginSub'); if(ls) ls.textContent='Administrator sign-in';
-  $('btnBackup').hidden=true; $('btnRestore').hidden=true;
-  if(!TENANCY){ $('main').innerHTML=head('Flagstick portal','')+`<div class="banner">The database has not been prepared for tenants yet — run <b>tenants-setup.sql</b> in the Supabase SQL editor, then reload.</div>`; return; }
-  if(!sessionOK){ $('login').classList.add('show'); setTimeout(()=>{ const e=$('loginEmail'); if(e&&!e.value) e.focus(); else $('loginPw').focus(); },100); return; }
-  $('btnSignOut').hidden=false; paintSync('synced'); vPortal($('main')); loadTenants();
+  if(!TENANCY){ $('nav').innerHTML=''; $('main').innerHTML=head('Flagstick portal','')+`<div class="banner">The database has not been prepared for tenants yet — run <b>tenants-setup.sql</b> and <b>portal-setup.sql</b> in the Supabase SQL editor, then reload.</div>`; return; }
+  if(!sessionOK){ $('nav').innerHTML=''; $('login').classList.add('show'); setTimeout(()=>{ const e=$('loginEmail'); if(e&&!e.value) e.focus(); else $('loginPw').focus(); },100); return; }
+  $('btnSignOut').hidden=false; paintSync('synced'); portalNav(); vPortal($('main')); loadPortal();
 }
-async function loadTenants(){
-  PORTAL_STATE.loading=true; PORTAL_STATE.err=null; vPortal($('main'));
-  const {data,error}=await sb.from('tenants').select('*').order('created_at');
-  PORTAL_STATE.loading=false; if(error) PORTAL_STATE.err=error.message; else PORTAL_STATE.tenants=data||[];
-  if(PORTAL_STATE.tenants){ const {data:u}=await sb.from('tenant_users').select('tenant,email,role,created_at'); PORTAL_STATE.users=u||[]; }
+function portalNav(){
+  const items=[['clients','Clients',I.org],['team','Team',I.shield],['activity','Activity',I.ledger]];
+  $('nav').innerHTML=items.map(([k,l,ic])=>`<button class="nav${PS.view===k||(k==='clients'&&PS.view==='client')?' on':''}" data-pv="${k}">${ic}<span>${l}</span></button>`).join('');
+  $('nav').querySelectorAll('[data-pv]').forEach(b=>b.onclick=()=>{ PS.view=b.dataset.pv; PS.slug=null; $('side').classList.remove('open'); portalNav(); vPortal($('main')); window.scrollTo(0,0); });
+}
+async function loadPortal(){
+  PS.err=null;
+  const q=async t=>{ const {data,error}=await sb.from(t).select('*'); if(error){ PS.err=(PS.err?PS.err+' · ':'')+t+': '+error.message; return []; } return data||[]; };
+  const [tenants,users,contacts,admins,events]=await Promise.all([q('tenants'),q('tenant_users'),q('tenant_contacts'),q('flagstick_admins'),q('tenant_events')]);
+  PS.tenants=tenants.sort((a,b)=>a.name.localeCompare(b.name)); PS.users=users; PS.contacts=contacts; PS.admins=admins; PS.events=events.sort((a,b)=>new Date(b.at)-new Date(a.at));
+  const ids=[...new Set([...users.map(u=>u.user_id),...admins.map(a=>a.user_id)])].filter(Boolean);
+  if(ids.length){ try{ const {data}=await sb.rpc('admin_users_info',{p_ids:ids}); PS.auth={}; (data||[]).forEach(x=>PS.auth[x.id]=x); }catch(_){} }
+  try{ const {data}=await sb.from('mga_hub').select('tenant,id,data').eq('id','club'); (data||[]).forEach(r=>{ if(r.tenant) PS.clubs[r.tenant]={orgs:(r.data&&r.data.orgs)||[],name:r.data&&r.data.name}; }); }catch(_){}
   vPortal($('main'));
 }
-function vPortal(m){
-  const T=PORTAL_STATE.tenants, U=PORTAL_STATE.users||[];
-  const st=s=>s==='active'?'<span class="chip ok">Active</span>':s==='trial'?'<span class="chip gold">Trial</span>':'<span class="chip warn">Suspended</span>';
-  const row=t=>`<div class="tr click" data-t="${esc(t.slug)}" style="grid-template-columns:minmax(0,1.6fr) 150px minmax(0,2fr) 110px 40px">
-      <div class="cell2"><b>${esc(t.name)}</b><small>${esc(t.slug)}.${esc(BASE_DOMAIN)}${(t.hosts||[]).length?' · '+(t.hosts||[]).map(esc).join(', '):''}</small></div>
-      <span>${esc(planLabel(t.plan))}</span><span style="display:flex;flex-wrap:wrap;gap:4px">${modChips(t)}</span><span>${st(t.status)}</span><span class="ib">${I.edit}</span></div>`;
-  m.innerHTML=head('Clients',`Every club on Flagstick. A client is a tenant: its own address, its own board logins, and the modules its subscription turns on. ${T?T.length+' client'+(T.length===1?'':'s'):''}`,
-      btn('New client','ptNew','pri',I.plus))+
-    (PORTAL_STATE.err?`<div class="banner">${esc(PORTAL_STATE.err)}</div>`:'')+
-    `<div class="card" style="overflow:hidden"><div class="t">${T?(T.map(row).join('')||'<div class="tr"><span class="muted">No clients yet.</span></div>'):'<div class="tr"><span class="muted">Loading…</span></div>'}</div></div>
-    <div class="card pad" style="display:flex;flex-direction:column;gap:8px"><h2 class="h2">Modules</h2>
-      ${MODULE_CATALOG.map(x=>`<div style="display:flex;gap:10px;align-items:baseline"><b style="min-width:150px">${esc(x.name)}</b><span class="muted" style="font-size:13.5px">${esc(x.desc)}${x.base?' · every client has it':''}${x.soon?' · not built yet; the box is here so plans can be set up ahead of it':''}</span></div>`).join('')}
-      <p class="hint" style="margin:0">Presets: <b>Club management</b> turns everything on; <b>Golf management</b> is golf + associations + small groups (the course keeps its directory). Boxes can be changed any time; the club's hub picks it up on its next load.</p></div>
-    <div class="card pad" style="display:flex;flex-direction:column;gap:6px"><h2 class="h2">Board logins</h2>
-      ${U.length?`<div class="mini">${U.map(u=>`<div class="mr" style="grid-template-columns:minmax(0,1fr) 120px 110px"><span>${esc(u.email||'')}</span><span class="muted">${esc(u.tenant)}</span><span class="muted">${esc(u.role||'')}</span></div>`).join('')}</div>`:'<p class="muted" style="margin:0">None listed yet.</p>'}
-      <p class="hint" style="margin:0">A board login opens one club's hubs only. Passwords are set when a login is created; to change one later, use Supabase → Authentication → Users → Reset password.</p></div>`;
-  $('ptNew').onclick=()=>editTenant(null);
-  m.querySelectorAll('[data-t]').forEach(r=>r.onclick=()=>editTenant((T||[]).find(t=>t.slug===r.dataset.t)));
+async function logEvent(tenant,kind,text){
+  const ev={tenant:tenant||null,actor:(ACCESS&&ACCESS.email)||'',kind,text,at:new Date().toISOString()};
+  PS.events.unshift(ev);
+  try{ await sb.from('tenant_events').insert({tenant:ev.tenant,actor:ev.actor,kind,text}); }catch(_){}
 }
-const genPassword=()=>{ const a='abcdefghjkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789'; const u=new Uint32Array(14); crypto.getRandomValues(u); return [...u].map(n=>a[n%a.length]).join('').replace(/(.{5})(?=.)/g,'$1-'); };
-function moduleBoxes(m){ return `<div class="fld"><span class="lbl">Modules</span><div class="mini" id="ptMods">${MODULE_CATALOG.map(x=>`<label class="mr" style="grid-template-columns:28px minmax(0,1fr);cursor:pointer"><input type="checkbox" data-mod="${x.id}"${m[x.id]||x.base?' checked':''}${x.base?' disabled':''}><span><b>${esc(x.name)}</b>${x.soon?' <span class="chip inact">soon</span>':''}<br><span class="muted" style="font-size:12.5px">${esc(x.desc)}</span></span></label>`).join('')}</div></div>`; }
-function readModules(root){ const m={golf:true}; root.querySelectorAll('[data-mod]').forEach(c=>{ if(c.checked) m[c.dataset.mod]=true; }); return m; }
-function editTenant(t){
-  const m=modulesOf(t), users=(PORTAL_STATE.users||[]).filter(u=>t&&u.tenant===t.slug);
+/* the admin's one-click sign-in into a client's hub: a one-time token the hub verifies on arrival */
+async function openHub(t,path){
+  const url=tenantURL(t.slug)+(path||'');
+  const w=window.open('about:blank','_blank');
+  try{ const r=await adminFn('sso',{redirect:url}); const u=url+'#sso='+encodeURIComponent(r.token_hash); if(w) w.location=u; else location.href=u; }
+  catch(e){ if(w) w.location=url; else location.href=url; if(e.message!=='FN_MISSING') toast(e.message); else toast('Opened without one-click sign-in (deploy admin-users) — sign in with your Flagstick login'); }
+}
+
+/* ---------- pages ---------- */
+function vPortal(m){
+  if(!m) return;
+  if(PS.view==='client'&&PS.slug) return vClient(m,PS.slug);
+  if(PS.view==='team') return vTeam(m);
+  if(PS.view==='activity') return vActivity(m);
+  return vClients(m);
+}
+const openClient=slug=>{ PS.view='client'; PS.slug=slug; portalNav(); vPortal($('main')); window.scrollTo(0,0); };
+function vClients(m){
+  const T=PS.tenants, counts={all:0};
+  (T||[]).forEach(t=>{ counts.all++; counts[t.status]=(counts[t.status]||0)+1; });
+  const q=PS.q.trim().toLowerCase();
+  const list=(T||[]).filter(t=>PS.filter==='all'||t.status===PS.filter).filter(t=>!q||[t.name,t.short,t.slug,(t.hosts||[]).join(' '),...contactsOf(t.slug).map(c=>c.name+' '+c.email)].join(' ').toLowerCase().includes(q));
+  const tabs=[['active','Active'],['trial','Trial'],['prospect','Prospect'],['suspended','Suspended'],['inactive','Inactive'],['all','All']];
+  const cols='grid-template-columns:minmax(0,1.7fr) 140px minmax(0,1.2fr) minmax(0,1.3fr) 70px 110px 32px';
+  const row=t=>{ const pc=contactsOf(t.slug)[0], n=usersOf(t.slug).filter(u=>u.role==='staff').length;
+    return `<div class="tr click" data-t="${esc(t.slug)}" style="${cols}">
+      <div class="cell2"><b>${esc(t.name)}</b><small>${esc(t.slug)}.${esc(BASE_DOMAIN)}${addrLine(t.address)[2]?' · '+esc(addrLine(t.address)[2]):''}</small></div>
+      <span>${esc(planLabel(t.plan))}</span><span style="display:flex;flex-wrap:wrap;gap:4px">${modChips(t)}</span>
+      <div class="cell2">${pc?`<span>${esc(pc.name)}</span><small>${esc(pc.email||pc.phone||'')}</small>`:'<span class="muted">No contact yet</span>'}</div>
+      <span class="num">${n}</span><span>${tStatusChip(t.status)}</span><span class="ib">${I.chev}</span></div>`; };
+  m.innerHTML=head('Clients','Every club on Flagstick. A client is a tenant: its own address, its own staff logins, and the modules its subscription turns on.',btn('New client','ptNew','pri',I.plus))+
+    (PS.err?`<div class="banner">${esc(PS.err)}</div>`:'')+
+    `<div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:14px">
+      <div class="seg" id="ptFilter">${tabs.map(([k,l])=>`<button type="button" data-v="${k}" class="${PS.filter===k?'on':''}">${l}${counts[k]?' · '+counts[k]:''}</button>`).join('')}</div>
+      <div class="search">${I.search}<input class="inp" id="ptQ" placeholder="Search clients, contacts, hosts" value="${esc(PS.q)}" aria-label="Search clients"></div></div>
+    <div class="card" style="overflow:hidden"><div class="t">
+      <div class="tr th" style="${cols}"><span>Client</span><span>Plan</span><span>Modules</span><span>Primary contact</span><span>Staff</span><span>Status</span><span></span></div>
+      ${T?(list.map(row).join('')||`<div class="tr"><span class="muted">${q?'Nothing matches.':'No '+(STATUS_LABEL[PS.filter]||'').toLowerCase()+' clients.'}</span></div>`):'<div class="tr"><span class="muted">Loading…</span></div>'}</div></div>`;
+  $('ptNew').onclick=()=>editClient(null);
+  m.querySelectorAll('#ptFilter button').forEach(b=>b.onclick=()=>{ PS.filter=b.dataset.v; vClients(m); });
+  const qi=$('ptQ'); qi.oninput=()=>{ PS.q=qi.value; const pos=qi.selectionStart; vClients(m); const n=$('ptQ'); n.focus(); n.setSelectionRange(pos,pos); };
+  m.querySelectorAll('[data-t]').forEach(r=>r.onclick=()=>openClient(r.dataset.t));
+}
+function vClient(m,slug){
+  const t=tenantOf(slug); if(!t){ PS.view='clients'; return vClients(m); }
+  const mods=modulesOf(t), users=usersOf(slug), staff=users.filter(u=>u.role==='staff'), board=users.filter(u=>u.role!=='staff'), contacts=contactsOf(slug), events=eventsOf(slug).slice(0,30), orgs=orgsOf(slug);
+  const card=(title,body,actions='')=>`<div class="card" style="overflow:hidden"><div class="cardhead"><h2 class="h2">${title}</h2><div class="actions">${actions}</div></div>${body}</div>`;
+  const kv=(k,v)=>`<div style="display:flex;gap:12px;padding:6px 0;border-top:1px solid var(--line)"><span class="muted" style="min-width:130px;font-size:13px">${k}</span><span style="min-width:0">${v||'<span class="muted">—</span>'}</span></div>`;
+  const urow=u=>{ const a=PS.auth[u.user_id]||{}; return `<div class="tr click" data-u="${esc(u.user_id)}" style="grid-template-columns:minmax(0,1.6fr) minmax(0,1.2fr) 130px 32px">
+      <div class="cell2"><b>${esc(u.name||a.name||u.email||'')}</b><small>${esc(u.email||a.email||'')}</small></div>
+      <span class="muted" style="font-size:13px">${a.last_sign_in_at?'Signed in '+fwhen(a.last_sign_in_at):u.invited_at?'Invited '+fdate(u.invited_at):'Never signed in'}</span>
+      <span>${a.confirmed===false?'<span class="chip warn">Unconfirmed</span>':'<span class="chip gold">Staff</span>'}</span><span class="ib">${I.edit}</span></div>`; };
+  const brow=u=>{ const a=PS.auth[u.user_id]||{}; return `<div class="tr" style="grid-template-columns:minmax(0,1.6fr) minmax(0,1.2fr) 130px;min-height:42px"><div class="cell2"><b>${esc(u.name||a.name||u.email||'')}</b><small>${esc(u.email||a.email||'')}</small></div><span style="font-size:13px">${esc(orgNames(slug,u.orgs))||'<span class="muted">no organization</span>'}</span><span>${u.manage?'<span class="chip navy">Board admin</span>':'<span class="chip">Board</span>'}</span></div>`; };
+  const crow=c=>`<div class="tr click" data-c="${esc(c.id)}" style="grid-template-columns:minmax(0,1.4fr) minmax(0,1fr) minmax(0,1.4fr) 130px 32px">
+      <div class="cell2"><b>${esc(c.name)}${c.is_primary?' <span class="chip gold" style="margin-left:6px">Primary</span>':''}</b><small>${esc(c.title||'')}</small></div>
+      <span>${esc(c.phone||'')}</span><span style="min-width:0;overflow:hidden;text-overflow:ellipsis">${c.email?`<a href="mailto:${esc(c.email)}">${esc(c.email)}</a>`:''}</span><span class="muted" style="font-size:12.5px">${esc(c.notes||'')}</span><span class="ib">${I.edit}</span></div>`;
+  const erow=e=>`<div class="tr" style="grid-template-columns:150px minmax(0,1fr) 160px;min-height:40px"><span class="muted" style="font-size:12.5px">${fwhen(e.at)}</span><span style="font-size:13.5px">${esc(e.text)}</span><span class="muted" style="font-size:12.5px;text-align:right">${esc(e.actor||'')}</span></div>`;
+  const addr=addrLine(t.address);
+  m.innerHTML=`<div class="phead"><div><p style="margin:0 0 4px;font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--gold-dk,#7E5F1A);font-weight:700"><a href="#" id="ptBack" style="color:inherit;text-decoration:none">Clients</a> › ${esc(planLabel(t.plan))}</p><h1 class="h1">${esc(t.name)}</h1>
+      <p class="sub"><a href="${esc(tenantURL(t.slug))}" target="_blank" rel="noopener">${esc(t.slug)}.${esc(BASE_DOMAIN)}</a>${(t.hosts||[]).length?' · '+(t.hosts||[]).map(esc).join(', '):''} · ${tStatusChip(t.status)}${t.started_on?' · client since '+fdate(t.started_on):''}</p></div>
+      <div class="actions">${btn('Open hub','ptOpen','',I.chev)}${btn('Status','ptStatus','')}${btn('Edit client','ptEdit','pri',I.edit)}</div></div><div class="rule"></div>
+    ${PS.err?`<div class="banner">${esc(PS.err)}</div>`:''}
+    <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px;align-items:start" class="g2">
+      ${card('Subscription',`<div style="padding:0 22px 18px">${kv('Plan',esc(planLabel(t.plan)))}${kv('Status',tStatusChip(t.status)+(t.ended_on?' <span class="muted" style="font-size:13px">since '+fdate(t.ended_on)+'</span>':''))}${kv('Client since',fdate(t.started_on))}${kv('Renews',fdate(t.renews_on))}${kv('Billing e-mail',t.billing_email?`<a href="mailto:${esc(t.billing_email)}">${esc(t.billing_email)}</a>`:'')}
+        <div style="border-top:1px solid var(--line);padding-top:10px;margin-top:4px"><span class="muted" style="font-size:13px">Modules</span>
+        <div class="mini" style="margin-top:8px" id="ptMods">${MODULE_CATALOG.map(x=>`<label class="mr" style="grid-template-columns:28px minmax(0,1fr);cursor:pointer"><input type="checkbox" data-mod="${x.id}"${mods[x.id]||x.base?' checked':''}${x.base?' disabled':''}><span><b>${esc(x.name)}</b>${x.soon?' <span class="chip inact">coming</span>':''}<br><span class="muted" style="font-size:12.5px">${esc(x.desc)}</span></span></label>`).join('')}</div>
+        <div class="actions" style="margin-top:10px"><button class="btn" id="ptModSave">Save modules</button><span class="hint" style="margin-left:8px">The club’s hub picks changes up on its next load.</span></div></div></div>`)}
+      ${card('Club details',`<div style="padding:0 22px 18px">${kv('Address',addr.length?addr.map(esc).join('<br>'):'')}${kv('Phone',esc(t.phone||''))}${kv('Website',t.website?`<a href="${esc(/^https?:/.test(t.website)?t.website:'https://'+t.website)}" target="_blank" rel="noopener">${esc(t.website)}</a>`:'')}${kv('Time zone',esc(t.timezone||''))}${kv('Short name',esc(t.short||''))}${kv('Other hosts',(t.hosts||[]).map(esc).join('<br>'))}${kv('Organizations',orgs.length?orgs.map(o=>esc(o.short||o.name)).join(', '):'')}${kv('Notes',esc(t.notes||'').replace(/\n/g,'<br>'))}</div>`,btn('Edit','ptEdit2','',I.edit))}
+    </div>
+    ${card('Points of contact',`<div class="t">${contacts.length?contacts.map(crow).join(''):'<div class="tr"><span class="muted">No contacts yet — add the head pro, the GM, the billing contact.</span></div>'}</div>`,btn('Add contact','ptAddC','',I.plus))}
+    ${card('Staff logins',`<div class="t"><div class="tr th" style="grid-template-columns:minmax(0,1.6fr) minmax(0,1.2fr) 130px 32px"><span>Login</span><span>Last activity</span><span></span><span></span></div>${staff.length?staff.map(urow).join(''):'<div class="tr"><span class="muted">No staff logins yet.</span></div>'}</div>
+      <div style="padding:12px 22px 18px"><p class="hint" style="margin:0">Staff see the whole club and manage their own board logins from the club hub (Logins). Flagstick creates staff logins; the club does the rest.</p>${fnNote()}</div>`,
+      btn('Link existing login','ptLink','')+btn('Create staff login','ptAddU','pri',I.plus))}
+    ${card('Board logins <span class="muted" style="font-size:13px;font-weight:400">· managed by the club</span>',`<div class="t">${board.length?board.map(brow).join(''):'<div class="tr"><span class="muted">None yet — the club invites its boards from its hub.</span></div>'}</div>`)}
+    ${card('Activity',`<div class="t">${events.length?events.map(erow).join(''):'<div class="tr"><span class="muted">Nothing yet.</span></div>'}</div>`)}`;
+  $('ptBack').onclick=e=>{ e.preventDefault(); PS.view='clients'; PS.slug=null; portalNav(); vPortal(m); };
+  $('ptOpen').onclick=()=>openHub(t); $('ptStatus').onclick=()=>statusDrawer(t); $('ptEdit').onclick=()=>editClient(t); $('ptEdit2').onclick=()=>editClient(t);
+  $('ptAddC').onclick=()=>editContact(t,null); $('ptAddU').onclick=()=>staffDrawer(t,null); $('ptLink').onclick=()=>linkDrawer(t);
+  $('ptModSave').onclick=async()=>{ const nm={golf:true}; m.querySelectorAll('[data-mod]').forEach(c=>{ if(c.checked) nm[c.dataset.mod]=true; }); const b=$('ptModSave'); b.disabled=true;
+    const {error}=await sb.from('tenants').update({modules:nm,updated_at:new Date().toISOString()}).eq('slug',t.slug); b.disabled=false;
+    if(error){ toast(error.message); return; } t.modules=nm; toast('Modules saved');
+    const on=MODULE_CATALOG.filter(x=>nm[x.id]&&!x.base).map(x=>x.name).join(', ')||'Golf management only'; logEvent(t.slug,'modules','Modules: '+on); vClient(m,slug); };
+  m.querySelectorAll('[data-c]').forEach(r=>r.onclick=()=>editContact(t,contacts.find(c=>c.id===r.dataset.c)));
+  m.querySelectorAll('[data-u]').forEach(r=>r.onclick=()=>staffDrawer(t,users.find(u=>u.user_id===r.dataset.u)));
+}
+/* ---------- drawers ---------- */
+function moduleBoxes(m){ return `<div class="fld"><span class="lbl">Modules</span><div class="mini" id="ptModsD">${MODULE_CATALOG.map(x=>`<label class="mr" style="grid-template-columns:28px minmax(0,1fr);cursor:pointer"><input type="checkbox" data-modd="${x.id}"${m[x.id]||x.base?' checked':''}${x.base?' disabled':''}><span><b>${esc(x.name)}</b>${x.soon?' <span class="chip inact">coming</span>':''}<br><span class="muted" style="font-size:12.5px">${esc(x.desc)}</span></span></label>`).join('')}</div></div>`; }
+function readModulesD(root){ const m={golf:true}; root.querySelectorAll('[data-modd]').forEach(c=>{ if(c.checked) m[c.dataset.modd]=true; }); return m; }
+function editClient(t){
+  const a=(t&&t.address)||{};
   openDrawer({kicker:t?'Client':'New client',title:t?t.name:'New client',wide:true,saveLabel:t?'Save':'Create client',
     body:pair(field('Club name','ptN',t?.name||'',{ph:'e.g. Walnut Creek Country Club'}),field('Short name','ptS',t?.short||'',{ph:'e.g. WCCC'}))+
-      field('Address (subdomain)','ptSlug',t?.slug||'',{ph:'e.g. wccc  →  wccc.'+BASE_DOMAIN,disabled:!!t})+
-      (t?'':'<p class="hint">Lower-case letters, digits and dashes. It becomes the club’s address and can’t change later.</p>')+
-      `<div class="fld"><span class="lbl">Plan</span>${seg('ptPlan',[['club','Club management'],['golf','Golf management']],t?.plan||'golf')}<p class="hint">A preset for the boxes below — tick or untick anything after.</p></div>`+
-      moduleBoxes(m)+
-      (t?`<div class="fld"><span class="lbl">Status</span>${seg('ptSt',[['active','Active'],['trial','Trial'],['suspended','Suspended']],t.status||'active')}<p class="hint">Suspended: the club’s hubs show a notice and nothing else; data is kept.</p></div>`:'')+
-      field('Extra host names','ptH',(t?.hosts||[]).join(', '),{ph:'e.g. app.wcccmga.org, hub.wcccmga.org'})+
-      '<p class="hint">Other addresses that open this club (their own domain). Each needs a CNAME to the site and a custom domain on Render.</p>'+
+      (t?'':field('Address (subdomain)','ptSlug','',{ph:'e.g. wccc  →  wccc.'+BASE_DOMAIN})+'<p class="hint">Lower-case letters, digits and dashes. It becomes the club’s address and can’t change later.</p>')+
+      `<div class="fld"><span class="lbl">Plan</span>${seg('ptPlan',[['golf','Golf management'],['club','Club management']],t?.plan||'golf')}<p class="hint">Golf management is the package (everything built today). Club management adds running the whole club, with its toggles below.</p></div>`+moduleBoxes(modulesOf(t))+
+      (t?'':`<div class="fld"><span class="lbl">Status</span>${seg('ptSt0',[['prospect','Prospect'],['trial','Trial'],['active','Active']],'active')}</div>`)+
+      pair(field('Client since','ptFrom',t?.started_on||'',{type:'date'}),field('Renews on','ptRen',t?.renews_on||'',{type:'date'}))+
+      '<div class="fld"><span class="lbl">Address</span></div>'+field('','ptA1',a.line1||'',{ph:'Street'})+field('','ptA2',a.line2||'',{ph:'Suite, building (optional)'})+
+      `<div class="frow2" style="grid-template-columns:2fr 1fr 1fr">${field('','ptCity',a.city||'',{ph:'City'})}${field('','ptState',a.state||'',{ph:'State'})}${field('','ptZip',a.zip||'',{ph:'ZIP'})}</div>`+
+      pair(field('Phone','ptPh',t?.phone||'',{type:'tel'}),field('Website','ptWeb',t?.website||'',{ph:'club.org'}))+
+      pair(field('Billing e-mail','ptBE',t?.billing_email||'',{type:'email'}),field('Time zone','ptTz',t?.timezone||'',{ph:'e.g. America/Chicago'}))+
+      field('Other host names','ptH',(t?.hosts||[]).join(', '),{ph:'e.g. app.wcccmga.org, hub.wcccmga.org'})+'<p class="hint">Other addresses that open this club (their own domain). Each needs a CNAME to the site and a custom domain on Render.</p>'+
       field('Notes','ptNo',t?.notes||'',{type:'textarea'})+
-      (t?`<div class="fld"><span class="lbl">Board logins</span><div class="mini">${users.length?users.map(u=>`<div class="mr" style="grid-template-columns:minmax(0,1fr) 100px"><span>${esc(u.email||'')}</span><span class="muted">${esc(u.role||'')}</span></div>`).join(''):'<div class="mr"><span class="muted">None yet.</span></div>'}</div>
-          <div style="display:flex;gap:8px;align-items:center;margin-top:8px;flex-wrap:wrap"><input class="inp" id="ptUE" type="email" placeholder="board@club.org" aria-label="New login e-mail" style="flex:1;min-width:200px"><button class="btn" id="ptUAdd">Add board login</button></div>
-          <div id="ptUNew"></div><p class="hint">The sign-in card at ${esc(tenantURL(t.slug))} shows the primary login below; any login linked here works.</p></div>`+
-        field('Primary login e-mail (shown on the sign-in card)','ptLE',t.login_email||'',{type:'email'})
-       :field('First board login (e-mail)','ptLE','',{type:'email',ph:'board@club.org'})+'<p class="hint">A password is generated and shown once after the client is created. Leave it blank to add logins later.</p>'),
-    wire:r=>{ wireSeg(r,'ptPlan',v=>{ const p=PLAN_PRESETS[v]||{}; r.querySelectorAll('[data-mod]').forEach(c=>{ if(!c.disabled) c.checked=!!p[c.dataset.mod]; }); }); wireSeg(r,'ptSt');
-      const add=r.querySelector('#ptUAdd'); if(add) add.onclick=async()=>{ const em=fv('ptUE'); if(!em||!/@/.test(em)){ toast('Enter the e-mail address'); return; } add.disabled=true;
-        try{ const pw=await addBoardLogin(t.slug,em); r.querySelector('#ptUNew').innerHTML=`<div class="banner" style="margin-top:8px"><b>Login created.</b> ${esc(em)} · password <code>${esc(pw)}</code> — copy it now; it is not shown again.</div>`; toast('Board login added'); loadTenants(); }
-        catch(e){ toast(e.message||'Could not add the login'); } add.disabled=false; }; },
+      (t?'':`<div class="fld" style="margin-top:6px"><span class="lbl">First staff login (optional)</span>${pair(field('','ptLE','',{type:'email',ph:'head.pro@club.org'}),field('','ptLN','',{ph:'Name'}))}${seg('ptLMode',[['set','Set a password now'],['invite','E-mail an invite']],'set')}<p class="hint">A staff login for the whole club. With “set a password” the password is generated and shown once; an invite e-mails them a link to choose their own.</p></div>`),
+    wire:r=>{ wireSeg(r,'ptPlan',v=>{ const p=PLAN_PRESETS[v]||{}; r.querySelectorAll('[data-modd]').forEach(c=>{ if(!c.disabled) c.checked=!!p[c.dataset.modd]; }); }); wireSeg(r,'ptSt0'); wireSeg(r,'ptLMode'); },
     save:()=>{ const name=fv('ptN'); if(!name){ toast('Give the club a name'); return false; }
       const slug=(t?t.slug:fv('ptSlug')).toLowerCase(); if(!/^[a-z0-9][a-z0-9-]{1,30}$/.test(slug)||['app','portal','www','api','admin','mail'].includes(slug)){ toast('Choose a different address: letters, digits and dashes'); return false; }
-      const body=$('dBody'), rec={name,short:fv('ptS'),plan:body.querySelector('#ptPlan').dataset.val,modules:readModules(body),hosts:fv('ptH').split(/[,\s]+/).map(h=>h.trim().toLowerCase()).filter(Boolean),notes:fv('ptNo'),login_email:fv('ptLE')||null,updated_at:new Date().toISOString()};
-      if(t) rec.status=body.querySelector('#ptSt').dataset.val;
-      saveTenant(t,slug,rec); }});
+      const body=$('dBody');
+      const rec={name,short:fv('ptS'),plan:body.querySelector('#ptPlan').dataset.val,modules:readModulesD(body),started_on:fv('ptFrom')||null,renews_on:fv('ptRen')||null,
+        address:{line1:fv('ptA1'),line2:fv('ptA2'),city:fv('ptCity'),state:fv('ptState'),zip:fv('ptZip')},phone:fv('ptPh'),website:fv('ptWeb'),billing_email:fv('ptBE'),timezone:fv('ptTz'),
+        hosts:fv('ptH').split(/[,\s]+/).map(h=>h.trim().toLowerCase()).filter(Boolean),notes:fv('ptNo'),updated_at:new Date().toISOString()};
+      const first=t?null:{email:fv('ptLE'),name:fv('ptLN'),mode:body.querySelector('#ptLMode').dataset.val,status:body.querySelector('#ptSt0').dataset.val};
+      saveClient(t,slug,rec,first); }});
 }
-async function saveTenant(t,slug,rec){
+async function saveClient(t,slug,rec,first){
   try{
-    if(t){ const {error}=await sb.from('tenants').update(rec).eq('slug',slug); if(error) throw error; toast('Saved'); }
+    if(t){ const {error}=await sb.from('tenants').update(rec).eq('slug',slug); if(error) throw error; Object.assign(t,rec); toast('Saved'); logEvent(slug,'edit','Client details updated'); }
     else {
-      const {error}=await sb.from('tenants').insert(Object.assign({slug,status:'active'},rec)); if(error) throw error;
+      const {error}=await sb.from('tenants').insert(Object.assign({slug,status:first.status||'active',login_email:first.email||null},rec)); if(error) throw error;
       // the club's own document, so the hub opens straight onto an empty directory rather than first-run set-up
       const club=normalize(null,{id:'club',kind:'club',name:rec.name,short:rec.short||''}); club.name=rec.name; club.short=rec.short||''; club.orgs=[];
       const {error:e2}=await sb.from('mga_hub').insert({tenant:slug,id:'club',data:Object.assign(club,{_rev:1,_w:CLIENT,_at:Date.now()}),updated_at:new Date().toISOString()}); if(e2) throw e2;
-      let pw=null; if(rec.login_email){ pw=await addBoardLogin(slug,rec.login_email); }
+      await logEvent(slug,'created','Client created on the '+planLabel(rec.plan)+' plan');
+      let made=null; if(first.email){ try{ made=await createLogin({tenant:slug,email:first.email,name:first.name,role:'staff',mode:first.mode,redirect:tenantURL(slug)}); logEvent(slug,'login',(first.mode==='invite'?'Invited staff ':'Created staff login ')+first.email); }catch(e){ toast('Client created, but the login failed: '+e.message); } }
       toast(rec.name+' created');
-      if(pw) setTimeout(()=>openDrawer({kicker:'New client',title:rec.name+' is ready',body:`<p>Address: <a href="${esc(tenantURL(slug))}" target="_blank" rel="noopener">${esc(tenantURL(slug))}</a></p><div class="banner"><b>Board login</b><br>${esc(rec.login_email)}<br>password <code>${esc(pw)}</code><br><small>Copy it now — it is not shown again. The club can change it from Supabase → Authentication, or you can add another login any time.</small></div>`}),50);
+      await loadPortal(); openClient(slug);
+      if(made) setTimeout(()=>loginResult(made,tenantURL(slug)),80);
+      return;
     }
   }catch(e){ toast(e.message||'That did not save'); }
-  loadTenants();
+  loadPortal();
 }
-/* a new board login: sign the user up on a side client (the admin stays signed in), then link them to the tenant */
-async function addBoardLogin(slug,email){
-  const side=window.supabase.createClient(CFG.url,CFG.anonKey,{auth:{persistSession:false,autoRefreshToken:false,detectSessionInUrl:false}});
-  const password=genPassword();
-  const {data,error}=await side.auth.signUp({email,password,options:{data:{tenant:slug}}});
-  if(error) throw new Error(error.message);
-  const uid=data&&data.user&&data.user.id; if(!uid) throw new Error('Supabase did not return the new user — is e-mail confirmation off?');
-  const {error:e2}=await sb.from('tenant_users').insert({user_id:uid,tenant:slug,role:'board',email});
-  if(e2) throw new Error(e2.message);
-  try{ await side.auth.signOut(); }catch(_){}
-  return password;
+function statusDrawer(t){
+  openDrawer({kicker:'Client',title:'Status · '+t.name,
+    body:`<div class="fld"><span class="lbl">Status</span>${seg('ptSt',[['prospect','Prospect'],['trial','Trial'],['active','Active'],['suspended','Suspended'],['inactive','Inactive']],t.status||'active')}
+      <p class="hint"><b>Suspended</b>: the club’s hubs show a paused notice and nothing else; data is kept. <b>Inactive</b>: a former client — same notice, listed under Inactive.</p></div>`+
+      field('Effective date','ptEnd',t.ended_on||'',{type:'date'})+field('Reason / note','ptWhy','',{ph:'e.g. non-payment, moved to another system'}),
+    wire:r=>wireSeg(r,'ptSt'),
+    save:()=>{ const st=$('dBody').querySelector('#ptSt').dataset.val, ended=fv('ptEnd'), why=fv('ptWhy');
+      (async()=>{ const rec={status:st,ended_on:(st==='suspended'||st==='inactive')?(ended||new Date().toISOString().slice(0,10)):null,updated_at:new Date().toISOString()};
+        const {error}=await sb.from('tenants').update(rec).eq('slug',t.slug); if(error){ toast(error.message); return; }
+        Object.assign(t,rec); logEvent(t.slug,'status','Status → '+STATUS_LABEL[st]+(why?' — '+why:'')); toast('Status: '+STATUS_LABEL[st]); vPortal($('main')); })(); }});
 }
-/* ---------- the screens a tenant's hub shows instead of a hub ---------- */
+function editContact(t,c){
+  openDrawer({kicker:t.name,title:c?c.name:'New contact',
+    body:pair(field('Name','pcN',c?.name||''),field('Title / role','pcT',c?.title||'',{ph:'e.g. Head Golf Professional'}))+pair(field('E-mail','pcE',c?.email||'',{type:'email'}),field('Phone','pcP',c?.phone||'',{type:'tel'}))+
+      `<label class="check"><input type="checkbox" id="pcPri"${c?.is_primary?' checked':''}>Primary contact</label>`+field('Notes','pcNo',c?.notes||'',{type:'textarea'}),
+    del:c?()=>{ (async()=>{ const {error}=await sb.from('tenant_contacts').delete().eq('id',c.id); if(error){ toast(error.message); return; } PS.contacts=PS.contacts.filter(x=>x.id!==c.id); logEvent(t.slug,'contact','Removed contact '+c.name); vPortal($('main')); })(); }:null,
+    save:()=>{ const name=fv('pcN'); if(!name){ toast('Give the contact a name'); return false; }
+      const rec={tenant:t.slug,name,title:fv('pcT'),email:fv('pcE'),phone:fv('pcP'),is_primary:$('pcPri').checked,notes:fv('pcNo'),updated_at:new Date().toISOString()};
+      (async()=>{ if(rec.is_primary){ for(const o of contactsOf(t.slug)) if(o.is_primary&&(!c||o.id!==c.id)){ o.is_primary=false; await sb.from('tenant_contacts').update({is_primary:false}).eq('id',o.id); } }
+        if(c){ const {error}=await sb.from('tenant_contacts').update(rec).eq('id',c.id); if(error){ toast(error.message); return; } Object.assign(c,rec); }
+        else { const {data,error}=await sb.from('tenant_contacts').insert(rec).select('*'); if(error){ toast(error.message); return; } PS.contacts.push((data&&data[0])||Object.assign({id:uid()},rec)); logEvent(t.slug,'contact','Added contact '+name+(rec.title?' ('+rec.title+')':'')); }
+        toast('Saved'); vPortal($('main')); })(); }});
+}
+/* a staff login: create (password we set, or invite) or manage (name, password, remove) */
+function staffDrawer(t,u){
+  const a=u?(PS.auth[u.user_id]||{}):{};
+  openDrawer({kicker:t.name,title:u?(u.name||u.email||'Staff login'):'New staff login',wide:true,saveLabel:u?'Save':'Create login',
+    body:(u?`<p class="muted" style="margin:0 0 10px">${esc(u.email||a.email||'')} · ${a.last_sign_in_at?'last signed in '+fwhen(a.last_sign_in_at):'never signed in'}${a.confirmed===false?' · <span class="chip warn">e-mail unconfirmed</span>':''}</p>`+field('Name','puN',u.name||a.name||'')
+       :pair(field('E-mail','puE','',{type:'email',ph:'head.pro@club.org'}),field('Name','puN','')))+
+      '<p class="hint">Staff see the whole club: the club hub, every organization, and the Logins page where they invite their boards.</p>'+
+      (u?`<div class="fld" style="margin-top:6px"><span class="lbl">Password</span><div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center"><input class="inp" id="puPw" placeholder="New password (8+ characters)" style="flex:1;min-width:200px" autocomplete="new-password"><button class="btn" id="puGen">Generate</button><button class="btn" id="puSet">Set password</button></div>
+          <div class="actions" style="margin-top:8px"><button class="btn" id="puReset">E-mail a reset link</button></div><div id="puMsg"></div>${fnNote()}</div>
+          <div class="fld" style="margin-top:6px"><span class="lbl">Remove</span><div class="actions"><button class="btn" id="puUnlink">Remove from ${esc(t.short||t.name)}</button><button class="btn danger" id="puDel">Delete the login entirely</button></div><p class="hint">Remove keeps the account (it may belong to another client); delete erases it everywhere.</p></div>`
+        :`<div class="fld"><span class="lbl">Password</span>${seg('puMode',[['set','Set a password now'],['invite','E-mail an invite']],'set')}
+          <div id="puSetBox" style="display:flex;gap:8px;align-items:center;margin-top:8px"><input class="inp" id="puPw" placeholder="Leave blank to generate one" style="flex:1" autocomplete="new-password"><button class="btn" id="puGen">Generate</button></div>
+          <p class="hint">Set now: the password is shown once after creation and you hand it over. Invite: they get an e-mail with a link to ${esc(tenantURL(t.slug))} and choose their own.</p>${fnNote()}</div>`),
+    wire:r=>{ wireSeg(r,'puMode',v=>{ r.querySelector('#puSetBox').style.display=v==='set'?'flex':'none'; });
+      const g=r.querySelector('#puGen'); if(g) g.onclick=()=>{ r.querySelector('#puPw').value=genPassword(); };
+      if(u){ const msg=r.querySelector('#puMsg');
+        r.querySelector('#puSet').onclick=async()=>{ const pw=r.querySelector('#puPw').value; if(pw.length<8){ toast('8 characters or more'); return; } try{ await adminFn('set_password',{user_id:u.user_id,password:pw}); msg.innerHTML=`<div class="banner" style="margin-top:8px">Password set for ${esc(u.email||'')}: <code>${esc(pw)}</code> — copy it now.</div>`; logEvent(t.slug,'login','Password set for '+(u.email||'')); }catch(e){ if(e.message==='FN_MISSING'){ msg.innerHTML=fnNote(); } else toast(e.message); } };
+        r.querySelector('#puReset').onclick=async()=>{ const {error}=await sb.auth.resetPasswordForEmail(u.email||a.email,{redirectTo:tenantURL(t.slug)}); if(error){ toast(error.message); return; } msg.innerHTML=`<div class="banner" style="margin-top:8px">Reset e-mail sent to ${esc(u.email||a.email||'')}.</div>`; logEvent(t.slug,'login','Password reset e-mailed to '+(u.email||'')); };
+        r.querySelector('#puUnlink').onclick=async()=>{ if(!confirm('Remove this login from '+t.name+'?')) return; const {error}=await sb.from('tenant_users').delete().eq('user_id',u.user_id).eq('tenant',t.slug); if(error){ toast(error.message); return; } PS.users=PS.users.filter(x=>!(x.user_id===u.user_id&&x.tenant===t.slug)); logEvent(t.slug,'login','Removed staff login '+(u.email||'')); closeDrawer(); vPortal($('main')); };
+        r.querySelector('#puDel').onclick=async()=>{ if(!confirm('Delete '+(u.email||'this login')+' everywhere? This cannot be undone.')) return; try{ await adminFn('delete',{user_id:u.user_id}); PS.users=PS.users.filter(x=>x.user_id!==u.user_id); logEvent(t.slug,'login','Deleted login '+(u.email||'')); closeDrawer(); vPortal($('main')); }catch(e){ if(e.message==='FN_MISSING') msg.innerHTML=fnNote(); else toast(e.message); } }; } },
+    save:()=>{ const name=fv('puN');
+      if(u){ (async()=>{ const {error}=await sb.from('tenant_users').update({name}).eq('user_id',u.user_id).eq('tenant',t.slug); if(error){ toast(error.message); return; } u.name=name; toast('Saved'); vPortal($('main')); })(); return; }
+      const body=$('dBody'), email=fv('puE'), mode=body.querySelector('#puMode').dataset.val, pw=body.querySelector('#puPw').value;
+      (async()=>{ try{ const r=await createLogin({tenant:t.slug,email,name,role:'staff',mode,password:pw||undefined,redirect:tenantURL(t.slug)});
+          logEvent(t.slug,'login',(mode==='invite'?'Invited staff ':'Created staff login ')+email);
+          await loadPortal(); loginResult(r,tenantURL(t.slug)); }catch(e){ toast(e.message); } })(); }});
+}
+/* attach a login that already exists (another client's staff, a Flagstick person) as staff here */
+function linkDrawer(t){
+  openDrawer({kicker:t.name,title:'Link an existing login as staff',saveLabel:'Link',
+    body:field('E-mail of the existing login','plE','',{type:'email'})+'<p class="hint">The login keeps its password; it gains staff access to '+esc(t.name)+'.</p>',
+    save:()=>{ const email=fv('plE'); if(!email) return false;
+      (async()=>{ const {data,error}=await sb.rpc('admin_user_by_email',{p_email:email}); if(error||!data){ toast(error?error.message:'No login with that e-mail — create one instead'); return; }
+        try{ await linkUser(data.id,{tenant:t.slug,role:'staff',email:data.email}); logEvent(t.slug,'login','Linked existing login '+data.email+' as staff'); await loadPortal(); toast('Linked'); }catch(e){ toast(e.message); } })(); }});
+}
+/* ---------- Team ---------- */
+function vTeam(m){
+  const row=a=>{ const x=PS.auth[a.user_id]||{}; return `<div class="tr" style="grid-template-columns:minmax(0,1.6fr) minmax(0,1fr) 150px 40px"><div class="cell2"><b>${esc(x.name||a.email||'')}</b><small>${esc(a.email||x.email||'')}</small></div><span class="muted" style="font-size:13px">${x.last_sign_in_at?'Signed in '+fwhen(x.last_sign_in_at):'Never signed in'}</span><span class="muted" style="font-size:13px">Added ${fdate(a.created_at)}</span><button class="ib" data-rm="${esc(a.user_id)}" title="Remove from the team">${I.trash}</button></div>`; };
+  m.innerHTML=head('Team','Flagstick’s own administrators: everyone here can open the portal and any client’s hub.',btn('Add administrator','ptAddA','pri',I.plus))+
+    `<div class="card" style="overflow:hidden"><div class="t">${PS.admins.length?PS.admins.map(row).join(''):'<div class="tr"><span class="muted">Loading…</span></div>'}</div></div>${fnNote()}`;
+  $('ptAddA').onclick=()=>openDrawer({kicker:'Team',title:'Add a Flagstick administrator',saveLabel:'Add',
+    body:pair(field('E-mail','paE','',{type:'email'}),field('Name','paN',''))+`<div class="fld"><span class="lbl">Account</span>${seg('paMode',[['set','New login, set a password'],['invite','New login, e-mail an invite'],['link','Existing login']],'set')}<div id="paSetBox" style="display:flex;gap:8px;align-items:center;margin-top:8px"><input class="inp" id="paPw" placeholder="Leave blank to generate one" style="flex:1" autocomplete="new-password"><button class="btn" id="paGen">Generate</button></div></div>`,
+    wire:r=>{ wireSeg(r,'paMode',v=>{ r.querySelector('#paSetBox').style.display=v==='set'?'flex':'none'; }); r.querySelector('#paGen').onclick=()=>{ r.querySelector('#paPw').value=genPassword(); }; },
+    save:()=>{ const email=fv('paE'), name=fv('paN'), body=$('dBody'), mode=body.querySelector('#paMode').dataset.val, pw=body.querySelector('#paPw').value; if(!email) return false;
+      (async()=>{ try{
+          if(mode==='link'){ const {data,error}=await sb.rpc('admin_user_by_email',{p_email:email}); if(error||!data){ toast('No login with that e-mail'); return; } await linkUser(data.id,{admin:true,email:data.email}); logEvent(null,'team','Added '+data.email+' to the Flagstick team'); await loadPortal(); toast('Added'); return; }
+          const r=await createLogin({admin:true,email,name,mode,password:pw||undefined,redirect:'https://app.'+BASE_DOMAIN+'/'}); logEvent(null,'team',(mode==='invite'?'Invited ':'Created ')+email+' as a Flagstick administrator'); await loadPortal(); loginResult(r,'https://app.'+BASE_DOMAIN+'/');
+        }catch(e){ toast(e.message); } })(); }});
+  m.querySelectorAll('[data-rm]').forEach(b=>b.onclick=async()=>{ const a=PS.admins.find(x=>x.user_id===b.dataset.rm); if(!a) return; if(a.user_id===(ACCESS&&ACCESS.user_id)){ toast('You cannot remove yourself'); return; } if(!confirm('Remove '+(a.email||'this person')+' from the Flagstick team? Their login stays.')) return;
+    const {error}=await sb.from('flagstick_admins').delete().eq('user_id',a.user_id); if(error){ toast(error.message); return; } PS.admins=PS.admins.filter(x=>x.user_id!==a.user_id); logEvent(null,'team','Removed '+(a.email||'')+' from the Flagstick team'); vTeam(m); });
+}
+function vActivity(m){
+  const erow=e=>{ const t=e.tenant?tenantOf(e.tenant):null; return `<div class="tr" style="grid-template-columns:150px 180px minmax(0,1fr) 160px;min-height:40px"><span class="muted" style="font-size:12.5px">${fwhen(e.at)}</span><span>${t?`<a href="#" data-go-t="${esc(t.slug)}">${esc(t.name)}</a>`:'<span class="muted">Flagstick</span>'}</span><span style="font-size:13.5px">${esc(e.text)}</span><span class="muted" style="font-size:12.5px;text-align:right">${esc(e.actor||'')}</span></div>`; };
+  m.innerHTML=head('Activity','Everything done from the portal, newest first.')+`<div class="card" style="overflow:hidden"><div class="t">${PS.events.length?PS.events.slice(0,200).map(erow).join(''):'<div class="tr"><span class="muted">Nothing yet.</span></div>'}</div></div>`;
+  m.querySelectorAll('[data-go-t]').forEach(a=>a.onclick=e=>{ e.preventDefault(); openClient(a.dataset.goT); });
+}
+/* ---------- what a tenant's address shows instead of a hub ---------- */
 function vNoTenant(m){
   $('nav').innerHTML=''; $('seasonBox').hidden=true; $('btnSwitch').hidden=true;
   m.innerHTML=head('No club at this address','')+`<div class="card pad" style="max-width:640px"><p style="margin:0 0 8px">Nothing is set up at <b>${esc(HOSTNAME||TENANT_HINT)}</b>.</p><p class="hint" style="margin:0">A club’s hub lives at <i>club</i>.${esc(BASE_DOMAIN)}. If this is your club’s address, ask Flagstick to add it under the client’s host names.</p></div>`;
@@ -2166,11 +2488,17 @@ function vSuspended(m){
   $('nav').innerHTML=''; $('seasonBox').hidden=true; $('btnSwitch').hidden=true;
   m.innerHTML=head(TENANT_INFO&&TENANT_INFO.name||'This club','')+`<div class="card pad" style="max-width:640px"><p style="margin:0 0 8px"><b>This hub is paused.</b></p><p class="hint" style="margin:0">Your data is safe. Please contact Flagstick to reactivate the subscription.</p></div>`;
 }
-/* an organization whose kind the subscription does not include */
 function vLocked(m,kind){
   const mod=kind==='group'?'groups':'associations', name=(MODULE_CATALOG.find(x=>x.id===mod)||{}).name||mod;
   m.innerHTML=head('Not included in your plan','')+`<div class="card pad" style="max-width:640px"><p style="margin:0 0 8px"><b>${esc(name)}</b> is not part of ${esc(CLUB&&CLUB.name||CLUB_META.name)}’s Flagstick subscription.</p><p class="hint" style="margin:0">Its data is kept. Contact Flagstick to add the module.</p><div class="actions" style="margin-top:12px"><button class="btn" id="lkBack">Back to the club hub</button></div></div>`;
   $('lkBack').onclick=()=>chooseOrg('club');
+}
+/* a board login landed on a hub it may not open */
+function vNotYours(m){
+  $('nav').innerHTML=''; $('seasonBox').hidden=true;
+  const mine=SCOPE_ORGS.map(id=>(CLUB&&CLUB.orgs||[]).find(o=>o.id===id)).filter(Boolean);
+  m.innerHTML=head('Not your hub','')+`<div class="card pad" style="max-width:640px"><p style="margin:0 0 8px">Your login opens ${mine.length?mine.map(o=>'<b>'+esc(o.name)+'</b>').join(', '):'no organizations yet'}.</p>${mine.length?`<div class="actions">${mine.map(o=>`<button class="btn" data-go-org="${esc(o.id)}">Open ${esc(o.short||o.name)}</button>`).join('')}</div>`:'<p class="hint" style="margin:0">Ask the club to give your login an organization.</p>'}</div>`;
+  m.querySelectorAll('[data-go-org]').forEach(b=>b.onclick=()=>chooseOrg(b.dataset.goOrg));
 }
 /* =====================================================================
    MGA Hub — Treasury: one ledger for the season, budget vs actual across
@@ -5126,7 +5454,7 @@ const cashierLink=t=>SITE_BASE+'cashier.html?k='+encodeURIComponent(calc(t).shar
 const newToken=()=>Array.from(crypto.getRandomValues(new Uint8Array(24)),b=>'abcdefghijkmnpqrstuvwxyz23456789'[b%32]).join('');
 /* create, replace or (token null) turn off a shared cashier / check-in row; admin links go through the database function */
 function shareRow(tid,token,name,doc){ return KEYMODE?keyRPC('hub_key_share',{p_tid:tid,p_token:token,p_name:name,p_doc:doc})
-  :token?sb.from('calcutta_share').upsert(trow({tid,token,name,doc,version:1,updated_at:new Date().toISOString()})):tq(sb.from('calcutta_share').update({token:null})).eq('tid',tid); }
+  :token?sb.from('calcutta_share').upsert(trow(Object.assign({tid,token,name,doc,version:1,updated_at:new Date().toISOString()},scopedDB()?{org:ORG_ID}:{}))):tq(sb.from('calcutta_share').update({token:null})).eq('tid',tid); }
 function calcPeople(t){ return (t.field||[]).map(p=>{ const m=memberById(p.memberId); return m?{id:m.id,name:tidyName(memberName(m))}:null; }).filter(Boolean).sort((a,b)=>a.name.localeCompare(b.name)); }
 const SHARE_ST={};
 /* the last cashier copy this device merged with — needed to tell what changed here; kept per device */
@@ -6325,7 +6653,7 @@ async function resultsPDF(t,opt){
 /* Keeps every open device on the latest version: checks version.json about once a minute and, when a
    newer build is live, reloads at a safe moment (nothing unsaved, no editor open, not mid-typing). */
 (function(){
-  const ME='20261020222400'; let ready=false, lastCheck=0;
+  const ME='20261020224817'; let ready=false, lastCheck=0;
   const typing=()=>{ const a=document.activeElement; return a&&/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)&&a.value&&a.type!=='search'; };
   const safe=()=>!typing()&&(typeof window.__canReload!=='function'||window.__canReload());
   async function check(){ lastCheck=Date.now(); if(location.protocol==='file:') return;

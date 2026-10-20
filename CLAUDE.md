@@ -83,7 +83,7 @@ python3 tests/smoke.py        # every page + every hub screen/tab renders with n
 python3 tests/test_payouts.py # Calcutta tie-splitting / owner payouts end to end
 python3 tests/test_sync.py    # migration + two devices on a shared fake database (see §3)
 python3 tests/test_score.py   # the public scoring page against the fake: mid-round changes reach open phones/boards
-python3 tests/test_tenants.py # tenants: host → tenant, per-tenant rows, module gates, refusals, the portal creating a client
+python3 tests/test_tenants.py # tenants, the portal, staff / board logins and scope, invite links — against the fake
 git add -A && git commit && git push origin main  # Render deploys main to app.wcccmga.org
 ```
 Tests need `pip install playwright && playwright install chromium` and `cd tests && npm i xlsx@0.18.5`.
@@ -95,18 +95,26 @@ compare-and-swap, 250 ms polling "realtime"). If you change `core.js` saving/mer
 
 ## 2. Data model
 
-**Tenants first** (`tenants-setup.sql`, `docs/tenancy.md`, `src/portal.js`, `tests/test_tenants.py`): a client is a row
-in `tenants` (`slug` = subdomain, `plan` preset, **`modules`** switchboard, `status`, extra `hosts`, `login_email`);
-every row in `mga_hub` / `golf_events` / `golf_scores` / `calcutta_share` / `hub_keys` carries `tenant`, `mga_hub`'s key
-is `(tenant, id)`, and row level security (`can_tenant()`, `tenant_users`, `flagstick_admins`) does the isolation.
-core.js: `PORTAL`, `resolveTenant()` → `tenant_lookup(host)` → `TENANT` / `TENANT_INFO`, `tq(q)` / `trow(o)` on every
-row query, `checkAccess()` → `my_access()` after sign-in, `MODULE_CATALOG` + `hasModule(id)` (golf always; associations,
-groups, club = Dues collection + club Treasury/Budget; billing and pos reserved). Until the migration has run the RPC is
-missing and `TENANCY=false` = the old single-club behaviour. **New tables get a `tenant` column and a `can_tenant`
-policy; new features belong to a module and check `hasModule()` at their entry points; switching a module off never
-deletes data.** The portal (Flagstick admins only, `app.<domain>` or `?portal=1`; www and the bare domain are the marketing website) lists clients, creates
-one (tenant row + empty club document + first board login via a side supabase client's `signUp` → `tenant_users`),
-edits modules / status / hosts / logins.
+**Tenants first** (`tenants-setup.sql` + `portal-setup.sql`, `docs/tenancy.md`, `src/portal.js`, `src/logins.js`,
+`tests/test_tenants.py`): a client is a row in `tenants` (`slug` = subdomain, `plan` preset, **`modules`** switchboard,
+`status` prospect/trial/active/suspended/inactive, extra `hosts`, address/contact fields, `login_email`); every row in
+`mga_hub` / `golf_events` / `golf_scores` / `calcutta_share` / `hub_keys` carries `tenant`, `mga_hub`'s key is
+`(tenant, id)`. **Modules:** Golf management (`golf`) is the package = everything built today (associations and small
+groups included); `club`, `billing`, `pos` are the coming Club-management tier (`MODULE_CATALOG`, `hasModule()`).
+**Logins** (`tenant_users`): role `staff` = the whole club, created by Flagstick in the portal; role `org` = only the
+organizations in `orgs` (a board login), `manage` = a board administrator who invites its own board; staff invite boards
+from the club hub's Logins page. RLS does the isolation: `can_org(tenant, org)` on every data table, `can_manage_login()`
+on `tenant_users`; a board login gets the club document cut down through `scoped_read()` / `scoped_people()` (core.js:
+`SCOPED`, `SCOPE_ORGS`, `GRANT`, `canManageLogins()`), exactly like key mode. core.js: `PORTAL`, `resolveTenant()` →
+`tenant_lookup(host)` → `TENANT` / `TENANT_INFO`, `tq(q)` / `trow(o)` on every row query, `checkAccess()` → `my_access()`
+after sign-in; `AUTH_HASH` + logins.js `authLanding()` handle invite / reset / one-click sign-in links. Until the
+migrations have run the RPCs are missing and the app behaves as before. Privileged account actions go through the Edge
+Function `supabase/functions/admin-users` (create with password, invite, set password, delete, `sso`); logins.js falls
+back to a side-client sign-up and reset e-mails when it is not deployed. **New tables get a `tenant` column and a
+`can_org` policy; new features belong to a module and check `hasModule()` at their entry points; switching a module off
+never deletes data.** The portal (Flagstick admins only, `app.<domain>` or `?portal=1`; www and the bare domain are the
+marketing website): Clients by status → client record (subscription + boxes, details, contacts, staff logins, the
+club-managed board logins, activity), new client (+ empty club document + first staff login), Team, Activity.
 
 **One JSONB document per organization**, all in `mga_hub`, each normalized by `normalize(doc, meta)` in core.js:
 ```
@@ -423,9 +431,11 @@ groups, printed scorecards — the printed cards include a live-scoring QR that 
 
 ## 6. Status / history
 
-- **Built Oct 2026 (tenants + portal):** `tenants-setup.sql`, `src/portal.js`, module gates, per-tenant sign-in; the
-  owner's go-live steps (Supabase SQL, auth setting, DNS wildcard, Render custom domains) are in `docs/tenancy.md` §5.
-  Roadmap there: billing / POS as modules, per-user sign-in on `tenant_users.role`, Flagstick's own subscriptions.
+- **Built Oct 2026 (tenants, portal, logins):** `tenants-setup.sql` + `portal-setup.sql`, `src/portal.js` (the client
+  portal: clients by status, client records, staff logins, team, activity), `src/logins.js` (staff / board logins and
+  scope in the hub, invite and reset links), the Edge Function `supabase/functions/admin-users`; the owner's go-live
+  steps are in `docs/tenancy.md` §6. Roadmap there: Club management (billing, POS) as modules, finer roles, Flagstick's
+  own subscriptions.
 
 - **Legacy app (retired):** the original Member-Member app used to live on `main` (its history is still in git);
   its `mm_tournament` table is still in Supabase as an archive, to be dropped when that system is deprecated. The

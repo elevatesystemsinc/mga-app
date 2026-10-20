@@ -24,11 +24,10 @@ const I={
 I.org=svg('<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18M9 20v-6h6v6"/>');
 I.lib=svg('<path d="M4 5h5a3 3 0 013 3v12a2 2 0 00-2-2H4z"/><path d="M20 5h-5a3 3 0 00-3 3v12a2 2 0 012-2h6z"/>');
 I.coins=svg('<ellipse cx="12" cy="6" rx="7" ry="3"/><path d="M5 6v12c0 1.7 3.1 3 7 3s7-1.3 7-3V6"/><path d="M5 12c0 1.7 3.1 3 7 3s7-1.3 7-3"/>');
-const NAV=[['dash','Dashboard',I.home],['tournaments','Tournaments',I.flag],['members','Members',I.users],['collections','Dues collection',I.coins],['board','Board',I.shield],['budget','Season budget',I.ledger],['orgs','Organizations',I.org],['library','Game library',I.lib]];
+const NAV=[['dash','Dashboard',I.home],['tournaments','Tournaments',I.flag],['members','Members',I.users],['collections','Dues collection',I.coins],['board','Board',I.shield],['budget','Season budget',I.ledger],['orgs','Organizations',I.org],['library','Game library',I.lib],['logins','Logins',I.shield]];
 /* which pages each kind of organization gets (associations get everything) */
-const ORG_NAV={club:['dash','tournaments','golf','members','collections','orgs','library','budget','treasury'],association:['dash','tournaments','golf','members','board','treasury','budget'],group:['dash','tournaments','golf','members']};
-const CLUB_TIER_NAV={collections:1,treasury:1,budget:1};   // the club hub's money pages belong to the Club management module
-function navItems(){ const allow=ORG_NAV[db.kind]; return NAV.filter(([k])=>(!allow||allow.includes(k))&&!(isClub()&&CLUB_TIER_NAV[k]&&!hasModule('club'))).map(([k,l,ic])=>[k,k==='members'&&isClub()?'Directory':l,ic]); }
+const ORG_NAV={club:['dash','tournaments','golf','members','collections','orgs','library','budget','treasury','logins'],association:['dash','tournaments','golf','members','board','treasury','budget'],group:['dash','tournaments','golf','members']};
+function navItems(){ const allow=ORG_NAV[db.kind]; return NAV.filter(([k])=>(!allow||allow.includes(k))&&(k!=='logins'||canManageLogins())).map(([k,l,ic])=>[k,k==='members'&&isClub()?'Directory':l,ic]); }
 /* the organization on screen: the club's record from CLUB.orgs wins over what the document says */
 const curOrg=()=>!db?null:isClub()?Object.assign({},CLUB_META,{name:CLUB.name||CLUB_META.name,crest:CLUB.crest||CLUB_META.crest}):(orgMeta()||{id:db.id,kind:db.kind,name:db.name,short:db.short});
 const orgShort=()=>{ const o=curOrg(); return o?(o.short||o.name||'club'):'club'; };
@@ -92,7 +91,7 @@ function render(){
 function renderInner(){
   if(PORTAL){ if(sessionOK&&TENANCY&&typeof vPortal==='function') vPortal($('main')); return; }
   if(TENANCY&&!TENANT){ vNoTenant($('main')); return; }
-  if(tenantStatus()==='suspended'&&!(ACCESS&&ACCESS.admin)){ vSuspended($('main')); return; }
+  if((tenantStatus()==='suspended'||tenantStatus()==='inactive')&&!(ACCESS&&ACCESS.admin)){ vSuspended($('main')); return; }
   const o=curOrg(), clubName=CLUB&&CLUB.name||CLUB_META.name;
   const title=o?(isClub()?'Club Hub':orgShort()+' Hub'):'Club Hub';
   // the sidebar leads with the Flagstick mark (head.html); this line names the hub you are in, in words only
@@ -100,8 +99,8 @@ function renderInner(){
   $('brandName').textContent=lock?clubName:(o.name||o.short); $('brandSub').textContent=lock?(o?'Club hub':'Choose a hub'):clubName;
   $('topName').textContent=title; document.title=(o?(isClub()?clubName:orgShort()+' · '+clubName):clubName)+' · Flagstick';
   const lc=$('loginClub'); if(lc) lc.textContent=TENANT_INFO&&TENANT_INFO.name||clubName;   // the sign-in card names the tenant, even before its document is open
-  $('btnSwitch').hidden=!CLUB||(!db&&!setupNeeded)||KEYMODE; if(typeof paintHubSync==='function') paintHubSync();
-  if(!db){ $('nav').innerHTML=''; $('seasonBox').hidden=true; (setupNeeded?vSetup:vPicker)($('main')); return; }
+  $('btnSwitch').hidden=!CLUB||(!db&&!setupNeeded)||KEYMODE||(SCOPED&&SCOPE_ORGS.length<2); if(typeof paintHubSync==='function') paintHubSync();
+  if(!db){ $('nav').innerHTML=''; $('seasonBox').hidden=true; (setupNeeded?vSetup:SCOPED&&cloudReady&&(ORG_ID==='club'||!allowedOrg(ORG_ID))?vNotYours:vPicker)($('main')); return; }
   if(!isClub()&&!hasModule(db.kind==='group'?'groups':'associations')){ $('nav').innerHTML=''; $('seasonBox').hidden=true; vLocked($('main'),db.kind); return; }
   $('seasonBox').hidden=false;
   const ys=Object.keys(db.seasons).sort((a,b)=>b-a);
@@ -112,17 +111,18 @@ function renderInner(){
     live.map(e=>`<button class="nav livelink" data-golfev="${e.id}"><span class="livedot"></span><span class="trunc">Leaderboard · ${esc(e.name)}</span></button>`).join('');
   $('nav').querySelectorAll('[data-go]').forEach(b=>b.onclick=()=>{ if(b.dataset.go==='golf') view.geid=null; go(b.dataset.go); });
   const m=$('main');
-  ({dash:vDash,tournaments:vTournaments,tournament:vTournament,members:vMembers,board:vBoard,budget:vBudget,treasury:vTreasury,golf:vGolf,orgs:vOrgs,pick:vPicker,collections:vCollections,games:vGames,ledger:vLedger,library:vLibrary}[view.page]||vDash)(m);
+  ({dash:vDash,tournaments:vTournaments,tournament:vTournament,members:vMembers,board:vBoard,budget:vBudget,treasury:vTreasury,golf:vGolf,orgs:vOrgs,pick:vPicker,collections:vCollections,games:vGames,ledger:vLedger,library:vLibrary,logins:vLogins}[view.page]||vDash)(m);
+  if(view.page==='board'&&!isClub()&&typeof loginsCard==='function') loginsCard(m,ORG_ID);
 }
 
 /* ---------- Organization picker / first-run set-up (shown when no organization is open) ---------- */
 function vPicker(m){
-  const orgs=(CLUB&&CLUB.orgs||[]).filter(x=>!x.archived), club=Object.assign({},CLUB_META,{name:CLUB&&CLUB.name||CLUB_META.name,crest:CLUB&&CLUB.crest||CLUB_META.crest});
+  const orgs=(CLUB&&CLUB.orgs||[]).filter(x=>!x.archived&&allowedOrg(x.id)), club=Object.assign({},CLUB_META,{name:CLUB&&CLUB.name||CLUB_META.name,crest:CLUB&&CLUB.crest||CLUB_META.crest});
   const card=(id,x,sub)=>`<button class="orgcard" data-org="${esc(id)}">${crestHTML(x)}<div class="cell2"><b>${esc(x.name)}</b><small>${esc(sub)} · ${esc(orgURL(id))}</small></div>${I.chev}</button>`;
   const unknown=ORG_ID&&ORG_ID!=='club'&&!orgMeta(ORG_ID)&&!db?`<div class="banner">There is no organization at ${esc(orgURL(ORG_ID))}. Pick one below.</div>`:'';
   const grp=(k,empty)=>{ const l=orgs.filter(x=>x.kind===k); return l.length?l.map(x=>card(x.id,x,ORG_KINDS[k]+(x.short?' · '+x.short:''))).join(''):`<p class="muted" style="margin:0;font-size:13.5px">${empty}</p>`; };
   m.innerHTML=`<div class="phead"><div><div class="fs light"><img src="flagstick-crest.svg" alt=""><div><b>FLAGSTICK</b><small>GOLF SOFTWARE</small></div></div><h1 class="h2" style="margin:0 0 4px">${esc(club.name)}</h1><p class="sub">Choose what to work on. Each organization has its own hub; the club keeps the member directory.</p></div></div><div class="rule"></div>
-  ${unknown}<div class="orgs">${card('club',club,'Club hub · member directory · club tournaments · organizations')}
+  ${unknown}<div class="orgs">${SCOPED?'':card('club',club,'Club hub · member directory · club tournaments · organizations')}
     ${hasModule('associations')?`<h2 class="h2" style="margin-top:10px">Associations</h2>${grp('association','No associations yet — create one in the club hub under Organizations.')}`:''}
     ${hasModule('groups')?`<h2 class="h2" style="margin-top:10px">Small groups</h2>${grp('group','No small groups yet — create one in the club hub under Organizations.')}`:''}</div>`;
   m.querySelectorAll('[data-org]').forEach(b=>b.onclick=()=>chooseOrg(b.dataset.org));
@@ -642,7 +642,7 @@ function vMembers(m){
     const mid=simple?`<span class="muted">${esc(x.memberNo||'')}</span><span class="muted">${esc(x.ghin||'')}</span>`:`<span>${br.map(r=>`<span class="chip navy">${esc(r)}</span>`).join(' ')}</span><span><span class="chip ${du[1]}">${du[0]}</span></span>`;
     return `<div class="tr num click" data-m="${x.id}" style="${cols}"><span class="av">${initials(x)}</span><div class="cell2"><b class="trunc">${esc(memberName(x))}</b>${!simple&&(x.ghin||x.memberNo)?`<small>${x.ghin?'GHIN '+esc(x.ghin):'#'+esc(x.memberNo)}</small>`:''}</div><span class="trunc muted">${esc(x.email||'')}</span><span class="muted">${esc(x.phone||'')}</span><span>${esc(x.hcp??'')}</span>${mid}<span><span class="chip ${x.status==='Inactive'?'':'ok'}">${esc(x.status||'Active')}</span></span><span class="ib">${I.edit}</span></div>`; };
   m.innerHTML=head(club?'Directory':'Members',club?`Every member of ${esc(CLUB.name||CLUB_META.name)}. Associations and small groups pick their members from this list.`:`Everyone in the ${esc(short)}. Board seats and tournament fields are picked from this list.`,
-      (simple?'':btn('Dues settings','mDues','')+btn('Bill dues','mBill',''))+(KEYMODE?'':btn(club?'Import club roster':'Import member list','mCsv','',I.down))+btn('Add member','mAdd','pri',I.plus))+`
+      (simple?'':btn('Dues settings','mDues','')+btn('Bill dues','mBill',''))+(KEYMODE||SCOPED?'':btn(club?'Import club roster':'Import member list','mCsv','',I.down))+btn('Add member','mAdd','pri',I.plus))+`
   <div class="toolbar"><div class="search">${I.search}<input class="inp" id="mq" placeholder="Search name, email, phone, member # or GHIN" value="${esc(view.mq)}" aria-label="Search members"></div>
     <div class="seg">${filters.map(x=>`<button class="${f===x?'on':''}" data-mf="${x}">${x}</button>`).join('')}</div>
     <span class="muted" style="margin-left:auto;font-size:13px">${active} active${simple?` of ${total}`:` · ${y} dues ${fmt(amt)}${n0(s.dues.installments)>1?` (${s.dues.installments} × ${fmt(amt/s.dues.installments)})`:''}`}</span></div>
@@ -659,7 +659,7 @@ function vMembers(m){
 function editMember(mm){
   const y=Y(), s=db.seasons[y], club=isClub(), simple=club||db.kind==='group', short=orgShort(); const pays=mm&&!simple?clone(s.duesPayments.filter(p=>p.memberId===mm.id)):[];
   let pickedId=mm?mm.id:'';
-  const locked=KEYMODE&&!!(mm&&personById(mm.id)), L={disabled:locked};   // an admin link may add people to the directory, not change them
+  const locked=(KEYMODE||SCOPED)&&!!(mm&&personById(mm.id)), L={disabled:locked};   // an admin link or a board login may add people to the directory, not change them
   const payHTML=()=>pays.map((p,i)=>`<div class="mr num" style="grid-template-columns:90px minmax(0,1fr) 28px"><input class="inp r" data-di="${i}" data-k="amount" inputmode="decimal" value="${esc(p.amount)}" aria-label="Dues amount"><input class="inp" data-di="${i}" data-k="date" value="${esc(p.date)}" placeholder="Date" aria-label="Dues date"><button class="ib" data-ddel="${i}" aria-label="Remove">${I.x}</button></div>`).join('')||'<div class="mr"><span class="muted">No dues recorded for '+y+'.</span></div>';
   const inT=mm?db.tournaments.filter(t=>t.field.some(p=>p.memberId===mm.id)):[];
   const candidates=!mm&&!club?persons().filter(p=>!membershipOf(p.id)):[];   // club members who aren't in this organization yet
@@ -1042,6 +1042,7 @@ async function boot(){
   $('loginBtn').onclick=doLogin; $('loginPw').onkeydown=e=>{ if(e.key==='Enter') doLogin(); }; const le=$('loginEmail'); if(le) le.onkeydown=e=>{ if(e.key==='Enter') $('loginPw').focus(); };
   await resolveTenant(); paintLogin();
   if(TENANCY&&!TENANT&&!PORTAL){ setSync('local'); render(); return; }          // no club at this address
+  if(AUTH_HASH&&typeof authLanding==='function') await authLanding();          // arrived by a sign-in, invite or reset link
   const {data}=await sb.auth.getSession();
   if(data&&data.session){ const ok=await checkAccess(); if(!ok.ok){ await sb.auth.signOut(); $('login').classList.add('show'); $('loginErr').textContent=ok.msg||''; if(PORTAL) portalBoot(); return; } }
   if(PORTAL){ sessionOK=!!(data&&data.session); portalBoot(); return; }

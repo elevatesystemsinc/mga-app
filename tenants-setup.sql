@@ -15,8 +15,8 @@ create table if not exists public.tenants (
   slug        text primary key check (slug ~ '^[a-z0-9][a-z0-9-]{1,30}$'),
   name        text not null,
   short       text not null default '',
-  plan        text not null default 'golf',                    -- 'club' | 'golf' (a preset; the switches below decide)
-  modules     jsonb not null default '{"golf":true}'::jsonb,   -- {"golf":true,"associations":true,"groups":true,"club":true,"pos":false,"billing":false}
+  plan        text not null default 'golf',                    -- 'golf' (the package) | 'club' (a preset; the switches below decide)
+  modules     jsonb not null default '{"golf":true}'::jsonb,   -- {"golf":true,"club":false,"billing":false,"pos":false}
   status      text not null default 'active' check (status in ('active','trial','suspended')),
   hosts       jsonb not null default '[]'::jsonb,              -- extra host names that open this tenant, e.g. ["app.wcccmga.org"]
   login_email text,                                            -- the board login shown on the sign-in card
@@ -57,8 +57,8 @@ $$;
 
 -- ---------------------------------------------------------------- 2. tenant column everywhere; today's rows → 'wccc'
 insert into public.tenants (slug, name, short, plan, modules, status, hosts, login_email)
-values ('wccc', 'Walnut Creek Country Club', 'WCCC', 'club',
-        '{"golf":true,"associations":true,"groups":true,"club":true}'::jsonb, 'active',
+values ('wccc', 'Walnut Creek Country Club', 'WCCC', 'golf',
+        '{"golf":true}'::jsonb, 'active',
         '["app.wcccmga.org","hub.wcccmga.org"]'::jsonb, 'vicepresident@wcccmga.org')
 on conflict (slug) do nothing;
 
@@ -312,7 +312,7 @@ revoke all on function public.hub_key_tenant(text) from public;
 -- ---------------------------------------------------------------- 7. people
 -- >>> the existing board login keeps Walnut Creek:
 insert into public.tenant_users (user_id, tenant, role, email)
-select id, 'wccc', 'board', email from auth.users where lower(email) = lower('vicepresident@wcccmga.org')
+select id, 'wccc', 'staff', email from auth.users where lower(email) = lower('vicepresident@wcccmga.org')
 on conflict do nothing;
 -- >>> you, as Flagstick (create the user first under Authentication → Users if it does not exist yet):
 insert into public.flagstick_admins (user_id, email)

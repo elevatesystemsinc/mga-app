@@ -59,45 +59,76 @@ sign-in later only adds rows to `tenant_users`.
 ## 3. Modules — the switchboard
 
 `MODULE_CATALOG` in core.js is the list; `tenants.modules` is `{id:true}` per tenant; `hasModule(id)` is the one
-question the UI asks. Presets (`PLAN_PRESETS`) fill the boxes; the boxes are what count.
+question the UI asks. **Golf management is the package** and it is everything built so far: the directory,
+tournaments, rounds and results, live scoring and formats, the game library, associations, small groups, dues
+collection, the club's treasury and budget. **Club management** is the coming tier for running the whole club
+through Flagstick, with its own toggles; the boxes exist today so a plan can be set up ahead of the features.
 
-| module | what it opens today | where the gate is |
+| module | what it opens | status |
 |---|---|---|
-| `golf` (base, always on) | the club hub: directory, tournaments, golf, game library, organizations | — |
-| `associations` | association hubs (MGA, LGA, SMGA…) | `renderInner` → `vLocked`; picker; Organizations page buttons |
-| `groups` | small-group hubs, admin links | same |
-| `club` | the club tier: Dues collection, the club's Treasury and Season budget | `navItems` (`CLUB_TIER_NAV`) |
-| `billing` (not built) | member accounts, charges, statements, payments | box exists so plans can be set up ahead |
-| `pos` (not built) | F&B / pro shop charges to member accounts | same |
+| `golf` (base, every client) | all of the above | built |
+| `club` | run the whole club: membership, member numbers, statements, operations | coming |
+| `billing` | member accounts, charges, statements, payment collection | coming |
+| `pos` | F&B / pro-shop charges to member accounts | coming |
 
-Rules for new work: every new table gets a `tenant` column and a `can_tenant(tenant)` policy from day one; every
-new feature belongs to a module and checks `hasModule()` at its entry points (nav item, page, the create button),
-not deep inside; data is never deleted when a module is switched off — the hub closes, the rows stay.
+Presets (`PLAN_PRESETS`): Golf management = golf; Club management = golf + club + billing + pos. The boxes are what
+count and can be changed any time from the client record. Rules for new work: every new table gets a `tenant`
+column and a `can_org()` policy from day one; every new feature belongs to a module and checks `hasModule()` at its
+entry points (nav item, page, the create button); switching a module off never deletes data.
 
-## 4. The portal (`src/portal.js`)
+## 4. Logins and who sees what
 
-Flagstick's back office, on the same static site. Only `flagstick_admins` get past the sign-in (`my_access().admin`),
-and RLS enforces the same thing on the tables.
+`tenant_users` is the list of logins per client (`portal-setup.sql`):
 
-- **Clients**: every tenant with its address, plan, module chips, status.
-- **New client**: name, short name, slug (becomes the subdomain, cannot change), plan preset, the module boxes, the
-  first board login e-mail. Creates the `tenants` row, the client's empty club document (`mga_hub` `(slug,'club')`),
-  and the board login — a second supabase-js client with no persisted session signs the user up with a generated
-  password (shown once), then `tenant_users` links them. No server function needed; Supabase → Authentication →
-  Providers → Email → **Confirm email must be off** or the login waits for a confirmation mail.
-- **Edit client**: modules, status (active / trial / suspended), extra host names, notes, the primary login e-mail,
-  more board logins.
-- Password resets and deleting logins: Supabase dashboard → Authentication → Users (no service key in the browser).
+| role | sees | who manages them |
+|---|---|---|
+| `staff` | the whole club: the club hub, every organization, the Logins page | **Flagstick**, from the portal |
+| `org` | only the organizations in `orgs` (an MGA board member sees the MGA and nothing else) | the club's staff (club hub → Logins), and any board login with `manage` (a **board administrator**, from its association's Board page) |
 
-## 5. Going live on flagstickhub.com — the steps outside the code
+Enforcement is in the database, not the screens: `can_org(tenant, org)` replaces `can_tenant()` on every data table,
+so an org login cannot read another organization's row even with the API; the club document reaches it through
+`scoped_read()` as the same cut-down copy an admin link gets (directory, its own organizations, the game library) and
+`scoped_people()` lets it add people. `can_manage_login()` guards `tenant_users` itself: staff may write any board
+login of their club, a board administrator only `org` rows inside its own organizations, nobody can promote
+themselves. In the hub: a board login lands on its own hub (`SCOPED`, `SCOPE_ORGS` in core.js), the picker offers only
+its organizations, the Logins page is staff-only, the Board page carries the board's logins for administrators.
+
+**Account actions** (logins.js → the Edge Function `supabase/functions/admin-users`, called with the caller's own
+session): create a login with a password the caller sets, invite by e-mail (they choose a password on arrival),
+set or reset a password, delete, and `sso` — a one-time link that signs a Flagstick admin straight into a client's
+hub ("Open hub" in the portal). The function checks the caller's scope the same way the policies do. Without the
+function the browser falls back to a side-client sign-up and reset e-mails and says so on screen (passwords can't be
+set for an existing login, one-click sign-in becomes a normal sign-in). Arriving by an invite or reset link shows
+"choose your password" before anything else (`authLanding()`, `setPasswordScreen()`).
+
+## 5. The portal (`src/portal.js`)
+
+Flagstick's back office at app.flagstickhub.com. Only `flagstick_admins` get past the sign-in (`my_access().admin`),
+and RLS enforces the same on the tables.
+
+- **Clients**: every tenant by status (prospect, trial, active, suspended, inactive) with search; a row opens the
+  **client record**: subscription (plan, status, dates, billing e-mail, the module boxes), club details (address,
+  phone, website, time zone, other hosts, notes), points of contact, **staff logins** (create with a password or
+  invite, set a password later, reset e-mail, remove, delete), the board logins the club manages itself (read-only),
+  and the activity log. "Open hub" signs you into that client's hub in one click.
+- **New client**: name, slug (= subdomain, fixed), plan preset and boxes, status, address and contacts, the first
+  staff login. It creates the tenant row, an empty club document and the login.
+- **Team**: Flagstick's own administrators (new login with a password, invite, or link an existing login).
+- **Activity**: everything the portal did, newest first (`tenant_events`).
+
+## 6. Going live on flagstickhub.com — the steps outside the code
 
 1. **Supabase → SQL editor**: open `tenants-setup.sql`, replace the two `>>>` e-mail addresses (the WCCC board login
    is already right; put your own Flagstick e-mail on the `flagstick_admins` line), run it. If your Flagstick user does
-   not exist yet, create it first under Authentication → Users → Add user (e-mail + password, auto-confirm). Re-run
-   the last three `select`s: one tenant `wccc` with hosts `app.wcccmga.org` / `hub.wcccmga.org`, the board linked, you
-   as admin. Everything that exists is now tenant `wccc`; app.wcccmga.org keeps working.
-2. **Supabase → Authentication → Providers → Email**: turn **Confirm email off** (the portal creates board logins by
-   sign-up). Leave everything else.
+   not exist yet, create it first under Authentication → Users → Add user (e-mail + password, auto-confirm). Then run
+   **`portal-setup.sql`** (the client record, contacts, roles and scope, the activity log). Both are safe to re-run.
+   Everything that exists is now tenant `wccc` and its board login is `staff`; app.wcccmga.org keeps working.
+2. **Supabase → Edge Functions → Deploy new function**, name `admin-users`, paste `supabase/functions/admin-users/index.ts`
+   (or `supabase functions deploy admin-users` with the CLI). It uses the project's service role key from the
+   environment; nothing to configure. Without it the portal still works with the fallbacks described in §4.
+2b. **Supabase → Authentication**: Providers → Email → **Confirm email off** (sign-up fallback and invites); URL
+   configuration → Site URL `https://app.flagstickhub.com`, Redirect URLs `https://*.flagstickhub.com/**` and
+   `https://app.wcccmga.org/**` (invite and reset links land on the club's own address).
 3. **DNS for flagstickhub.com**: `@` and `www` → the marketing website's host (not this app). For the app, either
    (a) `CNAME *` → the Render site's `*.onrender.com` host plus the two `_acme-challenge` / `_cf-custom-hostname`
    CNAMEs Render shows when the wildcard is added — Render requires the root domain to point at Render for a
@@ -112,18 +143,18 @@ and RLS enforces the same thing on the tables.
 6. **Move Walnut Creek**: tell the board the new address; when ready, set a redirect on the old site
    (Render → Redirects: `app.wcccmga.org/*` → `https://wccc.flagstickhub.com/*`, 301) or just leave the extra host in
    place. Also set `hub.wcccmga.org` the same way once PR #2 is merged and the two-way sync is off.
-7. **Create the next client** from the portal: name, slug, plan, the first board login; hand over the address and the
-   one-time password. Their hub is live immediately at `<slug>.flagstickhub.com` (with option b, add that host name
+7. **Create the next client** from the portal: name, slug, plan, the first staff login; hand over the address and the
+   one-time password (or let the invite e-mail do it). Their staff then invite their boards from the hub. Their hub is live immediately at `<slug>.flagstickhub.com` (with option b, add that host name
    on Render and a CNAME first).
 
 Optional: `config.js` → `baseDomain` if the product domain ever changes (defaults to `flagstickhub.com`).
 
-## 6. What comes next, in this frame
+## 7. What comes next, in this frame
 
 - **Member billing / POS** as modules: new tables (`member_accounts`, `charges`, `statements`, `payments`,
   `pos_tickets`…) each with `tenant`, each behind `can_tenant()`, each opened by its box; the club hub gains the pages.
-- **Per-user sign-in**: `tenant_users.role` already exists; individual logins for a club are more rows, and visibility
-  rules inside a tenant become policies on role.
+- **Finer roles**: `tenant_users` already carries role, organizations and `manage`; per-page rights inside a hub
+  (treasurer vs. handicap chair) are more columns and policies, not a new model.
 - **Billing Flagstick itself** (subscriptions, invoices per tenant): a `subscriptions` table keyed by tenant, and the
   portal's status/plan driven from it.
 - **Custom domains per client** (`golf.theirclub.com`): already supported through `hosts`; each one is a CNAME on

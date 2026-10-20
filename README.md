@@ -16,8 +16,10 @@ and row, the login card and the picker; printed scorecards, PDFs and the drawing
 in is named in words beneath the mark.
 
 Flagstick serves many clubs from one installation: each client has its own address (`<club>.flagstickhub.com`), its own
-board logins and the modules its subscription turns on (golf management for every client; associations, small groups
-and club management as boxes Flagstick ticks in its portal at app.flagstickhub.com). See `docs/tenancy.md`.
+logins and the modules its subscription turns on. Golf management is the package (everything in this guide); Club
+management, member billing and point of sale are the coming tier, switched on per client in Flagstick's portal at
+app.flagstickhub.com. A club's **staff** logins see the whole club and invite **board** logins for each association from
+the club hub's Logins page; a board login sees its own organization only. See `docs/tenancy.md`.
 
 ## Branches and sites
 

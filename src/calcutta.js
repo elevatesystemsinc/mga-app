@@ -408,7 +408,7 @@ const cashierLink=t=>SITE_BASE+'cashier.html?k='+encodeURIComponent(calc(t).shar
 const newToken=()=>Array.from(crypto.getRandomValues(new Uint8Array(24)),b=>'abcdefghijkmnpqrstuvwxyz23456789'[b%32]).join('');
 /* create, replace or (token null) turn off a shared cashier / check-in row; admin links go through the database function */
 function shareRow(tid,token,name,doc){ return KEYMODE?keyRPC('hub_key_share',{p_tid:tid,p_token:token,p_name:name,p_doc:doc})
-  :token?sb.from('calcutta_share').upsert(trow({tid,token,name,doc,version:1,updated_at:new Date().toISOString()})):tq(sb.from('calcutta_share').update({token:null})).eq('tid',tid); }
+  :token?sb.from('calcutta_share').upsert(trow(Object.assign({tid,token,name,doc,version:1,updated_at:new Date().toISOString()},scopedDB()?{org:ORG_ID}:{}))):tq(sb.from('calcutta_share').update({token:null})).eq('tid',tid); }
 function calcPeople(t){ return (t.field||[]).map(p=>{ const m=memberById(p.memberId); return m?{id:m.id,name:tidyName(memberName(m))}:null; }).filter(Boolean).sort((a,b)=>a.name.localeCompare(b.name)); }
 const SHARE_ST={};
 /* the last cashier copy this device merged with — needed to tell what changed here; kept per device */
