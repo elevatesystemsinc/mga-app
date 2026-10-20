@@ -82,8 +82,8 @@ async def main():
     fdb.admin=True
     c4=await b.new_context(); await cloud(c4,fdb)
     p9,e9=await open_page(c4,'?portal=1',ready="()=>PORTAL_STATE.tenants&&PORTAL_STATE.tenants.length")
-    r=await p9.evaluate("()=>({rows:[...document.querySelectorAll('[data-t]')].map(r=>r.dataset.t), title:document.querySelector('#main h1').textContent, chips:document.querySelectorAll('[data-t=\"wccc\"] .chip').length})")
-    ok=r['rows']==['wccc','pines'] and r['title']=='Clients' and r['chips']==5 and not e9
+    r=await p9.evaluate("()=>({rows:[...document.querySelectorAll('[data-t]')].map(r=>r.dataset.t), title:document.querySelector('#main h1').textContent, chips:document.querySelectorAll('[data-t=\"wccc\"] .chip').length, sync:document.getElementById('syncTxt').textContent})")
+    ok=r['rows']==['wccc','pines'] and r['title']=='Clients' and r['chips']==5 and r['sync']=='Signed in as board@test' and not e9
     print('portal lists the clients with their modules', r, e9, 'OK' if ok else 'FAIL'); bad+=not ok
     await p9.evaluate("""()=>{ document.getElementById('ptNew').click(); document.getElementById('ptN').value='Oak Ridge Golf Club'; document.getElementById('ptS').value='ORGC'; document.getElementById('ptSlug').value='oakridge';
       document.querySelector('#ptPlan [data-v=club]').click(); document.querySelector('[data-mod=groups]').checked=false; document.getElementById('ptLE').value='board@oakridge.org'; document.getElementById('dSave').click(); }""")

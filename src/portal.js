@@ -20,7 +20,7 @@ function portalBoot(){
   $('btnBackup').hidden=true; $('btnRestore').hidden=true;
   if(!TENANCY){ $('main').innerHTML=head('Flagstick portal','')+`<div class="banner">The database has not been prepared for tenants yet — run <b>tenants-setup.sql</b> in the Supabase SQL editor, then reload.</div>`; return; }
   if(!sessionOK){ $('login').classList.add('show'); setTimeout(()=>{ const e=$('loginEmail'); if(e&&!e.value) e.focus(); else $('loginPw').focus(); },100); return; }
-  $('btnSignOut').hidden=false; vPortal($('main')); loadTenants();
+  $('btnSignOut').hidden=false; paintSync('synced'); vPortal($('main')); loadTenants();
 }
 async function loadTenants(){
   PORTAL_STATE.loading=true; PORTAL_STATE.err=null; vPortal($('main'));

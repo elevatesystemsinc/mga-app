@@ -312,7 +312,9 @@ function setSyncD(D,s,err){ D.st=s; D.err=err||null; showSync(); }
 function showSync(){ const ds=openDocs(); const off=ds.find(D=>D.st==='offline'); paintSync(off?'offline':ds.some(D=>D.st==='saving')?'saving':ds.some(D=>D.st==='local')?'local':'synced',off&&off.err); }
 function setSync(s,err){ openDocs().forEach(D=>{ D.st=s; D.err=err||null; }); paintSync(s,err); }
 function paintSync(s,err){
-  const d=$('syncDot'), t=$('syncTxt'); if(!d||!t) return; d.className='dot '+s;
+  const d=$('syncDot'), t=$('syncTxt'); if(!d||!t) return;
+  if(PORTAL){ const on=sessionOK&&ACCESS&&ACCESS.admin; d.className='dot '+(on?'synced':'local'); t.textContent=on?'Signed in as '+(ACCESS.email||'Flagstick admin'):'Not signed in'; return; }   // no documents here: say who is in
+  d.className='dot '+s;
   t.textContent=({synced:'All changes saved',saving:'Saving…',offline:'Not saving to cloud — tap to retry',local:'This device only'}[s]||s)+(t.dataset.upd&&s!=='offline'?` · updated ${t.dataset.upd}`:'');
   if(s==='offline'){ const m=err?(err.message||String(err))+(err.code?' ('+err.code+')':''):'Cloud unreachable';
     if(m!==lastSyncErr) toast('Cloud save failed: '+m); lastSyncErr=m; $('syncErr').textContent=m; $('syncErr').hidden=false; }
