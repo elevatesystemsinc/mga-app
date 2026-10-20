@@ -40,6 +40,8 @@ a{color:#7E5F1A}a:hover{color:#0F2A38}
 .pill{display:flex;flex-direction:column;gap:12px;padding:30px;border-radius:18px;background:#0F2A38;color:#fff;min-height:250px;box-sizing:border-box}
 .pill ul{margin:0;padding:0 0 0 18px;font-size:15px;line-height:1.6;color:#C9CFD2}
 .ck{width:28px;height:28px;border-radius:999px;background:#C7A13A;color:#0F2A38;display:inline-flex;align-items:center;justify-content:center;font-weight:800;font-size:14px;flex:0 0 auto}
+.hcard{background:#fff;border:1px solid #E1D9C6;border-radius:16px;padding:24px;display:flex;flex-direction:column;gap:12px;box-sizing:border-box}
+.hcard .chip{align-self:flex-start}
 .hub{background:#fff;border:1px solid #E1D9C6;border-radius:16px;padding:20px 22px;display:flex;align-items:center;gap:14px}
 .inp{height:48px;border:1px solid #E1D9C6;border-radius:10px;padding:0 12px;font:inherit;font-size:15px;background:#fff;width:100%;box-sizing:border-box}
 label{font-size:13px;font-weight:700;color:#3E4A52}
@@ -163,15 +165,20 @@ label{font-size:13px;font-weight:700;color:#3E4A52}
   </div>
 </section>
 
-<section id="horizon" style="background:#fff;border-top:1px solid #E1D9C6;border-bottom:1px solid #E1D9C6;padding:64px 0">
-  <div class="wrap" style="display:flex;flex-direction:column;gap:22px;align-items:flex-start">
-    <span class="kicker">What’s next</span>
-    <h2 class="serif h2" style="margin:0;font-size:44px;line-height:1.05;color:#0F2A38">Golf today. The whole club next.</h2>
-    <div style="display:flex;gap:10px;flex-wrap:wrap">
-      <span class="chip gold" style="height:38px;font-size:14px;padding:0 16px">Club management</span><span class="chip gold" style="height:38px;font-size:14px;padding:0 16px">Member billing &amp; statements</span><span class="chip gold" style="height:38px;font-size:14px;padding:0 16px">Point of sale</span>
-      <span class="chip" style="height:38px;font-size:14px;padding:0 16px">Handicap posting</span><span class="chip" style="height:38px;font-size:14px;padding:0 16px">Member sign-in</span>
+<section id="horizon" style="background:#fff;border-top:1px solid #E1D9C6;border-bottom:1px solid #E1D9C6;padding:88px 0">
+  <div class="wrap" style="display:flex;flex-direction:column;gap:32px">
+    <div style="display:flex;justify-content:space-between;align-items:flex-end;gap:24px;flex-wrap:wrap">
+      <div style="display:flex;flex-direction:column;gap:12px;max-width:620px"><span class="kicker">What’s next</span><h2 class="serif h2" style="margin:0;font-size:48px;line-height:1.05;color:#0F2A38">Golf today. The whole club next.</h2></div>
+      <p style="margin:0;max-width:420px;font-size:16px;line-height:1.55;color:#3E4A52">Each one arrives as a module you switch on when you are ready — on the same directory and the same logins your staff already use.</p>
     </div>
-    <p style="margin:0;font-size:16px;line-height:1.55;color:#3E4A52;max-width:640px">Club management is on the way: membership, member billing and statements, food &amp; beverage and pro-shop point of sale — modules you switch on when you are ready, on the same directory and the same logins your staff already use.</p>
+    <div class="grid3">
+      <div class="hcard"><span class="chip gold">Coming</span><h3 class="serif" style="margin:0;font-size:27px;color:#0F2A38">Club management</h3><p style="margin:0;font-size:14.5px;line-height:1.55;color:#3E4A52">Run the whole club through Flagstick: membership and member numbers, statements, the club’s operations — one system from the first tee to the front desk.</p></div>
+      <div class="hcard"><span class="chip gold">Coming</span><h3 class="serif" style="margin:0;font-size:27px;color:#0F2A38">Member billing &amp; statements</h3><p style="margin:0;font-size:14.5px;line-height:1.55;color:#3E4A52">Member accounts, charges and monthly statements, with payment collection built in. Dues, entry fees and side pools land on the account instead of in a drawer.</p></div>
+      <div class="hcard"><span class="chip gold">Coming</span><h3 class="serif" style="margin:0;font-size:27px;color:#0F2A38">Point of sale</h3><p style="margin:0;font-size:14.5px;line-height:1.55;color:#3E4A52">Food &amp; beverage and pro-shop sales charged to the member account, with the same minimal training as everything else. The grill knows the member; the statement knows the grill.</p></div>
+      <div class="hcard"><span class="chip">Planned</span><h3 class="serif" style="margin:0;font-size:27px;color:#0F2A38">Handicap posting</h3><p style="margin:0;font-size:14.5px;line-height:1.55;color:#3E4A52">Scores from live rounds posted to the handicap system when the event closes, so nobody keys a card twice and the indexes stay honest.</p></div>
+      <div class="hcard"><span class="chip">Planned</span><h3 class="serif" style="margin:0;font-size:27px;color:#0F2A38">Member sign-in</h3><p style="margin:0;font-size:14.5px;line-height:1.55;color:#3E4A52">Every member with a login of their own: their upcoming events, their results and history, their association and their account, on their phone.</p></div>
+      <div class="hcard" style="background:#0F2A38;border-color:#0F2A38;color:#fff;justify-content:center;align-items:flex-start"><span class="kicker">Have a say</span><h3 class="serif" style="margin:0;font-size:27px">Early clubs shape the roadmap.</h3><p style="margin:0;font-size:14.5px;line-height:1.55;color:#C9CFD2">What we build next comes from the clubs running it today. Tell us what your season needs.</p><a class="btn gold" href="#demo" style="height:46px;padding:0 20px;font-size:15px;margin-top:6px">Talk to us</a></div>
+    </div>
   </div>
 </section>
 
