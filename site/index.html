@@ -23,8 +23,13 @@ a{color:#7E5F1A}a:hover{color:#0F2A38}
 .grid3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:20px}
 .grid4{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px}
 .two{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:56px;align-items:center}
+.hero{grid-template-columns:minmax(0,1.05fr) minmax(0,.95fr)}
 @media (max-width:900px){.grid3,.grid4{grid-template-columns:repeat(2,minmax(0,1fr))}}
-@media (max-width:700px){.grid3,.grid4,.two{grid-template-columns:minmax(0,1fr)}.nav{display:none}.h1{font-size:46px!important}.h2{font-size:36px!important}.quote{font-size:34px!important}.wrap{padding:0 20px}.hero-art{min-height:420px!important}}
+@media (max-width:700px){.grid3,.grid4,.two,.hero{grid-template-columns:minmax(0,1fr)}.two{gap:36px}.nav{display:none!important}.h1{font-size:50px!important}#demoForm>div{grid-template-columns:minmax(0,1fr)!important}html,body{overflow-x:hidden}.h2{font-size:36px!important}.quote{font-size:34px!important}.wrap{padding:0 20px}
+  .hero-art{min-height:0!important}.hero-art>div:first-child{position:static!important;max-width:none!important}.hero-art>div:last-child{display:none}
+  .hub{padding:14px 16px}.hub b{font-size:19px!important}.hub[style*="margin-left:40px"]{margin-left:16px!important}.hub[style*="margin-left:80px"]{margin-left:32px!important}
+  header .wrap{height:64px}header .btn{height:38px!important;padding:0 14px!important;font-size:14px!important}.kicker{letter-spacing:.16em}
+  .btn{height:50px}.pill{min-height:0}section{padding-top:56px!important;padding-bottom:56px!important}}
 .chip{display:inline-flex;align-items:center;height:30px;padding:0 13px;border-radius:999px;font-size:13px;font-weight:700;border:1px solid #E1D9C6;background:#fff;color:#0F2A38;white-space:nowrap}
 .chip.gold{background:#F6ECCF;border-color:#E5CF8E;color:#6B4F12}
 .chip.live{color:#1F6B4A;border-color:#BCD9C7;background:#E3F0E8}
@@ -53,7 +58,7 @@ label{font-size:13px;font-weight:700;color:#3E4A52}
 </header>
 
 <section style="background:#0F2A38;color:#fff;padding:84px 0 96px;background-image:radial-gradient(1100px 520px at 88% 10%, rgba(199,161,58,.16), rgba(15,42,56,0) 60%)">
-  <div class="wrap two" style="grid-template-columns:minmax(0,1.05fr) minmax(0,.95fr)">
+  <div class="wrap two hero">
     <div style="display:flex;flex-direction:column;gap:26px">
       <span class="kicker">Golf management for private clubs</span>
       <h1 class="serif h1" style="margin:0;font-size:76px;line-height:.98;font-weight:700;color:#fff">Every event.<br>One system.<br><span style="color:#D8B75F">Zero training.</span></h1>
