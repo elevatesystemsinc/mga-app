@@ -21,6 +21,14 @@ async def main():
       for tb in tabs: await pg.evaluate(f"()=>{{ view.ttab='{tb}'; render(); }}"); await pg.wait_for_timeout(60)
       brand=await pg.evaluate("()=>[document.getElementById('brandName').textContent, isClub(), db.id]")
       print(f'{org:5} pages {pages} tabs {len(tabs)} brand {brand} errors {errs}'); bad+=bool(errs)
+      # a reload (pull-to-refresh, the auto-update) comes back to the same page, tab and record
+      await pg.evaluate("()=>{ go('tournament',{tid:'T1'}); view.ttab='field'; render(); }"); await pg.reload(); await pg.wait_for_timeout(700)
+      r=await pg.evaluate("()=>[view.page,view.tid,view.ttab,!!document.querySelector('.crumb')]")
+      ok=r==['tournament','T1','field',True]; print(f'{org:5} reload keeps the place', r, 'OK' if ok else 'FAIL'); bad+=not ok
+      # …but not a record that no longer exists
+      await pg.evaluate("()=>{ localStorage.setItem(VIEW_KEY(),JSON.stringify(Object.assign({},view,{tid:'gone',_at:Date.now()}))); }"); await pg.reload(); await pg.wait_for_timeout(700)
+      r=await pg.evaluate("()=>view.page"); ok=r=='tournaments'; print(f'{org:5} reload with a missing record falls back', r, 'OK' if ok else 'FAIL'); bad+=not ok
+      await pg.evaluate("()=>go('tournament',{tid:'T1'})")
       if org=='mga':
         # rounds → scoring events from the field → combined results; tab toggles
         r=await pg.evaluate("""async()=>{ const t=db.tournaments.find(x=>x.id==='T1'); t.teamSize=2; t.days=2; t.startDate='2026-10-03';

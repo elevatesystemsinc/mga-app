@@ -1111,7 +1111,20 @@ function render(){
   renderInner();
   if(keep){ const n=document.getElementById(keep.id); if(n){ if(n.value!==keep.v&&n.tagName!=='SELECT') n.value=keep.v; n.focus({preventScroll:true}); try{ n.setSelectionRange(keep.s,keep.e); }catch(_){} } }
   if(Math.abs(window.scrollY-sy)>2) window.scrollTo(0,sy);
+  if(restoreY!==null&&db){ const y=restoreY; restoreY=null; requestAnimationFrame(()=>window.scrollTo(0,y)); }   // first render with the document open
+  rememberView();
 }
+/* ---------- where you are survives a reload (pull-to-refresh, the auto-update, a crash) ----------
+   The view state is kept per organization on this device; the next load of the same hub opens the same page, tab and
+   record, and every screen already falls back when its record is gone (vTournament → tournaments, vGames → the list…). */
+const VIEW_KEY=()=>'hub_view_'+(ORG_ID||'club');
+let viewRestored=false, restoreY=null;
+function rememberView(){ if(!db||PORTAL||view.page==='pick'||!viewRestored) return;
+  try{ localStorage.setItem(VIEW_KEY(),JSON.stringify(Object.assign({},view,{_at:Date.now(),_y:window.scrollY}))); }catch(_){ } }
+function restoreView(){ viewRestored=true;
+  try{ const v=JSON.parse(localStorage.getItem(VIEW_KEY())||'null'); if(!v||Date.now()-(v._at||0)>36e5*36) return;
+    restoreY=v._y>0?v._y:null; delete v._at; delete v._y; Object.assign(view,v);
+  }catch(_){ } }
 function renderInner(){
   if(PORTAL){ if(sessionOK&&TENANCY&&typeof vPortal==='function') vPortal($('main')); return; }
   if(TENANCY&&!TENANT){ vNoTenant($('main')); return; }
@@ -2061,7 +2074,7 @@ async function doLogin(){
   startCloud();
 }
 async function boot(){
-  wireChrome(); render();
+  wireChrome(); restoreView(); render();
   if(!CLOUD){ setSync('local'); return; }
   $('loginBtn').onclick=doLogin; $('loginPw').onkeydown=e=>{ if(e.key==='Enter') doLogin(); }; const le=$('loginEmail'); if(le) le.onkeydown=e=>{ if(e.key==='Enter') $('loginPw').focus(); };
   await resolveTenant(); paintLogin();
@@ -6911,7 +6924,7 @@ async function resultsPDF(t,opt){
 /* Keeps every open device on the latest version: checks version.json about once a minute and, when a
    newer build is live, reloads at a safe moment (nothing unsaved, no editor open, not mid-typing). */
 (function(){
-  const ME='20261022213402'; let ready=false, lastCheck=0;
+  const ME='20261022234116'; let ready=false, lastCheck=0;
   const typing=()=>{ const a=document.activeElement; return a&&/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)&&a.value&&a.type!=='search'; };
   const safe=()=>!typing()&&(typeof window.__canReload!=='function'||window.__canReload());
   async function check(){ lastCheck=Date.now(); if(location.protocol==='file:') return;
