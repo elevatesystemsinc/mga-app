@@ -1,0 +1,156 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0F2A38">
+<meta name="robots" content="noindex">
+<title>Survey · Flagstick</title>
+<link rel="icon" href="favicon.png?v=3">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@600;700&family=Public+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script src="config.js"></script>
+<style>
+:root{--navy:#0F2A38;--gold:#C7A13A;--goldl:#D8B75F;--golddk:#7E5F1A;--paper:#F4F0E6;--ivory:#FBFAF5;--line:#E3DCC9;--muted:#56626A;--ink:#14222B;--pos:#1F6B4A;--neg:#B5443A;
+  --serif:'Cormorant Garamond',Georgia,serif;--sans:'Public Sans',system-ui,-apple-system,'Segoe UI',sans-serif}
+*{box-sizing:border-box} html,body{margin:0} [hidden]{display:none!important}
+body{font-family:var(--sans);background:var(--paper);color:var(--ink);font-size:16px;line-height:1.4;-webkit-font-smoothing:antialiased;font-variant-numeric:lining-nums}
+button,input,textarea{font:inherit;color:inherit} button{cursor:pointer}
+.top{background:radial-gradient(circle at 10% 40%,#1B3D50,var(--navy) 65%);color:#fff;padding:calc(14px + env(safe-area-inset-top,0px)) 18px 14px;display:flex;align-items:center;gap:14px;border-bottom:4px solid var(--gold)}
+.top img{width:44px;height:44px;object-fit:contain}
+.top .t{flex:1;min-width:0} .top b{display:block;font-family:var(--serif);font-size:24px;line-height:1.05;white-space:nowrap;overflow:hidden;text-overflow:ellipsis} .top small{color:#C9CFD2;font-size:12.5px;display:block;margin-top:2px}
+main{max-width:720px;margin:0 auto;padding:16px 14px 90px}
+.card{background:#fff;border:1px solid var(--line);border-radius:14px;padding:18px 18px 16px;margin-bottom:14px}
+.intro h1{font-family:var(--serif);font-size:30px;line-height:1.05;margin:0 0 8px;color:var(--navy)}
+.intro p{margin:0;color:#2B3940}
+.anon{display:flex;gap:10px;align-items:flex-start;background:var(--ivory);border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin-top:14px;font-size:13.5px;color:#3A4950}
+.anon svg{width:20px;height:20px;flex:none;color:var(--golddk);margin-top:1px}
+.sec{margin:26px 0 10px} .sec h2{font-family:var(--serif);font-size:26px;margin:0;color:var(--navy);line-height:1.05} .sec p{margin:4px 0 0;color:var(--muted);font-size:14px}
+.q{margin-bottom:12px} .q .qt{font-weight:600;font-size:16px;display:flex;gap:10px} .q .qt .n{color:var(--muted);font-weight:700;font-size:13px;margin-top:3px;min-width:18px}
+.q .help{margin:4px 0 0 28px;font-size:13px;color:var(--muted)}
+.ans{margin:12px 0 0 28px}
+.scale{display:grid;grid-template-columns:repeat(11,1fr);gap:4px}
+.scale button{height:40px;border-radius:8px;border:1.5px solid #CFC6AE;background:#fff;font-weight:700;font-size:14px;padding:0;color:var(--ink)}
+.scale button.on{background:var(--navy);border-color:var(--navy);color:#fff}
+.ends{display:flex;justify-content:space-between;font-size:11.5px;color:var(--muted);margin-top:5px;font-weight:600}
+.opts{display:flex;flex-wrap:wrap;gap:8px}
+.opts button{min-height:40px;padding:8px 14px;border-radius:999px;border:1.5px solid #CFC6AE;background:#fff;font-weight:600;font-size:14px;text-align:left}
+.opts button.on{background:var(--navy);border-color:var(--navy);color:#fff}
+.yn{display:grid;grid-template-columns:1fr 1fr;gap:8px;max-width:320px} .yn button{height:46px;border-radius:10px;border:1.5px solid #CFC6AE;background:#fff;font-weight:700;font-size:15px} .yn button.on{background:var(--navy);border-color:var(--navy);color:#fff}
+textarea{width:100%;min-height:84px;border:1.5px solid #CFC6AE;border-radius:10px;padding:10px 12px;background:#fff;font-size:15px;resize:vertical}
+textarea:focus{outline:none;border-color:var(--gold);box-shadow:0 0 0 3px rgba(199,161,58,.2)}
+.sl{padding:6px 0 0}
+.sl input{width:100%;height:36px;margin:0;-webkit-appearance:none;appearance:none;background:transparent}
+.sl input::-webkit-slider-runnable-track{height:10px;border-radius:999px;background:linear-gradient(90deg,var(--navy),#E1D9C6 50%,var(--gold))}
+.sl input::-moz-range-track{height:10px;border-radius:999px;background:linear-gradient(90deg,var(--navy),#E1D9C6 50%,var(--gold))}
+.sl input::-webkit-slider-thumb{-webkit-appearance:none;width:30px;height:30px;border-radius:999px;background:#fff;border:3px solid var(--navy);margin-top:-10px;box-shadow:0 1px 4px rgba(0,0,0,.25)}
+.sl input::-moz-range-thumb{width:24px;height:24px;border-radius:999px;background:#fff;border:3px solid var(--navy);box-shadow:0 1px 4px rgba(0,0,0,.25)}
+.sl.idle input::-webkit-slider-thumb{border-color:#CFC6AE;border-style:dashed} .sl.idle input::-moz-range-thumb{border-color:#CFC6AE;border-style:dashed}
+.sl .lab{display:flex;justify-content:space-between;font-size:13px;font-weight:700;color:var(--navy);margin-top:2px} .sl .lab span:last-child{color:var(--golddk)}
+.sl .cap{text-align:center;font-size:13px;color:var(--muted);margin-top:6px;min-height:18px}
+.cm{margin-top:10px} .cm summary{cursor:pointer;font-size:13.5px;font-weight:600;color:var(--golddk);list-style:none} .cm summary::-webkit-details-marker{display:none} .cm summary::before{content:'+ '} .cm[open] summary::before{content:'– '}
+.cm textarea{margin-top:8px;min-height:70px}
+.secc{margin-top:4px} .secc .qt{font-weight:600}
+.send{position:fixed;left:0;right:0;bottom:0;background:rgba(244,240,230,.94);backdrop-filter:blur(8px);border-top:1px solid var(--line);padding:12px 14px calc(12px + env(safe-area-inset-bottom,0px))}
+.send .in{max-width:720px;margin:0 auto;display:flex;gap:12px;align-items:center}
+.send small{flex:1;color:var(--muted);font-size:12.5px} .send button{height:50px;padding:0 24px;border-radius:12px;border:none;background:var(--navy);color:#fff;font-weight:800;font-size:16px} .send button:disabled{opacity:.6}
+.done{text-align:center;padding:40px 18px} .done .ok{width:70px;height:70px;border-radius:999px;background:#E3F0E8;color:var(--pos);display:inline-flex;align-items:center;justify-content:center;margin-bottom:14px}
+.done h1{font-family:var(--serif);font-size:32px;margin:0 0 8px;color:var(--navy)} .done p{color:var(--muted);margin:0 0 18px}
+.done .again{background:none;border:none;color:var(--muted);font-size:13px;text-decoration:underline}
+.toast{position:fixed;left:50%;bottom:90px;transform:translateX(-50%);background:var(--navy);color:#fff;padding:12px 18px;border-radius:10px;font-weight:600;z-index:60;box-shadow:0 6px 20px rgba(0,0,0,.25);max-width:92vw;text-align:center}
+.pv{background:#F6ECCF;border:1px solid #E5CF8E;color:#5C4410;border-radius:10px;padding:10px 14px;font-size:13.5px;margin-bottom:14px}
+.fs{display:flex;align-items:center;justify-content:center;gap:8px;margin-top:30px;color:var(--muted);font-size:11px;letter-spacing:.14em;text-transform:uppercase;font-weight:800} .fs img{width:18px;height:18px}
+@media (max-width:400px){ .scale{gap:3px} .scale button{height:36px;font-size:13px;border-radius:6px} .intro h1{font-size:27px} }
+</style>
+</head>
+<body>
+<header class="top"><img src="flagstick-crest-light.svg" alt="Flagstick"><div class="t"><b id="hTitle">Survey</b><small id="hSub">Member survey</small></div></header>
+<main id="main"><div class="card"><p style="color:var(--muted);margin:0">Loading…</p></div></main>
+<script>
+const $=id=>document.getElementById(id);
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const CFG=window.MM_CONFIG||{}; const sb=(CFG.url&&CFG.anonKey&&window.supabase)?window.supabase.createClient(CFG.url,CFG.anonKey,{auth:{persistSession:false}}):null;
+const Q=new URLSearchParams(location.search), TOKEN=(Q.get('k')||'').trim(), PREVIEW=(Q.get('preview')||'').trim();
+const DONE_KEY='survey_done_'+(TOKEN||PREVIEW);
+let S=null, A={}, sending=false;
+function toast(m){ const d=document.createElement('div'); d.className='toast'; d.textContent=m; document.body.appendChild(d); setTimeout(()=>d.remove(),2600); }
+const ls={get(k){ try{ return localStorage.getItem(k); }catch(_){ return null; } },set(k,v){ try{ localStorage.setItem(k,v); }catch(_){ } },del(k){ try{ localStorage.removeItem(k); }catch(_){ } }};
+function msg(title,text){ $('main').innerHTML=`<div class="card"><b style="font-family:var(--serif);font-size:24px;color:var(--navy)">${esc(title)}</b><p style="color:var(--muted);margin:8px 0 0">${esc(text)}</p></div>`; }
+async function load(){
+  if(PREVIEW){ try{ S=JSON.parse(ls.get('survey_preview_'+PREVIEW)||'null'); }catch(_){ S=null; } if(!S) return msg('Nothing to preview','Open the preview from the hub again.'); return render(); }
+  if(!TOKEN) return msg('This link is not complete','Ask for the survey link again.');
+  if(!sb) return msg('Not connected','The survey is not available right now.');
+  const {data,error}=await sb.rpc('survey_get',{p_token:TOKEN});
+  if(error||!data||!data.doc) return msg('This survey link is not valid','It may have been turned off. Ask the board for a new link.');
+  S=data.doc; S.status=data.status;
+  if(S.status!=='open') return closedScreen();
+  if(ls.get(DONE_KEY)) return doneScreen(true);
+  render();
+}
+function closedScreen(){ header(); $('main').innerHTML=`<div class="card done"><h1>This survey has closed</h1><p>Thank you to everyone who answered. The board is reading the results.</p></div>`; }
+function header(){ $('hTitle').textContent=S.orgName||S.org||'Survey'; $('hSub').textContent=(S.club?S.club+' · ':'')+'Member survey'; document.title=(S.title||'Survey')+' · '+(S.orgName||'Flagstick'); }
+const shield='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l8 3v6c0 5-3.5 8.5-8 9-4.5-.5-8-4-8-9V6z"/><path d="M9 12l2 2 4-4"/></svg>';
+function render(){
+  header(); let n=0;
+  const q=(sec,qq)=>{ n++; let ans='';
+    if(qq.type==='rating') ans=`<div class="scale" data-q="${qq.id}">${Array.from({length:11},(_,i)=>`<button type="button" data-v="${i}" class="${A[qq.id]===i?'on':''}">${i}</button>`).join('')}</div><div class="ends"><span>0 · poor</span><span>10 · excellent</span></div>`;
+    else if(qq.type==='slider'){ const v=A[qq.id]; ans=`<div class="sl ${v===undefined?'idle':''}" data-q="${qq.id}"><input type="range" min="0" max="10" step="1" value="${v===undefined?5:v}" aria-label="${esc(qq.left)} to ${esc(qq.right)}"><div class="lab"><span>${esc(qq.left)}</span><span>${esc(qq.right)}</span></div><div class="cap">${slCap(qq,v)}</div></div>`; }
+    else if(qq.type==='choice'||qq.type==='multi'){ const cur=A[qq.id]; ans=`<div class="opts" data-q="${qq.id}" data-k="${qq.type}">${(qq.options||[]).map(o=>`<button type="button" data-v="${esc(o)}" class="${qq.type==='multi'?(Array.isArray(cur)&&cur.includes(o)?'on':''):(cur===o?'on':'')}">${esc(o)}</button>`).join('')}</div>${qq.type==='multi'?'<div class="ends"><span>Pick any that apply</span></div>':''}`; }
+    else if(qq.type==='yesno') ans=`<div class="yn" data-q="${qq.id}" data-k="choice">${['Yes','No'].map(o=>`<button type="button" data-v="${o}" class="${A[qq.id]===o?'on':''}">${o}</button>`).join('')}</div>`;
+    else ans=`<textarea data-t="${qq.id}" placeholder="Your answer">${esc(A[qq.id]||'')}</textarea>`;
+    const cm=qq.comment&&qq.type!=='text'?`<details class="cm"${A[qq.id+':c']?' open':''}><summary>Add a comment</summary><textarea data-t="${qq.id}:c" placeholder="Anything you want the board to know about this">${esc(A[qq.id+':c']||'')}</textarea></details>`:'';
+    return `<div class="card q"><div class="qt"><span class="n">${n}</span><span>${esc(qq.text)}</span></div>${qq.help?`<p class="help">${esc(qq.help)}</p>`:''}<div class="ans">${ans}${cm}</div></div>`; };
+  $('main').innerHTML=(PREVIEW?'<div class="pv"><b>Preview.</b> This is what members see. Answers here are not sent.</div>':'')+
+    `<div class="card intro"><h1>${esc(S.title)}</h1>${S.intro?`<p>${esc(S.intro)}</p>`:''}<div class="anon">${shield}<span><b>Anonymous.</b> We don't ask who you are and nothing about you or your phone is recorded — only your answers. Skip anything you like.</span></div></div>`+
+    (S.sections||[]).map(sec=>`<div class="sec"><h2>${esc(sec.title)}</h2>${sec.intro?`<p>${esc(sec.intro)}</p>`:''}</div>${(sec.questions||[]).map(qq=>q(sec,qq)).join('')}
+      ${sec.comments?`<div class="card q secc"><div class="qt">Suggestions or comments on ${esc(sec.title.toLowerCase())}</div><div class="ans" style="margin-left:0"><textarea data-t="sec:${sec.id}" placeholder="Anything else the board should hear about this">${esc(A['sec:'+sec.id]||'')}</textarea></div></div>`:''}`).join('')+
+    `<div class="fs"><img src="flagstick-crest.svg" alt="">Flagstick</div>
+    <div class="send"><div class="in"><small id="cnt"></small><button id="go" type="button">${PREVIEW?'Preview only':'Send my answers'}</button></div></div>`;
+  wire(); count();
+}
+function slCap(qq,v){ if(v===undefined) return 'Slide to answer — or skip it'; if(v===5) return 'Either one, evenly'; const t=v<5?qq.left:qq.right, d=Math.abs(v-5); return (d>=5?'All the way to ':d>=3?'Strongly toward ':'Leaning toward ')+t.toLowerCase(); }
+function count(){ const n=Object.keys(A).filter(k=>!k.includes(':')&&!k.startsWith('sec:')).filter(k=>{ const v=A[k]; return v!==undefined&&v!==''&&!(Array.isArray(v)&&!v.length); }).length; const total=(S.sections||[]).reduce((a,s)=>a+(s.questions||[]).length,0); $('cnt').textContent=n?`${n} answered of ${total} — send whenever you're ready`:`${total} questions, about five minutes`; }
+function wire(){
+  document.querySelectorAll('.scale').forEach(el=>el.querySelectorAll('button').forEach(b=>b.onclick=()=>{ const v=+b.dataset.v; const was=A[el.dataset.q]===v; if(was) delete A[el.dataset.q]; else A[el.dataset.q]=v; el.querySelectorAll('button').forEach(x=>x.classList.toggle('on',!was&&x===b)); count(); }));
+  document.querySelectorAll('.opts,.yn').forEach(el=>el.querySelectorAll('button').forEach(b=>b.onclick=()=>{ const id=el.dataset.q, v=b.dataset.v;
+    if(el.dataset.k==='multi'){ const cur=Array.isArray(A[id])?A[id].slice():[]; const i=cur.indexOf(v); if(i>=0) cur.splice(i,1); else cur.push(v); if(cur.length) A[id]=cur; else delete A[id]; b.classList.toggle('on',i<0); }
+    else { const was=A[id]===v; if(was) delete A[id]; else A[id]=v; el.querySelectorAll('button').forEach(x=>x.classList.toggle('on',!was&&x===b)); } count(); }));
+  document.querySelectorAll('.sl').forEach(el=>{ const inp=el.querySelector('input'), qq=findQ(el.dataset.q); const set=()=>{ A[el.dataset.q]=+inp.value; el.classList.remove('idle'); el.querySelector('.cap').textContent=slCap(qq,+inp.value); count(); }; inp.oninput=set; inp.onchange=set; });
+  document.querySelectorAll('textarea[data-t]').forEach(t=>t.oninput=()=>{ const v=t.value.trim(); if(v) A[t.dataset.t]=t.value; else delete A[t.dataset.t]; count(); });
+  $('go').onclick=send;
+}
+function findQ(id){ for(const s of S.sections||[]) for(const q of s.questions||[]) if(q.id===id) return q; return {left:'',right:''}; }
+async function send(){
+  if(PREVIEW){ toast('Preview only — nothing is sent'); return; }
+  const answers={}; for(const k in A){ const v=A[k]; if(v===undefined||v===''||(Array.isArray(v)&&!v.length)) continue; answers[k]=typeof v==='string'?v.trim().slice(0,4000):v; }
+  if(!Object.keys(answers).length){ toast('Answer at least one question first'); return; }
+  if(sending) return; sending=true; $('go').disabled=true; $('go').textContent='Sending…';
+  const {error}=await sb.rpc('survey_submit',{p_token:TOKEN,p_answers:answers});
+  sending=false; $('go').disabled=false; $('go').textContent='Send my answers';
+  if(error){ if(/closed/i.test(error.message)){ S.status='closed'; return closedScreen(); } toast('Could not send — check your connection and try again'); return; }
+  ls.set(DONE_KEY,new Date().toISOString().slice(0,10)); A={}; doneScreen(false);
+}
+function doneScreen(returning){ header();
+  $('main').innerHTML=`<div class="card done"><div class="ok"><svg viewBox="0 0 24 24" width="34" height="34" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5L20 7"/></svg></div>
+    <h1>${returning?'You already answered':'Thank you'}</h1><p>${returning?'This phone has sent a response to this survey.':'Your answers are in — anonymously. The board reads every one.'}</p>
+    <button class="again" id="again">Someone else on this phone? Start a new response</button></div>`;
+  $('again').onclick=()=>{ ls.del(DONE_KEY); A={}; render(); window.scrollTo(0,0); };
+}
+load();
+/* Keeps every open device on the latest version: checks version.json about once a minute and, when a
+   newer build is live, reloads at a safe moment (nothing unsaved, no editor open, not mid-typing). */
+(function(){
+  const ME='20261022212438'; let ready=false, lastCheck=0;
+  const typing=()=>{ const a=document.activeElement; return a&&/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)&&a.value&&a.type!=='search'; };
+  const safe=()=>!typing()&&(typeof window.__canReload!=='function'||window.__canReload());
+  async function check(){ lastCheck=Date.now(); if(location.protocol==='file:') return;
+    try{ const r=await fetch('version.json?t='+Date.now(),{cache:'no-store'}); if(!r.ok) return; const v=await r.json(); if(v&&v.build&&v.build!==ME) ready=true; }catch(_){} }
+  setInterval(()=>{ if(ready){ if(safe()) location.reload(); } else if(Date.now()-lastCheck>60000) check(); },3000);
+  document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='visible') check(); });
+  window.__build=ME;
+})();
+</script>
+</body>
+</html>

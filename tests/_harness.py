@@ -96,7 +96,33 @@ class FakeDB:
             rows=self._rows('golf_scores'); rows[:]=[r for r in rows if not(r['event_id']==a['p_event'] and r['player_id']==a['p_player'] and r['hole']==a['p_hole'])]
             if a.get('p_strokes'): rows.append({'event_id':a['p_event'],'player_id':a['p_player'],'hole':a['p_hole'],'strokes':a['p_strokes']})
             return json.dumps({'data':True,'error':None})
+        # survey-setup.sql: the public survey page's two functions (anonymous: answers + the day only)
+        if fn=='survey_get':
+            r=next((r for r in self._rows('survey_share') if r.get('token') and r['token']==a.get('p_token')),None)
+            return json.dumps({'data':({'sid':r['sid'],'status':r.get('status','draft'),'doc':copy.deepcopy(r['doc'])} if r else None),'error':None})
+        if fn=='survey_submit':
+            r=next((r for r in self._rows('survey_share') if r.get('token') and r['token']==a.get('p_token')),None)
+            if not r: return json.dumps({'data':None,'error':{'message':'Invalid link','code':'P0001'}})
+            if r.get('status')!='open': return json.dumps({'data':None,'error':{'message':'closed','code':'P0001'}})
+            ans=a.get('p_answers')
+            if not isinstance(ans,dict) or not ans: return json.dumps({'data':None,'error':{'message':'Nothing to send','code':'P0001'}})
+            self._rows('survey_responses').append({'id':str(uuid.uuid4()),'tenant':r.get('tenant','wccc'),'org':r['org'],'sid':r['sid'],'answers':copy.deepcopy(ans),'day':datetime.date.today().isoformat()})
+            return json.dumps({'data':True,'error':None})
         org=self._key_org(a.get('p_key')); tn=self._key_tenant(a.get('p_key'))
+        if fn=='hub_key_survey':
+            if org is None: return err('invalid key')
+            rows=self._rows('survey_share')
+            if a.get('p_doc') is None:
+                rows[:]=[r for r in rows if not(r['sid']==a['p_sid'] and r['org']==org)]; rr=self._rows('survey_responses'); rr[:]=[r for r in rr if not(r['sid']==a['p_sid'] and r['org']==org)]; return json.dumps({'data':True,'error':None})
+            old=next((r for r in rows if r['sid']==a['p_sid']),None)
+            if old and old['org']!=org: return err('not allowed')
+            row={'sid':a['p_sid'],'tenant':tn,'org':org,'token':a.get('p_token'),'status':a.get('p_status') or 'draft','doc':copy.deepcopy(a['p_doc'])}
+            if old: old.update(row)
+            else: rows.append(row)
+            return json.dumps({'data':True,'error':None})
+        if fn=='hub_key_survey_results':
+            if org is None: return err('invalid key')
+            return json.dumps({'data':[{'answers':copy.deepcopy(r['answers']),'day':r['day']} for r in self._rows('survey_responses') if r['sid']==a['p_sid'] and r['org']==org],'error':None})
         if org is None: return err('invalid key')
         if fn=='hub_key_read':
             pid=a['p_id']; self.reads+=1
@@ -160,7 +186,7 @@ class FakeDB:
             rows=self._rows(t); hits=[r for r in rows if self._col_match(r,a['filters'])]
             if op=='select': return json.dumps({'data':(copy.deepcopy(hits[0]) if hits else None) if a['single'] else copy.deepcopy(hits),'error':None})
             if op=='upsert':
-                row=dict(a['payload']); key=('user_id','tenant') if 'user_id' in row and 'tenant' in row else ('user_id',) if 'user_id' in row else ('slug',) if 'slug' in row else ('id',)
+                row=dict(a['payload']); key=('user_id','tenant') if 'user_id' in row and 'tenant' in row else ('user_id',) if 'user_id' in row else ('slug',) if 'slug' in row else ('sid',) if 'sid' in row else ('id',)
                 old=next((r for r in rows if all(r.get(k)==row.get(k) for k in key)),None)
                 if old: old.update(copy.deepcopy(row))
                 else: row.setdefault('created_at',datetime.datetime.utcnow().isoformat()+'Z'); rows.append(copy.deepcopy(row))

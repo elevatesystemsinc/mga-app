@@ -21,6 +21,16 @@ management, member billing and point of sale are the coming tier, switched on pe
 app.flagstickhub.com. A club's **staff** logins see the whole club and invite **board** logins for each association from
 the club hub's Logins page; a board login sees its own organization only. See `docs/tenancy.md`.
 
+## Surveys
+
+Every hub has a **Surveys** page. Build a survey in sections (Thursday nights, weekend tournaments, membership…) with 0–10
+ratings, trade-off sliders (better food ↔ higher payouts), pick-one / pick-any questions, yes/no and written answers, with
+a comment box under any question and a suggestions box at the end of each section. *From the member survey template* gives
+you the full season-review survey in one click. **Open the survey** creates the private link to send out; members answer
+on their phones with no sign-in. Surveys are **anonymous**: nothing about who answered is asked or stored, only the answers
+and the day. The Results tab shows averages, distributions, how the sliders lean, option counts and every comment, with a
+CSV export. Close the survey when you are done; the link then says so.
+
 ## Branches and sites
 
 - `main` → **app.wcccmga.org** — the club hub, the product going forward. The club is at `/`; each organization has its

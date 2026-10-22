@@ -59,11 +59,13 @@ src/
   checkin.js           Check-in tab + registration link
   raffle.js            50/50 Drawing tab, drawing screen, official record PDF
   payouts.js           Calcutta payouts math (calcPayouts, ties) + Results / Payouts sub-tabs
+  surveys.js           Surveys: anonymous member surveys (sections → questions, public link, results, CSV)
   autoupdate.js        version.json polling + safe reload (__BUILD__ placeholder)                     [shared]
   cashier_src.html     cashier page   (markers /*CALCCORE*/ /*AUTOUPDATE*/)
   checkin_src.html     check-in page  (markers /*CKCORE*/  /*AUTOUPDATE*/)
   score_src.html       live scoring   (markers /*GOLFCORE*/ /*AUTOUPDATE*/)
-build.sh               → index.html, cashier.html, checkin.html, score.html, version.json (repo root)
+  survey_src.html      public survey page (marker /*AUTOUPDATE*/ only)
+build.sh               → index.html, cashier.html, checkin.html, score.html, survey.html, version.json (repo root)
 ```
 `index.html` = `head.html` + one `<script>` of the modules **in the order listed in `build.sh`** + `boot();`.
 Everything shares one global scope (no modules/imports) — later files may call earlier files' functions, and
@@ -84,6 +86,7 @@ python3 tests/test_payouts.py # Calcutta tie-splitting / owner payouts end to en
 python3 tests/test_sync.py    # migration + two devices on a shared fake database (see §3)
 python3 tests/test_score.py   # the public scoring page against the fake: mid-round changes reach open phones/boards
 python3 tests/test_tenants.py # tenants, the portal, staff / board logins and scope, invite links — against the fake
+python3 tests/test_survey.py  # a survey from the template → public link → anonymous answers → results, against the fake
 git add -A && git commit && git push origin main  # Render deploys main to app.wcccmga.org
 ```
 Tests need `pip install playwright && playwright install chromium` and `cd tests && npm i xlsx@0.18.5`.
@@ -272,6 +275,7 @@ Tournament = { id, name, season, days, startDate, field:[{id,memberId,team,paid,
 | `mga_hub` (tenant, id, data jsonb) | one row per organization per tenant: `club`, `mga`, `lga`, `smga`, `<group id>` — plus `main`, the MGA Hub's row (two-way synced with `mga`), and `sync:<org>`, the sync base. `hub-setup.sql`, `hub-fix-permissions.sql` |
 | `calcutta_share` (tid, token, name, doc, version) + RPC `calcutta_get(p_token)`, `calcutta_put(p_token,p_doc,p_version)` | token links for people without the board login: the **cashier** page (tid = tournament id) and the **registration/check-in** page (tid = tournament id + `:checkin`). `calcutta_put` is version-checked (conflict → retry). `calcutta-setup.sql` |
 | `golf_events`, `golf_scores` + RPC `golf_event`, `golf_join`, `golf_submit` | public live scoring (`golf-setup.sql`). `public.org` names the owning organization. |
+| `survey_share` (sid, tenant, org, token, status, doc), `survey_responses` (id, tenant, org, sid, answers, day) + RPC `survey_get(p_token)`, `survey_submit(p_token,p_answers)`, `hub_key_survey`, `hub_key_survey_results` | surveys (`survey-setup.sql`): the share row is what the public page shows; a response is answers + the **day** only — no user, e-mail, IP or device, ever. |
 | `hub_keys` (org_id, key_hash, label, revoked_at) + RPC `hub_key_org/read/write/people/golf_event/golf_delete/score/share` | admin links (`admin-links-setup.sql`): security-definer functions that act for exactly one organization. |
 | `mm_tournament` | the retired Member-Member app's row (`supabase-setup.sql`). Archive only — no hub code reads or writes it. |
 
@@ -395,6 +399,19 @@ Don't weaken any of this (no `Math.random` for picks, no silent redraws, no edit
 Alphabetical, searchable (own name first; partner only if nobody matches; number = team). Registration link for
 the two people at the table. The user wants this **simple** — don't add features to it unasked.
 
+### Surveys (`surveys.js`, `survey_src.html` → `survey.html?k=TOKEN`, `survey-setup.sql`)
+Any organization's hub (and the club) has **Surveys**: `db.surveys = [{id, title, intro, status:'draft'|'open'|'closed', token,
+sections:[{id, title, intro, comments (an open box at the end), questions:[{id, type:'rating'|'slider'|'choice'|'multi'|'yesno'|'text',
+text, help, options, left, right, comment (a comment box under the question)}]}]}]`. Opening a survey mints `token` and writes
+`surveyPub(s)` (questions only) to `survey_share`; every later edit while open republishes (`pushSurvey`). Members answer on
+`survey.html` without a sign-in; `survey_submit` stores answers + the day. **100% anonymous — the owner's requirement:** no
+name/e-mail/sign-in asked, nothing about the sender or device stored, times cut to the day, the hub only ever shows aggregates
+and the text answers; the one-response-per-phone mark is a localStorage flag the member can clear. Results tab: averages and
+0–10 distributions, the trade-off slider's lean (left / either / right), option counts, comments, CSV export (`svExportCSV`).
+`memberSurveyTemplate()` = the first survey (Thursday night golf · Weekend tournaments · Membership; food-vs-payouts slider in
+both golf sections; comment boxes per section and on key questions). Answer keys: `qid`, `qid:c` (comment), `sec:<id>`.
+`SV_R` (responses) is device-local. `tests/test_survey.py` covers template → link → answers → results → close → delete.
+
 ### Other
 Checklist (95-task 2026 template, assignees from members/board, notes, print). Golf (courses, WHS, flights,
 groups, printed scorecards — the printed cards include a live-scoring QR that isn't being used). Treasury.
@@ -431,6 +448,8 @@ groups, printed scorecards — the printed cards include a live-scoring QR that 
 
 ## 6. Status / history
 
+- **Built Oct 2026 (surveys):** `src/surveys.js` + `survey.html` + `survey-setup.sql` (applied to the project); the MGA's first
+  survey comes from `memberSurveyTemplate()`.
 - **Built Oct 2026 (tenants, portal, logins):** `tenants-setup.sql` + `portal-setup.sql`, `src/portal.js` (the client
   portal: clients by status, client records, staff logins, team, activity), `src/logins.js` (staff / board logins and
   scope in the hub, invite and reset links), the Edge Function `supabase/functions/admin-users`; the owner's go-live

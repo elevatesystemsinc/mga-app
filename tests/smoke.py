@@ -7,7 +7,7 @@ async def main():
   bad=0
   async with async_playwright() as p:
     b=await p.chromium.launch()
-    for name,check in [('index.html',"()=>!!document.getElementById('nav')"),('cashier.html',"()=>!!document.getElementById('main')"),('checkin.html',"()=>!!document.getElementById('main')"),('score.html',"()=>document.body.innerText.length>0")]:
+    for name,check in [('index.html',"()=>!!document.getElementById('nav')"),('cashier.html',"()=>!!document.getElementById('main')"),('checkin.html',"()=>!!document.getElementById('main')"),('score.html',"()=>document.body.innerText.length>0"),('survey.html',"()=>document.body.innerText.includes('not complete')")]:
       pg=await b.new_page(); errs=[]; pg.on('pageerror',lambda e,errs=errs:errs.append(str(e))); await local(pg)
       await pg.goto(page(name)); await pg.wait_for_timeout(700); ok=await pg.evaluate(check)
       print(f'{name:14} rendered={ok} errors={errs}'); bad+= (not ok) or bool(errs)
