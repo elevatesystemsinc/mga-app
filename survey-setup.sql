@@ -87,13 +87,17 @@ begin
     execute $f$
       create or replace function public.hub_key_survey(p_key text, p_sid text, p_token text, p_status text, p_doc jsonb) returns boolean
       language plpgsql security definer set search_path = public as $b$
-      declare org text; tn text;
+      declare v_org text; v_tn text;
       begin
-        org := hub_key_org(p_key);
-        if org is null then raise exception 'not allowed' using errcode = '42501'; end if;
-        select coalesce(k.tenant, 'wccc') into tn from hub_keys k where k.key_hash = encode(sha256(convert_to(p_key, 'UTF8')), 'hex') and k.revoked_at is null limit 1;
-        if p_doc is null then delete from survey_responses where sid = p_sid and org = hub_key_survey.org; delete from survey_share where sid = p_sid and survey_share.org = hub_key_survey.org; return true; end if;
-        insert into survey_share (sid, tenant, org, token, status, doc, updated_at) values (p_sid, coalesce(tn, 'wccc'), org, p_token, coalesce(p_status, 'draft'), p_doc, now())
+        v_org := hub_key_org(p_key);
+        if v_org is null then raise exception 'not allowed' using errcode = '42501'; end if;
+        select coalesce(k.tenant, 'wccc') into v_tn from hub_keys k where k.key_hash = encode(sha256(convert_to(p_key, 'UTF8')), 'hex') and k.revoked_at is null limit 1;
+        if p_doc is null then
+          delete from survey_responses r where r.sid = p_sid and r.org = v_org;
+          delete from survey_share s where s.sid = p_sid and s.org = v_org;
+          return true;
+        end if;
+        insert into survey_share (sid, tenant, org, token, status, doc, updated_at) values (p_sid, coalesce(v_tn, 'wccc'), v_org, p_token, coalesce(p_status, 'draft'), p_doc, now())
         on conflict (sid) do update set token = excluded.token, status = excluded.status, doc = excluded.doc, updated_at = now() where survey_share.org = excluded.org;
         return true;
       end $b$;

@@ -20,8 +20,8 @@ async def main():
       return {nav:navItems().map(x=>x[0]).includes('surveys'), secs:s.sections.map(x=>[x.title,x.questions.length,x.comments]), types:[...new Set(svQuestions(s).map(q=>q.type))].sort(),
         sliders:svQuestions(s).filter(q=>q.type==='slider').map(q=>q.left+'/'+q.right), comments:svQuestions(s).filter(q=>q.comment).length, status:s.status, page:view.sid===s.id&&view.stab==='questions',
         asksWho:/your name|e-?mail address|phone number|member number|ghin/i.test(svQuestions(s).map(q=>q.text).join(' '))}; }""")
-    check('template: three sections with comment boxes',[x[0] for x in r['secs']]==['Thursday night golf','Weekend tournaments','Membership'] and all(x[2] for x in r['secs']) and all(x[1]>=8 for x in r['secs']),json.dumps(r['secs']))
-    check('template: every answer type, food-vs-payouts slider in both golf sections',r['types']==['choice','multi','rating','slider','text','yesno'] and r['sliders']==['Better food/Higher payouts']*2 and r['comments']>=6,json.dumps(r))
+    check('template: four sections with comment boxes',[x[0] for x in r['secs']]==['Thursday night golf','Weekend tournaments','The Member-Member','Membership'] and all(x[2] for x in r['secs']) and all(x[1]>=8 for x in r['secs']),json.dumps(r['secs']))
+    check('template: every answer type, food-vs-payouts slider in both golf sections',r['types']==['choice','multi','rating','slider','text','yesno'] and r['sliders']==['Better food/Higher payouts','Better food/Higher payouts','Better food & events/Higher payouts'] and r['comments']>=6,json.dumps(r))
     check('template: draft, opens on the questions tab, asks nothing identifying',r['status']=='draft' and r['page'] and not r['asksWho'])
     # editing: add a question with a comment box, move it up, edit a section
     r=await hub.evaluate("""()=>{ const s=db.surveys[0], sec=s.sections[2]; const n=sec.questions.length;
@@ -34,7 +34,7 @@ async def main():
     r=await hub.evaluate("""async()=>{ const s=db.surveys[0]; document.getElementById('svOpen').click(); await new Promise(r=>setTimeout(r,400));
       return {status:s.status, token:s.token, link:document.getElementById('svUrl')&&document.getElementById('svUrl').value, tab:view.stab}; }""")
     share=fdb._rows('survey_share'); tok=r['token']
-    check('open: link minted, share row written',r['status']=='open' and tok and len(tok)>=20 and r['link'].endswith('survey.html?k='+tok) and len(share)==1 and share[0]['status']=='open' and share[0]['org']=='mga' and len(share[0]['doc']['sections'])==3,json.dumps([r['status'],r['tab'],len(share)]))
+    check('open: link minted, share row written',r['status']=='open' and tok and len(tok)>=20 and r['link'].endswith('survey.html?k='+tok) and len(share)==1 and share[0]['status']=='open' and share[0]['org']=='mga' and len(share[0]['doc']['sections'])==4,json.dumps([r['status'],r['tab'],len(share)]))
     await settled([hub])
     check('open: no writes to the club row, one survey in the MGA row',fdb.writes['club']==clubW and len(fdb.get('mga_hub','mga')['surveys'])==1)
     # --- 3. a member answers on the public page: no sign-in, no name asked
@@ -42,7 +42,7 @@ async def main():
     ph=await M.new_page(); perr=[]; ph.on('pageerror',lambda e:perr.append(str(e)))
     await ph.goto(page('survey.html')+'?k='+tok); await ph.wait_for_function("()=>!!S&&document.querySelectorAll('.scale').length>0")
     r=await ph.evaluate("""()=>{ const txt=document.body.innerText; return {title:S.title, scales:document.querySelectorAll('.scale').length, sliders:document.querySelectorAll('.sl').length, anon:/Anonymous/.test(txt), inputs:[...document.querySelectorAll('input')].map(i=>i.type), secC:document.querySelectorAll('textarea[data-t^="sec:"]').length}; }""")
-    check('page: renders the survey, says it is anonymous, the only inputs are the sliders',r['scales']>=10 and r['sliders']==2 and r['anon'] and set(r['inputs'])=={'range'} and r['secC']==3,json.dumps(r))
+    check('page: renders the survey, says it is anonymous, the only inputs are the sliders',r['scales']>=10 and r['sliders']==3 and r['anon'] and set(r['inputs'])=={'range'} and r['secC']==4,json.dumps(r))
     # answer: a 9 on the first rating, slide the first trade-off toward payouts, pick a choice, two multi options, a comment, a section comment, a written answer
     r=await ph.evaluate("""()=>{ const sc=document.querySelector('.scale'); sc.querySelector('[data-v="9"]').click();
       const sl=document.querySelector('.sl input'); sl.value='8'; sl.dispatchEvent(new Event('input'));

@@ -6061,7 +6061,7 @@ function memberSurveyTemplate(){
       S('If Thursday money has to go one way or the other, which would you rather have?','Better food','Higher payouts','Slide toward the one that matters more to you.'),
       C('What start time works best for you?',['Earlier than now','The current time is right','Later than now','Depends on the season']),
       T('What would get you out on more Thursday nights?')]}),
-    Object.assign(newSection('Weekend tournaments'),{intro:'The Member-Member, the Turkey Shoot and the other weekend events.',questions:[
+    Object.assign(newSection('Weekend tournaments'),{intro:'The Turkey Shoot and the other weekend events — the Member-Member has its own section below.',questions:[
       C('How many weekend tournaments did you play this year?',['All of them','Most of them','One or two','None']),
       M('What kept you from playing more of them?',['The dates','The cost','The formats','Needed a partner','Skill level or handicap worries','Pace of play','Nothing — I played what I wanted'],{comment:true}),
       R('The food experience at tournaments',{comment:true}),
@@ -6074,6 +6074,25 @@ function memberSurveyTemplate(){
       M('Which formats would you like to see more of?',['Scramble','Best ball','Shamble','Individual stroke play','Match play','Stableford or points','Alternate shot','Keep the mix as it is']),
       C('How do you feel about the number of weekend events?',['More would be better','About right','Fewer, but bigger']),
       T('What would make you play more weekend tournaments?')]}),
+    Object.assign(newSection('The Member-Member'),{intro:'Our biggest weekend: three days, the party, the Calcutta and the golf. Rate each piece on its own.',questions:[
+      C('Did you play in this year’s Member-Member?',['Yes','No — I wanted to but could not','No — it is not for me'],{comment:true}),
+      R('Registration and check-in',{help:'Signing up, paying, picking up your package',comment:true}),
+      R('The Friday night party and the Calcutta evening',{comment:true}),
+      R('How the Calcutta was run',{help:'The auction itself — pace, the auctioneer, the pool, the buy-in',comment:true}),
+      R('Food availability during play',{help:'Breakfast, the turn, on the course',comment:true}),
+      R('Food quality and execution at the dinners',{comment:true}),
+      R('Drinks — bar service, beverage carts, selection',{comment:true}),
+      R('Live music and entertainment',{comment:true}),
+      R('The formats — Saturday’s scramble and shamble, Sunday’s best ball',{comment:true}),
+      R('Flights, pairings and tee times'),
+      R('Pace of play'),
+      R('Live scoring and the leaderboards'),
+      R('The awards and payouts'),
+      R('Value for the entry fee'),
+      S('If Member-Member money has to go one way or the other, which would you rather have?','Better food & events','Higher payouts','Slide toward the one that matters more to you.'),
+      M('Which parts of the weekend matter most to you?',['The golf','The Calcutta','The Friday party','The dinners','The live music','Time with my partner and friends','The payouts']),
+      C('Would you play again next year?',['Yes','Probably','Not sure','No'],{comment:true}),
+      T('What is the one thing you would change about the Member-Member?')]}),
     Object.assign(newSection('Membership'),{intro:`Being a member of the ${org}.`,questions:[
       C(`How long have you been a member of the ${org}?`,['This is my first year','2–5 years','6–10 years','More than 10 years']),
       R('Communication from the board',{help:'Schedules, results, changes, reminders',comment:true}),
@@ -6892,7 +6911,7 @@ async function resultsPDF(t,opt){
 /* Keeps every open device on the latest version: checks version.json about once a minute and, when a
    newer build is live, reloads at a safe moment (nothing unsaved, no editor open, not mid-typing). */
 (function(){
-  const ME='20261022212438'; let ready=false, lastCheck=0;
+  const ME='20261022213402'; let ready=false, lastCheck=0;
   const typing=()=>{ const a=document.activeElement; return a&&/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)&&a.value&&a.type!=='search'; };
   const safe=()=>!typing()&&(typeof window.__canReload!=='function'||window.__canReload());
   async function check(){ lastCheck=Date.now(); if(location.protocol==='file:') return;
