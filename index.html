@@ -6045,9 +6045,11 @@ async function pushSurvey(s){ if(!svCloud()) return false;
 async function dropSurveyCloud(s){ if(!svCloud()) return;
   if(KEYMODE){ await keyRPC('hub_key_survey',{p_sid:s.id,p_token:null,p_status:'closed',p_doc:null}); return; }
   await tq(sb.from('survey_responses').delete()).eq('sid',s.id); await tq(sb.from('survey_share').delete()).eq('sid',s.id); }
-async function loadResponses(s){ if(!svCloud()) return SV_R[s.id]=SV_R[s.id]||[];
+const SV_AT={};                     // when each survey's responses were last fetched
+async function loadResponses(s){ if(!CLOUD) return SV_R[s.id]=SV_R[s.id]||[]; if(!svCloud()) return SV_R[s.id]||null;   // before the sign-in has settled: not loaded yet, not "none"
+  SV_AT[s.id]=Date.now();
   const r=KEYMODE?await keyRPC('hub_key_survey_results',{p_sid:s.id}):await tq(sb.from('survey_responses').select('answers,day')).eq('sid',s.id);
-  if(r.error){ toast('Could not load responses: '+r.error.message); return SV_R[s.id]||[]; }
+  if(r.error){ toast('Could not load responses: '+r.error.message); return SV_R[s.id]=SV_R[s.id]||[]; }
   SV_R[s.id]=(r.data||[]).map(x=>({answers:x.answers||{},day:x.day||''})); return SV_R[s.id]; }
 const newSection=(title)=>({id:uid(),title:title||'New section',intro:'',comments:true,questions:[]});
 const newQuestion=(type,text,o={})=>Object.assign({id:uid(),type:type||'rating',text:text||'',help:'',options:[],left:'',right:'',comment:false},o);
@@ -6229,7 +6231,8 @@ function svStats(q,R){
 }
 function svResultsTab(el,s){
   const R=SV_R[s.id];
-  if(!R){ el.innerHTML='<div class="card pad muted">Loading responses…</div>'; if(svCloud()) loadResponses(s).then(()=>{ if(view.sid===s.id&&view.stab==='results') render(); }); else { SV_R[s.id]=[]; render(); } return; }
+  if(!R){ el.innerHTML='<div class="card pad muted">Loading responses…</div>'; if(!CLOUD){ SV_R[s.id]=[]; render(); } else if(svCloud()&&!SV_AT[s.id]) loadResponses(s).then(()=>{ if(view.sid===s.id&&view.stab==='results') render(); }); return; }
+  if(svCloud()&&Date.now()-(SV_AT[s.id]||0)>20000) loadResponses(s).then(()=>{ if(view.sid===s.id&&view.stab==='results'&&(SV_R[s.id]||[]).length!==R.length) render(); });   // coming back to the tab picks up new answers
   const n=R.length, days=R.map(r=>r.day).filter(Boolean).sort(), qs=svQuestions(s);
   const rated=qs.filter(q=>q.type==='rating').map(q=>({q,st:svStats(q,R)})).filter(x=>x.st.n), best=rated.slice().sort((a,b)=>b.st.avg-a.st.avg);
   el.innerHTML=`<div style="display:flex;justify-content:flex-end;gap:8px;margin-bottom:12px">${btn('Refresh','svRef','',I.refresh)}${btn('Export CSV','svCsv')}</div>
@@ -6924,7 +6927,7 @@ async function resultsPDF(t,opt){
 /* Keeps every open device on the latest version: checks version.json about once a minute and, when a
    newer build is live, reloads at a safe moment (nothing unsaved, no editor open, not mid-typing). */
 (function(){
-  const ME='20261022234116'; let ready=false, lastCheck=0;
+  const ME='20261022235333'; let ready=false, lastCheck=0;
   const typing=()=>{ const a=document.activeElement; return a&&/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)&&a.value&&a.type!=='search'; };
   const safe=()=>!typing()&&(typeof window.__canReload!=='function'||window.__canReload());
   async function check(){ lastCheck=Date.now(); if(location.protocol==='file:') return;

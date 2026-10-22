@@ -71,6 +71,11 @@ async def main():
       const txt=document.getElementById('svBody').textContent;
       return {n:R.length, avg:st.avg, dist:st.dist, slAvg:sl.avg, lean:[sl.left,sl.mid,sl.right], multi:mu.counts, kpi:document.querySelector('.kpi .v').textContent, hasComment:/More tacos/.test(txt), hasSec:/Start at 5:30/.test(txt), lean70:/100% lean higher payouts/.test(txt)}; }""")
     check('results: 2 responses, average 7.0 of two, distribution, slider lean, multi counts, comments shown',r['n']==2 and abs(r['avg']-7)<1e-9 and r['dist'][5]==1 and r['dist'][9]==1 and r['slAvg']==8 and r['lean']==[0,0,1] and list(r['multi'].values())[0]==1 and r['kpi']=='2' and r['hasComment'] and r['hasSec'] and r['lean70'],json.dumps(r))
+    # a reload draws the results tab before the sign-in has settled (cached document, sessionOK still false): it must say
+    # "loading", not "0", and fill in once the session is confirmed
+    r=await hub.evaluate("""async()=>{ const s=db.surveys[0]; delete SV_R[s.id]; delete SV_AT[s.id]; const was=sessionOK; sessionOK=false; render(); const early=document.getElementById('svBody').textContent;
+      const cached=SV_R[s.id]; sessionOK=was; render(); await new Promise(r=>setTimeout(r,300)); return {early, cachedEmpty:Array.isArray(cached), n:(SV_R[s.id]||[]).length, kpi:document.querySelector('.kpi .v').textContent}; }""")
+    check('results before the session settles: loading, then the real count','Loading' in r['early'] and not r['cachedEmpty'] and r['n']==2 and r['kpi']=='2',json.dumps(r))
     async with hub.expect_download() as dl: await hub.click('#svCsv')
     d=await dl.value; path=await d.path(); csv=open(path,encoding='utf-8-sig').read().splitlines()
     check('csv: header + one row per response, no identity column',len(csv)==3 and csv[0].startswith('"Day","Thursday night golf') and 'More tacos' in csv[1] and not __import__('re').search(r'\b(name|e-?mail|phone|ghin)\b',csv[0].lower()) ,csv[0][:120])
