@@ -116,18 +116,23 @@ function skinsResult(pub,scores,rules,playerIds){
   const wins=[], per={}; let carried=0, lost=0, incomplete=0, waitingOn=null;
   for(let h=1;h<=18;h++){
     const rows=started.map(x=>({x,r:at(x,h)})); if(!rows.length){ incomplete++; continue; }
-    const missing=rows.filter(r=>!r.r); if(missing.length){ incomplete++; if(!waitingOn) waitingOn={hole:h,names:missing.map(r=>r.x.p.name)}; continue; }
-    const key=r=>rules.net?r.r.net:r.r.s, low=Math.min(...rows.map(key)); let lows=rows.filter(r=>key(r)===low);
+    const missing=rows.filter(r=>!r.r), have=rows.filter(r=>r.r);
+    if(!have.length){ incomplete++; if(!waitingOn) waitingOn={hole:h,names:missing.map(r=>r.x.p.name)}; continue; }
+    // skins to date: in pot mode a hole is reckoned from the cards in so far — the outright low LEADS until everyone who
+    // has started has played it, then it is won. (Per-hole carries wait for the hole to be complete.)
+    const open=missing.length; if(open){ if(!waitingOn) waitingOn={hole:h,names:missing.map(r=>r.x.p.name)}; if(rules.carry){ incomplete++; continue; } }
+    const key=r=>rules.net?r.r.net:r.r.s, low=Math.min(...have.map(key)); let lows=have.filter(r=>key(r)===low);
     if(lows.length>1&&rules.net&&rules.grossBeatsNet){ const g=lows.filter(r=>r.r.k===0); if(g.length===1) lows=g; }
     if(lows.length!==1){ if(rules.carry) carried++; continue; }
-    const {x,r}=lows[0], w={hole:h,pid:x.p.id,name:x.p.name,score:r.s,net:r.net,count:1+(rules.carry?carried:0),status:'won',checkHole:null}; carried=0;
+    const {x,r}=lows[0], w={hole:h,pid:x.p.id,name:x.p.name,score:r.s,net:r.net,count:1+(rules.carry?carried:0),status:open?'lead':'won',open,checkHole:null}; carried=0;
     if(rules.validate&&rules.validate!=='none'){ const nh=x.next(h);
       if(nh!=null){ w.checkHole=nh; const r2=at(x,nh);
         if(!r2) w.status='pending';
         else { const [over,useNet]=SKIN_VALID[rules.validate]||[0,false]; if(!((useNet?r2.net:r2.s)<=r2.par+over)){ w.status='void'; if(rules.carry) carried+=w.count; else lost+=w.count; } } } }
+    if(w.status==='pending'&&open) w.status='lead';   // still leading, and its validation hole is not in yet either
     wins.push(w); if(w.status==='won') per[w.pid]=(per[w.pid]||0)+w.count;
   }
-  return {wins,per,total:wins.filter(w=>w.status==='won').reduce((a,w)=>a+w.count,0),carried,lost,incomplete,pending:wins.filter(w=>w.status==='pending').length,players:pl.length,started:started.length,notStarted,waitingOn};
+  return {wins,per,total:wins.filter(w=>w.status==='won').reduce((a,w)=>a+w.count,0),carried,lost,incomplete,pending:wins.filter(w=>w.status==='pending').length,leading:wins.filter(w=>w.status==='lead').length,players:pl.length,started:started.length,notStarted,waitingOn};
 }
 
 /* ---------- WCCC-style scorecard ----------

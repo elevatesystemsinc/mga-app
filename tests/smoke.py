@@ -57,11 +57,14 @@ async def main():
         # skins: a player with no scores at all (a no-show, a late group) does not hold the holes up; the board says who a hole waits on
         r=await pg.evaluate("""()=>{ const c=courseById('oak'), par=c.par.M; const pub={format:'stroke',scoring:'net',allow:{'*':100},noPar3:false,courses:{oak:{name:c.name,par:c.par,hcp:c.hcp,tees:{}}},
             groups:[{id:'g1',label:'G1',course:'oak',startHole:1,players:[{id:'a',name:'Ann',ph:0,set:'M'},{id:'b',name:'Bo',ph:0,set:'M'},{id:'c',name:'Cy',ph:0,set:'M'},{id:'d',name:'Di',ph:0,set:'M'}]}]};
-          const sc={a:{1:par[0]-1,2:par[1],3:par[2]},b:{1:par[0],2:par[1],3:par[2]},c:{1:par[0],2:par[1]}};   // Di never scored; Cy has not posted 3
+          const sc={a:{1:par[0]-1,2:par[1],3:par[2]-1},b:{1:par[0],2:par[1],3:par[2]},c:{1:par[0],2:par[1]}};   // Di never scored; Cy has not posted 3; Ann birdied 3 so far
           const rules={net:true,grossBeatsNet:true,validate:'none',carry:false,mode:'pot'}; const r=skinsResult(pub,sc,rules,['a','b','c','d']);
           const before=skinsResult(pub,sc,rules,['a','b','c']);   // the same without Di in the pot
-          return {wins:r.wins.map(w=>[w.hole,w.name,w.status]), notStarted:r.notStarted, waiting:r.waitingOn, txt:skinsWaitTxt(r), same:JSON.stringify(before.wins)===JSON.stringify(r.wins)}; }""")
-        ok=r['wins']==[[1,'Ann','won']] and r['notStarted']==['Di'] and r['waiting']=={'hole':3,'names':['Cy']} and r['txt']=='hole 3 waits on Cy · Di not started' and r['same']
+          sc.c[3]=par[2]-1; const after=skinsResult(pub,sc,rules,['a','b','c','d']);   // Cy ties Ann on 3 → the lead disappears
+          return {wins:r.wins.map(w=>[w.hole,w.name,w.status,w.open||0]), total:r.total, leading:r.leading, notStarted:r.notStarted, waiting:r.waitingOn, txt:skinsWaitTxt(r), same:JSON.stringify(before.wins)===JSON.stringify(r.wins), after:after.wins.map(w=>[w.hole,w.status])}; }""")
+        # hole 1 is won (everyone who started has it); hole 3 Ann LEADS with Cy still to play; total counts won skins only; a tie on 3 later removes the lead
+        ok=(r['wins']==[[1,'Ann','won',0],[3,'Ann','lead',1]] and r['total']==1 and r['leading']==1 and r['notStarted']==['Di'] and r['waiting']=={'hole':3,'names':['Cy']}
+            and r['txt']=='hole 3 waits on Cy · Di not started' and r['same'] and r['after']==[[1,'won']])
         print('skins: no-shows do not block, waiting line', r, 'OK' if ok else 'FAIL'); bad+=not ok
         # no pops on par 3s: the playing handicap is spread over the non-par-3 holes; a plus handicap gives back from the easiest of them;
         # the switch travels event → published copy → leaderboard / skins; off = the old 18-hole allocation exactly

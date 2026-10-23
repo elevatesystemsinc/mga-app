@@ -213,18 +213,23 @@ function skinsResult(pub,scores,rules,playerIds){
   const wins=[], per={}; let carried=0, lost=0, incomplete=0, waitingOn=null;
   for(let h=1;h<=18;h++){
     const rows=started.map(x=>({x,r:at(x,h)})); if(!rows.length){ incomplete++; continue; }
-    const missing=rows.filter(r=>!r.r); if(missing.length){ incomplete++; if(!waitingOn) waitingOn={hole:h,names:missing.map(r=>r.x.p.name)}; continue; }
-    const key=r=>rules.net?r.r.net:r.r.s, low=Math.min(...rows.map(key)); let lows=rows.filter(r=>key(r)===low);
+    const missing=rows.filter(r=>!r.r), have=rows.filter(r=>r.r);
+    if(!have.length){ incomplete++; if(!waitingOn) waitingOn={hole:h,names:missing.map(r=>r.x.p.name)}; continue; }
+    // skins to date: in pot mode a hole is reckoned from the cards in so far — the outright low LEADS until everyone who
+    // has started has played it, then it is won. (Per-hole carries wait for the hole to be complete.)
+    const open=missing.length; if(open){ if(!waitingOn) waitingOn={hole:h,names:missing.map(r=>r.x.p.name)}; if(rules.carry){ incomplete++; continue; } }
+    const key=r=>rules.net?r.r.net:r.r.s, low=Math.min(...have.map(key)); let lows=have.filter(r=>key(r)===low);
     if(lows.length>1&&rules.net&&rules.grossBeatsNet){ const g=lows.filter(r=>r.r.k===0); if(g.length===1) lows=g; }
     if(lows.length!==1){ if(rules.carry) carried++; continue; }
-    const {x,r}=lows[0], w={hole:h,pid:x.p.id,name:x.p.name,score:r.s,net:r.net,count:1+(rules.carry?carried:0),status:'won',checkHole:null}; carried=0;
+    const {x,r}=lows[0], w={hole:h,pid:x.p.id,name:x.p.name,score:r.s,net:r.net,count:1+(rules.carry?carried:0),status:open?'lead':'won',open,checkHole:null}; carried=0;
     if(rules.validate&&rules.validate!=='none'){ const nh=x.next(h);
       if(nh!=null){ w.checkHole=nh; const r2=at(x,nh);
         if(!r2) w.status='pending';
         else { const [over,useNet]=SKIN_VALID[rules.validate]||[0,false]; if(!((useNet?r2.net:r2.s)<=r2.par+over)){ w.status='void'; if(rules.carry) carried+=w.count; else lost+=w.count; } } } }
+    if(w.status==='pending'&&open) w.status='lead';   // still leading, and its validation hole is not in yet either
     wins.push(w); if(w.status==='won') per[w.pid]=(per[w.pid]||0)+w.count;
   }
-  return {wins,per,total:wins.filter(w=>w.status==='won').reduce((a,w)=>a+w.count,0),carried,lost,incomplete,pending:wins.filter(w=>w.status==='pending').length,players:pl.length,started:started.length,notStarted,waitingOn};
+  return {wins,per,total:wins.filter(w=>w.status==='won').reduce((a,w)=>a+w.count,0),carried,lost,incomplete,pending:wins.filter(w=>w.status==='pending').length,leading:wins.filter(w=>w.status==='lead').length,players:pl.length,started:started.length,notStarted,waitingOn};
 }
 
 /* ---------- WCCC-style scorecard ----------
@@ -804,8 +809,8 @@ function renderSkinsBoard(comp,fromJoin){
   const txt=sk.validate&&sk.validate!=='none'?{par:'par',netpar:'net par',bogey:'bogey',netbogey:'net bogey'}[sk.validate]||'':'';
   $('main').innerHTML=`${BIG?`<h1 style="font-size:44px;margin:6px 4px 16px">${esc(pub.name)} · ${esc(comp.name)}</h1>`:`<h1 class="ttl">${esc(pub.name)}<small>${esc(comp.name)} · ${sk.net?'net':'gross'} skins · live</small></h1>`}${BIG?'':compChips()}
    <div class="card" style="overflow:hidden"><div class="lb h${per?'':' sk'}"><span>Hole</span><span>Skin</span><span class="r"></span>${per?'<span class="r">Holes</span>':''}</div>
-   ${r.wins.length?r.wins.map(w=>`<div class="lb num${per?'':' sk'}"><b>${w.hole}</b><div style="min-width:0"><div style="font-weight:700">${esc(w.name)}</div><div class="muted" style="font-size:12px">${w.score}${sk.net&&w.net!==w.score?' (net '+w.net+')':''}${w.status==='void'?' · didn’t validate on '+w.checkHole:w.status==='pending'?' · validates on '+w.checkHole:txt?' · validated':''}</div></div><span class="r ${w.status==='void'?'neg':w.status==='pending'?'muted':'pos'}" style="font-weight:800">${w.status==='void'?'✕':w.status==='pending'?'…':'✓'}</span>${per?`<span class="r">${w.count>1?w.count:''}</span>`:''}</div>`).join(''):'<div class="lb none"><span class="muted">No skins yet — the first one shows here as the cards come in.</span></div>'}
-   </div><p class="muted" style="text-align:center;font-size:12.5px">${won.length} skin${won.length===1?'':'s'}${r.pending?' · '+r.pending+' pending':''} · ${sk.net?(sk.grossBeatsNet?'net, gross beats net':'net'):'gross'}${txt?' · validated by '+txt+' on the next hole':''} · updates live</p>${skinsWaitTxt(r)?`<p class="muted" style="text-align:center;font-size:12.5px;margin-top:-6px">${esc(skinsWaitTxt(r))}</p>`:''}${fromJoin?'<p style="text-align:center"><button class="btn" id="backJoin">Back</button></p>':''}`;
+   ${r.wins.length?r.wins.map(w=>`<div class="lb num${per?'':' sk'}"><b>${w.hole}</b><div style="min-width:0"><div style="font-weight:700">${esc(w.name)}</div><div class="muted" style="font-size:12px">${w.score}${sk.net&&w.net!==w.score?' (net '+w.net+')':''}${w.status==='void'?' · didn’t validate on '+w.checkHole:w.status==='lead'?` · leading · ${w.open} still to play`:w.status==='pending'?' · validates on '+w.checkHole:txt?' · validated':''}</div></div><span class="r ${w.status==='void'?'neg':w.status==='pending'||w.status==='lead'?'muted':'pos'}" style="font-weight:800">${w.status==='void'?'✕':w.status==='lead'?'▲':w.status==='pending'?'…':'✓'}</span>${per?`<span class="r">${w.count>1?w.count:''}</span>`:''}</div>`).join(''):'<div class="lb none"><span class="muted">No skins yet — the first one shows here as the cards come in.</span></div>'}
+   </div><p class="muted" style="text-align:center;font-size:12.5px">${won.length} skin${won.length===1?'':'s'}${r.leading?' · '+r.leading+' leading':''}${r.pending?' · '+r.pending+' pending':''} · ${sk.net?(sk.grossBeatsNet?'net, gross beats net':'net'):'gross'}${txt?' · validated by '+txt+' on the next hole':''} · updates live</p>${skinsWaitTxt(r)?`<p class="muted" style="text-align:center;font-size:12.5px;margin-top:-6px">${esc(skinsWaitTxt(r))}</p>`:''}${fromJoin?'<p style="text-align:center"><button class="btn" id="backJoin">Back</button></p>':''}`;
   const bj=$('backJoin'); if(bj) bj.onclick=()=>renderJoin();
   document.querySelectorAll('[data-comp]').forEach(b=>b.onclick=()=>{ lbComp=b.dataset.comp; renderBoard(fromJoin); }); chipIntoView();
 }
@@ -860,7 +865,7 @@ window.__canReload=()=>!queue.length;
    page counts, and a reload is tried once per build — if the page that comes back is still the old one, the CDN
    hasn't caught up; wait a while before trying that build again. */
 (function(){
-  const ME='20261023202441', KEY='au_tried', RETRY=10*60*1000; let ready=false, lastCheck=0;
+  const ME='20261023202733', KEY='au_tried', RETRY=10*60*1000; let ready=false, lastCheck=0;
   const typing=()=>{ const a=document.activeElement; return a&&/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)&&a.value&&a.type!=='search'; };
   const safe=()=>!typing()&&(typeof window.__canReload!=='function'||window.__canReload());
   const tried=()=>{ try{ const [b,t]=(sessionStorage.getItem(KEY)||'').split('|'); return b?{build:b,at:+t||0}:null; }catch(_){ return null; } };
