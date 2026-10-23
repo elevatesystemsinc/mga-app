@@ -265,8 +265,11 @@ Tournament = { id, name, season, days, startDate, field:[{id,memberId,team,paid,
     tagged "Club"): the designer's picker and the game page's Add players both use it, and adding someone to a game does
     **not** make them a member of the group (the owner, Oct 2026: membership is what will gate sign-ups through a
     registration link when that is built; manual adds and game creation pull from the entire directory).
-  - **Game sheet PDF** (`gameSheetPDF(g,{strokes,returnDoc})`): competitions and denominations, teams when known
-    (an after-round draw says so), the groups as they play with each player's strokes.
+  - **Game sheet PDF** (`gameSheetPDF(g,{strokes,returnDoc})`): the band (date · course · tee · players · all in), THE GAME as a
+    card — each competition with its rules in words (`potRulesText`) and its entry, the total as a navy strip — the **house
+    rules** typed in the designer (`g.rules`, one per line, printed as bullets), teams when known, and the groups as
+    two-up cards (number, code, tee time, each player's strokes / scratch / gives n / no index; an empty group reads
+    "Open — tee time held for extras").
 - Arrays of objects carry stable `id`s — the merge (§3) matches by id. Keep it that way for anything new.
 - `_rev` (revision), `_w` (writer/client id), `_at` are bookkeeping, excluded from comparisons.
 - **Device-local, never in the shared doc:** cashier/check-in link status (`SHARE_ST`, `CKI_ST`), the cashier-link merge base (`localStorage mga_cbase_<tid>`), check-in base (`mga_ckibase_<tid>`).

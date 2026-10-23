@@ -189,7 +189,8 @@ function vGameDesign(m){
     <div class="frow2"><div class="fld"><span class="lbl">Money changes hands</span>${seg('gdWhen',[['after','After the round'],['before','Before the round']],d.payWhen||'after')}<p class="hint">After: the sheet leads with results and the settlement. Before: it leads with who has paid in.</p></div>
       <div class="fld"><span class="lbl">Settlement</span>${seg('gdSettle',[['pot','Pot — everyone puts in, winners pull out'],['net','Net — one figure per player']],d.settle||'pot')}</div>
       <div class="fld"><span class="lbl">Handicaps</span>${seg('gdHcp',[['full','Full — 100% across the board'],['usga','USGA allowances — 95% stroke play, 85% best ball…']],d.hcp||'full')}</div></div>
-    ${field('Notes','gdNotes',d.notes||'',{type:'textarea'})}</div>
+    ${field('Notes','gdNotes',d.notes||'',{type:'textarea'})}
+    ${field('Rules for the game sheet','gdRules',d.rules||'',{type:'textarea'})}<p class="hint" style="margin:-8px 0 0">Printed on the sheet as the house rules — one rule per line (e.g. “Gimmes inside the leather”, “Ties in skins: nobody’s”, “$5 for a two”).</p></div>
   <div class="card pad" style="display:flex;flex-direction:column;gap:14px"><div class="cardhead" style="padding:0;border:0"><div><h2 class="h2">Competitions</h2><span class="muted">Each runs on the same scores with its own entry, players and payout.</span></div>
       <div class="actions"><select class="inp" id="gdAddSel" style="height:38px;width:auto"><option value="">Add a competition…</option>${groups.map(gr=>`<optgroup label="${esc(gr)}">${lib.filter(x=>x.group===gr).map(x=>`<option value="${x.id}">${esc(x.name)}</option>`).join('')}</optgroup>`).join('')}</select></div></div>
     ${d.pots.length?d.pots.map(potCard).join(''):'<div class="empty"><b>No competitions yet</b><span>Add stroke play, a best ball, skins — as many as the group wants.</span></div>'}
@@ -204,7 +205,7 @@ function vGameDesign(m){
   const rerender=()=>render();
   $('gdBack').onclick=$('gdCancel').onclick=()=>{ if(!confirm('Leave without saving?')) return; GD=null; view.gdesign=null; render(); };
   const del=$('gdDelete'); if(del) del.onclick=()=>{ const g=gamesData().find(x=>x.id===GD.id); if(!g) return; if(!confirm(`Delete ${gameTitle(g)} on ${shortDate(g.date)}? Its scoring event, scores and money record go with it.`)) return; deleteGame(g); GD=null; view.gdesign=null; view.gameId=null; persist(); render(); toast('Game deleted'); };
-  const readAll=()=>{ d.name=fv('gdName'); d.course=fv('gdCourse'); d.tee=fv('gdTee')||d.tee||'White'; d.date=fv('gdDate'); d.time=fv('gdTime'); d.notes=fv('gdNotes'); d.payWhen=$('gdWhen').dataset.val; d.settle=$('gdSettle').dataset.val; d.hcp=$('gdHcp').dataset.val;
+  const readAll=()=>{ d.name=fv('gdName'); d.course=fv('gdCourse'); d.tee=fv('gdTee')||d.tee||'White'; d.date=fv('gdDate'); d.time=fv('gdTime'); d.notes=fv('gdNotes'); d.rules=fv('gdRules'); d.payWhen=$('gdWhen').dataset.val; d.settle=$('gdSettle').dataset.val; d.hcp=$('gdHcp').dataset.val;
     for(const pot of d.pots){ const v=id=>fv(id+'_'+pot.id); pot.name=v('gdN')||pot.name; if(pot.kind!=='manual') pot.entry=n0(v('gdE'));
       const NP=$('gdNP3_'+pot.id); if(NP) pot.rules.noPar3=NP.checked;
       if(pot.kind==='format'){ const pf=potEngine(pot).format; if(POINT_FORMATS.includes(pf)&&$('gdPt_'+pot.id+'_0')){ const t=readPoints(document,'gdPt_'+pot.id,pf); pot.rules.points=t?{[pf]:t}:{}; } }
@@ -704,48 +705,88 @@ function syncGameEvent(g,ev){
 }
 
 /* ---------- the game sheet: a branded PDF for the first tee ---------- */
+/* plain-English rules of one competition, for the sheet */
+function potRulesText(pot){
+  const bits=[];
+  if(pot.kind==='skins'){ const sk=skinsRulesOf(pot); bits.push(`${sk.net?'Net':'Gross'} skins${sk.net&&sk.grossBeatsNet?' — gross beats net on a tied hole':''}.`);
+    bits.push(sk.mode==='hole'?'The pot is split over 18 holes; a tied hole’s share carries to the next, and holes unwon at the end are not paid.':'One pot for the day, divided by the skins won. A tied hole is nobody’s.');
+    if(sk.validate&&sk.validate!=='none') bits.push(`A skin must be validated by ${({par:'par',netpar:'net par',bogey:'bogey',netbogey:'net bogey'})[sk.validate]||sk.validate} or better on the next hole, or it is lost.`); }
+  else if(pot.kind==='dots'){ bits.push(dotsRuleText(pot)+'.'); }
+  else if(pot.kind==='manual'){ bits.push('Winners entered by hand.'); }
+  else { const E=potEngine(pot), C=potCat(pot), team=potIsTeam(pot), sc=(pot.rules.scoring||'gross');
+    let what=C.desc||C.name; if(pot.rules.points&&POINT_FORMATS.includes(E.format)&&pot.rules.points[E.format]) what=what.replace(/\s*\([^)]*\)/,''); bits.push(`${sc==='net'?'Net':'Gross'} — ${what}${/[.!?]$/.test(what)?'':'.'}`);
+    if(team) bits.push(`${E.teamSize}-player teams${E.count&&E.count<E.teamSize?`, best ${E.count} of ${E.teamSize} count`:''}; partners ${TEAMS_BY[pot.rules.teamsBy||'hand']}.`);
+    if(pot.rules.nassau){ const ns=nassauStakes(pot); bits.push(`Front ${gMoney(ns.front)} · back ${gMoney(ns.back)} · 18 ${gMoney(ns.total)} per player, each to the side with the ${(E.matchBy||'holes')==='strokes'?'lower total score':'most holes'}.`); }
+    else if(pot.rules.places&&pot.rules.places.length) bits.push(`Pays ${pot.rules.places.map((x,i)=>`${x}% to ${ordinal(i+1)}`).join(', ')}.`);
+    else bits.push('Pays the usual split for the field.');
+    if(pot.rules.points&&POINT_FORMATS.includes(E.format)&&pot.rules.points[E.format]){ const t=pot.rules.points[E.format]; bits.push(`Points: ${PTS_ROWS.map(([k,l])=>`${l.toLowerCase().replace(' or worse','+')} ${t[k]??0}`).join(', ')}.`); } }
+  if(pot.rules.noPar3&&pot.kind!=='manual') bits.push('No pops on par 3s.');
+  return bits.join(' ');
+}
 async function gameSheetPDF(g,opt){
   opt=opt||{}; const strokes=opt.strokes!==false, ev=gameEvent(g); if(!ev){ toast('No scoring event'); return; }
   try{ await loadJsPDF(); }catch(e){ toast(e.message); return; }
   const crest=await crestPNG().catch(()=>null), doc=new window.jspdf.jsPDF({unit:'pt',format:'letter'});
   [['ps400','PS-400.ttf','PublicSans','normal'],['ps700','PS-700.ttf','PublicSans','bold'],['ps800','PS-800.ttf','PublicSansXB','normal'],['cg700','CG-700.ttf','Cormorant','bold']].forEach(([k,f,fam,st])=>{ doc.addFileToVFS(f,PDF_FONTS[k]); doc.addFont(f,fam,st); });
-  const NAVY=[15,42,56],GOLD=[199,161,58],GOLDL=[216,183,95],GOLDDK=[126,95,26],IVORY=[251,250,245],INK=[20,34,43],MUTED=[86,98,106];
-  const L=40,R2=572,W=612,H=792, font=(f,s,z,col)=>{ doc.setFont(f,s); doc.setFontSize(z); doc.setTextColor(...col); };
+  const NAVY=[15,42,56],GOLD=[199,161,58],GOLDL=[216,183,95],GOLDDK=[126,95,26],IVORY=[251,250,245],INK=[20,34,43],MUTED=[86,98,106],LINE=[225,217,198],WHITE=[255,255,255];
+  const L=40,R2=572,W=612,H=792, font=(f,st,z,col)=>{ doc.setFont(f,st); doc.setFontSize(z); doc.setTextColor(...col); };
   const page=()=>{ doc.setFillColor(...IVORY); doc.rect(0,0,W,H,'F'); };
   page();
-  const pots=g.pots.filter(p=>p.kind!=='manual'), allIn=sum(pots,p=>n0(p.entry)), course=courseById(g.course);
-  font('PublicSans','normal',8.4,[214,218,220]); const sub=doc.splitTextToSize(`${gameWhen(g)} · ${course?course.name:''} · ${g.players.length} players · ${allIn?gMoney(allIn)+' all in':''}`,R2-L-90); const bandH=74+Math.max(0,sub.length-1)*11;
+  const pots=g.pots.filter(p=>p.kind!=='manual'), allIn=sum(pots,p=>n0(p.entry)), course=courseById(g.course||ev.defaultCourse), tee=g.tee||ev.defaultTee||'';
+  const players=evPlayers(ev).length||g.players.length;
+  font('PublicSans','normal',8.6,[214,218,220]); const sub=doc.splitTextToSize([gameWhen(g),course?course.name+(tee?' · '+tee+' tees':''):'',`${players} player${players===1?'':'s'}`,allIn?gMoney(allIn)+' all in':''].filter(Boolean).join('  ·  '),R2-L-90); const bandH=78+Math.max(0,sub.length-1)*11;
   doc.setFillColor(...GOLD); doc.roundedRect(L,32,R2-L,bandH+4,8,8,'F'); doc.setFillColor(...NAVY); doc.roundedRect(L,32,R2-L,bandH,8,8,'F'); doc.rect(L,32+bandH-12,R2-L,8,'F');
-  if(crest) doc.addImage(crest,'PNG',L+16,42,54*850/1024,54);
-  font('PublicSansXB','normal',6.8,GOLDL); doc.text(`${(orgName()||'').toUpperCase()} · ${g.season||''}`,L+76,56,{charSpace:1.2});
-  font('Cormorant','bold',24,[255,255,255]); doc.text(gameTitle(g),L+76,80);
-  font('PublicSans','normal',8.4,[214,218,220]); doc.text(sub,L+76,96);
+  if(crest) doc.addImage(crest,'PNG',L+18,44,56*850/1024,56);
+  font('PublicSansXB','normal',6.8,GOLDL); doc.text(`${(orgName()||'').toUpperCase()}${CLUB&&CLUB.name?' · '+CLUB.name.toUpperCase():''}`,L+80,58,{charSpace:1.2});
+  font('Cormorant','bold',26,WHITE); doc.text(gameTitle(g),L+80,84);
+  font('PublicSans','normal',8.6,[214,218,220]); doc.text(sub,L+80,100);
   let y=32+bandH+26;
-  const need=h=>{ if(y+h>H-44){ doc.addPage(); page(); y=48; } };
-  const section=(label,note)=>{ need(40); font('PublicSansXB','normal',7.4,GOLDDK); doc.text(label.toUpperCase(),L,y,{charSpace:1.1}); if(note){ font('PublicSans','normal',8,MUTED); doc.text(note,R2,y,{align:'right'}); } y+=6; doc.setDrawColor(...GOLD); doc.setLineWidth(1); doc.line(L,y,R2,y); y+=12; };
-  const zebra=i=>{ if(i%2===0){ doc.setFillColor(255,255,255); doc.rect(L-4,y-9,R2-L+8,15,'F'); } };
-  // the game
-  section('The game',g.payWhen==='before'?'money in before the round':'settled after the round'+(g.settle==='net'?' · net':''));
-  g.pots.forEach((pot,i)=>{ const team=potIsTeam(pot), lines=doc.splitTextToSize(potSummary(pot).replace(/^[^·]+· /,''),R2-L-200); need(6+lines.length*11);
-    zebra(i); font('PublicSans','bold',9.6,INK); doc.text(pot.name,L,y); font('PublicSans','normal',8.4,MUTED); doc.text(lines,L+150,y); font('PublicSans','bold',10,INK); doc.text(pot.kind==='manual'?'—':gMoney(pot.entry),R2,y,{align:'right'}); y+=Math.max(15,4+lines.length*11); });
-  if(allIn){ font('PublicSans','bold',9,INK); doc.text('In everything',L,y); doc.text(gMoney(allIn),R2,y,{align:'right'}); y+=14; }
-  y+=8;
-  // teams, when they are known before play
-  const teamPots=g.pots.filter(p=>potIsTeam(p));
-  for(const pot of teamPots){ const by=pot.rules.teamsBy||'hand';
-    if(!potTeamsKnown(pot)){ section(pot.name+' — teams'); font('PublicSans','normal',9,MUTED); doc.text(by==='after'?'Partners are drawn after the round.':'Teams to be announced.',L,y); y+=20; continue; }
+  const need=h=>{ if(y+h>H-36){ doc.addPage(); page(); y=44; } };
+  const section=(label,note)=>{ need(48); font('PublicSansXB','normal',7.6,GOLDDK); doc.text(label.toUpperCase(),L,y,{charSpace:1.2}); if(note){ font('PublicSans','normal',8,MUTED); doc.text(note,R2,y,{align:'right'}); } y+=7; doc.setDrawColor(...GOLD); doc.setLineWidth(1.2); doc.line(L,y,R2,y); y+=16; };
+  // ---- the game: one card, a row per competition with its rules in words, the total as a navy strip
+  section('The game',g.payWhen==='before'?'Money in before the round':'Settled after the round'+(g.settle==='net'?' · one net figure per player':''));
+  const rows=g.pots.map(pot=>({pot,lines:doc.splitTextToSize(potRulesText(pot),R2-L-250)}));
+  const cardH=rows.reduce((a,r)=>a+Math.max(30,14+r.lines.length*10.6+10),0)+(allIn?26:0);
+  need(cardH+8);
+  doc.setFillColor(...WHITE); doc.setDrawColor(...LINE); doc.setLineWidth(.8); doc.roundedRect(L,y-6,R2-L,cardH,8,8,'FD');
+  rows.forEach((r,i)=>{ const h=Math.max(30,14+r.lines.length*10.6+10); if(i){ doc.setDrawColor(...LINE); doc.setLineWidth(.6); doc.line(L+14,y-6,R2-14,y-6); }
+    font('PublicSans','bold',11,INK); doc.text(r.pot.name,L+16,y+10); font('PublicSans','normal',8.4,MUTED); doc.text(r.lines,L+170,y+10,{lineHeightFactor:1.26});
+    font('Cormorant','bold',17,NAVY); doc.text(r.pot.kind==='manual'?'—':gMoney(r.pot.entry),R2-16,y+11,{align:'right'}); y+=h; });
+  if(allIn){ doc.setFillColor(...NAVY); doc.roundedRect(L,y-6,R2-L,26,0,0,'F'); doc.rect(L,y-6,R2-L,8,'F'); doc.setFillColor(...NAVY); doc.roundedRect(L,y-6,R2-L,26,8,8,'F'); doc.rect(L,y-6,R2-L,10,'F');
+    font('PublicSansXB','normal',7.4,GOLDL); doc.text('IN EVERYTHING',L+16,y+10,{charSpace:1.2}); font('Cormorant','bold',18,WHITE); doc.text(gMoney(allIn),R2-16,y+11,{align:'right'}); y+=20; }
+  y+=18;
+  // ---- the house rules typed in the designer
+  const rules=String(g.rules||'').split('\n').map(x=>x.trim()).filter(Boolean);
+  if(rules.length){ section('House rules'); for(const t of rules){ font('PublicSans','normal',9.4,INK); const ln=doc.splitTextToSize(t.replace(/^[-•*]\s*/,''),R2-L-16); need(ln.length*12.5+3); doc.setFillColor(...GOLD); doc.circle(L+4,y-3,1.8,'F'); doc.text(ln,L+16,y); y+=ln.length*12.5+3; } y+=12; }
+  // ---- teams, when they are known before play
+  for(const pot of g.pots.filter(p=>potIsTeam(p))){ const by=pot.rules.teamsBy||'hand';
+    if(!potTeamsKnown(pot)){ section(pot.name+' — teams'); font('PublicSans','normal',9.4,MUTED); doc.text(by==='after'?'Partners are drawn after the round.':'Teams to be announced.',L,y); y+=22; continue; }
     const byTeam={}; evPlayers(ev).forEach(({p})=>{ const t=pot.teams[p.id]; if(t) (byTeam[t]=byTeam[t]||[]).push(p); });
-    section(pot.name+' — teams',pot.draw?'drawn '+new Date(pot.draw.at).toLocaleString():'');
-    Object.keys(byTeam).sort((a,b)=>+a.slice(1)-+b.slice(1)).forEach((k,i)=>{ need(16); zebra(i); font('PublicSans','bold',9.4,INK); doc.text('Team '+k.slice(1),L,y); font('PublicSans','normal',9.4,INK); doc.text(byTeam[k].map(p=>p.name).join(' & '),L+70,y); y+=15; });
-    y+=8; }
-  // groups as they play
-  section('Groups',ev.groups.some(gr=>gr.teeTime)?'tee times':'');
-  ev.groups.forEach((grp,gi)=>{ need(20+grp.players.length*14);
-    font('PublicSans','bold',9.6,GOLDDK); doc.text(`Group ${grp.code}`,L,y); font('PublicSans','normal',8.4,MUTED); doc.text(`${grp.teeTime?fmtTime(grp.teeTime):'hole '+(grp.startHole||1)}${courseById(grp.course)&&courseById(grp.course)!==course?' · '+courseById(grp.course).name:''}`,L+90,y); y+=13;
-    grp.players.forEach((p,i)=>{ const h=strokes?playerHcp(ev,grp,p):null; zebra(i); font('PublicSans','normal',9.4,INK); doc.text(p.name,L+16,y); if(h&&h.ph!=null){ font('PublicSans','normal',8.6,MUTED); doc.text(`${h.ph} stroke${h.ph===1?'':'s'}`,R2,y,{align:'right'}); } y+=14; });
-    y+=6; });
-  font('PublicSans','normal',7.6,MUTED); need(30);
-  doc.text(doc.splitTextToSize(`Scoring: ${scoringLink(ev)} — each group enters its group ID. Generated by the ${orgShort()} hub, ${new Date().toLocaleString()}.`,R2-L),L,Math.max(y+8,H-40));
+    section(pot.name+' — teams',pot.draw?'Drawn '+new Date(pot.draw.at).toLocaleString():'');
+    const keys=Object.keys(byTeam).sort((a,b)=>+a.slice(1)-+b.slice(1)), colW=(R2-L-14)/2; let col=0, top=y;
+    keys.forEach((k,i)=>{ const x=L+col*(colW+14); if(col===0){ need(18); top=y; } font('PublicSans','bold',9.4,GOLDDK); doc.text('Team '+k.slice(1),x,top+(col?0:0)); font('PublicSans','normal',9.4,INK); doc.text(doc.splitTextToSize(byTeam[k].map(p=>p.name).join(' & '),colW-50)[0],x+48,top); if(col===1||i===keys.length-1){ y=top+15; } col=1-col; });
+    y+=10; }
+  // ---- groups as cards, two to a row
+  section('Groups',ev.groups.some(gr=>gr.teeTime)?'Tee times':'');
+  const colW=(R2-L-14)/2, rowH=13.4, cards=ev.groups.map((grp,gi)=>({grp,gi,h:33+Math.max(1,grp.players.length)*rowH+6}));
+  const stroke=h=>!h?'':h.ph==null?'no index':h.ph>0?`${h.ph} stroke${h.ph===1?'':'s'}`:h.ph===0?'scratch':`gives ${-h.ph}`;
+  for(let i=0;i<cards.length;i+=2){ const pair=cards.slice(i,i+2), rh=Math.max(...pair.map(c=>c.h)); need(rh+10);
+    pair.forEach((c,k)=>{ const x=L+k*(colW+14), {grp,gi}=c, gc=courseById(grp.course);
+      doc.setFillColor(...WHITE); doc.setDrawColor(...LINE); doc.setLineWidth(.8); doc.roundedRect(x,y-6,colW,c.h,8,8,'FD');
+      doc.setFillColor(...IVORY); doc.roundedRect(x,y-6,colW,30,8,8,'F'); doc.rect(x,y+12,colW,12,'F'); doc.setDrawColor(...LINE); doc.line(x,y+24,x+colW,y+24);
+      font('PublicSans','bold',10.5,NAVY); doc.text(`Group ${gi+1}`,x+12,y+8); font('PublicSans','normal',8,MUTED); doc.text(`code ${grp.code}`,x+12,y+19);
+      font('Cormorant','bold',15,INK); doc.text(grp.teeTime?fmtTime(grp.teeTime):`Hole ${grp.startHole||1}`,x+colW-12,y+9,{align:'right'});
+      font('PublicSans','normal',7.6,MUTED); doc.text([(gc&&gc!==course)?gc.name:null,grp.teeTime&&(grp.startHole||1)!==1?`off ${grp.startHole}`:null].filter(Boolean).join(' · '),x+colW-12,y+19,{align:'right'});
+      let yy=y+38;
+      if(!grp.players.length){ font('PublicSans','normal',9,MUTED); doc.text('Open — tee time held for extras',x+12,yy); }
+      grp.players.forEach((p,pi)=>{ const h=strokes?playerHcp(ev,grp,p):null; if(pi%2===1){ doc.setFillColor(...IVORY); doc.rect(x+1,yy-10,colW-2,rowH,'F'); }
+        font('PublicSans','normal',9.6,INK); doc.text(doc.splitTextToSize(p.name,colW-110)[0],x+12,yy);
+        const teeTxt=(p.tee&&tee&&p.tee!==tee)?p.tee+' tees':''; if(teeTxt){ font('PublicSans','normal',7.4,MUTED); doc.text(teeTxt,x+colW-70,yy,{align:'right'}); }
+        const noIdx=h&&h.ph==null; font('PublicSans',noIdx?'normal':'bold',noIdx?7.6:8.8,noIdx?MUTED:(h&&h.ph<0?GOLDDK:INK)); doc.text(stroke(h),x+colW-12,yy,{align:'right'}); yy+=rowH; }); });
+    y+=rh+10; }
+  // ---- footer
+  font('PublicSans','normal',7.6,MUTED); if(y+20>H-30){ doc.addPage(); page(); y=48; }   // the footer sits at the foot of the page it ends on
+  doc.text(doc.splitTextToSize(`Live scoring: ${scoringLink(ev)} — each group enters its code. Strokes are playing handicaps for today${tee?` from the ${tee} tees`:''}. Generated by the ${orgShort()} hub, ${new Date().toLocaleString()}.`,R2-L),L,Math.max(y+6,H-42));
   if(opt.returnDoc) return doc;
   doc.save(`${slugify(gameTitle(g))}-${g.date||'game'}-sheet.pdf`); toast('Game sheet downloaded');
 }
