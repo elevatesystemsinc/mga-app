@@ -102,16 +102,21 @@ const SKIN_VALID={par:[0,false],gross:[0,false],netpar:[0,true],net:[0,true],bog
 const SKIN_VALID_LABEL={none:'None — a skin stands on its own',par:'Par or better on the next hole',netpar:'Net par or better on the next hole',bogey:'Bogey or better on the next hole',netbogey:'Net bogey or better on the next hole'};
 /* a uniformly random integer in [0,n) from the browser's cryptographic generator (rejection sampling, no modulo bias) */
 function secureInt(n){ if(n<=1) return 0; const buf=new Uint32Array(1), lim=Math.floor(4294967296/n)*n; let x; do{ crypto.getRandomValues(buf); x=buf[0]; }while(x>=lim); return x%n; }
+/* one line under a skins board: what the next undecided hole is waiting on */
+function skinsWaitTxt(r){ const bits=[]; if(r.waitingOn) bits.push(`hole ${r.waitingOn.hole} waits on ${r.waitingOn.names.length<=3?r.waitingOn.names.join(', '):r.waitingOn.names.length+' players'}`); if(r.notStarted&&r.notStarted.length) bits.push(`${r.notStarted.length<=4?r.notStarted.join(', '):r.notStarted.length+' players'} not started`); return bits.join(' · '); }
 function skinsResult(pub,scores,rules,playerIds){
   rules=rules||{}; const inG=playerIds?new Set(playerIds):null, pl=[];
   for(const g of pub.groups||[]){ const c=pub.courses[g.course]; if(!c) continue; const order=playOrder(g.startHole);
     for(const p of g.players||[]) if(!inG||inG.has(p.id)) pl.push({p,c,next:h=>{ const i=order.indexOf(h); return i<0||i===17?null:order[i+1]; }}); }
   const at=(x,h)=>{ const s=+((scores[x.p.id]||{})[h]); if(!s) return null; const set=x.p.set||'M', hc=(x.c.hcp[set]||x.c.hcp.M)[h-1], par=(x.c.par[set]||x.c.par.M)[h-1];
     const k=rules.net&&typeof x.p.ph==='number'?strokesAt(pub,x.c,set,h,x.p.ph):0; return {s,net:s-k,par,k}; };
-  const wins=[], per={}; let carried=0, lost=0, incomplete=0;
+  // a player with no scores at all has not started (a no-show, or a late group): they do not hold a hole up, and they
+  // join the reckoning the moment their first score lands. A hole counts once every player who HAS started has it.
+  const started=pl.filter(x=>Object.values(scores[x.p.id]||{}).some(v=>+v>0)), notStarted=pl.filter(x=>!started.includes(x)).map(x=>x.p.name);
+  const wins=[], per={}; let carried=0, lost=0, incomplete=0, waitingOn=null;
   for(let h=1;h<=18;h++){
-    const rows=pl.map(x=>({x,r:at(x,h)})); if(!rows.length) continue;
-    if(rows.some(r=>!r.r)){ incomplete++; continue; }
+    const rows=started.map(x=>({x,r:at(x,h)})); if(!rows.length){ incomplete++; continue; }
+    const missing=rows.filter(r=>!r.r); if(missing.length){ incomplete++; if(!waitingOn) waitingOn={hole:h,names:missing.map(r=>r.x.p.name)}; continue; }
     const key=r=>rules.net?r.r.net:r.r.s, low=Math.min(...rows.map(key)); let lows=rows.filter(r=>key(r)===low);
     if(lows.length>1&&rules.net&&rules.grossBeatsNet){ const g=lows.filter(r=>r.r.k===0); if(g.length===1) lows=g; }
     if(lows.length!==1){ if(rules.carry) carried++; continue; }
@@ -122,7 +127,7 @@ function skinsResult(pub,scores,rules,playerIds){
         else { const [over,useNet]=SKIN_VALID[rules.validate]||[0,false]; if(!((useNet?r2.net:r2.s)<=r2.par+over)){ w.status='void'; if(rules.carry) carried+=w.count; else lost+=w.count; } } } }
     wins.push(w); if(w.status==='won') per[w.pid]=(per[w.pid]||0)+w.count;
   }
-  return {wins,per,total:wins.filter(w=>w.status==='won').reduce((a,w)=>a+w.count,0),carried,lost,incomplete,pending:wins.filter(w=>w.status==='pending').length,players:pl.length};
+  return {wins,per,total:wins.filter(w=>w.status==='won').reduce((a,w)=>a+w.count,0),carried,lost,incomplete,pending:wins.filter(w=>w.status==='pending').length,players:pl.length,started:started.length,notStarted,waitingOn};
 }
 
 /* ---------- WCCC-style scorecard ----------
