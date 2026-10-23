@@ -1,30 +1,166 @@
-# MGA Hub (side branch)
+# Club Hub
 
-The season-wide hub for the Walnut Creek CC MGA: members, board, every tournament
-(1–3 days, meals, events, field, sponsors, budget) and the season budget.
-One static `index.html` (plus the cashier, check-in and scoring pages), Supabase, Render.
-The hub keeps its own table (`mga_hub`). It replaced the original Member-Member app
-(app.wcccmga.org), which is retired; its `mm_tournament` table is left in Supabase as an archive.
+The hub for Walnut Creek Country Club and the organizations inside it. It began as the MGA Hub
+(members, board, every tournament with its meals, events, field, sponsors and budget, the season budget,
+the Calcutta, check-in, the 50/50 drawing, live scoring) and is growing into a club-wide hub with three tiers:
+the **club** (master member directory, club-run tournaments), **associations** (MGA, LGA, SMGA — each with its
+own hub) and **small groups** (a roster, games with entry fees and payouts, live scoring, a money-game ledger).
 
-## Set up the branch (once)
+One static `index.html` (plus the cashier, check-in and scoring pages), Supabase, Render. The hub keeps its
+own table (`mga_hub`), one row per organization.
 
-1. In the repo: `git checkout -b hub`
-2. Replace `index.html` and `README.md` with the ones from this zip, add `crest.png`
-   and `hub-setup.sql`. Leave `config.js` handling exactly as it is on `main`.
-3. `git add -A && git commit -m "MGA Hub" && git push -u origin hub`
+
+The product is **Flagstick** (golf software), and its crest is the only logo in the app: the white-and-gold crest leads the
+sidebar on every hub and the scoring, cashier and check-in pages; the navy-and-gold crest marks every organization card
+and row, the login card and the picker; printed scorecards, PDFs and the drawing overlays carry it too. The hub you are
+in is named in words beneath the mark.
+
+Flagstick serves many clubs from one installation: each client has its own address (`<club>.flagstickhub.com`), its own
+logins and the modules its subscription turns on. Golf management is the package (everything in this guide); Club
+management, member billing and point of sale are the coming tier, switched on per client in Flagstick's portal at
+app.flagstickhub.com. A club's **staff** logins see the whole club and invite **board** logins for each association from
+the club hub's Logins page; a board login sees its own organization only. See `docs/tenancy.md`.
+
+## Surveys
+
+Every hub has a **Surveys** page. Build a survey in sections (Thursday nights, weekend tournaments, membership…) with 0–10
+ratings, trade-off sliders (better food ↔ higher payouts), pick-one / pick-any questions, yes/no and written answers, with
+a comment box under any question and a suggestions box at the end of each section. *From the member survey template* gives
+you the full season-review survey in one click. **Open the survey** creates the private link to send out; members answer
+on their phones with no sign-in. Surveys are **anonymous**: nothing about who answered is asked or stored, only the answers
+and the day. The Results tab shows averages, distributions, how the sliders lean, option counts and every comment, with a
+CSV export. Close the survey when you are done; the link then says so.
+
+## Branches and sites
+
+- `main` → **app.wcccmga.org** — the club hub, the product going forward. The club is at `/`; each organization has its
+  own address: `/mga`, `/lga`, `/smga`, and `/<id>` for a small group. (Render: one Rewrite rule, `/*` → `/index.html`.)
+- **hub.wcccmga.org** — the MGA's address. Served from `main` as well (bare host = the MGA hub, `/club` = the club
+  hub), once the Render site for that domain is switched from the old `Hub` branch to `main`; until then it runs the
+  old MGA Hub code against its own row, kept in two-way sync (below).
+
+The MGA's hub on app.wcccmga.org and hub.wcccmga.org show the **same data**: the two are kept in two-way sync while
+anyone has the club hub or the MGA hub open (every half minute, and right after a save). An edit on either site
+reaches the other, edits to different things never collide, and when the very same field is changed in both places
+the later save wins. The sidebar shows "MGA Hub in sync" with the time of the last pass and a *Sync now* link.
+
+## Organizations and members
+
+The **club hub** keeps the **Directory** (every club member, one record each — import the club software's export, or
+add people by hand) and the list of **Organizations**: associations (MGA, LGA, SMGA) and small groups, each with its
+own hub. An organization's **Members** page is the club members who belong to it: add one from the directory, import
+the organization's own list (club members are matched and joined; new people are added to the directory too), and keep
+status, join date, notes and dues per organization. Editing a person's details anywhere updates the directory.
+
+## Live scoring, always
+
+Every tournament round and every small-group game has an open scoring event the moment it exists — nothing to switch
+on. A tournament's rounds are suggested from its length and team size (change them under Rounds & results), the field
+flows into each round's event as players sign up, and the Golf page, the scoring link and the leaderboard are ready
+from day one. The sidebar and dashboards show the leaderboards of events happening today.
+
+## Rounds & results
+
+Each tournament declares its rounds — one or more per day, each with a format (a day can be scramble on the front
+and shamble on the back, the next day best ball). **Create scoring events** builds the live-scoring events from the
+field in one click, teams and all; later days copy the first day's flights, and groups can be copied too. **Results**
+total every round per team or player, overall and by flight, print to a branded **results sheet (PDF)**, and can be
+sent to the Calcutta as finishes. **Flights** are set once per tournament by combined Handicap Index (with the optional
+partner handicap differential cap, e.g. 10 strokes: a +2 and a 12 play as +2 and 8) and pushed to every round; day one
+groups are built by handicap, later days **paired by the standings** (leaders off last with tee times, on hole 1 for a
+shotgun), and every group stays editable. Tournament
+details has checkboxes for which tabs a tournament uses: the Calcutta, sponsors, meals, checklist and the 50/50 drawing
+are optional; registration, check-in and rounds are always there.
+
+## Game library
+
+The club hub's **Game library** lists every game the hub can score — stroke play, maximum score, Stableford and modified,
+quota and Chicago, par/bogey, singles, Nassau, four-ball, Hi-Lo and foursomes match play, best ball of any size,
+aggregate, 1-2-3, cha-cha-cha, 1-2-3 by par, yellow ball, shamble, team Stableford, scramble and Florida scramble,
+foursomes, greensome, Chapman, a front/back split, and the side games (skins, dots, closest to the pin, long drive,
+low gross/net pots, blind-draw partners, hole-in-one) plus random, ABCD and balanced partner draws — and lets the club
+switch any of them off for its associations and small groups. **Draw partners** on an event (or a game) draws teams
+before or after the round.
+
+## Formats
+
+Scoring events (and small-group games) support stroke play, Stableford, modified Stableford, quota, par/bogey, singles
+and four-ball match play, best ball (any 1 to size−1 balls of a 2- to 6-player team, or 1-2-3), aggregate, scramble
+(2–6 players), shamble, foursomes, greensome/Chapman, team Stableford, and a front/back split. Allowances default to
+the USGA tables (club defaults where the USGA has none) and are editable per event. `docs/formats.md` spells out every
+format's team score and handicap math, with worked examples.
+
+## Small groups
+
+A small group's hub is the regular game, and small tournaments when it wants them (the same Tournaments page as an
+association, with the Calcutta, meals and the rest switched on per tournament).
+
+**Designing a game.** One screen: the day (date, course, tee time, whether money changes hands before or after the
+round, pot or net settlement), the **competitions**, and who's in. A game can run any number of competitions on the
+same scores, each with its own entry, its own players and its own payout: stroke play paying three places, a best
+ball paying two with partners **drawn after the round**, skins, dots, closest to the pin… Team competitions set how
+the partners come about: picked by hand, drawn before the round, or drawn after it. **Skins** is one pot for the day
+divided by the skins won: a tied hole is nobody's, and a skin that fails validation is lost. Gross or net,
+gross-beats-net and the validation standard on the next hole (par, net par, bogey or net bogey) are each a switch;
+a per-hole format (the pot split over 18 holes, ties carrying forward) is there for groups that play it that way.
+Skins stay off the screen during the round unless you switch "announce live" on; afterwards **Call out the skins**
+walks the cards one hole per tap, a skin stays pending until its validation hole comes up, and a failed validation
+flashes "Didn't validate" before that hole's result. Every other competition has its own **Show on the live
+leaderboard** switch in the designer, and the live scoring page shows one board per competition that is switched on
+(dots are tallied by hand and never show). Removing a player, from the game page or the designer, takes them out
+of every competition, the scoring event, the leaderboard and live scoring, scores and all. Games are deleted from the designer; deleting a scoring event
+that belongs to a game or a tournament round removes that game or round with it. A game plays **full handicaps, 100% across the board** unless the designer switches to the USGA allowances. The **who's-in grid** ticks every player into every competition
+they want, so nine can be in the skins while eight play the team game. A new game starts from the last one.
+
+**On the day.** Everyone plays their own ball; every competition is scored live from those cards. A team competition
+whose partners are not drawn yet shows individual standings until the **drawing**: a full-screen stage that draws
+with real randomness, saves the result first, then reveals the teams one at a time. A competition can be added at any point, even after you have teed off: Design, add it, pick the teams ("Teams =
+the groups" for a group-against-group challenge) and the standings pick up the scores already on the cards. Two
+team matches are built for exactly that: the **reverse waltz** (front, back and 18, each bet going to the side with
+the lower total of its counted balls; each hole counts the best three balls, then two, then one, repeating, with
+every ball counting on 9 and 18 — the board shows each side's total to par for the front, the back and the 18) and a
+plain **team Nassau** on best ball. Set what each segment is worth per player and the match is settled segment by
+segment. **Groups & handicaps** on the game page: move players between groups, set each group's starting hole or tee time,
+pick a player's tee box, and type an index for the day where it differs from the directory. Course and playing
+handicaps update on the spot, and the same card works mid-round: correct an index on the 7th tee and the standings,
+the leaderboard and every phone scoring the round pick it up within half a minute, no reload needed. The **settlement** shows what
+each player put in, pulled out and nets, and for net settlement the fewest payments that square it. The **game sheet
+PDF** carries the competitions and denominations, the teams when they are known, and the groups as they play with
+each player's strokes. The **Ledger** shows who is up or down for the season or any quarter, with a one-click
+settle-up.
+
+**Admin links.** A small group (or an association) can be run without the board password: in the club hub, open the
+organization under Organizations and create an **admin link** (`app.wcccmga.org/misfits#key=…`). Whoever opens it gets
+that organization's hub — its games, tournaments, members and live scoring — and sees the club directory (they can add
+people to it, not change them). Nothing else in the club is reachable with the link, it works on the device it was
+opened on until "Leave this hub", and the club can revoke it at any time. Run `admin-links-setup.sql` once to turn
+this on.
+
+## Dues collected by the club
+
+The club charges no dues of its own. An association sets its dues (Members → Dues settings), and new members are
+billed automatically; **Bill dues** bills everyone who still owes (full year or an installment). Each bill goes to the
+club hub's **Dues collection** page: the club exports the open charges for its billing software (or ticks them off
+one by one), marks them *on account*, and when the money is in marks them *collected* — that records the payment on
+the member in the association's books, credited to the association. The club's own budget and treasury never count it.
+
+## The club calendar
+
+The club's Tournaments page and dashboard also list every association's and small group's tournaments — name, dates,
+field size and status, with a button into that organization's hub. Their budgets and money stay in their own hubs.
+
+First time on a database the club hub offers **Set up from the MGA Hub**: it builds the directory from the MGA's list,
+registers the three associations and copies the MGA Hub's data into the MGA's hub. The club hub's Organizations page can
+re-run that import later.
+
+Both use the same Supabase project. Render serves the repo root of each branch; the built pages are committed,
+so a push is a deploy (see `CLAUDE.md` for the build).
 
 ## Supabase (same project)
 
-SQL Editor → run `hub-setup.sql`. It creates `public.mga_hub` with RLS and realtime.
-The hub signs in with the shared board login.
-
-## Render (a second static site)
-
-Render → **New → Static Site** → same repo, branch **`hub`**, publish directory `.`.
-Copy the current site's build command and environment variables
-(`SUPABASE_URL`, `SUPABASE_ANON_KEY`, `BOARD_EMAIL`) if it generates `config.js`.
-Optional: give it its own subdomain (e.g. `hub.wcccmga.org`). The current site on
-`main` keeps serving `app.wcccmga.org` untouched.
+SQL Editor → run `hub-setup.sql` (creates `public.mga_hub` with RLS and realtime), `calcutta-setup.sql`
+(cashier and check-in links), `golf-setup.sql` (live scoring) and `admin-links-setup.sql` (admin links for small
+groups and associations). The hub signs in with the shared board login; admin links work without it.
 
 ## Staying up to date
 
@@ -139,6 +275,13 @@ each have a search box: names, paddle numbers (101 or #101), lot numbers, flight
   bidders never overwrite each other; on the same one, the latest wins. A laptop that drops offline keeps
   its changes and saves them when it reconnects. **Turn off** locks the link immediately; the data stays.
 
+### Payout exports
+
+On the Payouts sub-tab: **Spreadsheet** (payouts by person, the detail behind each, and the flights), **Payouts PDF**
+(the branded sheet with finishes, team payouts and what each person is owed) and **Winners PDF (no amounts)** — the
+same sheet with no dollar figure on it, listing finishes and who should see the cashier, for posting on the board or
+online.
+
 ## Live scoring (Golf)
 
 One-time: Supabase → SQL Editor → run `golf-setup.sql`. Upload `score.html` alongside
@@ -152,8 +295,10 @@ One-time: Supabase → SQL Editor → run `golf-setup.sql`. Upload `score.html` 
   tee time), course, starting hole, and players (members, field players, or guests), each with
   a tee and men's/women's par.
 - **Open scoring**, then share the link: `…/score.html?e=<your-link>`. Players enter their
-  Group ID and score hole by hole. Scores save as they tap, queue up in dead zones, and send
-  when signal returns. `…&view=board` is a big-screen leaderboard for the clubhouse TV.
+  Group ID and score hole by hole. Each hole starts at par and the scorer taps up or down from there;
+  moving on from a hole (the Save button, the › arrow or a tap on a later hole) records par for anyone
+  left untouched, while going back changes nothing. Scores save as they tap, queue up in dead zones, and
+  send when signal returns. `…&view=board` is a big-screen leaderboard for the clubhouse TV.
 - **Leaderboard:** gross stroke play, to par for holes played, both courses combined. It's in the
   event page, on the Dashboard, and a live link sits in the sidebar while scoring is open.
   Click any player to correct a group's scores from the hub.
