@@ -158,15 +158,11 @@ function courseHcp(index,course,teeName,set){ if(index==null) return null; const
   const par=G_SUM(course.par[set||'M']||course.par.M); return whsRound(index*r.slope/113+(r.cr-par)); }
 /* strokes a player gets on one hole from a playing handicap (plus handicaps give strokes back, from hcp 18 up) */
 function strokesOn(ph,holeHcp,n){ n=n||18; if(!ph||holeHcp>n) return 0; if(ph>0) return Math.floor(ph/n)+(holeHcp<=ph%n?1:0); const g=-ph; return -(Math.floor(g/n)+(holeHcp>n-(g%n)?1:0)); }
-/* No pops on par 3s (pub.noPar3): a par 3 never gives or takes a stroke; the playing handicap is spread over the other
-   holes in stroke-index order (15 holes on a normal course: a 20 gets one on each and a second on the five hardest; a
-   plus player gives strokes back from the easiest non-par-3 hole up). strokesAt is what every net figure goes through. */
-const _SI3=new WeakMap();
-function strokeIdx3(c,set){ let m=_SI3.get(c); if(!m) _SI3.set(c,m={}); if(m[set]) return m[set];
-  const hc=c.hcp[set]||c.hcp.M, par=c.par[set]||c.par.M, holes=[]; for(let i=0;i<18;i++) if(par[i]!==3) holes.push(i);
-  holes.sort((a,b)=>hc[a]-hc[b]); const si=Array(18).fill(99); holes.forEach((i,r)=>{ si[i]=r+1; }); si.n=holes.length||18; return m[set]=si; }
+/* No pops on par 3s (pub.noPar3): the stroke index stays as printed on the card, but a par 3 never gives or takes a
+   stroke — a stroke that falls on a par 3 is simply lost (the owner: that is the proper way). strokesAt is what every
+   net figure goes through. */
 function strokesAt(pub,c,set,h,ph){ if(ph==null||!ph||!c) return 0; set=set||'M';
-  if(pub&&pub.noPar3){ const si=strokeIdx3(c,set); return strokesOn(ph,si[h-1],si.n); }
+  if(pub&&pub.noPar3&&(c.par[set]||c.par.M)[h-1]===3) return 0;
   return strokesOn(ph,(c.hcp[set]||c.hcp.M)[h-1]); }
 
 
@@ -834,7 +830,7 @@ window.__canReload=()=>!queue.length;
    page counts, and a reload is tried once per build — if the page that comes back is still the old one, the CDN
    hasn't caught up; wait a while before trying that build again. */
 (function(){
-  const ME='20261023022801', KEY='au_tried', RETRY=10*60*1000; let ready=false, lastCheck=0;
+  const ME='20261023022942', KEY='au_tried', RETRY=10*60*1000; let ready=false, lastCheck=0;
   const typing=()=>{ const a=document.activeElement; return a&&/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)&&a.value&&a.type!=='search'; };
   const safe=()=>!typing()&&(typeof window.__canReload!=='function'||window.__canReload());
   const tried=()=>{ try{ const [b,t]=(sessionStorage.getItem(KEY)||'').split('|'); return b?{build:b,at:+t||0}:null; }catch(_){ return null; } };
