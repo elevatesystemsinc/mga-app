@@ -256,6 +256,11 @@ async def main():
     ok=(r['skins']==[[2,'Bo Baker',2],[8,'Cy Cole',6]] and r['total']==8 and r['lb'][0]==['Bo Baker',1,70] and r['lb'][1]==['Ann Able',2,71] and r['dots']==['4/0','5/0','1/0','0/0']
         and r['pot']==[2,[1,1]] and 'carry' not in r['potTxt'])   # pot skins: a skin is a skin, nothing carries
     print('skins + leaderboard + dots', r, 'OK' if ok else 'FAIL'); bad+=not ok
+    # Export cards: one JSON with every card, the handicaps, the competitions' rules and the computed results
+    r=await pg.evaluate("""()=>{ const g=seasonGames()[0]; if(!g) return {noGame:true}; const ev=ensureGameEvent(g); let got=null; const real=window.deliverFile; window.deliverFile=(b,n)=>{ got={n,b}; }; try{ exportGameCards(g); } finally { window.deliverFile=real; }
+      if(!got) return {none:true}; return got.b.text().then(t=>{ const o=JSON.parse(t); return {name:got.n, cards:o.cards.length, players:g.players.length, comps:o.competitions.map(c=>[c.kind,!!c.computed]), hasCourses:!!o.event.courses, hasHoles:o.cards.some(c=>Object.keys(c.holes).length===18)}; }); }""")
+    ok=not r.get('noGame') and not r.get('none') and r['name'].endswith('-cards.json') and r['cards']==r['players'] and all(c[1] for c in r['comps'] if c[0] in ('skins','format')) and r['hasCourses'] and r['hasHoles']
+    print('export cards', r, 'OK' if ok else 'FAIL'); bad+=not ok
     r=await pg.evaluate("""async()=>{ const g=GAME(); const S=()=>document.getElementById('dSave').click(); payFormat(g,g.pots[0]); const pcts=document.getElementById('pfP').value; S(); paySkins(g,g.pots[1]); S();
       payDots(g,g.pots[2]); const di=document.querySelector('[data-dt="gp_p3|Sandy"]'); di.value='2'; di.dispatchEvent(new Event('input')); S();
       const beforeDraw=eventBoard(potPub(g,g.pots[3]),scoresFor(gameEvent(g)),{sort:'gross'}).filter(r=>r.n).length;   // individual standings until the draw

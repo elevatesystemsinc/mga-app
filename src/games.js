@@ -266,7 +266,7 @@ function vGame(m,g){
       ${potStandingsHTML(g,pot,ev)}
       ${payoutsTxt?`<div style="padding:10px 22px;display:flex;gap:6px;flex-wrap:wrap;border-top:1px solid var(--line)">${payoutsTxt}</div>`:''}</div>`; };
   const settleCard=`<div class="card" style="overflow:hidden"><div class="cardhead"><div><h2 class="h2">Settlement</h2><span class="muted">${g.settle==='net'?'Net: one figure per player, and the fewest payments that square it':'Pot: everyone puts in, winners pull out'} · ${gMoney(S.out)} of ${gMoney(S.inn)} paid out${Math.abs(mo.left)>0.004?` · <b class="${mo.left>0?'':'neg'}">${gMoney(Math.abs(mo.left))} ${mo.left>0?'still in the pot':'over the pot'}</b>`:''}</span></div>
-      <div class="actions"><button class="btn sm" id="gmSheet">${I.down}Game sheet PDF</button><button class="btn sm" id="gmImg1" title="Page 1 — the game and house rules, as an image for BAND or a text">Rules image</button><button class="btn sm" id="gmImg2" title="Page 2 — the groups and tee times, as an image">Groups image</button>${g.status==='settled'?'<button class="btn sm" id="gmReopen">Reopen</button>':'<button class="btn sm" id="gmSettle">Mark settled</button>'}</div></div>
+      <div class="actions"><button class="btn sm" id="gmSheet">${I.down}Game sheet PDF</button><button class="btn sm" id="gmImg1" title="Page 1 — the game and house rules, as an image for BAND or a text">Rules image</button><button class="btn sm" id="gmImg2" title="Page 2 — the groups and tee times, as an image">Groups image</button><button class="btn sm" id="gmCards" title="Every scorecard, the handicaps, the rules and the computed results in one file — for checking a game after the fact">Export cards</button>${g.status==='settled'?'<button class="btn sm" id="gmReopen">Reopen</button>':'<button class="btn sm" id="gmSettle">Mark settled</button>'}</div></div>
     ${g.players.length?`<div class="tw"><div class="t" style="min-width:560px"><div class="tr th" style="grid-template-columns:minmax(160px,1fr) 100px 100px 110px"><span>Player</span><span class="r">Put in</span><span class="r">Pulled out</span><span class="r">Net</span></div>
       ${S.rows.map(r=>`<div class="tr num" style="grid-template-columns:minmax(160px,1fr) 100px 100px 110px"><b class="trunc">${esc(r.name)}</b><span class="r">${gMoney(r.inn)}</span><span class="r ${r.out?'pos':'muted'}">${r.out?gMoney(r.out):'—'}</span><b class="r ${netCls(r.net)}">${gSigned(r.net)}</b></div>`).join('')}</div></div>
       ${g.settle==='net'?`<div style="padding:14px 22px;border-top:1px solid var(--line)"><span class="lbl">Who pays whom</span>${S.transfers.length?`<div class="mini" style="margin-top:6px">${S.transfers.map(t=>`<div class="mr num" style="grid-template-columns:minmax(0,1fr) 90px"><span>${esc(t.from)} <span class="muted">pays</span> ${esc(t.to)}</span><b class="r">${gMoney(t.amount)}</b></div>`).join('')}</div>`:'<p class="muted" style="margin:6px 0 0">Nothing to settle yet.</p>'}</div>`:''}`:''}</div>`;
@@ -291,7 +291,7 @@ function vGame(m,g){
   const cp=$('gmCopy'); if(cp) cp.onclick=async()=>{ try{ await navigator.clipboard.writeText(link); toast('Link copied'); }catch(_){ prompt('Copy this link:',link); } };
   $('gmGroups').onclick=()=>{ view.geid=ev.id; view.getab='groups'; go('golf'); };
   wireGameGroups(m,g,ev);
-  $('gmSheet').onclick=()=>gameSheetPDF(g); $('gmImg1').onclick=()=>sheetImage(g,1); $('gmImg2').onclick=()=>sheetImage(g,2);
+  $('gmSheet').onclick=()=>gameSheetPDF(g); $('gmImg1').onclick=()=>sheetImage(g,1); $('gmImg2').onclick=()=>sheetImage(g,2); $('gmCards').onclick=()=>exportGameCards(g);
   m.querySelectorAll('[data-gsheet]').forEach(b=>b.onclick=()=>scoreSheet(ev,ev.groups.find(x=>x.id===b.dataset.gsheet)));
   m.querySelectorAll('[data-gp]').forEach(r=>r.onclick=()=>editGamePlayer(g,g.players.find(p=>p.id===r.dataset.gp)));
   m.querySelectorAll('[data-gin]').forEach(c=>c.onchange=()=>{ const [pid,plid]=c.dataset.gin.split('|'); const pot=g.pots.find(x=>x.id===pid); if(c.checked) pot.inn[plid]=true; else delete pot.inn[plid]; persist(); render(); });
@@ -738,6 +738,31 @@ async function deliverImage(cv,name,title){
     <div class="imgv-bar">${canShare?'<button class="rf-go" id="ivShare">Share / Save image</button>':''}<span>${canShare?'or ':''}press and hold the image to save it</span></div>`;
   const close=()=>{ ov.remove(); URL.revokeObjectURL(url); }; ov.querySelector('#ivClose').onclick=close;
   const sb=ov.querySelector('#ivShare'); if(sb) sb.onclick=async()=>{ const r=await share(); if(r===true) close(); else if(r===false) toast('Press and hold the image to save it'); };
+}
+/* every card and everything needed to check them: the published event (courses, groups, handicaps), each hole score,
+   each competition's rules, teams and payouts, and what the hub computed from it (standings, skins). One JSON file. */
+function exportGameCards(g){
+  const ev=gameEvent(g); if(!ev){ toast('No scoring event'); return; }
+  const pub=publicEvent(ev), sc=scoresFor(ev), evp=evPlayers(ev);
+  const cards=evp.map(({p,grp})=>{ const h=playerHcp(ev,grp,p), gp=g.players.find(x=>x.gpid===p.id)||{}, holes={}; let gross=0,n=0; for(let k=1;k<=18;k++){ const v=+((sc[p.id]||{})[k]); if(v){ holes[k]=v; gross+=v; n++; } }
+    return {playerId:p.id,name:gpName(gp.id?gp:{name:p.name}),group:grp.label||grp.code,groupCode:grp.code,course:grp.course,tee:p.tee||ev.defaultTee,index:h.idx!=null?h.idx:null,courseHcp:h.ch,playingHcp:h.ph,holes,gross,holesPlayed:n}; });
+  const comps=g.pots.map(pot=>{ const o={id:pot.id,name:pot.name,kind:pot.kind,entry:pot.entry,rules:pot.rules,players:potPlayers(g,pot).map(p=>p.gpid),teams:pot.teams||null,sitOut:pot.sitOut||[],payouts:pot.payouts||[]};
+    try{ if(pot.kind==='skins'){ const r=skinsCalc(g,pot); o.computed={skins:r&&r.wins,total:r&&r.total,pending:r&&r.pending,lost:r&&r.lost,waitingOn:r&&r.waitingOn,notStarted:r&&r.notStarted}; }
+      else if(pot.kind==='format'){ const pp=potPub(g,pot); o.computed={standings:eventBoard(pp,sc,{sort:pp.scoring}).map(r=>({pos:r.posTxt,name:r.name,thru:r.thru,gross:r.gross,net:r.net,pts:r.pts,ptsRaw:r.ptsRaw,quota:r.quota,need:r.need,status:r.status,members:r.members||null}))}; } }catch(e){ o.computed={error:String(e&&e.message||e)}; }
+    return o; });
+  const out={exported:new Date().toISOString(),build:window.__build||'',club:CLUB&&CLUB.name,org:orgName(),game:{id:g.id,name:gameTitle(g),date:g.date,time:g.time,course:g.course,tee:g.tee,hcp:g.hcp||'full',payWhen:g.payWhen,settle:g.settle,rules:g.rules||'',notes:g.notes||''},
+    event:{id:ev.id,slug:ev.slug,status:ev.status,format:pub.format,scoring:pub.scoring,allow:pub.allow,noPar3:pub.noPar3,points:pub.points,courses:pub.courses,groups:pub.groups},cards,competitions:comps,
+    notes:'Scores are gross per hole. playingHcp is the course handicap at the game’s allowance; strokes fall by the course’s hcp (stroke index) array, none on par 3s where a competition says noPar3. Skins: see competitions[].rules.skins and computed.'};
+  deliverFile(new Blob([JSON.stringify(out,null,1)],{type:'application/json'}),`${slugify(gameTitle(g))}-${g.date||'game'}-cards.json`,`${gameTitle(g)} — scorecards`);
+}
+/* a file onto the device: desktops download; phones get the share sheet, or the file opened in a tab to share from there */
+async function deliverFile(blob,name,title){
+  const touch=matchMedia('(pointer:coarse)').matches||/iPhone|iPad|Android/i.test(navigator.userAgent);
+  const file=new File([blob],name,{type:blob.type});
+  if(touch&&navigator.canShare&&navigator.canShare({files:[file]})&&navigator.share){ try{ await navigator.share({files:[file],title}); return; }catch(e){ if(e&&e.name==='AbortError') return; } }
+  const url=URL.createObjectURL(blob);
+  if(touch){ window.open(url,'_blank'); toast('Opened in a new tab — share it from there'); setTimeout(()=>URL.revokeObjectURL(url),60000); return; }
+  const a=document.createElement('a'); a.href=url; a.download=name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(url),4000); toast('Downloaded');
 }
 /* plain-English rules of one competition, for the sheet */
 function potRulesText(pot){
