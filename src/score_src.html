@@ -67,11 +67,25 @@ h1{font-family:var(--serif);font-weight:700;color:var(--navy);font-size:32px;mar
 .chips{display:flex;gap:6px;flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;margin:0 -14px 10px;padding:0 14px 2px;-webkit-overflow-scrolling:touch}.chips::-webkit-scrollbar{display:none}
 .chips button{flex:0 0 auto;height:36px;padding:0 14px;border-radius:999px;border:1px solid var(--line);background:#fff;font-weight:700;font-size:13px;color:var(--muted);white-space:nowrap}.chips button.on{background:var(--navy);border-color:var(--navy);color:#fff}
 .chips.sub button{height:32px;font-size:12.5px;padding:0 12px}
-.lb.sk{grid-template-columns:44px minmax(0,1fr) 40px}
+.lb.sk{grid-template-columns:44px minmax(0,1fr) 40px} .big .lb.sk{grid-template-columns:90px minmax(0,1fr) 110px} .big .lb.h{font-size:18px}
+.lb.none{display:block;text-align:center;padding:26px 16px}
 .lb.m{grid-template-columns:40px minmax(0,1fr) 36px 92px} .big .lb.m{grid-template-columns:70px minmax(0,1fr) 90px 200px} .big .lb .muted{font-size:18px}
 .fmtpill{display:inline-block;padding:4px 12px;border-radius:999px;background:#F6ECCF;border:1px solid #E5CF8E;color:#6B4F12;font-weight:800;font-size:12.5px}
 .pop{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--gold);margin-left:6px;vertical-align:2px}
 .big .lb .tp{font-size:30px} .big main{max-width:1100px}
+/* desktop: the same board with room to breathe — a wider card, larger rows, the title above the competitions */
+.ttl{display:none}
+@media (min-width:900px){
+  body:not(.big) main{max-width:1040px;padding:26px 28px 80px}
+  body:not(.big) .ttl{display:block;font-family:var(--serif);font-size:38px;line-height:1.05;margin:4px 2px 16px;color:var(--navy)} body:not(.big) .ttl small{display:block;font-family:var(--sans);font-size:14px;font-weight:600;color:var(--muted);margin-top:6px;letter-spacing:.02em}
+  body:not(.big) .chips button{height:44px;font-size:15px;padding:0 20px}
+  body:not(.big) .lb{grid-template-columns:64px minmax(0,1fr) 90px 120px;gap:14px;padding:16px 24px;font-size:19px}
+  body:not(.big) .lb.h{font-size:13px;padding-top:12px;padding-bottom:12px}
+  body:not(.big) .lb .tp{font-size:26px} body:not(.big) .lb .muted{font-size:14px}
+  body:not(.big) .lb.sk{grid-template-columns:72px minmax(0,1fr) 90px} body:not(.big) .lb.m{grid-template-columns:64px minmax(0,1fr) 70px 220px}
+  body:not(.big) .lb.none{padding:40px 24px;font-size:17px}
+  body:not(.big) main>p.muted,body:not(.big) .card+p.muted{font-size:14px}
+}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
 </head>
@@ -260,9 +274,9 @@ function subLine(r,net){ if(r.unit==='match') return r.segs?`<div class="muted" 
 function renderSkinsBoard(comp,fromJoin){
   const sk=comp.skins||{}, r=skinsResult(compPub(pub,comp),scores,sk,comp.players), per=sk.mode==='hole', won=r.wins.filter(w=>w.status==='won');
   const txt=sk.validate&&sk.validate!=='none'?{par:'par',netpar:'net par',bogey:'bogey',netbogey:'net bogey'}[sk.validate]||'':'';
-  $('main').innerHTML=`${BIG?`<h1 style="font-size:44px;margin:6px 4px 16px">${esc(pub.name)} · ${esc(comp.name)}</h1>`:''}${BIG?'':compChips()}
+  $('main').innerHTML=`${BIG?`<h1 style="font-size:44px;margin:6px 4px 16px">${esc(pub.name)} · ${esc(comp.name)}</h1>`:`<h1 class="ttl">${esc(pub.name)}<small>${esc(comp.name)} · ${sk.net?'net':'gross'} skins · live</small></h1>`}${BIG?'':compChips()}
    <div class="card" style="overflow:hidden"><div class="lb h${per?'':' sk'}"><span>Hole</span><span>Skin</span><span class="r"></span>${per?'<span class="r">Holes</span>':''}</div>
-   ${r.wins.length?r.wins.map(w=>`<div class="lb num${per?'':' sk'}"><b>${w.hole}</b><div style="min-width:0"><div style="font-weight:700">${esc(w.name)}</div><div class="muted" style="font-size:12px">${w.score}${sk.net&&w.net!==w.score?' (net '+w.net+')':''}${w.status==='void'?' · didn’t validate on '+w.checkHole:w.status==='pending'?' · validates on '+w.checkHole:txt?' · validated':''}</div></div><span class="r ${w.status==='void'?'neg':w.status==='pending'?'muted':'pos'}" style="font-weight:800">${w.status==='void'?'✕':w.status==='pending'?'…':'✓'}</span>${per?`<span class="r">${w.count>1?w.count:''}</span>`:''}</div>`).join(''):'<div class="lb"><span></span><span class="muted">No skins yet.</span></div>'}
+   ${r.wins.length?r.wins.map(w=>`<div class="lb num${per?'':' sk'}"><b>${w.hole}</b><div style="min-width:0"><div style="font-weight:700">${esc(w.name)}</div><div class="muted" style="font-size:12px">${w.score}${sk.net&&w.net!==w.score?' (net '+w.net+')':''}${w.status==='void'?' · didn’t validate on '+w.checkHole:w.status==='pending'?' · validates on '+w.checkHole:txt?' · validated':''}</div></div><span class="r ${w.status==='void'?'neg':w.status==='pending'?'muted':'pos'}" style="font-weight:800">${w.status==='void'?'✕':w.status==='pending'?'…':'✓'}</span>${per?`<span class="r">${w.count>1?w.count:''}</span>`:''}</div>`).join(''):'<div class="lb none"><span class="muted">No skins yet — the first one shows here as the cards come in.</span></div>'}
    </div><p class="muted" style="text-align:center;font-size:12.5px">${won.length} skin${won.length===1?'':'s'}${r.pending?' · '+r.pending+' pending':''} · ${sk.net?(sk.grossBeatsNet?'net, gross beats net':'net'):'gross'}${txt?' · validated by '+txt+' on the next hole':''} · updates live</p>${fromJoin?'<p style="text-align:center"><button class="btn" id="backJoin">Back</button></p>':''}`;
   const bj=$('backJoin'); if(bj) bj.onclick=()=>renderJoin();
   document.querySelectorAll('[data-comp]').forEach(b=>b.onclick=()=>{ lbComp=b.dataset.comp; renderBoard(fromJoin); }); chipIntoView();
@@ -280,7 +294,7 @@ function renderBoard(fromJoin){
   const lb=eventBoard(pub,scores,{flight:lbFlight,sort:net?'net':'gross',view:BB?lbView:'players'});
   const valTxt=r=>MATCH?r.status:unit==='points'?ptsTxt(r):unit==='holes'?(r.n?(r.holesUp>0?'+':'')+r.holesUp:'—'):(r.n?toParTxt(net&&r.netToPar!=null?r.netToPar:r.toPar):'—');
   const colHead=MATCH?(lb.some(r=>r.segs)?'The 18':'Match'):unit==='points'?(playerFormatOf(pub)==='quota'?'vs quota':'Points'):unit==='holes'?'Holes':(net?'Net':'To par'), mcls=MATCH?' m':'';
-  $('main').innerHTML=`${BIG?`<h1 style="font-size:44px;margin:6px 4px 16px">${esc(pub.name)}${lbFlight?' · Flight '+esc(lbFlight):''}</h1>`:''}
+  $('main').innerHTML=`${BIG?`<h1 style="font-size:44px;margin:6px 4px 16px">${esc(pub.name)}${lbFlight?' · Flight '+esc(lbFlight):''}</h1>`:`<h1 class="ttl">${esc(pub.name)}${lbFlight?' · Flight '+esc(lbFlight):''}<small>${esc(MATCH?formatSummary(pub):(net?'Net ':'Gross ')+FORMAT_LABEL[playerFormatOf(pub)].toLowerCase())} · live leaderboard</small></h1>`}
    ${BIG?'':compChips()}${!BIG&&(flights.length||hasNet||BB)?`<div class="chips sub">${BB&&!noPl&&!MATCH?[['teams','Teams'],['players','Players']].map(([k,l])=>`<button data-vw="${k}" class="${lbView===k?'on':''}">${l}</button>`).join(''):''}${hasNet&&!MATCH&&unit==='strokes'?['gross','net'].map(x=>`<button data-sort="${x}" class="${(net?'net':'gross')===x?'on':''}">${x==='net'?'Net':'Gross'}</button>`).join(''):''}${flights.length?['',...flights].map(f=>`<button data-fl="${f}" class="${lbFlight===f?'on':''}">${f?'Flight '+f:'All'}</button>`).join(''):''}</div>`:''}
    <div class="card" style="overflow:hidden">
    <div class="lb h${mcls}"><span>Pos</span><span>${MATCH?'Side':BB&&lbView==='teams'?'Team':'Player'}</span><span class="r">Thru</span><span class="r">${colHead}</span></div>
@@ -300,7 +314,7 @@ function renderCompBoard(comp,fromJoin){
   const valTxt=r=>MATCH?r.status:unit==='points'?ptsTxt(r):unit==='holes'?(r.n?(r.holesUp>0?'+':'')+r.holesUp:'—'):(r.n?toParTxt(net&&r.netToPar!=null?r.netToPar:r.toPar):'—');
   const colHead=MATCH?(lb.some(r=>r.segs)?'The 18':'Match'):unit==='points'?(playerFormatOf(pub)==='quota'?'vs quota':'Points'):unit==='holes'?'Holes':(net?'Net':'To par'), mcls=MATCH?' m':'';
   const teamsPending=comp.teams==null&&(FORMATS[comp.format]||{}).team&&(+comp.teamSize||1)>=2;
-  $('main').innerHTML=`${BIG?`<h1 style="font-size:44px;margin:6px 4px 16px">${esc(pub.name)} · ${esc(comp.name)}</h1>`:''}${BIG?'':compChips()}
+  $('main').innerHTML=`${BIG?`<h1 style="font-size:44px;margin:6px 4px 16px">${esc(pub.name)} · ${esc(comp.name)}</h1>`:`<h1 class="ttl">${esc(pub.name)}<small>${esc(comp.name)}${formatSummary(cp)!==comp.name?' · '+esc(formatSummary(cp)):''} · live</small></h1>`}${BIG?'':compChips()}
    ${teamsPending?'<div class="banner">Partners are drawn after the round — individual standings until then.</div>':''}
    <div class="card" style="overflow:hidden"><div class="lb h${mcls}"><span>Pos</span><span>${MATCH?'Side':BB?'Team':'Player'}</span><span class="r">Thru</span><span class="r">${colHead}</span></div>
    ${lb.map(r=>`<div class="lb num${mcls}${mine.has(r.id)||(r.members||[]).some(id=>mine.has(id))?' me':''}"${r.groupId?` data-card="${esc(r.groupId)}|${esc(r.team?(r.members||[])[0]:r.id)}" style="cursor:pointer"`:''}><b>${r.posTxt}</b><div style="min-width:0"><div style="font-weight:700;${r.team?'line-height:1.25':'overflow:hidden;text-overflow:ellipsis;white-space:nowrap'}" title="${esc(r.name)}">${r.team?r.name.split(' / ').map(esc).join('<br>'):esc(r.name)}</div>${MATCH?subLine(r,net):BIG||unit!=='strokes'?'':subLine(r,net)}</div><span class="r muted">${r.thru||'—'}</span>${(()=>{ if(MATCH) return matchCell(r); const v=unit==='strokes'?(net?r.netToPar:r.toPar):null; return `<span class="tp ${r.n&&v!=null&&v<0?'pos':r.n?'':'muted'}">${valTxt(r)}</span>`; })()}</div>`).join('')||'<div class="lb"><span></span><span class="muted">No scores yet.</span></div>'}

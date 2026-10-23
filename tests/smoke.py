@@ -181,6 +181,15 @@ async def main():
     ok=(r['hasTee'] and r['gTee']=='Gold' and r['def']=='Gold' and set(r['tees0'])=={'Gold'} and set(r['courses'])=={'pecan'} and r['gCourse']=='pecan'
         and set(r['tees1'])=={'White'} and r['tees2'].count('Blue')==1 and r['tees2'].count('White')==len(r['tees2'])-1 and r['groups']>=2)
     print('game default course & tee', r, 'OK' if ok else 'FAIL'); bad+=not ok
+    # placeholder groups: five empty groups added in a row stay (with their own tee times), survive a player moving, and an empty one can be removed
+    r=await pg.evaluate("""()=>{ designGame(null); const d=GD.draft; ['p0','p1'].forEach(id=>addPlayer(d,{memberId:id})); $('gdSave').click(); const g=db.games[db.games.length-1]; view.gameId=g.id; go('games'); const ev=ensureGameEvent(g); render();
+      const before=ev.groups.length; for(let i=0;i<5;i++) document.getElementById('ggAddGroup').click(); const after=ev.groups.length;
+      const t=document.querySelector(`[data-gtime="${ev.groups[1].id}"]`); t.value='08:20'; t.dispatchEvent(new Event('change'));
+      const mv=document.querySelector('[data-gmove]'); mv.value=ev.groups[2].id; mv.dispatchEvent(new Event('change')); const afterMove=ev.groups.length, synced=(ensureGameEvent(g),ev.groups.length);
+      const time=ev.groups[1].teeTime; const rm=document.querySelector('[data-grm]'); if(rm) rm.click(); const afterRemove=ev.groups.length;
+      deleteGame(g); view.gameId=null; go('games'); return {before,after,afterMove,synced,afterRemove,time,hadRemove:!!rm}; }""")
+    ok=r['before']==1 and r['after']==6 and r['afterMove']==6 and r['synced']==6 and r['hadRemove'] and r['afterRemove']==5 and r['time']=='08:20'
+    print('placeholder groups stay', r, 'OK' if ok else 'FAIL'); bad+=not ok
     # pops on par 3s is per competition: the skins pot can switch it on while the stroke pot keeps the classic allocation
     r=await pg.evaluate("""()=>{ designGame(null); const d=GD.draft; d.pots.push(newPot('skins',d)); const sk=d.pots.find(p=>p.kind==='skins'); render();
       const box=document.getElementById('gdNP3_'+sk.id), other=document.getElementById('gdNP3_'+d.pots[0].id); box.checked=true; box.dispatchEvent(new Event('change'));

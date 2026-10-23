@@ -314,7 +314,7 @@ function gameGroupsCard(g,ev){
       <select class="inp" data-gtee="${p.id}" aria-label="Tee for ${esc(p.name)}">${tees(c).map(t=>`<option${(p.tee||ev.defaultTee)===t?' selected':''}>${esc(t)}</option>`).join('')}</select>
       <span class="r">${h.ch!=null?h.ch:'—'}</span><b class="r">${h.ph!=null?h.ph:'—'}</b>
       <select class="inp" data-gmove="${p.id}" aria-label="Group for ${esc(p.name)}">${ev.groups.map((x,i)=>`<option value="${x.id}"${x===grp?' selected':''}>Group ${i+1} · ${esc(x.code)}</option>`).join('')}<option value="__new">+ New group</option></select></div>`; };
-  const groupHead=(grp,i)=>`<div class="tr" style="grid-template-columns:minmax(0,1fr) 150px 120px 110px;background:var(--ivory)"><div class="cell2"><b>Group ${i+1} · ${esc(grp.code)}</b><small>${grp.players.length} player${grp.players.length===1?'':'s'}</small></div>
+  const groupHead=(grp,i)=>`<div class="tr" style="grid-template-columns:minmax(0,1fr) 150px 120px 110px;background:var(--ivory)"><div class="cell2" style="flex-direction:row;align-items:center;gap:10px"><div class="cell2"><b>Group ${i+1} · ${esc(grp.code)}</b><small>${grp.players.length?grp.players.length+' player'+(grp.players.length===1?'':'s'):'Empty — a placeholder tee time; move players in with the Group column'}</small></div>${grp.players.length?'':`<button class="ib" data-grm="${grp.id}" aria-label="Remove empty group" title="Remove this group">${I.trash}</button>`}</div>
       <select class="inp" data-gcourse="${grp.id}" aria-label="Course">${courses.map(c=>`<option value="${c.id}"${c.id===grp.course?' selected':''}>${esc(c.name)}</option>`).join('')}</select>
       <select class="inp" data-ghole="${grp.id}" aria-label="Starting hole">${Array.from({length:18},(_,k)=>`<option value="${k+1}"${(+grp.startHole||1)===k+1?' selected':''}>Hole ${k+1}</option>`).join('')}</select>
       <input class="inp" type="time" data-gtime="${grp.id}" value="${esc(grp.teeTime||'')}" aria-label="Tee time"></div>`;
@@ -333,15 +333,14 @@ function wireGameGroups(m,g,ev){
   m.querySelectorAll('[data-gtee]').forEach(s=>s.onchange=()=>{ const f=find(s.dataset.gtee); if(f){ f.p.tee=s.value; save(); } });
   m.querySelectorAll('[data-gmove]').forEach(s=>s.onchange=()=>{ const f=find(s.dataset.gmove); if(!f) return; let to=ev.groups.find(x=>x.id===s.value);
     if(s.value==='__new'){ to={id:uid(),code:newCode(ev),label:'Group '+(ev.groups.length+1),course:f.grp.course,startHole:1,teeTime:f.grp.teeTime||'',players:[]}; ev.groups.push(to); }
-    if(!to||to===f.grp) return; f.grp.players=f.grp.players.filter(x=>x!==f.p); to.players.push(f.p); ev.groups=ev.groups.filter(x=>x.players.length); save(); });
+    if(!to||to===f.grp) return; f.grp.players=f.grp.players.filter(x=>x!==f.p); to.players.push(f.p); save(); });   // an emptied group stays — it may be a placeholder tee time
   m.querySelectorAll('[data-gcourse]').forEach(s=>s.onchange=()=>{ const grp=ev.groups.find(x=>x.id===s.dataset.gcourse); if(grp){ grp.course=s.value; save(); } });
   m.querySelectorAll('[data-ghole]').forEach(s=>s.onchange=()=>{ const grp=ev.groups.find(x=>x.id===s.dataset.ghole); if(grp){ grp.startHole=+s.value; save(); } });
   m.querySelectorAll('[data-gtime]').forEach(s=>s.onchange=()=>{ const grp=ev.groups.find(x=>x.id===s.dataset.gtime); if(grp){ grp.teeTime=s.value; save(); } });
   const dc=$('ggDefCourse'); if(dc) dc.onchange=()=>{ g.course=dc.value; const c=courseById(g.course); if(c&&!c.tees.some(t=>t.name===g.tee)) g.tee=(c.tees[0]||{}).name||'White'; applyGameDefaults(g,ev,{course:true,tee:true}); save(); toast('Course set for every group'); };
   const dt=$('ggDefTee'); if(dt) dt.onchange=()=>{ g.tee=dt.value; applyGameDefaults(g,ev,{tee:true}); save(); toast('Tee set for every player'); };
-  const ng=$('ggAddGroup'); if(ng) ng.onclick=()=>{ ev.groups.push({id:uid(),code:newCode(ev),label:'Group '+(ev.groups.length+1),course:g.course||ev.defaultCourse||'oak',startHole:1,teeTime:g.time||'',players:[]}); toast('Move players into it with the Group column'); const grp=ev.groups[ev.groups.length-1];
-    // an empty group would be pruned on the next sync; keep it by rendering without one until a player lands in it
-    m.querySelector('#ggAddGroup').disabled=true; const card=m.querySelector('#ggAddGroup').closest('.card'); card.querySelectorAll('[data-gmove]').forEach(sel=>{ const o=document.createElement('option'); o.value=grp.id; o.textContent=`Group ${ev.groups.length} · ${grp.code}`; sel.insertBefore(o,sel.lastElementChild); }); };
+  const ng=$('ggAddGroup'); if(ng) ng.onclick=()=>{ ev.groups.push({id:uid(),code:newCode(ev),label:'Group '+(ev.groups.length+1),course:g.course||ev.defaultCourse||'oak',startHole:1,teeTime:'',players:[]}); save(); toast('Empty group added — set its tee time, move players in with the Group column'); };
+  m.querySelectorAll('[data-grm]').forEach(b=>b.onclick=()=>{ const grp=ev.groups.find(x=>x.id===b.dataset.grm); if(!grp||grp.players.length) return; ev.groups=ev.groups.filter(x=>x!==grp); save(); });
 }
 /* live standings for one competition, from the day's scores */
 function potStandingsHTML(g,pot,ev){
