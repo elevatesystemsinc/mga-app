@@ -259,6 +259,11 @@ async def main():
     ok=(r['skins']==[[2,'Bo Baker',2],[8,'Cy Cole',6]] and r['total']==8 and r['lb'][0]==['Bo Baker',1,70] and r['lb'][1]==['Ann Able',2,71] and r['dots']==['4/0','5/0','1/0','0/0']
         and r['pot']==[2,[1,1]] and 'carry' not in r['potTxt'])   # pot skins: a skin is a skin, nothing carries
     print('skins + leaderboard + dots', r, 'OK' if ok else 'FAIL'); bad+=not ok
+    # a row on the game page's standings (and a skins row) opens that player's scorecard
+    r=await pg.evaluate("""()=>{ const g=seasonGames()[0]; view.gameId=g.id; go('games'); const row=document.querySelector('[data-vc]'); if(!row) return {noRow:true}; row.click();
+      const open=drawerOpen(), title=document.getElementById('dTitle').textContent, hasCard=!!document.querySelector('#dBody table, #dBody .scard'); closeDrawer(); return {open,title,hasCard,rows:document.querySelectorAll('[data-vc]').length}; }""")
+    ok=not r.get('noRow') and r['open'] and r['title']=='Scorecard' and r['hasCard'] and r['rows']>=2
+    print('standings row opens the scorecard', r, 'OK' if ok else 'FAIL'); bad+=not ok
     # Export cards: one JSON with every card, the handicaps, the competitions' rules and the computed results
     r=await pg.evaluate("""()=>{ const g=seasonGames()[0]; if(!g) return {noGame:true}; const ev=ensureGameEvent(g); let got=null; const real=window.deliverFile; window.deliverFile=(b,n)=>{ got={n,b}; }; try{ exportGameCards(g); } finally { window.deliverFile=real; }
       if(!got) return {none:true}; return got.b.text().then(t=>{ const o=JSON.parse(t); return {name:got.n, cards:o.cards.length, players:g.players.length, comps:o.competitions.map(c=>[c.kind,!!c.computed]), hasCourses:!!o.event.courses, hasHoles:o.cards.some(c=>Object.keys(c.holes).length===18)}; }); }""")
