@@ -309,7 +309,7 @@ function gameGroupsCard(g,ev){
   const cols='grid-template-columns:minmax(150px,1fr) 88px 110px 54px 54px 150px';
   const row=(grp,p)=>{ const h=playerHcp(ev,grp,p), c=courseById(grp.course), m=p.memberId?memberById(p.memberId):null, dir=m&&m.hcp!=null&&String(m.hcp).trim()!==''?String(m.hcp):'';
     return `<div class="tr num" style="${cols}"><div class="cell2"><b class="trunc">${esc(p.name)}</b>${h.missing?`<small class="neg">no ${h.missing}</small>`:p.index!=null&&String(p.index).trim()!==''&&dir&&String(p.index)!==dir?`<small>directory ${esc(dir)}</small>`:''}</div>
-      <input class="inp r" data-gidx="${p.id}" value="${esc(p.index!=null?p.index:'')}" placeholder="${esc(dir||'—')}" autocomplete="off" autocapitalize="off" aria-label="Index for ${esc(p.name)}">
+      <input class="inp r" id="gidx_${p.id}" data-gidx="${p.id}" value="${esc(p.index!=null?p.index:'')}" placeholder="${esc(dir||'—')}" autocomplete="off" autocapitalize="off" aria-label="Index for ${esc(p.name)}">
       <select class="inp" data-gtee="${p.id}" aria-label="Tee for ${esc(p.name)}">${tees(c).map(t=>`<option${(p.tee||ev.defaultTee)===t?' selected':''}>${esc(t)}</option>`).join('')}</select>
       <span class="r">${h.ch!=null?h.ch:'—'}</span><b class="r">${h.ph!=null?h.ph:'—'}</b>
       <select class="inp" data-gmove="${p.id}" aria-label="Group for ${esc(p.name)}">${ev.groups.map((x,i)=>`<option value="${x.id}"${x===grp?' selected':''}>Group ${i+1} · ${esc(x.code)}</option>`).join('')}<option value="__new">+ New group</option></select></div>`; };

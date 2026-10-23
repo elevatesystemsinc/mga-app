@@ -160,6 +160,15 @@ async def main():
       GD=null; view.gdesign=null; go('games'); return {firstInGroup, tagged, added:!!p, name, expected:memberName(outsider), stillNotMember:!db.memberships.some(m=>m.id===outsider.id)}; }""")
     ok=not r.get('noOutsider') and r['firstInGroup'] and r['tagged'] and r['added'] and r['name']==r['expected'] and r['stillNotMember']
     print('games draw on the club directory', r, 'OK' if ok else 'FAIL'); bad+=not ok
+    # a guest's index typed on the game page survives the page redrawing mid-typing (live standings redraw often) and saves on change
+    r=await pg.evaluate("""()=>{ designGame(null); addPlayer(GD.draft,{name:'Guest Gus'}); $('gdSave').click(); const g=db.games[db.games.length-1]; if(!g) return {noGame:true}; view.gameId=g.id; view.gdesign=null; go('games'); const ev=ensureGameEvent(g); render();
+      const inp=document.querySelector('[data-gidx]'); if(!inp) return {noInput:true}; inp.focus(); inp.value='14.'; render();
+      const after=document.getElementById(inp.id); const kept=after&&after.value==='14.'&&document.activeElement===after;
+      after.value='+1.6'; after.dispatchEvent(new Event('change')); const p=evPlayers(ev).find(x=>x.p.id===after.dataset.gidx); const idx=p&&p.p.index, ph=p&&playerHcp(ev,p.grp,p.p).ph;
+      deleteGame(g); view.gameId=null; go('games');   // leave nothing behind: the next scenario starts from the last game
+      return {kept, idx, ph}; }""")
+    ok=not r.get('noGame') and not r.get('noInput') and r['kept'] and r['idx']=='+1.6' and isinstance(r['ph'],int) and r['ph']<0
+    print('index typed on the game page survives a redraw, plus accepted', r, 'OK' if ok else 'FAIL'); bad+=not ok
     # pops on par 3s is per competition: the skins pot can switch it on while the stroke pot keeps the classic allocation
     r=await pg.evaluate("""()=>{ designGame(null); const d=GD.draft; d.pots.push(newPot('skins',d)); const sk=d.pots.find(p=>p.kind==='skins'); render();
       const box=document.getElementById('gdNP3_'+sk.id), other=document.getElementById('gdNP3_'+d.pots[0].id); box.checked=true; box.dispatchEvent(new Event('change'));
