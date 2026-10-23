@@ -6315,7 +6315,7 @@ function svResultsTab(el,s){
   if(svCloud()&&Date.now()-(SV_AT[s.id]||0)>20000) loadResponses(s).then(()=>{ if(view.sid===s.id&&view.stab==='results'&&(SV_R[s.id]||[]).length!==R.length) render(); });   // coming back to the tab picks up new answers
   const n=R.length, days=R.map(r=>r.day).filter(Boolean).sort(), qs=svQuestions(s);
   const rated=qs.filter(q=>q.type==='rating').map(q=>({q,st:svStats(q,R)})).filter(x=>x.st.n), best=rated.slice().sort((a,b)=>b.st.avg-a.st.avg);
-  el.innerHTML=`<div style="display:flex;justify-content:flex-end;gap:8px;margin-bottom:12px">${btn('Refresh','svRef','',I.refresh)}${btn('Export CSV','svCsv')}</div>
+  el.innerHTML=`<div style="display:flex;justify-content:flex-end;gap:8px;margin-bottom:12px;flex-wrap:wrap">${btn('Refresh','svRef','',I.refresh)}${btn('Export CSV','svCsv')}${btn('Results PDF','svPdf','pri')}</div>
   <div class="grid g4">${kpi('Responses',n,s.status==='open'?'and counting':'')}${kpi('First / last',days.length?`${svDay(days[0])}${days.length>1&&days[days.length-1]!==days[0]?' – '+svDay(days[days.length-1]):''}`:'—','by day only — no times are kept')}
     ${kpi('Highest rated',best.length?best[0].st.avg.toFixed(1):'—',best.length?esc(best[0].q.text):'')}${kpi('Lowest rated',best.length?best[best.length-1].st.avg.toFixed(1):'—',best.length?esc(best[best.length-1].q.text):'')}</div>
   ${n?'':'<div class="card pad" style="margin-top:14px"><b>No responses yet.</b><p class="muted" style="margin:6px 0 0">Share the link above. Results appear here as they come in; press Refresh to check again.</p></div>'}
@@ -6323,6 +6323,7 @@ function svResultsTab(el,s){
     ${sec.comments?svTextCard('Suggestions and comments',R.map(r=>r.answers['sec:'+sec.id]).map(x=>String(x||'').trim()).filter(Boolean)):''}</div>`).join(''):''}`;
   $('svRef').onclick=async()=>{ await loadResponses(s); render(); toast('Results refreshed'); };
   $('svCsv').onclick=()=>svExportCSV(s,R);
+  $('svPdf').onclick=()=>{ if(!R.length){ toast('No responses yet'); return; } surveyPDF(s,R); };
 }
 function svBar(pct,label,val,cls=''){ return `<div class="svb ${cls}"><div class="svb-l"><span class="trunc">${esc(label)}</span><b>${val}</b></div><div class="svb-t"><i style="width:${Math.max(0,Math.min(100,pct)).toFixed(1)}%"></i></div></div>`; }
 function svQuestionCard(q,st,n){
@@ -6343,6 +6344,59 @@ function svExportCSV(s,R){
   const cell=v=>'"'+String(v??'').replace(/"/g,'""')+'"';
   const csv=[cols.map(c=>cell(c[0])).join(',')].concat(R.map(r=>cols.map(c=>cell(c[1](r))).join(','))).join('\r\n');
   const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob(['﻿'+csv],{type:'text/csv'})); a.download=s.title.replace(/[^\w\- ]+/g,'').trim()+' — responses.csv'; a.click(); setTimeout(()=>URL.revokeObjectURL(a.href),4000);
+}
+
+/* ---------- the results report: a branded PDF with every number and every written word, for reading or for analysis ---------- */
+async function surveyPDF(s,R,opt){
+  opt=opt||{};
+  try{ await loadJsPDF(); }catch(e){ toast(e.message); return; }
+  const crest=await crestPNG().catch(()=>null), doc=new window.jspdf.jsPDF({unit:'pt',format:'letter'});
+  [['ps400','PS-400.ttf','PublicSans','normal'],['ps700','PS-700.ttf','PublicSans','bold'],['ps800','PS-800.ttf','PublicSansXB','normal'],['cg700','CG-700.ttf','Cormorant','bold']].forEach(([k,f,fam,st])=>{ doc.addFileToVFS(f,PDF_FONTS[k]); doc.addFont(f,fam,st); });
+  const NAVY=[15,42,56],GOLD=[199,161,58],GOLDL=[216,183,95],GOLDDK=[126,95,26],IVORY=[251,250,245],INK=[20,34,43],MUTED=[86,98,106],LINE=[225,217,198],PAPER=[244,240,230];
+  const L=40,R2=572,W=612,H=792;
+  const font=(f,st,z,col)=>{ doc.setFont(f,st); doc.setFontSize(z); doc.setTextColor(...col); };
+  const page=()=>{ doc.setFillColor(...IVORY); doc.rect(0,0,W,H,'F'); };
+  const n=R.length, days=R.map(r=>r.day).filter(Boolean).sort(), qs=svQuestions(s);
+  page();
+  const subTxt=`${n} response${n===1?'':'s'}${days.length?` · ${svDay(days[0])}${days.length>1&&days[days.length-1]!==days[0]?' – '+svDay(days[days.length-1]):''}`:''} · ${s.status==='open'?'still open':'closed'} · anonymous — no respondent is identified anywhere in this report`;
+  font('PublicSans','normal',8.4,[214,218,220]); const sub=doc.splitTextToSize(subTxt,R2-L-90); const bandH=74+Math.max(0,sub.length-1)*11;
+  doc.setFillColor(...GOLD); doc.roundedRect(L,32,R2-L,bandH+4,8,8,'F'); doc.setFillColor(...NAVY); doc.roundedRect(L,32,R2-L,bandH,8,8,'F'); doc.rect(L,32+bandH-12,R2-L,8,'F');
+  if(crest) doc.addImage(crest,'PNG',L+16,42,54*850/1024,54);
+  font('PublicSansXB','normal',6.8,GOLDL); doc.text(`${(svOrgName()||'').toUpperCase()} · ${(CLUB&&CLUB.name||'').toUpperCase()}`,L+76,56,{charSpace:1.2});
+  font('Cormorant','bold',22,[255,255,255]); doc.text(doc.splitTextToSize(`${s.title} — Results`,R2-L-90)[0],L+76,80);
+  font('PublicSans','normal',8.4,[214,218,220]); doc.text(sub,L+76,96);
+  let y=32+bandH+26;
+  const need=h=>{ if(y+h>H-44){ doc.addPage(); page(); y=48; } };
+  const section=(label,note)=>{ need(44); font('PublicSansXB','normal',7.4,GOLDDK); doc.text(label.toUpperCase(),L,y,{charSpace:1.1}); if(note){ font('PublicSans','normal',8,MUTED); doc.text(doc.splitTextToSize(note,300)[0],R2,y,{align:'right'}); } y+=6; doc.setDrawColor(...GOLD); doc.setLineWidth(1); doc.line(L,y,R2,y); y+=14; };
+  const para=(txt,z,col,f,st,x,w)=>{ font(f||'PublicSans',st||'normal',z||8.6,col||INK); const lines=doc.splitTextToSize(String(txt),w||(R2-(x||L))); for(const ln of lines){ need(z*1.5); doc.text(ln,x||L,y); y+=(z||8.6)*1.38; } };
+  const bullets=(items,z)=>{ z=z||8.4; for(const t of items){ font('PublicSans','normal',z,INK); const lines=doc.splitTextToSize(String(t),R2-L-14); need(lines.length*z*1.38+2); doc.setFillColor(...GOLD); doc.circle(L+4,y-2.6,1.6,'F'); lines.forEach((ln,i)=>{ doc.text(ln,L+14,y); y+=z*1.38; }); y+=1.5; } };
+  const bar=(x,yy,w,h,pct,col)=>{ doc.setFillColor(...PAPER); doc.roundedRect(x,yy,w,h,h/2,h/2,'F'); if(pct>0){ doc.setFillColor(...(col||GOLD)); doc.roundedRect(x,yy,Math.max(h,w*Math.min(1,pct)),h,h/2,h/2,'F'); } };
+  const qTitle=(i,q,st)=>{ need(40); font('PublicSans','bold',10,INK); const lines=doc.splitTextToSize(`${i}. ${q.text}`,R2-L-110); lines.forEach(ln=>{ doc.text(ln,L,y); y+=13; }); y-=13;
+    font('PublicSans','normal',7.6,MUTED); doc.text(`${SURVEY_TYPE_NAME[q.type]||q.type} · ${st.n} of ${n} answered`,R2,y,{align:'right'}); y+=14; if(q.help){ para(q.help,7.8,MUTED); } };
+  // summary: the ratings ranked
+  const rated=qs.filter(q=>q.type==='rating').map(q=>({q,st:svStats(q,R)})).filter(x=>x.st.n).sort((a,b)=>b.st.avg-a.st.avg);
+  if(rated.length){ section('At a glance',`${rated.length} rated questions, highest to lowest`);
+    for(const {q,st} of rated){ need(16); font('PublicSans','normal',8.6,INK); const label=doc.splitTextToSize(q.text,300)[0]; doc.text(label,L,y); bar(L+310,y-7,150,7,st.avg/10,st.avg>=7?[31,107,74]:st.avg>=5?GOLD:[181,68,58]); font('PublicSans','bold',9,INK); doc.text(st.avg.toFixed(1),R2,y,{align:'right'}); font('PublicSans','normal',7.4,MUTED); doc.text(`n ${st.n}`,R2-28,y,{align:'right'}); y+=14; } y+=6; }
+  // every section, every question
+  let qi=0;
+  for(const sec of s.sections){ section(sec.title,sec.intro||'');
+    for(const q of sec.questions){ qi++; const st=svStats(q,R); qTitle(qi,q,st);
+      if(q.type==='rating'){ if(st.n){ need(70); font('Cormorant','bold',26,NAVY); doc.text(st.avg.toFixed(1),L,y+16); font('PublicSans','normal',7.6,MUTED); doc.text('average of 10',L,y+28);
+          const bx=L+90, bw=(R2-bx)/11, mx=Math.max(...st.dist,1); st.dist.forEach((c,k)=>{ const h=c?Math.max(3,c/mx*34):0; doc.setFillColor(...NAVY); if(h) doc.rect(bx+k*bw+4,y+34-h,bw-8,h,'F'); font('PublicSans','normal',7,MUTED); doc.text(String(k),bx+k*bw+bw/2,y+44,{align:'center'}); if(c){ font('PublicSans','bold',7,INK); doc.text(String(c),bx+k*bw+bw/2,y+30-h,{align:'center'}); } });
+          y+=56; } else { para('No answers.',8,MUTED); } }
+      else if(q.type==='slider'){ if(st.n){ need(50); const bx=L, bw=R2-L; doc.setFillColor(...PAPER); doc.roundedRect(bx,y,bw,8,4,4,'F'); const px=bx+bw*st.avg/10; doc.setFillColor(...NAVY); doc.circle(px,y+4,6,'F'); doc.setFillColor(255,255,255); doc.circle(px,y+4,3,'F');
+          y+=22; font('PublicSans','bold',8.4,NAVY); doc.text(q.left,bx,y); doc.text(q.right,R2,y,{align:'right'}); y+=13;
+          para(`Average ${st.avg.toFixed(1)} on a 0–10 scale from "${q.left}" (0) to "${q.right}" (10). ${Math.round(st.left/st.n*100)}% lean ${q.left.toLowerCase()}, ${Math.round(st.mid/st.n*100)}% either, ${Math.round(st.right/st.n*100)}% lean ${q.right.toLowerCase()}. Spread: ${st.dist.map((c,k)=>c?`${k}:${c}`:null).filter(Boolean).join(' · ')}.`,8.2,INK); } else para('No answers.',8,MUTED); }
+      else if(q.type==='text'){ if(st.texts&&st.texts.length) bullets(st.texts); else para('Nothing written.',8,MUTED); }
+      else { for(const o of st.opts){ need(14); const c=st.counts[o]||0, pct=st.n?c/st.n:0; font('PublicSans','normal',8.4,INK); doc.text(doc.splitTextToSize(o,250)[0],L,y); bar(L+260,y-7,200,7,pct); font('PublicSans','bold',8.4,INK); doc.text(`${c} · ${Math.round(pct*100)}%`,R2,y,{align:'right'}); y+=13; } if(q.type==='multi'){ font('PublicSans','normal',7.2,MUTED); need(10); doc.text('More than one answer allowed — percentages are of people who answered.',L,y); y+=10; } }
+      if(st.comments.length){ y+=4; font('PublicSansXB','normal',6.8,GOLDDK); need(14); doc.text(`COMMENTS (${st.comments.length})`,L,y,{charSpace:1}); y+=11; bullets(st.comments,8); }
+      y+=10; }
+    if(sec.comments){ const sug=R.map(r=>r.answers['sec:'+sec.id]).map(x=>String(x||'').trim()).filter(Boolean); need(30); font('PublicSans','bold',10,INK); doc.text(`Suggestions and comments on ${sec.title.toLowerCase()}`,L,y); font('PublicSans','normal',7.6,MUTED); doc.text(`${sug.length} written`,R2,y,{align:'right'}); y+=14; if(sug.length) bullets(sug); else para('Nothing written.',8,MUTED); y+=10; } }
+  font('PublicSans','normal',7.6,MUTED); need(30);
+  doc.text(doc.splitTextToSize(`Anonymous survey: no name, e-mail, sign-in or device was collected; each response is its answers and the day it arrived. Percentages are of the people who answered each question. Generated by the ${orgShort()} hub, ${new Date().toLocaleString()}.`,R2-L),L,Math.max(y+8,H-48));
+  const pages=doc.getNumberOfPages(); for(let i=1;i<=pages;i++){ doc.setPage(i); font('PublicSans','normal',7,MUTED); doc.text(`${s.title} · results · page ${i} of ${pages}`,W/2,H-20,{align:'center'}); }
+  if(opt.returnDoc) return doc;
+  doc.save(`${s.title.replace(/[^\w]+/g,'-')}-results.pdf`); toast('Results PDF downloaded');
 }
 /* =====================================================================
    50/50 Drawing — per tournament (t.raffle). Built to be verifiable:
@@ -7012,7 +7066,7 @@ async function resultsPDF(t,opt){
    page counts, and a reload is tried once per build — if the page that comes back is still the old one, the CDN
    hasn't caught up; wait a while before trying that build again. */
 (function(){
-  const ME='20261023032312', KEY='au_tried', RETRY=10*60*1000; let ready=false, lastCheck=0;
+  const ME='20261023033434', KEY='au_tried', RETRY=10*60*1000; let ready=false, lastCheck=0;
   const typing=()=>{ const a=document.activeElement; return a&&/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)&&a.value&&a.type!=='search'; };
   const safe=()=>!typing()&&(typeof window.__canReload!=='function'||window.__canReload());
   const tried=()=>{ try{ const [b,t]=(sessionStorage.getItem(KEY)||'').split('|'); return b?{build:b,at:+t||0}:null; }catch(_){ return null; } };
