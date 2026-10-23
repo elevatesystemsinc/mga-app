@@ -162,6 +162,7 @@ function vGameDesign(m){
       <div class="frow2">${field('Competition','gdG_'+pot.id,pot.rules.game,{type:'select',options:[]}).replace('</select>',groups.map(gr=>`<optgroup label="${esc(gr)}">${lib.filter(x=>x.group===gr).map(x=>`<option value="${x.id}"${x.id===pot.rules.game?' selected':''}>${esc(x.name)}</option>`).join('')}</optgroup>`).join('')+'</select>')}${field('Name on the sheet','gdN_'+pot.id,pot.name)}</div>
       <p class="hint" style="margin:-6px 0 0">${esc(C.desc||'')}</p>
       ${pot.kind!=='manual'?noPar3Box('gdNP3_'+pot.id,pot.rules.noPar3):''}
+      ${pot.kind==='format'&&POINT_FORMATS.includes(E.format)?pointsEditor('gdPt_'+pot.id,E.format,(pot.rules.points||{})[E.format]):''}
       ${pot.kind==='format'?`<label class="check"><input type="checkbox" id="gdLive_${pot.id}"${pot.rules.live!==false?' checked':''}>Show on the live leaderboard</label>`:pot.kind==='dots'?'<p class="hint" style="margin:0">Dots are tallied by hand, so they never show on the live leaderboard.</p>':''}
       <div class="frow2">${pot.kind==='manual'?'<div></div>':field('Entry per player $','gdE_'+pot.id,pot.entry,{type:'number'})}
         ${pot.kind==='format'?`<div class="fld"><span class="lbl">Scored</span>${seg('gdS_'+pot.id,[['gross','Gross'],['net','Net']],pot.rules.scoring||'gross')}</div>`:pot.kind==='skins'?`<div class="fld"><span class="lbl">Scored</span>${seg('gdS_'+pot.id,[['gross','Gross'],['net','Net']],sk.net?'net':'gross')}</div>`:pot.kind==='dots'?`<div class="fld"><span class="lbl">Birdies &amp; eagles</span>${seg('gdS_'+pot.id,[['gross','Gross'],['net','Net']],dr.net?'net':'gross')}</div>`:'<div></div>'}</div>
@@ -200,6 +201,7 @@ function vGameDesign(m){
   const readAll=()=>{ d.name=fv('gdName'); d.course=fv('gdCourse'); d.date=fv('gdDate'); d.time=fv('gdTime'); d.notes=fv('gdNotes'); d.payWhen=$('gdWhen').dataset.val; d.settle=$('gdSettle').dataset.val; d.hcp=$('gdHcp').dataset.val;
     for(const pot of d.pots){ const v=id=>fv(id+'_'+pot.id); pot.name=v('gdN')||pot.name; if(pot.kind!=='manual') pot.entry=n0(v('gdE'));
       const NP=$('gdNP3_'+pot.id); if(NP) pot.rules.noPar3=NP.checked;
+      if(pot.kind==='format'){ const pf=potEngine(pot).format; if(POINT_FORMATS.includes(pf)&&$('gdPt_'+pot.id+'_0')){ const t=readPoints(document,'gdPt_'+pot.id,pf); pot.rules.points=t?{[pf]:t}:{}; } }
       const S=$('gdS_'+pot.id); if(S){ const sc=S.dataset.val; if(pot.kind==='format') pot.rules.scoring=sc; if(pot.kind==='skins'){ skinsRulesOf(pot).net=sc==='net'; if(sc!=='net') skinsRulesOf(pot).grossBeatsNet=false; } if(pot.kind==='dots') dotsRules(pot).net=sc==='net'; }
       if(pot.kind==='format'){ pot.rules.live=$('gdLive_'+pot.id)?$('gdLive_'+pot.id).checked:pot.rules.live!==false; if($('gdT_'+pot.id)) pot.rules.teamSize=+v('gdT'); if($('gdC_'+pot.id)) pot.rules.count=+v('gdC'); if($('gdB_'+pot.id)) pot.rules.teamsBy=v('gdB'); 
         if($('gdNF_'+pot.id)){ pot.rules.nassau={front:n0(v('gdNF')),back:n0(v('gdNB')),total:n0(v('gdNT'))}; pot.entry=pot.rules.nassau.front+pot.rules.nassau.back+pot.rules.nassau.total; if($('gdNBy_'+pot.id)) pot.rules.matchBy=v('gdNBy'); } }
@@ -210,7 +212,7 @@ function vGameDesign(m){
     wireSeg(card,'gdS_'+pot.id,()=>{ readAll(); if(pot.kind==='skins') rerender(); }); const msel=card.querySelector('#gdMode_'+pot.id); if(msel) msel.onchange=()=>{ readAll(); rerender(); };
     const tsel=card.querySelector('#gdT_'+pot.id); if(tsel) tsel.onchange=()=>{ readAll(); rerender(); };
     const bsel=card.querySelector('#gdB_'+pot.id); if(bsel) bsel.onchange=()=>{ readAll(); };
-    wirePays(card,pot,()=>{ readAll(); rerender(); });
+    wirePays(card,pot,()=>{ readAll(); rerender(); }); wirePointsReset(card,'gdPt_'+pot.id,potEngine(pot).format);
     card.querySelector('[data-gdrm]').onclick=()=>{ readAll(); if(pot.payouts.length&&!confirm('This competition has payouts recorded. Remove it anyway?')) return; d.pots=d.pots.filter(x=>x!==pot); rerender(); }; });
   wireSeg(m,'gdWhen',()=>{}); wireSeg(m,'gdSettle',()=>{}); wireSeg(m,'gdHcp',()=>{});
   $('gdAddSel').onchange=e=>{ if(!e.target.value) return; readAll(); d.pots.push(newPot(e.target.value,d)); rerender(); };
@@ -441,7 +443,7 @@ function drawStage(g,pot){
 const potLive=pot=>pot.kind==='skins'?!!skinsRulesOf(pot).live:pot.rules.live!==false;
 function potComp(g,pot){
   const E=potEngine(pot), c={id:pot.id,name:pot.name,kind:pot.kind,players:potPlayers(g,pot).map(p=>p.gpid).filter(Boolean),teams:potIsTeam(pot)&&potTeamsKnown(pot)?pot.teams:null,sitOut:pot.sitOut||[],scoring:pot.rules.scoring||'gross'};
-  COMP_KEYS.forEach(k=>{ if(k!=='scoring'&&E[k]!==undefined) c[k]=E[k]; }); c.noPar3=!!pot.rules.noPar3;   // pops on par 3s is each competition's own call
+  COMP_KEYS.forEach(k=>{ if(k!=='scoring'&&E[k]!==undefined) c[k]=E[k]; }); c.noPar3=!!pot.rules.noPar3; c.points=pot.rules.points||{};   // pops on par 3s and the point table are each competition's own call
   if(pot.kind==='skins'){ const sk=skinsRulesOf(pot); c.skins={net:sk.net,grossBeatsNet:sk.grossBeatsNet,validate:sk.validate,carry:sk.carry,mode:sk.mode}; c.scoring=sk.net?'net':'gross'; }
   return c;
 }

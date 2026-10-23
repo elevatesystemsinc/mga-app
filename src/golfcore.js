@@ -325,7 +325,12 @@ function matchByOf(pub){ if(pub.matchBy==='strokes'||pub.matchBy==='holes') retu
 function catalogOf(pub){ const f=pub.format||'stroke'; return GAME_CATALOG.find(g=>!g.side&&!g.tool&&g.engine.format===f&&(g.engine.countPattern||'')===(pub.countPattern||'')&&(g.engine.matchScoring||'holes')===(pub.matchScoring||'holes')&&(g.engine.matchForm||'')===(pub.matchForm||'')&&(g.engine.quotaBase||36)===(+pub.quotaBase||36)&&(g.engine.cap||'')===(pub.cap||'')&&(f!=='match'||(g.engine.teamSize||1)===(pub.teamSize>=2?2:1)))||GAME_CATALOG.find(g=>g.engine.format===f)||GAME_CATALOG[0]; }
 const TEAM_FORMATS=Object.keys(FORMATS).filter(k=>FORMATS[k].team===true);
 /* points per hole by score to par (d): standard Stableford, the modified (pro-tour) table, and quota points (gross) */
-const PTS={stableford:{'-3':5,'-2':4,'-1':3,'0':2,'1':1},modstable:{'-3':8,'-2':5,'-1':2,'0':0,'1':-1,'2':-3},quota:{'-3':16,'-2':8,'-1':4,'0':2,'1':1}};
+const PTS={stableford:{'-3':5,'-2':4,'-1':3,'0':2,'1':1,'2':0},modstable:{'-3':8,'-2':5,'-1':2,'0':0,'1':-1,'2':-3},quota:{'-3':16,'-2':8,'-1':4,'0':2,'1':1,'2':0}};
+const POINT_FORMATS=['stableford','modstable','quota'];
+const PTS_ROWS=[['-3','Albatross'],['-2','Eagle'],['-1','Birdie'],['0','Par'],['1','Bogey'],['2','Double or worse']];
+/* the table in force for a format on an event / competition: its own (pub.points[fmt]) or the standard one */
+const pointsTable=(pub,fmt)=>Object.assign({},PTS[fmt]||{},(pub&&pub.points&&pub.points[fmt])||{});
+const pointsCustom=(pub,fmt)=>!!(pub&&pub.points&&pub.points[fmt]&&PTS_ROWS.some(([k])=>+pub.points[fmt][k]!==+(PTS[fmt]||{})[k]));
 function holePoints(fmt,d,custom){ const t=(custom&&custom[fmt])||PTS[fmt]; if(!t) return 0; const k=Math.min(2,Math.max(-3,d)); return t[String(k)]!=null?+t[String(k)]:(k>=2&&fmt==='modstable'?-3:0); }
 /* default allowances (USGA Appendix C where it has one; otherwise club defaults — docs/formats.md) */
 const USGA_ALLOW={stroke:95,stableford:95,modstable:95,quota:100,parbogey:95,match:100,match4:90,aggregate:100,foursomes:50,greensome:[60,40],
@@ -352,7 +357,7 @@ function holeFormat(pub,h){ return pub.format==='split'?(h<=9?pub.front:pub.back
 /* A published event may carry `comps`: the competitions of a small-group game that are shown live, each with its own
    engine fields, players and (when known) teams. compPub() cuts the event down to one of them; a team competition
    whose partners are not drawn yet is shown as individual stroke play. */
-const COMP_KEYS=['format','teamSize','count','countPattern','quotaBase','cap','matchScoring','matchForm','matchBy','scoring','noPar3'];
+const COMP_KEYS=['format','teamSize','count','countPattern','quotaBase','cap','matchScoring','matchForm','matchBy','scoring','noPar3','points'];
 function compPub(pub,comp){
   const out=Object.assign({},pub,{allow:pub.allow&&pub.allow['*']!=null?{'*':pub.allow['*']}:{},flights:[]}); COMP_KEYS.forEach(k=>{ if(comp[k]!==undefined) out[k]=comp[k]; });
   const inP=new Set(comp.players||[]), teams=comp.teams||null, teamy=!!teams&&Object.keys(teams).length>0, isTeamFmt=!!((FORMATS[out.format]||{}).team)&&(+out.teamSize||1)>=2;
@@ -370,7 +375,7 @@ function playerFormatOf(pub){ return eventFormats(pub).find(f=>FORMATS[f]&&FORMA
 function formatSummary(pub){ const n=teamSizeOf(pub), k=countOf(pub), P=pub.countPattern, one=f=>{ const F=FORMATS[f]||FORMATS.stroke; let l=F.label;
     if(F.count) l=P==='123'?'1-2-3 best ball':P==='123rot'?'Cha-cha-cha':P==='par345'?'1-2-3 by par':P==='yellow'?`Yellow ball (${n}-player)`:l+` (best ${k} of ${n})`; else if(F.team===true&&!F.size) l+=` (${n}-player)`;
     if(f==='match') l=pub.matchScoring==='nassau'?(matchByOf(pub)==='strokes'?'Nassau by total score':'Nassau'):pub.matchScoring==='hilo'?'Hi-Lo':pub.matchForm==='foursomes'?'Foursomes match play':n>=2?'Four-ball match play':'Singles match play';
-    if(f==='quota'&&+pub.quotaBase===39) l='Chicago (quota 39)'; if(f==='stroke'&&pub.cap==='nddb') l='Maximum score'; return l; };
+    if(f==='quota'&&+pub.quotaBase===39) l='Chicago (quota 39)'; if(f==='stroke'&&pub.cap==='nddb') l='Maximum score'; if(POINT_FORMATS.includes(f)&&pointsCustom(pub,f)) l+=' · own point table'; return l; };
   return pub.format==='split'?`Front: ${one(pub.front)} · Back: ${one(pub.back)}`:one(pub.format||'stroke'); }
 /* a player's playing handicap for a per-player format in this event (from their course handicap) */
 function segPH(pub,p,fmt){ if(typeof p.ch!=='number') return typeof p.ph==='number'?p.ph:null; const a=pctFor(pub,allowKey(pub,fmt)); return whsRound(p.ch*(+a||100)/100); }

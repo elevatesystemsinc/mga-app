@@ -37,9 +37,17 @@ function gameOptions(selectedId){ const gs=enabledGames().filter(g=>!g.side&&!g.
 /* an event's format fields from a catalog entry + the editor's team size / balls that count */
 /* the "no pops on par 3s" switch, the same wording in every editor (event, tournament round, game) */
 const noPar3Box=(id,on)=>`<label class="check" style="margin-top:2px"><input type="checkbox" id="${id}"${on?' checked':''}>No pops on par 3s — a stroke that falls on a par 3 is lost, the other holes are unchanged</label>`;
+/* Points per score for Stableford / modified Stableford / quota — the same small table in the event editor, the round
+   editor and a game competition. pointsEditor(id,fmt,table) draws it; readPoints(root,id,fmt) reads it back (null when it
+   is the standard table, so nothing is stored). */
+function pointsEditor(id,fmt,table){ const t=Object.assign({},PTS[fmt]||{},table||{});
+  return `<div class="fld" data-pts="${id}"><span class="lbl">Points per score${fmt==='quota'?' (gross)':''}</span><div class="ptsgrid">${PTS_ROWS.map(([k,l])=>`<label><small>${l}</small><input class="inp r num" id="${id}_${k}" value="${t[k]??0}" inputmode="numeric" aria-label="${l} points"></label>`).join('')}</div>
+    <p class="hint">Standard: ${PTS_ROWS.map(([k,l])=>`${l.toLowerCase().replace(' or worse','+')} ${PTS[fmt][k]}`).join(' · ')}. <a href="#" data-ptsreset="${id}">Reset</a></p></div>`; }
+function readPoints(root,id,fmt){ const t={}; let diff=false; for(const [k] of PTS_ROWS){ const el=root.querySelector('#'+id+'_'+k); if(!el) return null; const v=parseFloat(el.value); t[k]=isFinite(v)?v:0; if(t[k]!==+(PTS[fmt]||{})[k]) diff=true; } return diff?t:null; }
+function wirePointsReset(root,id,fmt){ const a=root.querySelector(`[data-ptsreset="${id}"]`); if(a) a.onclick=e=>{ e.preventDefault(); for(const [k] of PTS_ROWS){ const el=root.querySelector('#'+id+'_'+k); if(el) el.value=PTS[fmt][k]??0; } root.querySelectorAll(`[data-pts="${id}"] input`).forEach(i=>i.dispatchEvent(new Event('input'))); }; }
 function engineFrom(C,teamSize,count){ const e=C.engine, F=FORMATS[e.format]||FORMATS.stroke; const sizes=C.sizes||null; let ts=sizes?Math.min(Math.max(+teamSize||e.teamSize||sizes[0],sizes[0]),sizes[sizes.length-1]):(e.teamSize||1); if(e.format==='match'&&!e.teamSize&&!sizes) ts=1;
   return {game:C.id,format:e.format,teamSize:ts,count:C.count?Math.max(1,Math.min(ts-1,+count||1)):1,countPattern:e.countPattern||'',quotaBase:e.quotaBase||36,cap:e.cap||'',matchScoring:e.matchScoring||'holes',matchForm:e.matchForm||'',matchBy:e.matchBy||'holes'}; }
-const EV_GAME_KEYS=['game','format','teamSize','count','countPattern','quotaBase','cap','matchScoring','matchForm','matchBy','noPar3'];
+const EV_GAME_KEYS=['game','format','teamSize','count','countPattern','quotaBase','cap','matchScoring','matchForm','matchBy','noPar3','points'];
 const CODE_CHARS='ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 function newCode(ev){ let c; do{ c=Array.from({length:5},()=>CODE_CHARS[Math.floor(Math.random()*CODE_CHARS.length)]).join(''); }while(ev.groups.some(g=>g.code===c)); return c; }
 const slugify=s=>String(s||'').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'').slice(0,40)||'event';
@@ -62,7 +70,7 @@ function publicEvent(ev){
   for(const g of ev.groups){ if(!courses[g.course]){ const c=courseById(g.course); if(c) courses[g.course]={name:c.name,par:c.par,hcp:c.hcp,tees:Object.fromEntries(c.tees.map(t=>[t.name,t.yards||null]))}; } }
   return {slug:ev.slug,name:ev.name,date:ev.date,status:ev.status,club:(CLUB&&CLUB.name)||CLUB_META.name,org:ORG_ID,courses,
     groups:ev.groups.map(g=>({id:g.id,label:g.label||'',course:g.course,startHole:+g.startHole||1,teeTime:g.teeTime||'',players:g.players.map(p=>{ const h=playerHcp(ev,g,p); return {id:p.id,name:p.name,tee:p.tee||ev.defaultTee||'White',set:p.set||'M',ch:h.ch,ph:h.ph,flight:p.flight||'',team:evTeam(ev)?(p.team||ftm.get(p.memberId)||''):''}; })})),
-    format:ev.format||'stroke',front:ev.front,back:ev.back,teamSize:ev.teamSize||(isTeamEvent(ev)||ev.format==='match'&&ev.teamSize>=2?2:1),count:ev.count||1,countPattern:ev.countPattern||'',quotaBase:ev.quotaBase||36,cap:ev.cap||'',matchScoring:ev.matchScoring||'holes',matchForm:ev.matchForm||'',matchBy:ev.matchBy||'holes',noPar3:!!ev.noPar3,game:ev.game||'',allow:Object.assign({},ev.allow||{}),scoring:ev.scoring||'gross',flights:(ev.flights&&ev.flights.names)||[],
+    format:ev.format||'stroke',front:ev.front,back:ev.back,teamSize:ev.teamSize||(isTeamEvent(ev)||ev.format==='match'&&ev.teamSize>=2?2:1),count:ev.count||1,countPattern:ev.countPattern||'',quotaBase:ev.quotaBase||36,cap:ev.cap||'',matchScoring:ev.matchScoring||'holes',matchForm:ev.matchForm||'',matchBy:ev.matchBy||'holes',noPar3:!!ev.noPar3,points:ev.points||{},game:ev.game||'',allow:Object.assign({},ev.allow||{}),scoring:ev.scoring||'gross',flights:(ev.flights&&ev.flights.names)||[],
     comps:ev.gameId&&typeof gameComps==='function'?gameComps(ev):[]};
 }
 
@@ -174,13 +182,14 @@ function editEvent(ev){
       `<div class="fld"><span class="lbl">Game</span><select class="inp" id="geF">${gameOptions(ev?(ev.game||catalogOf(ev).id):'stroke')}</select></div>
        <div id="geTeamRow" style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px">${field('Team size','geTS',ev?.teamSize||2,{type:'select',options:[2,3,4,5,6].map(n=>[n,n+' players'])})}${field('Balls that count','geCnt',ev?.count||1,{type:'select',options:[1,2,3,4,5].map(n=>[n,'Best '+n])})}</div>
        <div id="geSplit" style="display:${(ev?.format)==='split'?'grid':'none'};grid-template-columns:repeat(2,minmax(0,1fr));gap:12px">${field('Front nine (1–9)','geFr',ev?.front||'scramble',{type:'select',options:TEAM_FORMATS.map(f=>[f,FORMAT_LABEL[f]])})}${field('Back nine (10–18)','geBk',ev?.back||'shamble',{type:'select',options:TEAM_FORMATS.map(f=>[f,FORMAT_LABEL[f]])})}</div>
-       <p class="hint" id="geFmtHint"></p>`+
+       <p class="hint" id="geFmtHint"></p><div id="gePts"></div>`+
       field('Leaderboard ranks by','geSc',ev?.scoring||'gross',{type:'select',options:[['gross','Gross'],['net','Net']]})+noPar3Box('geNP3',ev?.noPar3)+
       `<div class="fld"><div style="display:flex;justify-content:space-between;align-items:center"><span class="lbl">Handicap allowances</span><button class="btn sm" type="button" id="geUsga">Reset to defaults</button></div><div class="mini" id="geAllow"></div><p class="hint">Defaults follow the USGA Rules of Handicapping (Appendix C); where the USGA publishes none (5- and 6-player scrambles, 3-player best ball, shamble, quota) a common club setting is used. See docs/formats.md for every format’s math.</p></div>`+
       field('Custom link','geS',ev?.slug||'',{ph:'e.g. mm2026-sat',hint:'Players open <b>…/score.html?e=</b><i>this</i>. Letters, numbers and dashes.'})+
       field('Tournament (optional)','geTour',ev?.tournamentId||'',{type:'select',options:[['','— Not linked —']].concat(ts.map(t=>[t.id,t.name+' · '+dateRange(t)])),hint:'Linking lets you build groups straight from that tournament’s field.'}),
     wire:r=>{ const n=r.querySelector('#geN'), s=r.querySelector('#geS'); let touched=!!ev; s.oninput=()=>touched=true; n.oninput=()=>{ if(!touched) s.value=slugify(n.value); };
       const A=clone(ev?.allow||{});   // overrides only; anything not set falls back to the default for its key
+      const PT=clone(ev?.points||{}); r._pts=PT;   // point tables that differ from the standard ones, by format
       const cur=()=>{ const C=catalogById(r.querySelector('#geF').value)||catalogById('stroke'); return Object.assign(engineFrom(C,+r.querySelector('#geTS').value,+r.querySelector('#geCnt').value),{C,front:r.querySelector('#geFr').value,back:r.querySelector('#geBk').value,allow:A}); };
       const drawAllow=()=>{ const P=cur(), C=P.C, F=FORMATS[P.format]||FORMATS.stroke, sizes=C.sizes||null, team=!!sizes||P.format==='split'; const fixed=C.engine.teamSize||F.size;
         r.querySelector('#geTeamRow').style.display=team?'grid':'none'; const tsSel=r.querySelector('#geTS'); tsSel.disabled=!!fixed||(sizes&&sizes.length===1); [...tsSel.options].forEach(o=>{ o.hidden=sizes?!sizes.includes(+o.value):false; }); if(fixed) tsSel.value=fixed; else if(sizes&&!sizes.includes(+tsSel.value)) tsSel.value=sizes[0];
@@ -195,7 +204,8 @@ function editEvent(ev){
         r.querySelectorAll('[data-al]').forEach(inp=>inp.oninput=()=>{ const [k,i]=inp.dataset.al.split('|'); const v=parseFloat(inp.value); if(!isFinite(v)) return; if(i!=null){ if(!Array.isArray(A[k])) A[k]=clone(pctFor(P2,k)); A[k][+i]=v; } else A[k]=v; });
         r.querySelector('#geSplit').style.display=P.format==='split'?'grid':'none';
         const hints={scramble:'One team score per hole; the team plays off a handicap built from everyone’s course handicaps.',foursomes:'Partners alternate shots on one ball; team handicap is 50% of the combined course handicaps.',greensome:'Both drive, pick one, then alternate; team handicap 60% of the low course handicap + 40% of the high.',bestball:'Everyone plays their own ball; the best balls that count are added each hole.',shamble:'Team drive, then own ball in; the best balls that count are added each hole.',aggregate:'Every player’s net score counts each hole.',teamstable:'Each player’s Stableford points; the best that count are added each hole.',stableford:'Points per hole: albatross 5, eagle 4, birdie 3, par 2, bogey 1.',modstable:'Points per hole: albatross 8, eagle 5, birdie 2, par 0, bogey −1, double or worse −3.',quota:'Gross points (eagle 8, birdie 4, par 2, bogey 1) against a quota of 36 − playing handicap.',parbogey:'Each hole won, halved or lost against net par.',match:'The two sides in a group play hole by hole; everyone plays off the lowest handicap in the match.',stroke:''};
-        r.querySelector('#geFmtHint').textContent=P.format==='split'?(hints[P.front]||'')+' Back: '+(hints[P.back]||''):(C.desc||hints[P.format]||''); };
+        r.querySelector('#geFmtHint').textContent=P.format==='split'?(hints[P.front]||'')+' Back: '+(hints[P.back]||''):(C.desc||hints[P.format]||'');
+        const pe=r.querySelector('#gePts'); if(!POINT_FORMATS.includes(P.format)){ pe.innerHTML=''; delete pe.dataset.f; } else if(pe.dataset.f!==P.format){ pe.dataset.f=P.format; pe.innerHTML=pointsEditor('gePt',P.format,PT[P.format]); pe.querySelectorAll('input').forEach(i=>i.oninput=()=>{ const t=readPoints(pe,'gePt',P.format); if(t) PT[P.format]=t; else delete PT[P.format]; }); wirePointsReset(pe,'gePt',P.format); } };
       ['#geF','#geFr','#geBk','#geTS','#geCnt'].forEach(id=>{ r.querySelector(id).onchange=drawAllow; });
       r.querySelector('#geUsga').onclick=()=>{ Object.keys(A).forEach(k=>delete A[k]); drawAllow(); toast('Default allowances restored'); };
       r._allow=A; drawAllow(); },
@@ -204,7 +214,7 @@ function editEvent(ev){
       if(g.events.some(e=>e!==ev&&e.slug===slug)){ toast('Another event already uses that link'); return false; }
       const C=catalogById(fv('geF'))||catalogById('stroke'), E=engineFrom(C,+fv('geTS'),+fv('geCnt')); if(E.format==='split'&&fv('geFr')===fv('geBk')){ toast('Front and back use the same format — pick it as the game instead'); return false; }
       if(E.format==='split') E.teamSize=+fv('geTS')||2;
-      const data=Object.assign({name,date:fv('geD'),defaultTee:fv('geT'),slug,tournamentId:fv('geTour'),front:fv('geFr'),back:fv('geBk'),scoring:fv('geSc'),allow:clone($('dBody')._allow||{})},E,{noPar3:$('geNP3').checked});
+      const data=Object.assign({name,date:fv('geD'),defaultTee:fv('geT'),slug,tournamentId:fv('geTour'),front:fv('geFr'),back:fv('geBk'),scoring:fv('geSc'),allow:clone($('dBody')._allow||{})},E,{noPar3:$('geNP3').checked,points:clone($('dBody')._pts||{})});
       if(ev) Object.assign(ev,data); else { const e=Object.assign({id:uid(),status:'live',groups:[],pool:[],flights:{count:0,names:[]},createdAt:new Date().toISOString()},data); g.events.push(e); view.geid=e.id; view.getab='field'; ev=e; }
       golfSave(ev); toast('Saved'); return undefined; },
     del:ev?()=>{ const game=ev.gameId&&typeof gamesData==='function'?gamesData().find(x=>x.id===ev.gameId):null, tt=ev.tournamentId?db.tournaments.find(x=>x.id===ev.tournamentId):null, rnd=tt&&ev.roundId?(tt.rounds||[]).find(x=>x.id===ev.roundId):null;

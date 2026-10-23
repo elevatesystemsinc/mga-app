@@ -73,6 +73,18 @@ async def main():
         # the net total rises by exactly the strokes that fell on par 3s
         ok=r['p3']>=3 and r['okA'] and r['okB'] and r['okD'] and r['okOff'] and r['pubFlag'] and r['lostPH']>0 and r['netOn']==r['netOff']+r['lostPH']
         print('no pops on par 3s', r, 'OK' if ok else 'FAIL'); bad+=not ok
+        # points per score are adjustable: an event's own quota table (birdie 5, par 3) changes the board; the standard table is not stored
+        r=await pg.evaluate("""()=>{ const g=golfData(); const c=courseById('oak'), par=c.par.M;
+          const ev={id:'qt',slug:'qt',name:'Quota day',date:'2026-10-23',status:'live',format:'quota',quotaBase:36,scoring:'gross',defaultTee:'White',defaultCourse:'oak',allow:{},pool:[],flights:{count:0,names:[]},
+            groups:[{id:'g',code:'QTAAA',label:'G',course:'oak',startHole:1,teeTime:'',players:[{id:'x1',name:'Ann',index:'0.0',tee:'White',set:'M'}]}]}; g.events.push(ev);
+          const sc={x1:Object.fromEntries([...Array(18).keys()].map(i=>[i+1,par[i]-(i<2?1:0)]))};   // two birdies, sixteen pars
+          const std=eventBoard(publicEvent(ev),sc,{sort:'gross'})[0].pts; ev.points={quota:{'-3':16,'-2':8,'-1':5,'0':3,'1':1,'2':0}}; const pub=publicEvent(ev); const own=eventBoard(pub,sc,{sort:'gross'})[0].pts;
+          editEvent(ev); const grid=!!document.getElementById('gePt_-1'), bird=document.getElementById('gePt_-1').value; document.getElementById('gePt_-1').value='4'; document.getElementById('gePt_0').value='2'; document.getElementById('gePt_-1').dispatchEvent(new Event('input')); document.getElementById('gePt_0').dispatchEvent(new Event('input'));
+          document.getElementById('dSave').click(); const stored=JSON.stringify(ev.points), custom=pointsCustom(pub,'quota'), label=formatSummary(pub);
+          g.events=g.events.filter(x=>x!==ev); return {std,own,grid,bird,stored,custom,label,ph:pub.groups[0].players[0].ph}; }""")
+        # quota = 36 − PH (index 0.0 on Oak White plays to +3 → 39). Standard: 2×4 + 16×2 = 40. Own table: 2×5 + 16×3 = 58. Back to standard in the editor → nothing stored.
+        q=36-r['ph']; ok=r['std']==40-q and r['own']==58-q and r['grid'] and r['bird']=='5' and r['stored']=='{}' and r['custom'] and 'own point table' in r['label']
+        print('adjustable points per score', r, 'OK' if ok else 'FAIL'); bad+=not ok
         # partner cap, tournament flights → events, pairing by standings, results PDF
         r=await pg.evaluate("""async()=>{ const t=db.tournaments.find(x=>x.id==='T1'); t.hcpDiff=10; const evs=t.rounds.map(roundEvent);
           const cy=evPlayers(evs[0]).find(x=>x.p.memberId==='q2'); const h=hcpOf(evs[0],cy.p,cy.grp);

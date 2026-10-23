@@ -490,6 +490,9 @@ groups, printed scorecards — the printed cards include a live-scoring QR that 
   stroke — the stroke is **lost**, not moved (the owner: "they lose them is the proper way"); every other hole keeps
   its classic 18-hole allocation (`strokesOn`). Plus handicaps the same way: a stroke given back on a par 3 is not given back. Index
   inputs take a leading + everywhere (`parseIndex`); the two in-table index boxes use the full keyboard for it.
+  **Points per score are adjustable** (`points:{[fmt]:{'-3'..'2'}}` on events, rounds and `pot.rules.points`; `PTS` holds the
+  standard tables, `pointsTable(pub,fmt)` the one in force, `pointsEditor`/`readPoints` in golf.js draw and read the six
+  boxes; only a table that differs from the standard is stored; `COMP_KEYS` carries it to the phones).
 - **Built Oct 2026 (step 3, small groups):** Games, payouts by finish and skins, live scoring through golf events,
   season/quarter Ledger with settle-ups, a group dashboard; the Members page without dues for groups.
 - **Built Oct 2026 (step 1):** per-organization rows, the club directory + memberships, path routing, the picker,

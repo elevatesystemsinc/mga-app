@@ -123,3 +123,7 @@ holes on which it has a counting score.
 ## No pops on par 3s
 
 Any Golf event or tournament round can tick **No pops on par 3s**; in a small group's game each competition (skins, best ball, the stroke-play pot…) has its own box, since they share one round but need not share the rule. With it on, a par 3 never gives or takes a handicap stroke: a stroke that falls on a par 3 by stroke index is lost, and every other hole is exactly as it would be without the switch. Every net figure — leaderboards, skins, best ball, matches, the printed cards and the phones — uses the same rule.
+
+## Points per score
+
+Stableford, modified Stableford and quota each have a standard point table (quota: albatross 16, eagle 8, birdie 4, par 2, bogey 1, double or worse 0). Any Golf event, tournament round or game competition that plays one of these can set its own table — the six boxes appear under the game picker as soon as a point format is chosen, with a Reset link back to the standard. Only a table that differs from the standard is stored; the leaderboards, the phones and the summary line ("own point table") all use the table in force.
