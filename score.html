@@ -122,12 +122,17 @@ function leaderboard(pub,scores,opt){ opt=opt||{};
       for(let h=1;h<=18;h++){ let s=+sc[h]; if(!s) continue; const k=ph!=null?strokesAt(pub,c,p.set,h,ph):0; if(pub.cap==='nddb') s=Math.min(s,par[h-1]+2+Math.max(0,k));   // maximum score: net double bogey
         n++; gross+=s; parPlayed+=par[h-1]; if(h<=9) out+=s; else inn+=s; got+=k;
         const v=holeValue(pub,fmt,s,s-k,par[h-1]); pts+=v.pts; holesUp+=v.up; }
-      if(fmt==='quota') pts-=n?Math.round(((+pub.quotaBase||36)-(ph||0))*n/18*100)/100:0;   // quota is pro-rated while the round is live; whole at 18
-      if(fmt==='quota'&&n===18) pts=Math.round(pts);
-      rows.push({id:p.id,name:p.name,group:g.label||'',groupId:g.id,course:g.course,courseName:c.name,tee:p.tee,n,gross,toPar:gross-parPlayed,out,inn,thru:n===18?'F':String(n),par,ph,flight:p.flight||'',net:ph==null?null:gross-got,netToPar:ph==null?null:gross-got-parPlayed,pts,holesUp,unit});
+      let ptsRaw=pts, quota=null, need=null;
+      if(fmt==='quota'){ quota=(+pub.quotaBase||36)-(ph||0); need=n?Math.round(quota*n/18*100)/100:0;   // where the player should be after n holes: the quota pro-rated; whole at 18
+        pts=n?Math.round((ptsRaw-need)*100)/100:0; if(n===18) pts=Math.round(pts); }
+      rows.push({id:p.id,name:p.name,group:g.label||'',groupId:g.id,course:g.course,courseName:c.name,tee:p.tee,n,gross,toPar:gross-parPlayed,out,inn,thru:n===18?'F':String(n),par,ph,flight:p.flight||'',net:ph==null?null:gross-got,netToPar:ph==null?null:gross-got-parPlayed,pts,ptsRaw,quota,need,holesUp,unit});
     } }
   return rankRows(rows,unit,opt);
 }
+/* a points row's value: quota = how far above or below the quota you should have by now (signed, a half shows as .5),
+   the other point games = the points themselves. ptsLine = the small print under it for quota rows. */
+function ptsTxt(r){ if(!r.n) return '—'; if(r.quota==null) return String(r.pts); const v=r.pts; const a=Math.abs(v), s=Number.isInteger(a)?String(a):a.toFixed(1).replace(/\.0$/,''); return v>0?'+'+s:v<0?'−'+s:'E'; }
+function ptsLine(r){ if(r.quota==null||!r.n) return ''; return `${r.ptsRaw} pts · ${r.n===18?'quota '+r.quota:`${Number.isInteger(r.need)?r.need:r.need.toFixed(1)} needed thru ${r.n} of ${r.quota}`}`; }
 /* one hole for one player in an individual format → {pts, up} (points formats; par-bogey holes) */
 function holeValue(pub,fmt,gross,net,par){
   if(fmt==='teamstable') fmt='stableford';   // a player's own points inside a team Stableford
@@ -718,7 +723,7 @@ function renderHole(){
   const rows=oneBall?teams.map(t=>({id:t.captain.id,label:t.members.map(p=>p.name.split(' ')[0]).join(' & '),p:t.captain,k:(()=>{ const tph=teamPH(pub,fmt,t.members); return tph==null?0:strokesAt(pub,c,t.captain.set,h,tph); })(),team:t}))
     :g.players.map(p=>{ const ph=segPH(pub,p,fmt); return {id:p.id,label:p.name,p,k:typeof ph==='number'?strokesAt(pub,c,p.set,h,ph):0}; });
   const thru=r=>{ if(r.team){ let n=0,rel=0,pts=0; for(let hh=1;hh<=18;hh++){ const x=teamHole(pub,c,r.team,hh,scores); if(x){ n++; rel+=(pub.scoring==='net'&&x.net!=null?x.net:x.gross)-x.par; pts+=x.pts; } } return 'Team · '+(n?(unit==='points'?pts+' pts':toParTxt(rel)+(pub.scoring==='net'?' net':''))+' thru '+n:'not started'); }
-    if(unit==='points'||unit==='holes'){ const me=leaderboard(pub,scores,{}).find(x=>x.id===r.id); return me&&me.n?(unit==='points'?me.pts+' pts':(me.holesUp>0?'+':'')+me.holesUp)+' thru '+me.n:'Not started'; }
+    if(unit==='points'||unit==='holes'){ const me=leaderboard(pub,scores,{}).find(x=>x.id===r.id); return me&&me.n?(unit==='points'?(me.quota!=null?ptsTxt(me)+' vs quota · '+me.ptsRaw+' pts':me.pts+' pts'):(me.holesUp>0?'+':'')+me.holesUp)+' thru '+me.n:'Not started'; }
     if(unit==='match'){ const me=matchBoard(pub,scores,{}).find(x=>(x.members||[]).includes(r.id)); return me&&me.n?me.status:'Match not started'; }
     const tot=Object.entries(scores[r.id]||{}).filter(([hh])=>(FORMATS[holeFormat(pub,+hh)]||{}).entry!=='team'); const rel=tot.reduce((a,[hh,v])=>a+v-(c.par[r.p.set||'M']||c.par.M)[hh-1],0); return tot.length?toParTxt(rel)+' thru '+tot.length:'Not started'; };
   $('main').innerHTML=`${!live?`<div class="banner">${pub.status==='final'?'Scoring is closed — scores can no longer be changed.':'Scoring hasn’t opened yet. Scores will save once the committee opens it.'}</div>`:''}
@@ -772,7 +777,7 @@ const multiCourse=()=>Object.keys(pub.courses||{}).length>1;
    to par, never a total, because groups further along would always carry the higher total */
 function matchCell(r){ if(r.segs){ const t=r.segs.find(s=>s.k==='18'); return `<span class="tp ${t&&t.started&&(r.by==='strokes'?t.rel<0:t.v>0)?'pos':''}" style="font-size:15px;white-space:nowrap">${esc(t?t.txt:r.status)}</span>`; } return `<span class="tp ${r.over&&r.pts===1?'pos':''}" style="font-size:14px;line-height:1.2">${esc(r.status)}</span>`; }
 function subLine(r,net){ if(r.unit==='match') return r.segs?`<div class="muted" style="font-size:12px">${r.segs.filter(s=>s.k!=='18').map(s=>esc(s.label+' '+s.txt)).join(' · ')}</div>`:''; const bits=[]; if(multiCourse()&&r.courseName) bits.push(r.courseName.replace(' Course','')); if(r.flight&&!lbFlight) bits.push('Flt '+r.flight);
-  if(r.n){ if(net) bits.push('Gross '+toParTxt(r.toPar)); else if(r.netToPar!=null) bits.push('Net '+toParTxt(r.netToPar)); }
+  if(r.n){ if(r.quota!=null) bits.push(ptsLine(r)); else if(net) bits.push('Gross '+toParTxt(r.toPar)); else if(r.netToPar!=null) bits.push('Net '+toParTxt(r.netToPar)); }
   return bits.length?`<div class="muted" style="font-size:12px">${esc(bits.join(' · '))}</div>`:''; }
 function renderSkinsBoard(comp,fromJoin){
   const sk=comp.skins||{}, r=skinsResult(compPub(pub,comp),scores,sk,comp.players), per=sk.mode==='hole', won=r.wins.filter(w=>w.status==='won');
@@ -795,8 +800,8 @@ function renderBoard(fromJoin){
   if(!BIG&&!lbFlight&&group()&&flights.length){ const me=group().players.find(p=>p.flight); if(me&&renderBoard.first!==false){ lbFlight=me.flight; renderBoard.first=false; } }
   const BB=isTeamEvent(pub), noPl=eventFormats(pub).some(f=>(FORMATS[f]||{}).entry==='team'), unit=unitOf(pub), MATCH=unit==='match'; if(noPl) lbView='teams';
   const lb=eventBoard(pub,scores,{flight:lbFlight,sort:net?'net':'gross',view:BB?lbView:'players'});
-  const valTxt=r=>MATCH?r.status:unit==='points'?(r.n?r.pts:'—'):unit==='holes'?(r.n?(r.holesUp>0?'+':'')+r.holesUp:'—'):(r.n?toParTxt(net&&r.netToPar!=null?r.netToPar:r.toPar):'—');
-  const colHead=MATCH?(lb.some(r=>r.segs)?'The 18':'Match'):unit==='points'?'Points':unit==='holes'?'Holes':(net?'Net':'To par'), mcls=MATCH?' m':'';
+  const valTxt=r=>MATCH?r.status:unit==='points'?ptsTxt(r):unit==='holes'?(r.n?(r.holesUp>0?'+':'')+r.holesUp:'—'):(r.n?toParTxt(net&&r.netToPar!=null?r.netToPar:r.toPar):'—');
+  const colHead=MATCH?(lb.some(r=>r.segs)?'The 18':'Match'):unit==='points'?(playerFormatOf(pub)==='quota'?'vs quota':'Points'):unit==='holes'?'Holes':(net?'Net':'To par'), mcls=MATCH?' m':'';
   $('main').innerHTML=`${BIG?`<h1 style="font-size:44px;margin:6px 4px 16px">${esc(pub.name)}${lbFlight?' · Flight '+esc(lbFlight):''}</h1>`:''}
    ${BIG?'':compChips()}${!BIG&&(flights.length||hasNet||BB)?`<div class="chips sub">${BB&&!noPl&&!MATCH?[['teams','Teams'],['players','Players']].map(([k,l])=>`<button data-vw="${k}" class="${lbView===k?'on':''}">${l}</button>`).join(''):''}${hasNet&&!MATCH&&unit==='strokes'?['gross','net'].map(x=>`<button data-sort="${x}" class="${(net?'net':'gross')===x?'on':''}">${x==='net'?'Net':'Gross'}</button>`).join(''):''}${flights.length?['',...flights].map(f=>`<button data-fl="${f}" class="${lbFlight===f?'on':''}">${f?'Flight '+f:'All'}</button>`).join(''):''}</div>`:''}
    <div class="card" style="overflow:hidden">
@@ -814,8 +819,8 @@ function renderBoard(fromJoin){
 function renderCompBoard(comp,fromJoin){
   const cp=compPub(pub,comp), unit=unitOf(cp), MATCH=unit==='match', BB=isTeamEvent(cp), net=(cp.scoring||'gross')==='net', mine=new Set((group()||{players:[]}).players.map(p=>p.id));
   const lb=eventBoard(cp,scores,{sort:net?'net':'gross',view:'teams'});
-  const valTxt=r=>MATCH?r.status:unit==='points'?(r.n?r.pts:'—'):unit==='holes'?(r.n?(r.holesUp>0?'+':'')+r.holesUp:'—'):(r.n?toParTxt(net&&r.netToPar!=null?r.netToPar:r.toPar):'—');
-  const colHead=MATCH?(lb.some(r=>r.segs)?'The 18':'Match'):unit==='points'?'Points':unit==='holes'?'Holes':(net?'Net':'To par'), mcls=MATCH?' m':'';
+  const valTxt=r=>MATCH?r.status:unit==='points'?ptsTxt(r):unit==='holes'?(r.n?(r.holesUp>0?'+':'')+r.holesUp:'—'):(r.n?toParTxt(net&&r.netToPar!=null?r.netToPar:r.toPar):'—');
+  const colHead=MATCH?(lb.some(r=>r.segs)?'The 18':'Match'):unit==='points'?(playerFormatOf(pub)==='quota'?'vs quota':'Points'):unit==='holes'?'Holes':(net?'Net':'To par'), mcls=MATCH?' m':'';
   const teamsPending=comp.teams==null&&(FORMATS[comp.format]||{}).team&&(+comp.teamSize||1)>=2;
   $('main').innerHTML=`${BIG?`<h1 style="font-size:44px;margin:6px 4px 16px">${esc(pub.name)} · ${esc(comp.name)}</h1>`:''}${BIG?'':compChips()}
    ${teamsPending?'<div class="banner">Partners are drawn after the round — individual standings until then.</div>':''}
@@ -835,7 +840,7 @@ window.__canReload=()=>!queue.length;
    page counts, and a reload is tried once per build — if the page that comes back is still the old one, the CDN
    hasn't caught up; wait a while before trying that build again. */
 (function(){
-  const ME='20261023025122', KEY='au_tried', RETRY=10*60*1000; let ready=false, lastCheck=0;
+  const ME='20261023025426', KEY='au_tried', RETRY=10*60*1000; let ready=false, lastCheck=0;
   const typing=()=>{ const a=document.activeElement; return a&&/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)&&a.value&&a.type!=='search'; };
   const safe=()=>!typing()&&(typeof window.__canReload!=='function'||window.__canReload());
   const tried=()=>{ try{ const [b,t]=(sessionStorage.getItem(KEY)||'').split('|'); return b?{build:b,at:+t||0}:null; }catch(_){ return null; } };

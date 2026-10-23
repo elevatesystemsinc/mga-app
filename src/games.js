@@ -343,7 +343,7 @@ function potStandingsHTML(g,pot,ev){
     return T.length?`<div class="mini" style="margin:10px 22px 14px">${T.map(x=>`<div class="mr num" style="grid-template-columns:minmax(0,1fr) 60px"><span>${esc(gpName(x.p))} <span class="muted">${x.a.birdies}b ${x.a.eagles}e</span></span><b class="r">${x.dots}</b></div>`).join('')}</div>`:'<div style="padding:12px 22px" class="muted">No dots yet.</div>'; }
   const pub=potPub(g,pot), rows=eventBoard(pub,sc,{sort:pub.scoring}).filter(r=>r.n), net=pub.scoring==='net', unit=unitOf(pub);
   if(!rows.length) return '<div style="padding:12px 22px" class="muted">No scores yet.</div>';
-  const txt=r=>unit==='points'?r.pts+' pts':unit==='holes'?(r.holesUp>0?'+':'')+r.holesUp:unit==='match'?esc(r.status):(net&&r.netToPar!=null?toParTxt(r.netToPar):toParTxt(r.toPar));
+  const txt=r=>unit==='points'?(r.quota!=null?ptsTxt(r)+` <span class="muted" style="font-weight:400;font-size:11px">${r.ptsRaw}p</span>`:r.pts+' pts'):unit==='holes'?(r.holesUp>0?'+':'')+r.holesUp:unit==='match'?esc(r.status):(net&&r.netToPar!=null?toParTxt(r.netToPar):toParTxt(r.toPar));
   return `<div class="mini" style="margin:10px 22px 14px">${rows.slice(0,12).map(r=>`<div class="mr num" style="grid-template-columns:36px minmax(0,1fr) 44px 60px"><b>${r.posTxt}</b><span class="trunc">${esc(r.name)}</span><span class="muted r">${r.thru}</span><b class="r">${txt(r)}</b></div>`).join('')}${rows.length>12?`<div class="mr"><span class="muted">… and ${rows.length-12} more</span></div>`:''}</div>`;
 }
 function addGamePlayers(g){

@@ -40,12 +40,17 @@ function leaderboard(pub,scores,opt){ opt=opt||{};
       for(let h=1;h<=18;h++){ let s=+sc[h]; if(!s) continue; const k=ph!=null?strokesAt(pub,c,p.set,h,ph):0; if(pub.cap==='nddb') s=Math.min(s,par[h-1]+2+Math.max(0,k));   // maximum score: net double bogey
         n++; gross+=s; parPlayed+=par[h-1]; if(h<=9) out+=s; else inn+=s; got+=k;
         const v=holeValue(pub,fmt,s,s-k,par[h-1]); pts+=v.pts; holesUp+=v.up; }
-      if(fmt==='quota') pts-=n?Math.round(((+pub.quotaBase||36)-(ph||0))*n/18*100)/100:0;   // quota is pro-rated while the round is live; whole at 18
-      if(fmt==='quota'&&n===18) pts=Math.round(pts);
-      rows.push({id:p.id,name:p.name,group:g.label||'',groupId:g.id,course:g.course,courseName:c.name,tee:p.tee,n,gross,toPar:gross-parPlayed,out,inn,thru:n===18?'F':String(n),par,ph,flight:p.flight||'',net:ph==null?null:gross-got,netToPar:ph==null?null:gross-got-parPlayed,pts,holesUp,unit});
+      let ptsRaw=pts, quota=null, need=null;
+      if(fmt==='quota'){ quota=(+pub.quotaBase||36)-(ph||0); need=n?Math.round(quota*n/18*100)/100:0;   // where the player should be after n holes: the quota pro-rated; whole at 18
+        pts=n?Math.round((ptsRaw-need)*100)/100:0; if(n===18) pts=Math.round(pts); }
+      rows.push({id:p.id,name:p.name,group:g.label||'',groupId:g.id,course:g.course,courseName:c.name,tee:p.tee,n,gross,toPar:gross-parPlayed,out,inn,thru:n===18?'F':String(n),par,ph,flight:p.flight||'',net:ph==null?null:gross-got,netToPar:ph==null?null:gross-got-parPlayed,pts,ptsRaw,quota,need,holesUp,unit});
     } }
   return rankRows(rows,unit,opt);
 }
+/* a points row's value: quota = how far above or below the quota you should have by now (signed, a half shows as .5),
+   the other point games = the points themselves. ptsLine = the small print under it for quota rows. */
+function ptsTxt(r){ if(!r.n) return '—'; if(r.quota==null) return String(r.pts); const v=r.pts; const a=Math.abs(v), s=Number.isInteger(a)?String(a):a.toFixed(1).replace(/\.0$/,''); return v>0?'+'+s:v<0?'−'+s:'E'; }
+function ptsLine(r){ if(r.quota==null||!r.n) return ''; return `${r.ptsRaw} pts · ${r.n===18?'quota '+r.quota:`${Number.isInteger(r.need)?r.need:r.need.toFixed(1)} needed thru ${r.n} of ${r.quota}`}`; }
 /* one hole for one player in an individual format → {pts, up} (points formats; par-bogey holes) */
 function holeValue(pub,fmt,gross,net,par){
   if(fmt==='teamstable') fmt='stableford';   // a player's own points inside a team Stableford

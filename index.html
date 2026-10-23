@@ -2940,12 +2940,17 @@ function leaderboard(pub,scores,opt){ opt=opt||{};
       for(let h=1;h<=18;h++){ let s=+sc[h]; if(!s) continue; const k=ph!=null?strokesAt(pub,c,p.set,h,ph):0; if(pub.cap==='nddb') s=Math.min(s,par[h-1]+2+Math.max(0,k));   // maximum score: net double bogey
         n++; gross+=s; parPlayed+=par[h-1]; if(h<=9) out+=s; else inn+=s; got+=k;
         const v=holeValue(pub,fmt,s,s-k,par[h-1]); pts+=v.pts; holesUp+=v.up; }
-      if(fmt==='quota') pts-=n?Math.round(((+pub.quotaBase||36)-(ph||0))*n/18*100)/100:0;   // quota is pro-rated while the round is live; whole at 18
-      if(fmt==='quota'&&n===18) pts=Math.round(pts);
-      rows.push({id:p.id,name:p.name,group:g.label||'',groupId:g.id,course:g.course,courseName:c.name,tee:p.tee,n,gross,toPar:gross-parPlayed,out,inn,thru:n===18?'F':String(n),par,ph,flight:p.flight||'',net:ph==null?null:gross-got,netToPar:ph==null?null:gross-got-parPlayed,pts,holesUp,unit});
+      let ptsRaw=pts, quota=null, need=null;
+      if(fmt==='quota'){ quota=(+pub.quotaBase||36)-(ph||0); need=n?Math.round(quota*n/18*100)/100:0;   // where the player should be after n holes: the quota pro-rated; whole at 18
+        pts=n?Math.round((ptsRaw-need)*100)/100:0; if(n===18) pts=Math.round(pts); }
+      rows.push({id:p.id,name:p.name,group:g.label||'',groupId:g.id,course:g.course,courseName:c.name,tee:p.tee,n,gross,toPar:gross-parPlayed,out,inn,thru:n===18?'F':String(n),par,ph,flight:p.flight||'',net:ph==null?null:gross-got,netToPar:ph==null?null:gross-got-parPlayed,pts,ptsRaw,quota,need,holesUp,unit});
     } }
   return rankRows(rows,unit,opt);
 }
+/* a points row's value: quota = how far above or below the quota you should have by now (signed, a half shows as .5),
+   the other point games = the points themselves. ptsLine = the small print under it for quota rows. */
+function ptsTxt(r){ if(!r.n) return '—'; if(r.quota==null) return String(r.pts); const v=r.pts; const a=Math.abs(v), s=Number.isInteger(a)?String(a):a.toFixed(1).replace(/\.0$/,''); return v>0?'+'+s:v<0?'−'+s:'E'; }
+function ptsLine(r){ if(r.quota==null||!r.n) return ''; return `${r.ptsRaw} pts · ${r.n===18?'quota '+r.quota:`${Number.isInteger(r.need)?r.need:r.need.toFixed(1)} needed thru ${r.n} of ${r.quota}`}`; }
 /* one hole for one player in an individual format → {pts, up} (points formats; par-bogey holes) */
 function holeValue(pub,fmt,gross,net,par){
   if(fmt==='teamstable') fmt='stableford';   // a player's own points inside a team Stableford
@@ -3727,12 +3732,12 @@ function gBoard(el,ev){
   const pubB=publicEvent(ev), unit=unitOf(pubB), MATCH=unit==='match', lb=eventBoard(pubB,scoresFor(ev),{flight:view.gflight,sort:view.gsort,view:view.gview});
   const cols='grid-template-columns:52px minmax(0,1.5fr) minmax(0,1fr) 44px 60px 60px 64px 64px 40px';
   const valCols=r=>MATCH?`<span class="r"></span><b class="r" style="font-size:14px;grid-column:span 2;white-space:nowrap">${esc(r.status)}</b>`
-    :unit==='points'?`<span class="r">${r.n?r.gross:'—'}</span><b class="r" style="font-size:15px">${r.n?r.pts:'—'}</b><span></span>`
+    :unit==='points'?`<span class="r">${r.n?(r.quota!=null?r.ptsRaw+' pts':r.gross):'—'}</span><b class="r ${r.quota!=null&&r.n&&r.pts>0?'pos':''}" style="font-size:15px">${ptsTxt(r)}</b><span class="r muted" style="font-size:11.5px;white-space:nowrap">${r.quota!=null&&r.n?(r.n===18?'q '+r.quota:'of '+r.need):''}</span>`
     :unit==='holes'?`<span class="r">${r.n?r.gross:'—'}</span><b class="r ${r.n&&r.holesUp>0?'pos':''}" style="font-size:15px">${r.n?(r.holesUp>0?'+':'')+r.holesUp:'—'}</b><span class="r muted">holes</span>`:null;
   const courses=[...new Set(ev.groups.map(g=>g.course))];
   el.innerHTML=`<div class="toolbar">${BB&&!noPl&&!MATCH?`<div class="seg">${[['teams','Teams'],['players','Players']].map(([k,l])=>`<button class="${view.gview===k?'on':''}" data-gvw="${k}">${l}</button>`).join('')}</div>`:''}${MATCH||unit==='points'||unit==='holes'?'':`<div class="seg">${['gross','net'].map(s=>`<button class="${view.gsort===s?'on':''}" data-gs="${s}">${s==='net'?'Net':'Gross'}</button>`).join('')}</div>`}
     ${names.length?`<div class="seg">${['',...names].map(n=>`<button class="${view.gflight===n?'on':''}" data-gf="${n}">${n?'Flight '+n:'All flights'}</button>`).join('')}</div>`:''}
-    <span class="muted" style="font-size:13px">${ev.status==='final'?'Final · click any row for the scorecard':(MATCH?'Match status':unit==='points'?'Points for holes played':unit==='holes'?'Holes up or down':'To par for holes played')+(courses.length>1?' · both courses':'')+' · live · click a row for the scorecard'}</span><button class="btn sm" id="gbRef" style="margin-left:auto">${I.refresh}Refresh</button></div>
+    <span class="muted" style="font-size:13px">${ev.status==='final'?'Final · click any row for the scorecard':(MATCH?'Match status':unit==='points'?(playerFormatOf(pubB)==='quota'?'Points against the quota, pro-rated for holes played':'Points for holes played'):unit==='holes'?'Holes up or down':'To par for holes played')+(courses.length>1?' · both courses':'')+' · live · click a row for the scorecard'}</span><button class="btn sm" id="gbRef" style="margin-left:auto">${I.refresh}Refresh</button></div>
   <div class="card" style="overflow:hidden">${lb.length?`<div class="tw"><div class="t" style="min-width:860px"><div class="tr th" style="${cols}"><span>Pos</span><span>${BB&&view.gview==='teams'?'Team':'Player'}</span><span>Group</span><span class="r">Flt</span><span class="r">Thru</span>${MATCH?'<span class="r"></span><span class="r" style="grid-column:span 2">Match</span>':unit!=='strokes'?`<span class="r">Gross</span><span class="r">${unit==='points'?'Points':'Holes'}</span><span></span>`:`<span class="r">Gross</span><span class="r">${net?'Net':'To par'}</span><span class="r">${net?'Net to par':'Net'}</span>`}<span></span></div>
     ${lb.map(r=>`<div class="tr num click" data-lbg="${r.groupId}" data-lbp="${esc(r.team?(r.members||[])[0]:r.id)}" style="${cols}"><b>${r.posTxt}</b><b class="trunc">${esc(r.name)}</b><span class="trunc muted">${esc(r.group||'')} · ${esc(r.courseName.replace(' Course',''))}</span><span class="r muted">${esc(r.flight||'')}</span><span class="r">${r.n?r.thru:'—'}</span>${valCols(r)!==null?valCols(r):`<span class="r">${r.n?r.gross+' <small class="muted">('+toParTxt(r.toPar)+')</small>':'—'}</span>`+(net?`<span class="r">${r.n&&r.net!=null?r.net:'—'}</span><b class="r ${r.n&&r.netToPar<0?'pos':''}" style="font-size:15px">${r.n&&r.netToPar!=null?toParTxt(r.netToPar):'—'}</b>`:`<b class="r ${r.n&&r.toPar<0?'pos':''}" style="font-size:15px">${r.n?toParTxt(r.toPar):'—'}</b><span class="r muted">${r.n&&r.netToPar!=null?toParTxt(r.netToPar):'—'}</span>`)}<span class="ib">${I.edit}</span></div>`).join('')}</div></div>`
     :'<div class="empty"><b>No players yet</b><span>Add groups to see the leaderboard.</span></div>'}</div>`;
@@ -4530,7 +4535,7 @@ function potStandingsHTML(g,pot,ev){
     return T.length?`<div class="mini" style="margin:10px 22px 14px">${T.map(x=>`<div class="mr num" style="grid-template-columns:minmax(0,1fr) 60px"><span>${esc(gpName(x.p))} <span class="muted">${x.a.birdies}b ${x.a.eagles}e</span></span><b class="r">${x.dots}</b></div>`).join('')}</div>`:'<div style="padding:12px 22px" class="muted">No dots yet.</div>'; }
   const pub=potPub(g,pot), rows=eventBoard(pub,sc,{sort:pub.scoring}).filter(r=>r.n), net=pub.scoring==='net', unit=unitOf(pub);
   if(!rows.length) return '<div style="padding:12px 22px" class="muted">No scores yet.</div>';
-  const txt=r=>unit==='points'?r.pts+' pts':unit==='holes'?(r.holesUp>0?'+':'')+r.holesUp:unit==='match'?esc(r.status):(net&&r.netToPar!=null?toParTxt(r.netToPar):toParTxt(r.toPar));
+  const txt=r=>unit==='points'?(r.quota!=null?ptsTxt(r)+` <span class="muted" style="font-weight:400;font-size:11px">${r.ptsRaw}p</span>`:r.pts+' pts'):unit==='holes'?(r.holesUp>0?'+':'')+r.holesUp:unit==='match'?esc(r.status):(net&&r.netToPar!=null?toParTxt(r.netToPar):toParTxt(r.toPar));
   return `<div class="mini" style="margin:10px 22px 14px">${rows.slice(0,12).map(r=>`<div class="mr num" style="grid-template-columns:36px minmax(0,1fr) 44px 60px"><b>${r.posTxt}</b><span class="trunc">${esc(r.name)}</span><span class="muted r">${r.thru}</span><b class="r">${txt(r)}</b></div>`).join('')}${rows.length>12?`<div class="mr"><span class="muted">… and ${rows.length-12} more</span></div>`:''}</div>`;
 }
 function addGamePlayers(g){
@@ -6988,7 +6993,7 @@ async function resultsPDF(t,opt){
    page counts, and a reload is tried once per build — if the page that comes back is still the old one, the CDN
    hasn't caught up; wait a while before trying that build again. */
 (function(){
-  const ME='20261023025122', KEY='au_tried', RETRY=10*60*1000; let ready=false, lastCheck=0;
+  const ME='20261023025426', KEY='au_tried', RETRY=10*60*1000; let ready=false, lastCheck=0;
   const typing=()=>{ const a=document.activeElement; return a&&/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)&&a.value&&a.type!=='search'; };
   const safe=()=>!typing()&&(typeof window.__canReload!=='function'||window.__canReload());
   const tried=()=>{ try{ const [b,t]=(sessionStorage.getItem(KEY)||'').split('|'); return b?{build:b,at:+t||0}:null; }catch(_){ return null; } };

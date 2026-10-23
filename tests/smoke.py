@@ -85,6 +85,19 @@ async def main():
         # quota = 36 − PH (index 0.0 on Oak White plays to +3 → 39). Standard: 2×4 + 16×2 = 40. Own table: 2×5 + 16×3 = 58. Back to standard in the editor → nothing stored.
         q=36-r['ph']; ok=r['std']==40-q and r['own']==58-q and r['grid'] and r['bird']=='5' and r['stored']=='{}' and r['custom'] and 'own point table' in r['label']
         print('adjustable points per score', r, 'OK' if ok else 'FAIL'); bad+=not ok
+        # live quota: the owner's example — a 0 through 6 holes should have 12; 5 pars and a bogey = 11 → −1 vs quota
+        r=await pg.evaluate("""()=>{ const g=golfData(); const c=courseById('oak'), par=c.par.M;
+          const ev={id:'qt2',slug:'qt2',name:'Quota live',date:'2026-10-23',status:'live',format:'quota',quotaBase:36,scoring:'gross',defaultTee:'White',defaultCourse:'oak',allow:{},pool:[],flights:{count:0,names:[]},
+            groups:[{id:'g',code:'QTBBB',label:'G',course:'oak',startHole:1,teeTime:'',players:[{id:'x1',name:'Ann',index:'0.0',tee:'White',set:'M'},{id:'x2',name:'Bo',index:'18.0',tee:'White',set:'M'},{id:'x3',name:'Cy',index:'9.0',tee:'White',set:'M'}]}]}; g.events.push(ev);
+          const pub=publicEvent(ev); pub.groups[0].players[0].ph=0; pub.groups[0].players[1].ph=18; pub.groups[0].players[2].ph=9;   // the example is for a 0 playing handicap; Bo (quota 18) and Cy (quota 27) are in the same game
+          const sc={x1:{1:par[0],2:par[1],3:par[2],4:par[3],5:par[4],6:par[5]+1},            // Ann: 11 pts, needs 12 → −1
+                    x2:{1:par[0],2:par[1],3:par[2]+1,4:par[3]+1},                              // Bo thru 4: 6 pts, needs 4 → +2 (fewer points, but ahead of his quota)
+                    x3:{1:par[0],2:par[1]+1,3:par[2]+1,4:par[3]+1,5:par[4]+1,6:par[5]+1}};     // Cy thru 6: 7 pts, needs 9 → −2
+          const lb=eventBoard(pub,sc,{sort:'gross'}); const r=lb.find(x=>x.id==='x1'); g.events=g.events.filter(x=>x!==ev);
+          return {need:r.need,raw:r.ptsRaw,pts:r.pts,txt:ptsTxt(r),line:ptsLine(r),thru:r.thru,order:lb.map(x=>x.name+' '+ptsTxt(x)),pos:lb.map(x=>x.posTxt)}; }""")
+        ok=(r['need']==12 and r['raw']==11 and r['pts']==-1 and r['txt']=='−1' and r['line']=='11 pts · 12 needed thru 6 of 36' and r['thru']=='6'
+            and r['order']==['Bo +2','Ann −1','Cy −2'] and r['pos']==['1','2','3'])   # ranked by distance from quota, not by raw points
+        print('live quota vs pro-rated quota', r, 'OK' if ok else 'FAIL'); bad+=not ok
         # partner cap, tournament flights → events, pairing by standings, results PDF
         r=await pg.evaluate("""async()=>{ const t=db.tournaments.find(x=>x.id==='T1'); t.hcpDiff=10; const evs=t.rounds.map(roundEvent);
           const cy=evPlayers(evs[0]).find(x=>x.p.memberId==='q2'); const h=hcpOf(evs[0],cy.p,cy.grp);
