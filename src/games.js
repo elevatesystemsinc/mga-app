@@ -720,8 +720,24 @@ async function sheetImage(g,pageNo,opt){ opt=opt||{};
   const pg=await pdf.getPage(n), vp=pg.getViewport({scale:opt.scale||2.5}); const cv=document.createElement('canvas'); cv.width=Math.round(vp.width); cv.height=Math.round(vp.height);
   await pg.render({canvasContext:cv.getContext('2d'),viewport:vp}).promise;
   if(opt.returnCanvas) return cv;
-  const url=cv.toDataURL('image/png'); const a=document.createElement('a'); a.href=url; a.download=`${slugify(gameTitle(g))}-${g.date||'game'}-${n===1?'rules':'groups'}.png`; a.click();
-  toast(n===1?'Rules image downloaded':'Groups image downloaded');
+  await deliverImage(cv,`${slugify(gameTitle(g))}-${g.date||'game'}-${n===1?'rules':'groups'}.png`,`${gameTitle(g)} — ${n===1?'the game & rules':'groups & tee times'}`);
+}
+/* get a rendered image onto the device. Phones don't honour a download link from a script (and a home-screen app never
+   does), so: the share sheet when the browser offers one (Save Image / BAND / Messages), otherwise an on-screen copy
+   you can press-and-hold to save, with a Share button for a fresh tap; desktops simply download. */
+async function deliverImage(cv,name,title){
+  const blob=await new Promise(r=>cv.toBlob(r,'image/png')); if(!blob){ toast('Could not make the image'); return; }
+  const file=new File([blob],name,{type:'image/png'}), touch=matchMedia('(pointer:coarse)').matches||/iPhone|iPad|Android/i.test(navigator.userAgent);
+  const canShare=!!(navigator.canShare&&navigator.canShare({files:[file]})&&navigator.share);
+  const share=async()=>{ try{ await navigator.share({files:[file],title}); return true; }catch(e){ return e&&e.name==='AbortError'?'cancel':false; } };
+  if(!touch){ const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download=name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(url),4000); toast('Image downloaded'); return; }
+  if(canShare){ const r=await share(); if(r===true||r==='cancel') return; }   // a first try straight from the tap; if the browser wants a fresh tap, the viewer below has one
+  const url=URL.createObjectURL(blob), ov=document.createElement('div'); ov.className='rf-show imgv'; document.body.appendChild(ov);
+  ov.innerHTML=`<div class="rf-top"><img src="${typeof crestSrc==='function'?crestSrc():'flagstick-crest-light.svg'}" alt=""><div><div class="rf-k">${esc(orgName())}</div><div class="rf-h">${esc(title)}</div></div><button class="rf-x" id="ivClose" aria-label="Close">✕</button></div>
+    <div class="imgv-body"><img src="${url}" alt="${esc(title)}"></div>
+    <div class="imgv-bar">${canShare?'<button class="rf-go" id="ivShare">Share / Save image</button>':''}<span>${canShare?'or ':''}press and hold the image to save it</span></div>`;
+  const close=()=>{ ov.remove(); URL.revokeObjectURL(url); }; ov.querySelector('#ivClose').onclick=close;
+  const sb=ov.querySelector('#ivShare'); if(sb) sb.onclick=async()=>{ const r=await share(); if(r===true) close(); else if(r===false) toast('Press and hold the image to save it'); };
 }
 /* plain-English rules of one competition, for the sheet */
 function potRulesText(pot){
