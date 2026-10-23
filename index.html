@@ -4469,7 +4469,7 @@ function vGame(m,g){
       ${potStandingsHTML(g,pot,ev)}
       ${payoutsTxt?`<div style="padding:10px 22px;display:flex;gap:6px;flex-wrap:wrap;border-top:1px solid var(--line)">${payoutsTxt}</div>`:''}</div>`; };
   const settleCard=`<div class="card" style="overflow:hidden"><div class="cardhead"><div><h2 class="h2">Settlement</h2><span class="muted">${g.settle==='net'?'Net: one figure per player, and the fewest payments that square it':'Pot: everyone puts in, winners pull out'} · ${gMoney(S.out)} of ${gMoney(S.inn)} paid out${Math.abs(mo.left)>0.004?` · <b class="${mo.left>0?'':'neg'}">${gMoney(Math.abs(mo.left))} ${mo.left>0?'still in the pot':'over the pot'}</b>`:''}</span></div>
-      <div class="actions"><button class="btn sm" id="gmSheet">${I.down}Game sheet PDF</button>${g.status==='settled'?'<button class="btn sm" id="gmReopen">Reopen</button>':'<button class="btn sm" id="gmSettle">Mark settled</button>'}</div></div>
+      <div class="actions"><button class="btn sm" id="gmSheet">${I.down}Game sheet PDF</button><button class="btn sm" id="gmImg1" title="Page 1 — the game and house rules, as an image for BAND or a text">Rules image</button><button class="btn sm" id="gmImg2" title="Page 2 — the groups and tee times, as an image">Groups image</button>${g.status==='settled'?'<button class="btn sm" id="gmReopen">Reopen</button>':'<button class="btn sm" id="gmSettle">Mark settled</button>'}</div></div>
     ${g.players.length?`<div class="tw"><div class="t" style="min-width:560px"><div class="tr th" style="grid-template-columns:minmax(160px,1fr) 100px 100px 110px"><span>Player</span><span class="r">Put in</span><span class="r">Pulled out</span><span class="r">Net</span></div>
       ${S.rows.map(r=>`<div class="tr num" style="grid-template-columns:minmax(160px,1fr) 100px 100px 110px"><b class="trunc">${esc(r.name)}</b><span class="r">${gMoney(r.inn)}</span><span class="r ${r.out?'pos':'muted'}">${r.out?gMoney(r.out):'—'}</span><b class="r ${netCls(r.net)}">${gSigned(r.net)}</b></div>`).join('')}</div></div>
       ${g.settle==='net'?`<div style="padding:14px 22px;border-top:1px solid var(--line)"><span class="lbl">Who pays whom</span>${S.transfers.length?`<div class="mini" style="margin-top:6px">${S.transfers.map(t=>`<div class="mr num" style="grid-template-columns:minmax(0,1fr) 90px"><span>${esc(t.from)} <span class="muted">pays</span> ${esc(t.to)}</span><b class="r">${gMoney(t.amount)}</b></div>`).join('')}</div>`:'<p class="muted" style="margin:6px 0 0">Nothing to settle yet.</p>'}</div>`:''}`:''}</div>`;
@@ -4494,7 +4494,7 @@ function vGame(m,g){
   const cp=$('gmCopy'); if(cp) cp.onclick=async()=>{ try{ await navigator.clipboard.writeText(link); toast('Link copied'); }catch(_){ prompt('Copy this link:',link); } };
   $('gmGroups').onclick=()=>{ view.geid=ev.id; view.getab='groups'; go('golf'); };
   wireGameGroups(m,g,ev);
-  $('gmSheet').onclick=()=>gameSheetPDF(g);
+  $('gmSheet').onclick=()=>gameSheetPDF(g); $('gmImg1').onclick=()=>sheetImage(g,1); $('gmImg2').onclick=()=>sheetImage(g,2);
   m.querySelectorAll('[data-gsheet]').forEach(b=>b.onclick=()=>scoreSheet(ev,ev.groups.find(x=>x.id===b.dataset.gsheet)));
   m.querySelectorAll('[data-gp]').forEach(r=>r.onclick=()=>editGamePlayer(g,g.players.find(p=>p.id===r.dataset.gp)));
   m.querySelectorAll('[data-gin]').forEach(c=>c.onchange=()=>{ const [pid,plid]=c.dataset.gin.split('|'); const pot=g.pots.find(x=>x.id===pid); if(c.checked) pot.inn[plid]=true; else delete pot.inn[plid]; persist(); render(); });
@@ -4913,6 +4913,19 @@ function syncGameEvent(g,ev){
 }
 
 /* ---------- the game sheet: a branded PDF for the first tee ---------- */
+/* a page of the game sheet as a PNG (page 1 the game & rules, page 2 the groups) — for BAND, a text, the pro shop screen */
+function loadPdfJs(){ if(window.pdfjsLib) return Promise.resolve();
+  return new Promise((res,rej)=>{ const sc=document.createElement('script'); sc.src='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js'; sc.onload=()=>{ try{ window.pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js'; }catch(_){} res(); }; sc.onerror=()=>rej(new Error('Couldn’t load the image maker — check the connection')); document.head.appendChild(sc); }); }
+async function sheetImage(g,pageNo,opt){ opt=opt||{};
+  const doc=await gameSheetPDF(g,{returnDoc:true}); if(!doc) return;
+  try{ await loadPdfJs(); }catch(e){ toast(e.message); return; }
+  const data=doc.output('arraybuffer'); const pdf=await window.pdfjsLib.getDocument({data}).promise; const n=Math.min(pageNo,pdf.numPages);
+  const pg=await pdf.getPage(n), vp=pg.getViewport({scale:opt.scale||2.5}); const cv=document.createElement('canvas'); cv.width=Math.round(vp.width); cv.height=Math.round(vp.height);
+  await pg.render({canvasContext:cv.getContext('2d'),viewport:vp}).promise;
+  if(opt.returnCanvas) return cv;
+  const url=cv.toDataURL('image/png'); const a=document.createElement('a'); a.href=url; a.download=`${slugify(gameTitle(g))}-${g.date||'game'}-${n===1?'rules':'groups'}.png`; a.click();
+  toast(n===1?'Rules image downloaded':'Groups image downloaded');
+}
 /* plain-English rules of one competition, for the sheet */
 function potRulesText(pot){
   const bits=[];
@@ -4974,23 +4987,32 @@ async function gameSheetPDF(g,opt){
     const keys=Object.keys(byTeam).sort((a,b)=>+a.slice(1)-+b.slice(1)), colW=(R2-L-14)/2; let col=0, top=y;
     keys.forEach((k,i)=>{ const x=L+col*(colW+14); if(col===0){ need(18); top=y; } font('PublicSans','bold',9.4,GOLDDK); doc.text('Team '+k.slice(1),x,top+(col?0:0)); font('PublicSans','normal',9.4,INK); doc.text(doc.splitTextToSize(byTeam[k].map(p=>p.name).join(' & '),colW-50)[0],x+48,top); if(col===1||i===keys.length-1){ y=top+15; } col=1-col; });
     y+=10; }
-  // ---- groups as cards, two to a row
-  section('Groups',ev.groups.some(gr=>gr.teeTime)?'Tee times':'');
-  const colW=(R2-L-14)/2, rowH=13.4, cards=ev.groups.map((grp,gi)=>({grp,gi,h:33+Math.max(1,grp.players.length)*rowH+6}));
+  // ---- page 2: the groups, laid out to fit one page however big the game is (2 or 3 columns, rows shrink to fit)
+  doc.addPage(); page(); y=44;
+  doc.setFillColor(...NAVY); doc.roundedRect(L,y-14,R2-L,44,8,8,'F'); doc.rect(L,y+22,R2-L,8,'F'); doc.setFillColor(...GOLD); doc.rect(L,y+28,R2-L,2,'F');
+  font('PublicSansXB','normal',6.6,GOLDL); doc.text(`${(orgName()||'').toUpperCase()} · ${gameWhen(g).toUpperCase()}`,L+16,y+2,{charSpace:1.2});
+  font('Cormorant','bold',17,WHITE); doc.text(`${gameTitle(g)} — groups${ev.groups.some(gr=>gr.teeTime)?' & tee times':''}`,L+16,y+19);
+  font('PublicSans','normal',8.4,[214,218,220]); doc.text(`${players} player${players===1?'':'s'} · ${ev.groups.length} group${ev.groups.length===1?'':'s'}${course?' · '+course.name:''}${tee?' · '+tee+' tees':''}`,R2-16,y+19,{align:'right'});
+  y+=48;
   const stroke=h=>!h?'':h.ph==null?'no index':h.ph>0?`${h.ph} stroke${h.ph===1?'':'s'}`:h.ph===0?'scratch':`gives ${-h.ph}`;
-  for(let i=0;i<cards.length;i+=2){ const pair=cards.slice(i,i+2), rh=Math.max(...pair.map(c=>c.h)); need(rh+10);
-    pair.forEach((c,k)=>{ const x=L+k*(colW+14), {grp,gi}=c, gc=courseById(grp.course);
-      doc.setFillColor(...WHITE); doc.setDrawColor(...LINE); doc.setLineWidth(.8); doc.roundedRect(x,y-6,colW,c.h,8,8,'FD');
-      doc.setFillColor(...IVORY); doc.roundedRect(x,y-6,colW,30,8,8,'F'); doc.rect(x,y+12,colW,12,'F'); doc.setDrawColor(...LINE); doc.line(x,y+24,x+colW,y+24);
-      font('PublicSans','bold',10.5,NAVY); doc.text(`Group ${gi+1}`,x+12,y+8); font('PublicSans','normal',8,MUTED); doc.text(`code ${grp.code}`,x+12,y+19);
-      font('Cormorant','bold',15,INK); doc.text(grp.teeTime?fmtTime(grp.teeTime):`Hole ${grp.startHole||1}`,x+colW-12,y+9,{align:'right'});
-      font('PublicSans','normal',7.6,MUTED); doc.text([(gc&&gc!==course)?gc.name:null,grp.teeTime&&(grp.startHole||1)!==1?`off ${grp.startHole}`:null].filter(Boolean).join(' · '),x+colW-12,y+19,{align:'right'});
-      let yy=y+38;
-      if(!grp.players.length){ font('PublicSans','normal',9,MUTED); doc.text('Open — tee time held for extras',x+12,yy); }
-      grp.players.forEach((p,pi)=>{ const h=strokes?playerHcp(ev,grp,p):null; if(pi%2===1){ doc.setFillColor(...IVORY); doc.rect(x+1,yy-10,colW-2,rowH,'F'); }
-        font('PublicSans','normal',9.6,INK); doc.text(doc.splitTextToSize(p.name,colW-110)[0],x+12,yy);
-        const teeTxt=(p.tee&&tee&&p.tee!==tee)?p.tee+' tees':''; if(teeTxt){ font('PublicSans','normal',7.4,MUTED); doc.text(teeTxt,x+colW-70,yy,{align:'right'}); }
-        const noIdx=h&&h.ph==null; font('PublicSans',noIdx?'normal':'bold',noIdx?7.6:8.8,noIdx?MUTED:(h&&h.ph<0?GOLDDK:INK)); doc.text(stroke(h),x+colW-12,yy,{align:'right'}); yy+=rowH; }); });
+  const avail=H-52-y, groups=ev.groups;
+  // pick the layout: 2 columns with comfortable rows, else 3 columns, shrinking the row height until it fits (never below 9.2pt)
+  const layout=(cols,rowH)=>{ const colW=(R2-L-14*(cols-1))/cols, hh=groups.map(grp=>30+Math.max(1,grp.players.length)*rowH+6); let tot=0; for(let i=0;i<hh.length;i+=cols) tot+=Math.max(...hh.slice(i,i+cols))+10; return {cols,rowH,colW,hh,tot}; };
+  let lay=layout(2,13.4); if(lay.tot>avail) lay=layout(3,12); for(let r=12;lay.tot>avail&&r>9.2;r-=0.4) lay=layout(3,r);
+  const {cols,rowH,colW,hh}=lay, small=rowH<12, nameZ=small?8.4:9.6, strokeZ=small?8:8.8;
+  for(let i=0;i<groups.length;i+=cols){ const rh=Math.max(...hh.slice(i,i+cols)); need(rh+10);
+    groups.slice(i,i+cols).forEach((grp,k)=>{ const gi=i+k, x=L+k*(colW+14), gc=courseById(grp.course), ch=hh[gi];
+      doc.setFillColor(...WHITE); doc.setDrawColor(...LINE); doc.setLineWidth(.8); doc.roundedRect(x,y-6,colW,ch,8,8,'FD');
+      doc.setFillColor(...IVORY); doc.roundedRect(x,y-6,colW,28,8,8,'F'); doc.rect(x,y+12,colW,10,'F'); doc.setDrawColor(...LINE); doc.line(x,y+22,x+colW,y+22);
+      font('PublicSans','bold',small?9.4:10.5,NAVY); doc.text(`Group ${gi+1}`,x+10,y+7); font('PublicSans','normal',7.4,MUTED); doc.text(`code ${grp.code}`,x+10,y+17);
+      font('Cormorant','bold',small?13:15,INK); doc.text(grp.teeTime?fmtTime(grp.teeTime):`Hole ${grp.startHole||1}`,x+colW-10,y+8,{align:'right'});
+      font('PublicSans','normal',7.2,MUTED); doc.text([(gc&&gc!==course)?gc.name:null,grp.teeTime&&(grp.startHole||1)!==1?`off ${grp.startHole}`:null].filter(Boolean).join(' · '),x+colW-10,y+17,{align:'right'});
+      let yy=y+34;
+      if(!grp.players.length){ font('PublicSans','normal',small?8:9,MUTED); doc.text('Open — tee time held for extras',x+10,yy); }
+      grp.players.forEach((p,pi)=>{ const h=strokes?playerHcp(ev,grp,p):null; if(pi%2===1){ doc.setFillColor(...IVORY); doc.rect(x+1,yy-rowH+4,colW-2,rowH,'F'); }
+        font('PublicSans','normal',nameZ,INK); doc.text(doc.splitTextToSize(p.name,colW-(small?80:110))[0],x+10,yy);
+        const teeTxt=(p.tee&&tee&&p.tee!==tee)?p.tee+' tees':''; if(teeTxt&&!small){ font('PublicSans','normal',7.2,MUTED); doc.text(teeTxt,x+colW-66,yy,{align:'right'}); }
+        const noIdx=h&&h.ph==null; font('PublicSans',noIdx?'normal':'bold',noIdx?7.2:strokeZ,noIdx?MUTED:(h&&h.ph<0?GOLDDK:INK)); doc.text(stroke(h),x+colW-10,yy,{align:'right'}); yy+=rowH; }); });
     y+=rh+10; }
   // ---- footer
   font('PublicSans','normal',7.6,MUTED); if(y+20>H-30){ doc.addPage(); page(); y=48; }   // the footer sits at the foot of the page it ends on
@@ -7122,7 +7144,7 @@ async function resultsPDF(t,opt){
    page counts, and a reload is tried once per build — if the page that comes back is still the old one, the CDN
    hasn't caught up; wait a while before trying that build again. */
 (function(){
-  const ME='20261023150120', KEY='au_tried', RETRY=10*60*1000; let ready=false, lastCheck=0;
+  const ME='20261023160805', KEY='au_tried', RETRY=10*60*1000; let ready=false, lastCheck=0;
   const typing=()=>{ const a=document.activeElement; return a&&/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)&&a.value&&a.type!=='search'; };
   const safe=()=>!typing()&&(typeof window.__canReload!=='function'||window.__canReload());
   const tried=()=>{ try{ const [b,t]=(sessionStorage.getItem(KEY)||'').split('|'); return b?{build:b,at:+t||0}:null; }catch(_){ return null; } };

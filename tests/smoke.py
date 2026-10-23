@@ -200,6 +200,14 @@ async def main():
       deleteGame(g); view.gameId=null; go('games'); return {tiers:tiers.map(t=>t.letter+':'+t.players.length+':'+t.lo+'-'+t.hi), byTeam, shown, label, method:pot.draw&&pot.draw.method}; }""")
     ok=(r['tiers']==['A:3:2-6','B:3:10-14','C:3:20-24'] and sorted(r['byTeam'])==['ABC','ABC','ABC'] and r['shown']==3 and 'ABC draw' in (r['label'] or ''))
     print('A-B-C draw by handicap tier', r, 'OK' if ok else 'FAIL'); bad+=not ok
+    # a big game (64 players, 16 groups) still prints on two pages — rules, then every group on one page; the groups image renders
+    r=await pg.evaluate("""async()=>{ for(let i=0;i<64;i++) if(!personById('big'+i)) CLUB.members.push({id:'big'+i,first:'Player',last:'Number'+i,hcp:String(i%30),status:'Active'});
+      designGame(null); const d=GD.draft; for(let i=0;i<64;i++) addPlayer(d,{memberId:'big'+i}); render(); $('gdSave').click(); const g=db.games[db.games.length-1]; view.gameId=g.id; go('games'); const ev=ensureGameEvent(g);
+      const doc=await gameSheetPDF(g,{returnDoc:true}); const pages=doc.getNumberOfPages(), groups=ev.groups.length;
+      let img=null; try{ const cv=await sheetImage(g,2,{returnCanvas:true}); img=cv?[cv.width,cv.height]:null; }catch(e){ img='err:'+e.message; }
+      deleteGame(g); view.gameId=null; go('games'); return {pages,groups,img}; }""")
+    ok=r['pages']==2 and r['groups']==16 and (isinstance(r['img'],list) and r['img'][0]>1000 or (isinstance(r['img'],str) and 'load' in r['img']))
+    print('big game sheet: two pages, groups image', r, 'OK' if ok else 'FAIL'); bad+=not ok
     # pops on par 3s is per competition: the skins pot can switch it on while the stroke pot keeps the classic allocation
     r=await pg.evaluate("""()=>{ designGame(null); const d=GD.draft; d.pots.push(newPot('skins',d)); const sk=d.pots.find(p=>p.kind==='skins'); render();
       const box=document.getElementById('gdNP3_'+sk.id), other=document.getElementById('gdNP3_'+d.pots[0].id); box.checked=true; box.dispatchEvent(new Event('change'));
