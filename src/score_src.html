@@ -198,8 +198,8 @@ function renderHole(){
   const teams=groupTeams(g);
   // who enters a score on this hole: every player, or one entry per team on scramble holes
   const oneBall=(FORMATS[fmt]||{}).entry==='team', unit=unitOf(pub);
-  const rows=oneBall?teams.map(t=>({id:t.captain.id,label:t.members.map(p=>p.name.split(' ')[0]).join(' & '),p:t.captain,k:(()=>{ const tph=teamPH(pub,fmt,t.members); return tph==null?0:strokesOn(tph,hcpH(t.captain)); })(),team:t}))
-    :g.players.map(p=>{ const ph=segPH(pub,p,fmt); return {id:p.id,label:p.name,p,k:typeof ph==='number'?strokesOn(ph,hcpH(p)):0}; });
+  const rows=oneBall?teams.map(t=>({id:t.captain.id,label:t.members.map(p=>p.name.split(' ')[0]).join(' & '),p:t.captain,k:(()=>{ const tph=teamPH(pub,fmt,t.members); return tph==null?0:strokesAt(pub,c,t.captain.set,h,tph); })(),team:t}))
+    :g.players.map(p=>{ const ph=segPH(pub,p,fmt); return {id:p.id,label:p.name,p,k:typeof ph==='number'?strokesAt(pub,c,p.set,h,ph):0}; });
   const thru=r=>{ if(r.team){ let n=0,rel=0,pts=0; for(let hh=1;hh<=18;hh++){ const x=teamHole(pub,c,r.team,hh,scores); if(x){ n++; rel+=(pub.scoring==='net'&&x.net!=null?x.net:x.gross)-x.par; pts+=x.pts; } } return 'Team · '+(n?(unit==='points'?pts+' pts':toParTxt(rel)+(pub.scoring==='net'?' net':''))+' thru '+n:'not started'); }
     if(unit==='points'||unit==='holes'){ const me=leaderboard(pub,scores,{}).find(x=>x.id===r.id); return me&&me.n?(unit==='points'?me.pts+' pts':(me.holesUp>0?'+':'')+me.holesUp)+' thru '+me.n:'Not started'; }
     if(unit==='match'){ const me=matchBoard(pub,scores,{}).find(x=>(x.members||[]).includes(r.id)); return me&&me.n?me.status:'Match not started'; }

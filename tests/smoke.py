@@ -54,6 +54,25 @@ async def main():
           return {had, lbBefore, inEv:evs.map((ev,i)=>evPlayers(ev).some(x=>x.p.id===gone[i])), scores:evs.map((ev,i)=>Object.keys(scoresFor(ev)[gone[i]]||{}).length), lb:evs.map((ev,i)=>eventBoard(publicEvent(ev),scoresFor(ev),{sort:'gross'}).some(r=>r.id===gone[i]||(r.members||[]).includes(gone[i]))), players:evs.map(ev=>evPlayers(ev).length)}; }""")
         okf=rf['had']==[18,18] and rf['inEv']==[False,False] and rf['scores']==[0,0] and rf['lb']==[False,False] and rf['players']==[4,4]
         print('field removal → off every round, scores gone', rf, 'OK' if okf else 'FAIL'); bad+=not okf
+        # no pops on par 3s: the playing handicap is spread over the non-par-3 holes; a plus handicap gives back from the easiest of them;
+        # the switch travels event → published copy → leaderboard / skins; off = the old 18-hole allocation exactly
+        r=await pg.evaluate("""()=>{ const c=courseById('oak'), par=c.par.M, hc=c.hcp.M, p3=par.map((p,i)=>p===3?i:-1).filter(i=>i>=0);
+          const tot=(pub,ph)=>{ let t=0, on3=0, per=[]; for(let h=1;h<=18;h++){ const k=strokesAt(pub,c,'M',h,ph); t+=k; per.push(k); if(par[h-1]===3&&k) on3++; } return {t,on3,per}; };
+          const off={}, on={noPar3:true}; const a=tot(on,20), b=tot(on,-3), d=tot(on,7), e=tot(off,20), f=tot(off,-3);
+          const n=18-p3.length; const hardest=[...Array(18).keys()].filter(i=>par[i]!==3).sort((x,y)=>hc[x]-hc[y]);
+          const okA=a.t===20&&a.on3===0&&hardest.slice(0,20-n).every(i=>a.per[i]===2)&&hardest.slice(20-n).every(i=>a.per[i]===1);
+          const easiest=hardest.slice().reverse(); const okB=b.t===-3&&b.on3===0&&easiest.slice(0,3).every(i=>b.per[i]===-1);
+          const okD=d.t===7&&d.on3===0&&hardest.slice(0,7).every(i=>d.per[i]===1);
+          const okOff=e.t===20&&f.t===-3&&e.per.every((k,i)=>k===strokesOn(20,hc[i]))&&f.per.every((k,i)=>k===strokesOn(-3,hc[i]));
+          // through an event: the published copy carries the switch and the net board changes only by the par-3 strokes
+          const g=golfData(); const ev={id:'np3',slug:'np3',name:'NP3',date:'2026-10-23',status:'live',format:'stroke',scoring:'net',defaultTee:'White',defaultCourse:'oak',allow:{},pool:[],flights:{count:0,names:[]},
+            groups:[{id:'g',code:'NP3AA',label:'G',course:'oak',startHole:1,teeTime:'',players:[{id:'x1',name:'Ann',index:'18.0',tee:'White',set:'M'}]}]}; g.events.push(ev);
+          const sc={x1:Object.fromEntries([...Array(18).keys()].map(i=>[i+1,par[i]+1]))};
+          const netOff=eventBoard(publicEvent(ev),sc,{sort:'net'})[0].net; ev.noPar3=true; const pub=publicEvent(ev); const netOn=eventBoard(pub,sc,{sort:'net'})[0].net;
+          g.events=g.events.filter(x=>x!==ev);
+          return {p3:p3.length,n,okA,okB,okD,okOff,pubFlag:pub.noPar3,netOff,netOn,ph:pub.groups[0].players[0].ph}; }""")
+        ok=r['p3']>=3 and r['okA'] and r['okB'] and r['okD'] and r['okOff'] and r['pubFlag'] and r['netOn']==r['netOff']
+        print('no pops on par 3s', r, 'OK' if ok else 'FAIL'); bad+=not ok
         # partner cap, tournament flights → events, pairing by standings, results PDF
         r=await pg.evaluate("""async()=>{ const t=db.tournaments.find(x=>x.id==='T1'); t.hcpDiff=10; const evs=t.rounds.map(roundEvent);
           const cy=evPlayers(evs[0]).find(x=>x.p.memberId==='q2'); const h=hcpOf(evs[0],cy.p,cy.grp);

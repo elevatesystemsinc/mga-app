@@ -17,7 +17,7 @@ const roundLabel=(t,r)=>r.name||`${dayLabel(t,r.day).split(' · ')[0]} · ${form
 function defaultRounds(t){ const n=Math.max(1,t.days||1), ts=t.teamSize||1;
   return Array.from({length:n},(_,day)=>Object.assign({id:uid(),day,name:'',front:'scramble',back:'shamble',scoring:'net',eventId:''},engineFrom(catalogById(ts>=2?'bestball':'stroke'),ts,1))); }
 /* the round's format fields, pushed onto its event */
-const ROUND_KEYS=['game','format','front','back','teamSize','count','countPattern','quotaBase','cap','matchScoring','matchForm','matchBy','scoring'];
+const ROUND_KEYS=['game','format','front','back','teamSize','count','countPattern','quotaBase','cap','matchScoring','matchForm','matchBy','scoring','noPar3'];
 function roundToEvent(r,ev){ ROUND_KEYS.forEach(k=>{ ev[k]=r[k]; }); if(!ev.allow) ev.allow={}; }
 
 function tRounds(el,t){
@@ -71,7 +71,7 @@ function editRound(t,r){
       `<div class="fld"><span class="lbl">Game</span><select class="inp" id="rdF">${gameOptions(cur.game||catalogOf(cur).id)}</select></div>
        <div id="rdSplit" style="display:${cur.format==='split'?'grid':'none'};grid-template-columns:repeat(2,minmax(0,1fr));gap:12px">${field('Front nine (1–9)','rdFr',cur.front,{type:'select',options:TEAM_FORMATS.map(f=>[f,FORMAT_LABEL[f]])})}${field('Back nine (10–18)','rdBk',cur.back,{type:'select',options:TEAM_FORMATS.map(f=>[f,FORMAT_LABEL[f]])})}</div>
        <div id="rdTeam" style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px">${field('Team size','rdTS',cur.teamSize||ts,{type:'select',options:[2,3,4,5,6].map(n=>[n,n+' players'])})}${field('Balls that count','rdCnt',cur.count||1,{type:'select',options:[1,2,3,4,5].map(n=>[n,'Best '+n])})}</div>
-       <p class="hint" id="rdHint"></p>`+field('Scored','rdSc',cur.scoring||'net',{type:'select',options:[['net','Net (handicaps)'],['gross','Gross']]})+
+       <p class="hint" id="rdHint"></p>`+field('Scored','rdSc',cur.scoring||'net',{type:'select',options:[['net','Net (handicaps)'],['gross','Gross']]})+noPar3Box('rdNP3',cur.noPar3)+
       (ev?`<p class="hint">Changes apply to its scoring event too (${esc(ev.name)}). Allowances are edited on the event.</p>`:`<p class="hint">${ts>=2?`Teams come from the field (${ts} players).`:'An individual tournament: team formats form teams in the groups.'}</p>`),
     wire:x=>{ const upd=()=>{ const C=catalogById(x.querySelector('#rdF').value)||catalogById('stroke'), f=C.engine.format, sizes=C.sizes||null, team=!!sizes||f==='split'; x.querySelector('#rdSplit').style.display=f==='split'?'grid':'none'; x.querySelector('#rdTeam').style.display=team?'grid':'none';
         const tsSel=x.querySelector('#rdTS'); [...tsSel.options].forEach(o=>{ o.hidden=sizes?!sizes.includes(+o.value):false; });
@@ -80,7 +80,7 @@ function editRound(t,r){
         x.querySelector('#rdHint').textContent=f==='split'?'Front nine and back nine are scored with different team formats; both count toward the round.':(C.desc||''); };
       ['#rdF','#rdTS','#rdFr','#rdBk'].forEach(id=>x.querySelector(id).onchange=upd); upd(); },
     save:()=>{ const C=catalogById(fv('rdF'))||catalogById('stroke'), E=engineFrom(C,+fv('rdTS'),+fv('rdCnt')); if(E.format==='split'){ if(fv('rdFr')===fv('rdBk')){ toast('Front and back use the same format — pick it as the game instead'); return false; } E.teamSize=+fv('rdTS')||2; }
-      const d=Object.assign({day:+fv('rdD')||0,name:fv('rdN'),front:fv('rdFr'),back:fv('rdBk'),scoring:fv('rdSc')},E);
+      const d=Object.assign({day:+fv('rdD')||0,name:fv('rdN'),front:fv('rdFr'),back:fv('rdBk'),scoring:fv('rdSc')},E,{noPar3:$('rdNP3').checked});
       if(r){ Object.assign(r,d); const e=roundEvent(r); if(e){ roundToEvent(r,e); e.date=roundDate(t,r.day)||e.date; golfSave(e); } } else tournamentRounds(t).push(Object.assign({id:uid(),eventId:''},d)); },
     del:r?()=>{ const e=roundEvent(r); if(e&&!confirm(`Remove this round? Its scoring event (${e.name}) stays in Golf.`)) return false; t.rounds=t.rounds.filter(x=>x!==r); }:null,delLabel:'Remove round'});
 }

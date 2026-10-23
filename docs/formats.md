@@ -118,3 +118,8 @@ holes on which it has a counting score.
   after the round, skins (one pot ÷ skins won, with gross/net, gross beats net, carry-overs and a validation standard
   of par, net par, bogey or net bogey on the next hole), dots / doodah, or winners entered by hand. Only a one-ball
   game (scramble, foursomes, greensome) changes how the round is played.
+
+
+## No pops on par 3s
+
+Any event, tournament round or game can tick **No pops on par 3s**. A par 3 then never gives or takes a handicap stroke; the playing handicap is spread over the other holes in stroke-index order (on a course with four par 3s, a 17 gets one stroke on each of the fourteen other holes and a second on the three hardest of them). A plus handicap gives strokes back starting from the easiest non-par-3 hole. Every net figure — leaderboards, skins, best ball, matches, the printed cards and the phones — uses the same allocation.
