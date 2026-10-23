@@ -135,6 +135,18 @@ async def main():
       deleteGame(g); return r; }""")
     ok=r['boxes'] and r['skinsFlag'] and not r['strokeFlag'] and r['compSk'] and not r['compSt'] and not r['gameLevel']
     print('no pops per competition', r, 'OK' if ok else 'FAIL'); bad+=not ok
+    # the Pays editor: usual split by default, a place added from the last place, a dropdown change, back to the usual split; a bad total blocks Save
+    r=await pg.evaluate("""()=>{ designGame(null); const d=GD.draft; d.pots.push(newPot('stroke',d)); render(); const pot=d.pots[d.pots.length-1]; const box=()=>document.querySelector(`[data-pays="${pot.id}"]`);
+      if(!box()) return {diag:true, cards:document.querySelectorAll('.gd-pot').length, pays:[...document.querySelectorAll('[data-pays]')].map(x=>x.dataset.pays), potId:pot.id, pots:d.pots.map(p=>[p.id,p.kind,p.rules.game]), page:view.page, gdesign:view.gdesign, html:document.getElementById('main').innerText.slice(0,300)};
+      const auto0=!!box().querySelector('.pays-auto'), rows0=box().querySelectorAll('[data-pl]').length;
+      box().querySelector('[data-pladd]').click(); const afterAdd=pot.rules.places.slice();
+      const sel=box().querySelector('[data-pl="0"]'); sel.value='60'; sel.dispatchEvent(new Event('change')); const afterSel=pot.rules.places.slice(), hint=box().querySelector('.hint').textContent;
+      $('gdSave').click(); const blocked=!!GD;   // the designer stays open on a bad total
+      const sel2=box().querySelector('[data-pl="1"]'); sel2.value=String(100-60-afterSel.slice(2).reduce((a,b)=>a+b,0)); sel2.dispatchEvent(new Event('change')); const fixed=pot.rules.places.slice();
+      box().querySelector('[data-plauto]').click(); const backAuto=pot.rules.places.length===0&&!!box().querySelector('.pays-auto');
+      GD=null; view.gdesign=null; go('games'); return {auto0,rows0,afterAdd,afterSel,hint,blocked,fixed,backAuto}; }""")
+    ok=r['auto0'] and r['rows0']>=1 and len(r['afterAdd'])==r['rows0']+1 and sum(r['afterAdd'])==100 and r['afterSel'][0]==60 and 'make it 100%' in r['hint'] and r['blocked'] and sum(r['fixed'])==100 and r['backAuto']
+    print('pays editor', r, 'OK' if ok else 'FAIL'); bad+=not ok
     r=await pg.evaluate("""()=>{ go('games'); designGame(null); const d=GD.draft; d.name='Friday game'; d.date='2026-05-01'; d.pots[0].entry=20; d.pots[0].rules.scoring='gross';
       const sk=newPot('skins',d,{entry:5}); sk.rules.skins={net:false,grossBeatsNet:false,validate:'none',mode:'pot'}; d.pots.push(sk); render(); const designer=!!document.getElementById('gdSave'); document.getElementById('gdSave').click();
       const g=GAME(); ['p0','p1','p2','p3','p4'].forEach(id=>{ const p=addPlayer(g,{memberId:id}); p.id='gp_'+id; g.pots.forEach(pot=>{ delete pot.inn[p.id]; }); }); const gu=addPlayer(g,{name:'Guest Gus'}); gu.id='gp_guest';
