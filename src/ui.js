@@ -97,10 +97,12 @@ function render(){
 const VIEW_KEY=()=>'hub_view_'+(ORG_ID||'club');
 let viewRestored=false, restoreY=null;
 function rememberView(){ if(!db||PORTAL||view.page==='pick'||!viewRestored) return;
-  try{ localStorage.setItem(VIEW_KEY(),JSON.stringify(Object.assign({},view,{_at:Date.now(),_y:window.scrollY}))); }catch(_){ } }
+  const gd=view.gdesign&&typeof GD!=='undefined'&&GD?GD:undefined;   // a game being designed comes back with its draft
+  try{ localStorage.setItem(VIEW_KEY(),JSON.stringify(Object.assign({},view,{_at:Date.now(),_y:window.scrollY,_gd:gd}))); }catch(_){ } }
 function restoreView(){ viewRestored=true;
   try{ const v=JSON.parse(localStorage.getItem(VIEW_KEY())||'null'); if(!v||Date.now()-(v._at||0)>36e5*36) return;
-    restoreY=v._y>0?v._y:null; delete v._at; delete v._y; Object.assign(view,v);
+    restoreY=v._y>0?v._y:null; const gd=v._gd; delete v._at; delete v._y; delete v._gd; Object.assign(view,v);
+    if(view.gdesign){ if(gd&&typeof GD!=='undefined') GD=gd; else view.gdesign=null; }
   }catch(_){ } }
 function renderInner(){
   if(PORTAL){ if(sessionOK&&TENANCY&&typeof vPortal==='function') vPortal($('main')); return; }

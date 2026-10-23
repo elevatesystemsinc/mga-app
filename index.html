@@ -807,7 +807,7 @@ function persist(){
 }
 function pushAll(){ openDocs().forEach(D=>pushCloud(D)); }
 /* safe to reload for an update: nothing unsaved, not mid-save, no editor open */
-window.__canReload=()=>!(typeof drawerOpen==='function'&&drawerOpen())&&openDocs().every(D=>!D.pushing&&(!CLOUD||!sessionOK||!D.base||!docChanged(D)));
+window.__canReload=()=>!(typeof drawerOpen==='function'&&drawerOpen())&&!(typeof view!=='undefined'&&view&&view.gdesign)&&!document.querySelector('.rf-show')&&openDocs().every(D=>!D.pushing&&(!CLOUD||!sessionOK||!D.base||!docChanged(D)));
 async function fetchRow(id){
   if(KEYMODE){ const {data,error}=await keyRPC('hub_key_read',{p_id:id}); if(error) throw error; return data||null; }
   if(SCOPED&&id==='club'){ const {data,error}=await sb.rpc('scoped_read',{p_tenant:TENANT,p_id:id}); if(error) throw error; return data||null; }   // the cut-down club document
@@ -1120,10 +1120,12 @@ function render(){
 const VIEW_KEY=()=>'hub_view_'+(ORG_ID||'club');
 let viewRestored=false, restoreY=null;
 function rememberView(){ if(!db||PORTAL||view.page==='pick'||!viewRestored) return;
-  try{ localStorage.setItem(VIEW_KEY(),JSON.stringify(Object.assign({},view,{_at:Date.now(),_y:window.scrollY}))); }catch(_){ } }
+  const gd=view.gdesign&&typeof GD!=='undefined'&&GD?GD:undefined;   // a game being designed comes back with its draft
+  try{ localStorage.setItem(VIEW_KEY(),JSON.stringify(Object.assign({},view,{_at:Date.now(),_y:window.scrollY,_gd:gd}))); }catch(_){ } }
 function restoreView(){ viewRestored=true;
   try{ const v=JSON.parse(localStorage.getItem(VIEW_KEY())||'null'); if(!v||Date.now()-(v._at||0)>36e5*36) return;
-    restoreY=v._y>0?v._y:null; delete v._at; delete v._y; Object.assign(view,v);
+    restoreY=v._y>0?v._y:null; const gd=v._gd; delete v._at; delete v._y; delete v._gd; Object.assign(view,v);
+    if(view.gdesign){ if(gd&&typeof GD!=='undefined') GD=gd; else view.gdesign=null; }
   }catch(_){ } }
 function renderInner(){
   if(PORTAL){ if(sessionOK&&TENANCY&&typeof vPortal==='function') vPortal($('main')); return; }
@@ -6939,18 +6941,24 @@ async function resultsPDF(t,opt){
   doc.save(`${slugify(t.name)}-results${R.final?'-final':''}.pdf`); toast('Results sheet downloaded');
 }
 /* Keeps every open device on the latest version: checks version.json about once a minute and, when a
-   newer build is live, reloads at a safe moment (nothing unsaved, no editor open, not mid-typing). */
+   newer build is live, reloads at a safe moment (nothing unsaved, no editor open, not mid-typing).
+   The host's CDN caches version.json and the pages separately (up to 5 min each), so right after a deploy they can
+   disagree in either direction. Two rules keep that from turning into a reload loop: only a build NEWER than this
+   page counts, and a reload is tried once per build — if the page that comes back is still the old one, the CDN
+   hasn't caught up; wait a while before trying that build again. */
 (function(){
-  const ME='20261023021820'; let ready=false, lastCheck=0;
+  const ME='20261023022347', KEY='au_tried', RETRY=10*60*1000; let ready=false, lastCheck=0;
   const typing=()=>{ const a=document.activeElement; return a&&/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)&&a.value&&a.type!=='search'; };
   const safe=()=>!typing()&&(typeof window.__canReload!=='function'||window.__canReload());
+  const tried=()=>{ try{ const [b,t]=(sessionStorage.getItem(KEY)||'').split('|'); return b?{build:b,at:+t||0}:null; }catch(_){ return null; } };
   async function check(){ lastCheck=Date.now(); if(location.protocol==='file:') return;
-    try{ const r=await fetch('version.json?t='+Date.now(),{cache:'no-store'}); if(!r.ok) return; const v=await r.json(); if(v&&v.build&&v.build!==ME) ready=true; }catch(_){} }
-  setInterval(()=>{ if(ready){ if(safe()) location.reload(); } else if(Date.now()-lastCheck>60000) check(); },3000);
+    try{ const r=await fetch('version.json?t='+Date.now(),{cache:'no-store'}); if(!r.ok) return; const v=await r.json(); if(!v||!v.build||!(v.build>ME)) return;
+      const t=tried(); if(t&&t.build===v.build&&Date.now()-t.at<RETRY) return;   // already reloaded for this build and still got the old page
+      ready=v.build; }catch(_){} }
+  setInterval(()=>{ if(ready){ if(safe()){ try{ sessionStorage.setItem(KEY,ready+'|'+Date.now()); }catch(_){ } location.reload(); } } else if(Date.now()-lastCheck>60000) check(); },3000);
   document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='visible') check(); });
   window.__build=ME;
 })();
-
 boot();
 </script>
 </body>

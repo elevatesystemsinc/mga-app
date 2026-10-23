@@ -121,6 +121,12 @@ async def main():
     await pg.goto(page('index.html')+'?org=misfits'); await pg.wait_for_timeout(500)
     pages=await pg.evaluate("()=>{ ['p0','p1','p2','p3','p4'].forEach(id=>db.memberships.push({id,status:'Active',joined:'',notes:''})); persist(); return navItems().map(x=>x[0]); }")
     for v in pages: await pg.evaluate(f"()=>go('{v}')"); await pg.wait_for_timeout(60)
+    # a reload mid-design (the auto-update, pull-to-refresh) comes back to the designer with the draft; the auto-update itself holds off while designing
+    r=await pg.evaluate("()=>{ go('games'); designGame(null); GD.draft.name='Half-typed name'; render(); return {hold:!window.__canReload(), gd:view.gdesign}; }"); await pg.reload(); await pg.wait_for_timeout(700)
+    r2=await pg.evaluate("()=>({gd:view.gdesign, name:GD&&GD.draft.name, shown:!!document.getElementById('gdName'), val:document.getElementById('gdName')&&document.getElementById('gdName').value})")
+    ok=r['hold'] and r['gd']=='new' and r2['gd']=='new' and r2['name']=='Half-typed name' and r2['shown'] and r2['val']=='Half-typed name'
+    print('designer survives a reload; auto-update waits', r, r2, 'OK' if ok else 'FAIL'); bad+=not ok
+    await pg.evaluate("()=>{ GD=null; view.gdesign=null; go('games'); }")
     r=await pg.evaluate("""()=>{ go('games'); designGame(null); const d=GD.draft; d.name='Friday game'; d.date='2026-05-01'; d.pots[0].entry=20; d.pots[0].rules.scoring='gross';
       const sk=newPot('skins',d,{entry:5}); sk.rules.skins={net:false,grossBeatsNet:false,validate:'none',mode:'pot'}; d.pots.push(sk); render(); const designer=!!document.getElementById('gdSave'); document.getElementById('gdSave').click();
       const g=GAME(); ['p0','p1','p2','p3','p4'].forEach(id=>{ const p=addPlayer(g,{memberId:id}); p.id='gp_'+id; g.pots.forEach(pot=>{ delete pot.inn[p.id]; }); }); const gu=addPlayer(g,{name:'Guest Gus'}); gu.id='gp_guest';
