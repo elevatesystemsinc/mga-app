@@ -15,6 +15,7 @@
 :root{--navy:#0F2A38;--deep:#0A1C27;--gold:#8C6A1F;--goldl:#D8B75F;--ivory:#FBFAF5;--paper:#F4F0E6;--line:#E3DCC9;--muted:#56626A;--ink:#14222B;--pos:#1F6B4A;--neg:#A1402B;
   --serif:'Cormorant Garamond',Georgia,serif;--sans:'Public Sans',system-ui,-apple-system,'Segoe UI',sans-serif}
 *{box-sizing:border-box} html,body{margin:0;height:100%} [hidden]{display:none!important}
+html,body,button,.scale button,.opts button{touch-action:manipulation}   /* no double-tap zoom on the +/− and score buttons */
 body{font-family:var(--sans);background:var(--paper);color:var(--ink);font-size:15px;line-height:1.4;-webkit-font-smoothing:antialiased;-webkit-tap-highlight-color:transparent}
 button,input{font:inherit;color:inherit} button{cursor:pointer}
 :focus-visible{outline:2px solid var(--gold);outline-offset:2px}
