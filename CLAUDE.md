@@ -261,6 +261,10 @@ Tournament = { id, name, season, days, startDate, field:[{id,memberId,team,paid,
     event once), so corrected indexes reach every phone and board; a scorer with a field focused is not re-rendered,
     and a phone whose group was removed returns to the join screen. `syncGameEvent` no
     longer prunes empty groups, so a group made on purpose survives until someone lands in it.
+  - **Games draw on the whole club directory** (`gamePool()`: directory persons, the group's members first, non-members
+    tagged "Club"): the designer's picker and the game page's Add players both use it, and adding someone to a game does
+    **not** make them a member of the group (the owner, Oct 2026: membership is what will gate sign-ups through a
+    registration link when that is built; manual adds and game creation pull from the entire directory).
   - **Game sheet PDF** (`gameSheetPDF(g,{strokes,returnDoc})`): competitions and denominations, teams when known
     (an after-round draw says so), the groups as they play with each player's strokes.
 - Arrays of objects carry stable `id`s — the merge (§3) matches by id. Keep it that way for anything new.

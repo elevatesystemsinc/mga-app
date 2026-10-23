@@ -152,6 +152,14 @@ async def main():
     ok=r['hold'] and r['gd']=='new' and r2['gd']=='new' and r2['name']=='Half-typed name' and r2['shown'] and r2['val']=='Half-typed name'
     print('designer survives a reload; auto-update waits', r, r2, 'OK' if ok else 'FAIL'); bad+=not ok
     await pg.evaluate("()=>{ GD=null; view.gdesign=null; go('games'); }")
+    # a game draws on the whole club directory, the group's members first; a club person who is not in the group can be added and is named
+    r=await pg.evaluate("""()=>{ CLUB.members.push({id:'zz1',first:'Zed',last:'Zulu',hcp:'7.4',status:'Active'}); const pool=gamePool(), outsider=pool.find(x=>!x.inGroup); if(!outsider) return {noOutsider:true};
+      designGame(null); const d=GD.draft; const q=$('gdQ'); q.value=memberName(outsider).slice(0,4); q.dispatchEvent(new Event('input'));
+      const hit=document.querySelector(`[data-gdadd="${outsider.id}"]`), tagged=!!(hit&&hit.querySelector('.chip')); if(hit) hit.click();
+      const p=GD.draft.players.find(x=>x.memberId===outsider.id); const name=p?gpName(p):''; const firstInGroup=pool[0].inGroup;
+      GD=null; view.gdesign=null; go('games'); return {firstInGroup, tagged, added:!!p, name, expected:memberName(outsider), stillNotMember:!db.memberships.some(m=>m.id===outsider.id)}; }""")
+    ok=not r.get('noOutsider') and r['firstInGroup'] and r['tagged'] and r['added'] and r['name']==r['expected'] and r['stillNotMember']
+    print('games draw on the club directory', r, 'OK' if ok else 'FAIL'); bad+=not ok
     # pops on par 3s is per competition: the skins pot can switch it on while the stroke pot keeps the classic allocation
     r=await pg.evaluate("""()=>{ designGame(null); const d=GD.draft; d.pots.push(newPot('skins',d)); const sk=d.pots.find(p=>p.kind==='skins'); render();
       const box=document.getElementById('gdNP3_'+sk.id), other=document.getElementById('gdNP3_'+d.pots[0].id); box.checked=true; box.dispatchEvent(new Event('change'));

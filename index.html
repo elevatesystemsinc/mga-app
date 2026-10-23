@@ -4239,6 +4239,12 @@ const GAME=()=>gamesData().find(g=>g.id===view.gameId);
 const gMoney=v=>Math.abs(n0(v)-Math.round(n0(v)))<0.005?fmt(v):fmt2(v);
 const gSigned=v=>n0(v)>0.004?'+'+gMoney(v):n0(v)<-0.004?'−'+gMoney(Math.abs(v)):gMoney(0);
 const gpName=p=>p.memberId?(memberName(memberById(p.memberId))||p.name||'Member'):(p.name||'Guest');
+/* who a game can draw on: the whole club directory, the group's own members first — a small group plays with anyone at
+   the club, and a player needs no membership in the group to be in a game (the Ledger and the sheets name them from the
+   directory) */
+function gamePool(){ const inGrp=new Set(members().filter(m=>m.status!=='Inactive').map(m=>m.id));
+  return persons().filter(p=>p.status!=='Inactive').map(p=>Object.assign({},p,{inGroup:inGrp.has(p.id)})).sort((a,b)=>(b.inGroup-a.inGroup)||memberName(a).localeCompare(memberName(b))); }
+const poolTag=x=>x.inGroup?'':'<span class="chip inact" title="In the club directory, not a member of this group">Club</span>';
 const potIn=(pot,p)=>!!pot.inn[p.id];
 const potPlayers=(g,pot)=>g.players.filter(p=>potIn(pot,p));
 const potTotal=(g,pot)=>sum(potPlayers(g,pot),()=>n0(pot.entry));
@@ -4347,7 +4353,7 @@ function vGameDesign(m){
   const d=GD.draft, courses=golfData().courses, isNew=!GD.id;
   const lib=enabledGames().filter(x=>!x.tool), groups=[...new Set(lib.map(x=>x.group))];
   const inG=new Set(d.players.map(p=>p.memberId).filter(Boolean));
-  const pool=members().filter(x=>x.status!=='Inactive').sort((a,b)=>memberName(a).localeCompare(memberName(b)));
+  const pool=gamePool();
   const pots=d.pots.filter(p=>p.kind!=='manual'), allIn=p=>sum(pots.filter(pot=>potIn(pot,p)),pot=>n0(pot.entry));
   const potCard=(pot,i)=>{ const C=potCat(pot), E=potEngine(pot), team=potIsTeam(pot), sk=pot.kind==='skins'?skinsRulesOf(pot):null, dr=pot.kind==='dots'?dotsRules(pot):null;
     return `<div class="card pad gd-pot" data-pot="${pot.id}" style="display:flex;flex-direction:column;gap:12px"><div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><span class="chip navy">${i+1}</span><b style="font-size:15px">${esc(pot.name)}</b><span class="muted" style="font-size:13px">${esc(POT_KINDS[pot.kind])}</span><button class="ib" style="margin-left:auto" data-gdrm="${pot.id}" aria-label="Remove">${I.x}</button></div>
@@ -4381,7 +4387,7 @@ function vGameDesign(m){
     ${d.pots.length?d.pots.map(potCard).join(''):'<div class="empty"><b>No competitions yet</b><span>Add stroke play, a best ball, skins — as many as the group wants.</span></div>'}
     ${d.pots.filter(potOneBall).length&&d.pots.some(p=>p.kind==='format'&&!potOneBall(p))?'<div class="banner">A scramble, foursomes or greensome is one ball per team — it can’t share a round with own-ball competitions. Keep one or the other.</div>':''}</div>
   <div class="card pad" style="display:flex;flex-direction:column;gap:14px"><div class="cardhead" style="padding:0;border:0"><div><h2 class="h2">Who’s in</h2><span class="muted">${d.players.length} playing · tick who is in each competition</span></div>
-      <div class="actions"><input class="inp" id="gdQ" placeholder="Add a member…" style="height:38px;width:220px" autocomplete="off"><div class="pick" id="gdPick" style="display:none;position:absolute;z-index:5;max-height:260px;width:300px"></div><input class="inp" id="gdGuest" placeholder="Guest name" style="height:38px;width:160px"><button class="btn sm" id="gdGuestAdd" type="button">Add guest</button></div></div>
+      <div class="actions"><input class="inp" id="gdQ" placeholder="Add anyone from the club…" style="height:38px;width:220px" autocomplete="off"><div class="pick" id="gdPick" style="display:none;position:absolute;z-index:5;max-height:260px;width:300px"></div><input class="inp" id="gdGuest" placeholder="Guest name" style="height:38px;width:160px"><button class="btn sm" id="gdGuestAdd" type="button">Add guest</button></div></div>
     ${d.players.length?`<div class="tw"><div class="t gd-grid" style="min-width:${360+pots.length*96}px"><div class="tr th" style="grid-template-columns:minmax(160px,1fr) ${pots.map(()=>'90px').join(' ')} 80px 40px"><span>Player</span>${pots.map(pot=>`<span class="r" title="${esc(pot.name)}">${esc(pot.name.length>11?pot.name.slice(0,10)+'…':pot.name)}<br><small class="muted">${gMoney(pot.entry)}</small></span>`).join('')}<span class="r">All in</span><span></span></div>
       ${d.players.slice().sort((a,b)=>gpName(a).localeCompare(gpName(b))).map(p=>`<div class="tr num" style="grid-template-columns:minmax(160px,1fr) ${pots.map(()=>'90px').join(' ')} 80px 40px"><div class="cell2"><b class="trunc">${esc(gpName(p))}</b>${p.memberId?'':'<small>Guest</small>'}</div>${pots.map(pot=>`<span class="r"><input type="checkbox" data-gdin="${pot.id}|${p.id}"${potIn(pot,p)?' checked':''} aria-label="${esc(gpName(p))} in ${esc(pot.name)}"></span>`).join('')}<b class="r">${gMoney(allIn(p))}</b><button class="ib" data-gdpx="${p.id}" aria-label="Remove">${I.x}</button></div>`).join('')}
       <div class="tr tot num" style="grid-template-columns:minmax(160px,1fr) ${pots.map(()=>'90px').join(' ')} 80px 40px"><span>In the pot</span>${pots.map(pot=>`<span class="r">${gMoney(potTotal(d,pot))}</span>`).join('')}<b class="r">${gMoney(sum(pots,pot=>potTotal(d,pot)))}</b><span></span></div></div></div>`
@@ -4411,7 +4417,7 @@ function vGameDesign(m){
   m.querySelectorAll('[data-gdin]').forEach(c=>c.onchange=()=>{ readAll(); const [pid,plid]=c.dataset.gdin.split('|'); const pot=d.pots.find(x=>x.id===pid); if(c.checked) pot.inn[plid]=true; else delete pot.inn[plid]; rerender(); });
   m.querySelectorAll('[data-gdpx]').forEach(b=>b.onclick=()=>{ readAll(); const p=d.players.find(x=>x.id===b.dataset.gdpx); if(gpOut(d,p)&&!confirm(`${gpName(p)} has payouts recorded. Remove anyway?`)) return; removePlayer(d,p,{keepEvent:true}); rerender(); });
   const q=$('gdQ'), pk=$('gdPick'); q.oninput=()=>{ const s=q.value.toLowerCase().trim(); const hits=s?pool.filter(x=>!inG.has(x.id)&&memberName(x).toLowerCase().includes(s)).slice(0,8):[];
-    pk.innerHTML=hits.map(x=>`<button type="button" data-gdadd="${x.id}"><span class="av">${initials(x)}</span><b>${esc(memberName(x))}</b><span class="muted" style="margin-left:auto;font-size:12.5px">${x.hcp?'Index '+esc(x.hcp):''}</span></button>`).join('')||(s?'<span class="muted" style="padding:10px 14px;display:block">No one matches.</span>':''); pk.style.display=pk.innerHTML?'':'none';
+    pk.innerHTML=hits.map(x=>`<button type="button" data-gdadd="${x.id}"><span class="av">${initials(x)}</span><b>${esc(memberName(x))}</b>${poolTag(x)}<span class="muted" style="margin-left:auto;font-size:12.5px">${x.hcp?'Index '+esc(x.hcp):''}</span></button>`).join('')||(s?'<span class="muted" style="padding:10px 14px;display:block">No one matches.</span>':''); pk.style.display=pk.innerHTML?'':'none';
     pk.querySelectorAll('[data-gdadd]').forEach(b=>b.onclick=()=>{ readAll(); addPlayer(d,{memberId:b.dataset.gdadd}); rerender(); setTimeout(()=>{ const n=$('gdQ'); if(n) n.focus(); },0); }); };
   $('gdGuestAdd').onclick=()=>{ const n=fv('gdGuest'); if(!n) return; readAll(); addPlayer(d,{name:n}); rerender(); };
   $('gdSave').onclick=()=>{ readAll(); if(!d.pots.length){ toast('Add at least one competition'); return; }
@@ -4540,11 +4546,11 @@ function potStandingsHTML(g,pot,ev){
 }
 function addGamePlayers(g){
   const inG=new Set(g.players.map(p=>p.memberId).filter(Boolean));
-  const pool=members().filter(x=>x.status!=='Inactive'&&!inG.has(x.id)).sort((a,b)=>memberName(a).localeCompare(memberName(b)));
+  const pool=gamePool().filter(x=>!inG.has(x.id));
   const picked=new Set(); let guests=[];
-  const list=q=>{ q=q.toLowerCase(); return pool.filter(x=>!q||memberName(x).toLowerCase().includes(q)).map(x=>`<label class="check" style="padding:6px 0;border-bottom:1px solid var(--line)"><input type="checkbox" data-pk="${x.id}"${picked.has(x.id)?' checked':''}><span class="av" style="margin:0 8px">${initials(x)}</span>${esc(memberName(x))}<span class="muted" style="margin-left:auto;font-size:12.5px">${x.hcp?'Index '+esc(x.hcp):''}</span></label>`).join('')||'<span class="muted">No one left to add.</span>'; };
+  const list=q=>{ q=q.toLowerCase(); return pool.filter(x=>!q||memberName(x).toLowerCase().includes(q)).map(x=>`<label class="check" style="padding:6px 0;border-bottom:1px solid var(--line)"><input type="checkbox" data-pk="${x.id}"${picked.has(x.id)?' checked':''}><span class="av" style="margin:0 8px">${initials(x)}</span>${esc(memberName(x))}${poolTag(x)}<span class="muted" style="margin-left:auto;font-size:12.5px">${x.hcp?'Index '+esc(x.hcp):''}</span></label>`).join('')||'<span class="muted">No one left to add.</span>'; };
   openDrawer({kicker:gameTitle(g),title:'Add players',saveLabel:'Add',
-    body:`<input class="inp" id="apQ" placeholder="Search members" aria-label="Search members"><div id="apL" style="max-height:320px;overflow:auto">${list('')}</div>
+    body:`<input class="inp" id="apQ" placeholder="Search the club directory" aria-label="Search the club directory"><div id="apL" style="max-height:320px;overflow:auto">${list('')}</div>
       <div class="fld"><span class="lbl">Guest</span><div style="display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px"><input class="inp" id="apG" placeholder="Guest name"><button class="btn" type="button" id="apGAdd">Add guest</button></div><p class="hint" id="apGList" style="margin:0"></p></div>
       <p class="hint">New players go into every competition; untick any they are sitting out on the game page.</p>`,
     wire:r=>{ const bind=()=>r.querySelectorAll('[data-pk]').forEach(c=>c.onchange=()=>{ if(c.checked) picked.add(c.dataset.pk); else picked.delete(c.dataset.pk); });
@@ -6993,7 +6999,7 @@ async function resultsPDF(t,opt){
    page counts, and a reload is tried once per build — if the page that comes back is still the old one, the CDN
    hasn't caught up; wait a while before trying that build again. */
 (function(){
-  const ME='20261023025426', KEY='au_tried', RETRY=10*60*1000; let ready=false, lastCheck=0;
+  const ME='20261023030550', KEY='au_tried', RETRY=10*60*1000; let ready=false, lastCheck=0;
   const typing=()=>{ const a=document.activeElement; return a&&/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)&&a.value&&a.type!=='search'; };
   const safe=()=>!typing()&&(typeof window.__canReload!=='function'||window.__canReload());
   const tried=()=>{ try{ const [b,t]=(sessionStorage.getItem(KEY)||'').split('|'); return b?{build:b,at:+t||0}:null; }catch(_){ return null; } };
