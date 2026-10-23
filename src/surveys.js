@@ -267,11 +267,12 @@ async function surveyPDF(s,R,opt){
   font('PublicSans','normal',8.4,[214,218,220]); doc.text(sub,L+76,96);
   let y=32+bandH+26;
   const need=h=>{ if(y+h>H-44){ doc.addPage(); page(); y=48; } };
-  const section=(label,note)=>{ need(44); font('PublicSansXB','normal',7.4,GOLDDK); doc.text(label.toUpperCase(),L,y,{charSpace:1.1}); if(note){ font('PublicSans','normal',8,MUTED); doc.text(doc.splitTextToSize(note,300)[0],R2,y,{align:'right'}); } y+=6; doc.setDrawColor(...GOLD); doc.setLineWidth(1); doc.line(L,y,R2,y); y+=14; };
+  const section=(label,note)=>{ need(54); font('PublicSansXB','normal',7.4,GOLDDK); doc.text(label.toUpperCase(),L,y,{charSpace:1.1}); y+=6; doc.setDrawColor(...GOLD); doc.setLineWidth(1); doc.line(L,y,R2,y); y+=14;
+    if(note){ font('PublicSans','normal',8,MUTED); const lines=doc.splitTextToSize(note,R2-L); lines.forEach(ln=>{ doc.text(ln,L,y); y+=11; }); y+=4; } };
   const para=(txt,z,col,f,st,x,w)=>{ font(f||'PublicSans',st||'normal',z||8.6,col||INK); const lines=doc.splitTextToSize(String(txt),w||(R2-(x||L))); for(const ln of lines){ need(z*1.5); doc.text(ln,x||L,y); y+=(z||8.6)*1.38; } };
   const bullets=(items,z)=>{ z=z||8.4; for(const t of items){ font('PublicSans','normal',z,INK); const lines=doc.splitTextToSize(String(t),R2-L-14); need(lines.length*z*1.38+2); doc.setFillColor(...GOLD); doc.circle(L+4,y-2.6,1.6,'F'); lines.forEach((ln,i)=>{ doc.text(ln,L+14,y); y+=z*1.38; }); y+=1.5; } };
   const bar=(x,yy,w,h,pct,col)=>{ doc.setFillColor(...PAPER); doc.roundedRect(x,yy,w,h,h/2,h/2,'F'); if(pct>0){ doc.setFillColor(...(col||GOLD)); doc.roundedRect(x,yy,Math.max(h,w*Math.min(1,pct)),h,h/2,h/2,'F'); } };
-  const qTitle=(i,q,st)=>{ need(40); font('PublicSans','bold',10,INK); const lines=doc.splitTextToSize(`${i}. ${q.text}`,R2-L-110); lines.forEach(ln=>{ doc.text(ln,L,y); y+=13; }); y-=13;
+  const qTitle=(i,q,st)=>{ need(q.type==='rating'||q.type==='slider'?110:60); font('PublicSans','bold',10,INK); const lines=doc.splitTextToSize(`${i}. ${q.text}`,R2-L-110); lines.forEach(ln=>{ doc.text(ln,L,y); y+=13; }); y-=13;
     font('PublicSans','normal',7.6,MUTED); doc.text(`${SURVEY_TYPE_NAME[q.type]||q.type} · ${st.n} of ${n} answered`,R2,y,{align:'right'}); y+=14; if(q.help){ para(q.help,7.8,MUTED); } };
   // summary: the ratings ranked
   const rated=qs.filter(q=>q.type==='rating').map(q=>({q,st:svStats(q,R)})).filter(x=>x.st.n).sort((a,b)=>b.st.avg-a.st.avg);
@@ -284,7 +285,7 @@ async function surveyPDF(s,R,opt){
       if(q.type==='rating'){ if(st.n){ need(70); font('Cormorant','bold',26,NAVY); doc.text(st.avg.toFixed(1),L,y+16); font('PublicSans','normal',7.6,MUTED); doc.text('average of 10',L,y+28);
           const bx=L+90, bw=(R2-bx)/11, mx=Math.max(...st.dist,1); st.dist.forEach((c,k)=>{ const h=c?Math.max(3,c/mx*34):0; doc.setFillColor(...NAVY); if(h) doc.rect(bx+k*bw+4,y+34-h,bw-8,h,'F'); font('PublicSans','normal',7,MUTED); doc.text(String(k),bx+k*bw+bw/2,y+44,{align:'center'}); if(c){ font('PublicSans','bold',7,INK); doc.text(String(c),bx+k*bw+bw/2,y+30-h,{align:'center'}); } });
           y+=56; } else { para('No answers.',8,MUTED); } }
-      else if(q.type==='slider'){ if(st.n){ need(50); const bx=L, bw=R2-L; doc.setFillColor(...PAPER); doc.roundedRect(bx,y,bw,8,4,4,'F'); const px=bx+bw*st.avg/10; doc.setFillColor(...NAVY); doc.circle(px,y+4,6,'F'); doc.setFillColor(255,255,255); doc.circle(px,y+4,3,'F');
+      else if(q.type==='slider'){ if(st.n){ need(96); const bx=L, bw=R2-L; doc.setFillColor(...PAPER); doc.roundedRect(bx,y,bw,8,4,4,'F'); const px=bx+bw*st.avg/10; doc.setFillColor(...NAVY); doc.circle(px,y+4,6,'F'); doc.setFillColor(255,255,255); doc.circle(px,y+4,3,'F');
           y+=22; font('PublicSans','bold',8.4,NAVY); doc.text(q.left,bx,y); doc.text(q.right,R2,y,{align:'right'}); y+=13;
           para(`Average ${st.avg.toFixed(1)} on a 0–10 scale from "${q.left}" (0) to "${q.right}" (10). ${Math.round(st.left/st.n*100)}% lean ${q.left.toLowerCase()}, ${Math.round(st.mid/st.n*100)}% either, ${Math.round(st.right/st.n*100)}% lean ${q.right.toLowerCase()}. Spread: ${st.dist.map((c,k)=>c?`${k}:${c}`:null).filter(Boolean).join(' · ')}.`,8.2,INK); } else para('No answers.',8,MUTED); }
       else if(q.type==='text'){ if(st.texts&&st.texts.length) bullets(st.texts); else para('Nothing written.',8,MUTED); }
