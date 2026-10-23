@@ -260,7 +260,7 @@ textarea.inp{height:auto;min-height:84px;padding:10px 12px;resize:vertical}
 /* small-group draw stage + game designer */
 .dw-opts{display:flex;gap:16px;flex-wrap:wrap;justify-content:center;margin:6px 0 10px} .dw-opts label{display:flex;flex-direction:column;gap:6px;color:#C9CFD2;font-size:13px;font-weight:700;text-align:left} .dw-opts .inp{min-width:240px;height:42px}
 .dw-team{display:flex;gap:18px;flex-wrap:wrap;justify-content:center;margin:10px 0 18px}
-.rf-show.imgv{display:flex;flex-direction:column} .imgv-body{flex:1;min-height:0;overflow:auto;display:flex;align-items:flex-start;justify-content:center;padding:10px 14px} .imgv-body img{max-width:100%;height:auto;border-radius:8px;box-shadow:0 10px 40px rgba(0,0,0,.45);-webkit-touch-callout:default} .imgv-bar{display:flex;gap:14px;align-items:center;justify-content:center;flex-wrap:wrap;padding:12px 16px calc(14px + env(safe-area-inset-bottom,0px));color:#C9CFD2;font-size:13px}
+.rf-show.imgv{display:flex;flex-direction:column} .imgv .rf-top{padding:12px 16px} .imgv .rf-top img{width:40px;height:auto} .imgv .rf-h{font-size:20px;line-height:1.15} .imgv .rf-k{font-size:11px} .imgv-body{flex:1;min-height:0;overflow:auto;display:flex;align-items:flex-start;justify-content:center;padding:10px 14px} .imgv-body img{max-width:100%;height:auto;border-radius:8px;box-shadow:0 10px 40px rgba(0,0,0,.45);-webkit-touch-callout:default} .imgv-bar{display:flex;gap:14px;align-items:center;justify-content:center;flex-wrap:wrap;padding:12px 16px calc(14px + env(safe-area-inset-bottom,0px));color:#C9CFD2;font-size:13px}
 .dw-tiers{display:grid;gap:10px;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));max-width:960px;margin:4px auto 16px} .dw-tier{background:rgba(255,255,255,.06);border:1px solid rgba(216,183,95,.35);border-radius:12px;padding:10px 14px;text-align:left;color:#fff} .dw-tier b{font-family:var(--serif,Georgia),serif;font-size:26px;color:#D8B75F;margin-right:10px} .dw-tier small{color:#C9CFD2;font-size:12px} .dw-tier span{display:block;font-size:13px;margin-top:4px;color:#E8ECEE}
 .dw-letters{display:flex;gap:18px;justify-content:center;margin-top:8px} .dw-letters span{min-width:240px;text-align:center;font-family:var(--serif,Georgia),serif;font-size:22px;color:#D8B75F;letter-spacing:.1em}
 .dw-slot{min-width:240px;padding:22px 26px;border-radius:14px;background:rgba(255,255,255,.08);border:2px solid rgba(216,183,95,.45);font-family:var(--serif,Georgia),serif;font-size:36px;font-weight:700;color:#fff;transition:transform .15s,background .3s}
@@ -7161,7 +7161,7 @@ async function resultsPDF(t,opt){
    page counts, and a reload is tried once per build — if the page that comes back is still the old one, the CDN
    hasn't caught up; wait a while before trying that build again. */
 (function(){
-  const ME='20261023161700', KEY='au_tried', RETRY=10*60*1000; let ready=false, lastCheck=0;
+  const ME='20261023161805', KEY='au_tried', RETRY=10*60*1000; let ready=false, lastCheck=0;
   const typing=()=>{ const a=document.activeElement; return a&&/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)&&a.value&&a.type!=='search'; };
   const safe=()=>!typing()&&(typeof window.__canReload!=='function'||window.__canReload());
   const tried=()=>{ try{ const [b,t]=(sessionStorage.getItem(KEY)||'').split('|'); return b?{build:b,at:+t||0}:null; }catch(_){ return null; } };
