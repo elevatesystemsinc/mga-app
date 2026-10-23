@@ -169,6 +169,18 @@ async def main():
       return {kept, idx, ph}; }""")
     ok=not r.get('noGame') and not r.get('noInput') and r['kept'] and r['idx']=='+1.6' and isinstance(r['ph'],int) and r['ph']<0
     print('index typed on the game page survives a redraw, plus accepted', r, 'OK' if ok else 'FAIL'); bad+=not ok
+    # the game default course and tee: set once, every group and player follows; a single player can still differ afterwards
+    r=await pg.evaluate("""()=>{ designGame(null); const d=GD.draft; ['p0','p1','p2','p3','p4'].forEach(id=>addPlayer(d,{memberId:id})); const teeOpts=[...document.getElementById('gdTee').options].map(o=>o.value);
+      document.getElementById('gdTee').value='Gold'; $('gdSave').click(); const g=db.games[db.games.length-1]; view.gameId=g.id; go('games'); const ev=ensureGameEvent(g); render();
+      const tees0=evPlayers(ev).map(x=>x.p.tee), def=ev.defaultTee, gTee0=g.tee;
+      const dc=document.getElementById('ggDefCourse'); dc.value='pecan'; dc.dispatchEvent(new Event('change')); const courses=ev.groups.map(x=>x.course);
+      const dt=document.getElementById('ggDefTee'); dt.value='White'; dt.dispatchEvent(new Event('change')); const tees1=evPlayers(ev).map(x=>x.p.tee);
+      const one=document.querySelector('[data-gtee]'); one.value='Blue'; one.dispatchEvent(new Event('change')); const tees2=evPlayers(ev).map(x=>x.p.tee);
+      const r={hasTee:teeOpts.includes('Gold'), gTee:gTee0, def, tees0, courses, gCourse:g.course, tees1, tees2, groups:ev.groups.length};
+      deleteGame(g); view.gameId=null; go('games'); return r; }""")
+    ok=(r['hasTee'] and r['gTee']=='Gold' and r['def']=='Gold' and set(r['tees0'])=={'Gold'} and set(r['courses'])=={'pecan'} and r['gCourse']=='pecan'
+        and set(r['tees1'])=={'White'} and r['tees2'].count('Blue')==1 and r['tees2'].count('White')==len(r['tees2'])-1 and r['groups']>=2)
+    print('game default course & tee', r, 'OK' if ok else 'FAIL'); bad+=not ok
     # pops on par 3s is per competition: the skins pot can switch it on while the stroke pot keeps the classic allocation
     r=await pg.evaluate("""()=>{ designGame(null); const d=GD.draft; d.pots.push(newPot('skins',d)); const sk=d.pots.find(p=>p.kind==='skins'); render();
       const box=document.getElementById('gdNP3_'+sk.id), other=document.getElementById('gdNP3_'+d.pots[0].id); box.checked=true; box.dispatchEvent(new Event('change'));

@@ -362,6 +362,8 @@ textarea.inp{height:auto;min-height:84px;padding:10px 12px;resize:vertical}
 .pays-auto .inp{color:var(--muted);background:var(--ivory)} .hint.neg{color:var(--neg);font-weight:600}
 .ptsgrid{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:8px} .ptsgrid label{display:flex;flex-direction:column;gap:4px} .ptsgrid small{font-size:11px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis} .ptsgrid .inp{height:36px;padding:0 8px;text-align:center}
 @media (max-width:640px){ .ptsgrid{grid-template-columns:repeat(3,minmax(0,1fr))} }
+.gdef{display:grid;grid-template-columns:minmax(0,1fr) 200px 140px;gap:14px;align-items:end;padding:14px 22px;border-bottom:1px solid var(--line);background:#fff} .gdef .fld{gap:4px} .gdef .inp{height:36px}
+@media (max-width:640px){ .gdef{grid-template-columns:1fr 1fr} .gdef>.cell2{grid-column:1/-1} }
 /* surveys (surveys.js) */
 .svcard{text-align:left;display:flex;flex-direction:column;gap:6px;cursor:pointer;border:1px solid var(--line);font:inherit;color:inherit} .svcard:hover{border-color:var(--gold)}
 .svlink{display:flex;gap:8px;align-items:center} .svlink .inp{flex:1;font-size:13px;color:var(--muted)}
