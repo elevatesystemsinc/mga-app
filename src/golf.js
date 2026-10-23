@@ -455,12 +455,19 @@ function editFieldPlayer(ev,x){
    handicap). Before the round the groups are then built around the teams; after it, the draw is scored from the
    individual rounds (teams may span groups). Re-draw any time; the draw is remembered on the event. */
 function shuffled(a){ a=a.slice(); for(let i=a.length-1;i>0;i--){ const j=secureInt(i+1); [a[i],a[j]]=[a[j],a[i]]; } return a; }
+/* the handicap tiers for an A-B-C… draw: the field sorted by index and cut into `size` even buckets, A the lowest */
+const TIER_LETTERS='ABCDEF';
+function drawTiers(players,size,idxOf){ size=Math.max(2,+size||2);
+  const sorted=players.slice().sort((a,b)=>(idxOf(a)??99)-(idxOf(b)??99)||a.name.localeCompare(b.name));
+  return Array.from({length:size},(_,k)=>{ const ps=sorted.slice(Math.round(k*sorted.length/size),Math.round((k+1)*sorted.length/size)); const ix=ps.map(idxOf).filter(x=>x!=null);
+    return {letter:TIER_LETTERS[k]||String(k+1),players:ps,lo:ix.length?Math.min(...ix):null,hi:ix.length?Math.max(...ix):null}; }); }
 function drawTeams(players,size,method,idxOf){
   size=Math.max(2,+size||2); const n=Math.ceil(players.length/size), teams=Array.from({length:n},()=>[]);
   if(method==='random'){ shuffled(players).forEach((p,i)=>teams[i%n].push(p)); return teams; }
   const sorted=players.slice().sort((a,b)=>(idxOf(a)??99)-(idxOf(b)??99)||a.name.localeCompare(b.name));
-  if(method==='abcd'){ const tiers=Array.from({length:size},(_,k)=>shuffled(sorted.slice(Math.round(k*sorted.length/size),Math.round((k+1)*sorted.length/size)))); let ti=0;
-    tiers.forEach(tier=>tier.forEach((p,i)=>teams[(i+ti)%n].push(p))); return teams.map(t=>t.slice(0,size+1)); }
+  if(method==='abcd'){ // one player from each handicap tier per team: tier A is dealt first, so slot k of every team is its tier-k player
+    const tiers=drawTiers(players,size,idxOf).map(t=>shuffled(t.players));
+    tiers.forEach(tier=>tier.forEach((p,i)=>{ if(i<n) teams[i].push(p); else teams[secureInt(n)].push(p); })); return teams; }
   // snake: 1..n then n..1, repeat
   sorted.forEach((p,i)=>{ const round=Math.floor(i/n), k=i%n; teams[round%2?n-1-k:k].push(p); }); return teams;
 }

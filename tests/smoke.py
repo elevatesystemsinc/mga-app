@@ -190,6 +190,16 @@ async def main():
       deleteGame(g); view.gameId=null; go('games'); return {before,after,afterMove,synced,afterRemove,time,hadRemove:!!rm}; }""")
     ok=r['before']==1 and r['after']==6 and r['afterMove']==6 and r['synced']==6 and r['hadRemove'] and r['afterRemove']==5 and r['time']=='08:20'
     print('placeholder groups stay', r, 'OK' if ok else 'FAIL'); bad+=not ok
+    # an A-B-C draw for 3-man teams: the field is cut into three even handicap tiers and every team gets one from each, slot 1 = A
+    r=await pg.evaluate("""()=>{ const idx={m0:'2.0',m1:'4.0',m2:'6.0',m3:'10.0',m4:'12.0',m5:'14.0',m6:'20.0',m7:'22.0',m8:'24.0'}; Object.entries(idx).forEach(([id,h],i)=>{ if(!personById(id)) CLUB.members.push({id,first:'P'+i,last:'Tier',hcp:h,status:'Active'}); });
+      designGame(null); const d=GD.draft; d.pots=[]; const bb=newPot('bestball',d); bb.rules.teamSize=3; bb.rules.teamsBy='after'; d.pots.push(bb); Object.keys(idx).forEach(id=>addPlayer(d,{memberId:id})); render(); $('gdSave').click();
+      const g=db.games[db.games.length-1]; view.gameId=g.id; go('games'); const ev=ensureGameEvent(g); const pot=g.pots[0];
+      const tiers=drawTiers(evPlayers(ev).map(x=>x.p),3,p=>effIndex(ev,p).idx); const tierOf={}; tiers.forEach(t=>t.players.forEach(p=>{ tierOf[p.id]=t.letter; }));
+      drawStage(g,pot); const sel=document.getElementById('dwM'); const opt=[...sel.options].find(o=>o.value==='abcd'); sel.value='abcd'; sel.dispatchEvent(new Event('change')); const shown=document.querySelectorAll('.dw-tier').length, label=opt&&opt.textContent; document.getElementById('dwClose').click();
+      const teams=runDraw(g,pot,{method:'abcd',odd:'join'}); const byTeam=teams.map(t=>t.map(p=>tierOf[p.id]).join(''));
+      deleteGame(g); view.gameId=null; go('games'); return {tiers:tiers.map(t=>t.letter+':'+t.players.length+':'+t.lo+'-'+t.hi), byTeam, shown, label, method:pot.draw&&pot.draw.method}; }""")
+    ok=(r['tiers']==['A:3:2-6','B:3:10-14','C:3:20-24'] and sorted(r['byTeam'])==['ABC','ABC','ABC'] and r['shown']==3 and 'ABC draw' in (r['label'] or ''))
+    print('A-B-C draw by handicap tier', r, 'OK' if ok else 'FAIL'); bad+=not ok
     # pops on par 3s is per competition: the skins pot can switch it on while the stroke pot keeps the classic allocation
     r=await pg.evaluate("""()=>{ designGame(null); const d=GD.draft; d.pots.push(newPot('skins',d)); const sk=d.pots.find(p=>p.kind==='skins'); render();
       const box=document.getElementById('gdNP3_'+sk.id), other=document.getElementById('gdNP3_'+d.pots[0].id); box.checked=true; box.dispatchEvent(new Event('change'));

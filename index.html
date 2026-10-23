@@ -260,6 +260,8 @@ textarea.inp{height:auto;min-height:84px;padding:10px 12px;resize:vertical}
 /* small-group draw stage + game designer */
 .dw-opts{display:flex;gap:16px;flex-wrap:wrap;justify-content:center;margin:6px 0 10px} .dw-opts label{display:flex;flex-direction:column;gap:6px;color:#C9CFD2;font-size:13px;font-weight:700;text-align:left} .dw-opts .inp{min-width:240px;height:42px}
 .dw-team{display:flex;gap:18px;flex-wrap:wrap;justify-content:center;margin:10px 0 18px}
+.dw-tiers{display:grid;gap:10px;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));max-width:960px;margin:4px auto 16px} .dw-tier{background:rgba(255,255,255,.06);border:1px solid rgba(216,183,95,.35);border-radius:12px;padding:10px 14px;text-align:left;color:#fff} .dw-tier b{font-family:var(--serif,Georgia),serif;font-size:26px;color:#D8B75F;margin-right:10px} .dw-tier small{color:#C9CFD2;font-size:12px} .dw-tier span{display:block;font-size:13px;margin-top:4px;color:#E8ECEE}
+.dw-letters{display:flex;gap:18px;justify-content:center;margin-top:8px} .dw-letters span{min-width:240px;text-align:center;font-family:var(--serif,Georgia),serif;font-size:22px;color:#D8B75F;letter-spacing:.1em}
 .dw-slot{min-width:240px;padding:22px 26px;border-radius:14px;background:rgba(255,255,255,.08);border:2px solid rgba(216,183,95,.45);font-family:var(--serif,Georgia),serif;font-size:36px;font-weight:700;color:#fff;transition:transform .15s,background .3s}
 .dw-slot.rolling{color:#D8B75F} .dw-slot.won{background:#1F6B4A;border-color:#6FBF8E;transform:scale(1.04)} .dw-slot.empty{display:none}
 .dw-done{display:flex;flex-direction:column;gap:8px;align-items:center;max-height:38vh;overflow:auto;width:100%}
@@ -3881,12 +3883,19 @@ function editFieldPlayer(ev,x){
    handicap). Before the round the groups are then built around the teams; after it, the draw is scored from the
    individual rounds (teams may span groups). Re-draw any time; the draw is remembered on the event. */
 function shuffled(a){ a=a.slice(); for(let i=a.length-1;i>0;i--){ const j=secureInt(i+1); [a[i],a[j]]=[a[j],a[i]]; } return a; }
+/* the handicap tiers for an A-B-C… draw: the field sorted by index and cut into `size` even buckets, A the lowest */
+const TIER_LETTERS='ABCDEF';
+function drawTiers(players,size,idxOf){ size=Math.max(2,+size||2);
+  const sorted=players.slice().sort((a,b)=>(idxOf(a)??99)-(idxOf(b)??99)||a.name.localeCompare(b.name));
+  return Array.from({length:size},(_,k)=>{ const ps=sorted.slice(Math.round(k*sorted.length/size),Math.round((k+1)*sorted.length/size)); const ix=ps.map(idxOf).filter(x=>x!=null);
+    return {letter:TIER_LETTERS[k]||String(k+1),players:ps,lo:ix.length?Math.min(...ix):null,hi:ix.length?Math.max(...ix):null}; }); }
 function drawTeams(players,size,method,idxOf){
   size=Math.max(2,+size||2); const n=Math.ceil(players.length/size), teams=Array.from({length:n},()=>[]);
   if(method==='random'){ shuffled(players).forEach((p,i)=>teams[i%n].push(p)); return teams; }
   const sorted=players.slice().sort((a,b)=>(idxOf(a)??99)-(idxOf(b)??99)||a.name.localeCompare(b.name));
-  if(method==='abcd'){ const tiers=Array.from({length:size},(_,k)=>shuffled(sorted.slice(Math.round(k*sorted.length/size),Math.round((k+1)*sorted.length/size)))); let ti=0;
-    tiers.forEach(tier=>tier.forEach((p,i)=>teams[(i+ti)%n].push(p))); return teams.map(t=>t.slice(0,size+1)); }
+  if(method==='abcd'){ // one player from each handicap tier per team: tier A is dealt first, so slot k of every team is its tier-k player
+    const tiers=drawTiers(players,size,idxOf).map(t=>shuffled(t.players));
+    tiers.forEach(tier=>tier.forEach((p,i)=>{ if(i<n) teams[i].push(p); else teams[secureInt(n)].push(p); })); return teams; }
   // snake: 1..n then n..1, repeat
   sorted.forEach((p,i)=>{ const round=Math.floor(i/n), k=i%n; teams[round%2?n-1-k:k].push(p); }); return teams;
 }
@@ -4618,17 +4627,22 @@ function drawStage(g,pot){
   const close=()=>{ clearTimeout(timer); if(document.fullscreenElement) document.exitFullscreen().catch(()=>{}); ov.remove(); document.removeEventListener('keydown',key); render(); };
   const wait=ms=>new Promise(r=>{ timer=setTimeout(r,ms); });
   const header=`<div class="rf-top"><img src="${typeof crestSrc==='function'?crestSrc():'flagstick-crest-light.svg'}" alt=""><div><div class="rf-k">${esc(orgName())} · ${esc(gameTitle(g))}</div><div class="rf-h">${esc(pot.name)} — the draw</div></div><button class="rf-x" id="dwClose" aria-label="Close">✕</button></div>`;
-  const tools=enabledGames().filter(x=>x.tool);
+  const tools=enabledGames().filter(x=>x.tool), letters=TIER_LETTERS.slice(0,size);
   const setup=()=>{ ov.innerHTML=header+`<div class="rf-stage"><div class="rf-lbl">${ps.length} players · teams of ${size}</div>
-      <div class="dw-opts"><label>How<select class="inp" id="dwM">${tools.map(x=>`<option value="${x.id.replace('draw','')}">${esc(x.name)}</option>`).join('')||'<option value="random">Random</option>'}</select></label>
+      <div class="dw-opts"><label>How<select class="inp" id="dwM">${tools.map(x=>`<option value="${x.id.replace('draw','')}">${esc(x.name.replace('ABCD',letters).replace('A low … D high',`A low … ${letters.slice(-1)} high`))}</option>`).join('')||'<option value="random">Random</option>'}</select></label>
         ${ps.length%size?`<label>Odd player<select class="inp" id="dwO"><option value="join">Joins a team (one team of ${size+1})</option><option value="out">Sits out of this competition</option></select></label>`:''}</div>
+      <div class="dw-tiers" id="dwTiers"></div>
       <button class="rf-go" id="dwGo">Draw the partners</button><div class="rf-hint">The draw is made and saved before the reveal — or press the space bar</div></div>
       <div class="rf-facts"><span><b>${ps.length}</b> players</span><span><b>${Math.floor(ps.length/size)}</b> teams</span>${pot.draw?`<span>Last drawn <b>${new Date(pot.draw.at).toLocaleString()}</b></span>`:''}</div>`;
-    ov.querySelector('#dwClose').onclick=close; ov.querySelector('#dwGo').onclick=run; };
+    ov.querySelector('#dwClose').onclick=close; ov.querySelector('#dwGo').onclick=run;
+    const sel=ov.querySelector('#dwM'), tiersBox=ov.querySelector('#dwTiers');
+    const showTiers=()=>{ if(sel.value!=='abcd'){ tiersBox.innerHTML=''; return; } const tiers=drawTiers(ps,size,p=>effIndex(ev,p).idx);
+      tiersBox.innerHTML=tiers.map(t=>`<div class="dw-tier"><b>${t.letter}</b><small>${t.lo==null?'':idxTxt(t.lo)+(t.hi!==t.lo?' – '+idxTxt(t.hi):'')}</small><span>${t.players.map(p=>esc(gpName(g.players.find(x=>x.gpid===p.id)||{name:p.name}).split(' ')[0])).join(' · ')}</span></div>`).join(''); };
+    sel.onchange=showTiers; showTiers(); };
   async function run(){ if(running) return; running=true; const method=ov.querySelector('#dwM').value, oddSel=ov.querySelector('#dwO'), odd=oddSel?oddSel.value:'join';
     const teams=runDraw(g,pot,{method,odd,reason:pot._redraw}); delete pot._redraw; if(!teams){ running=false; toast('Could not draw'); close(); return; }
     const names=ps.map(p=>gpName(p).split(' ')[0]+' '+(gpName(p).split(' ')[1]||'').slice(0,1)+'.'), first=p=>gpName(g.players.find(x=>x.gpid===p.id)||{name:p.name});
-    ov.innerHTML=header+`<div class="rf-stage"><div class="rf-lbl" id="dwLbl">Team 1</div><div class="dw-team" id="dwTeam">${Array.from({length:Math.max(...teams.map(t=>t.length))},(_,k)=>`<div class="dw-slot" id="dwS${k}">?</div>`).join('')}</div><div class="dw-done" id="dwDone"></div></div><div class="rf-facts" id="dwFacts"><span><b>${teams.length}</b> teams</span><span>Drawn with the browser’s cryptographic random numbers</span></div>`;
+    ov.innerHTML=header+`<div class="rf-stage"><div class="rf-lbl" id="dwLbl">Team 1</div>${method==='abcd'?`<div class="dw-letters">${Array.from({length:Math.max(...teams.map(t=>t.length))},(_,k)=>`<span>${TIER_LETTERS[k]||''}</span>`).join('')}</div>`:''}<div class="dw-team" id="dwTeam">${Array.from({length:Math.max(...teams.map(t=>t.length))},(_,k)=>`<div class="dw-slot" id="dwS${k}">?</div>`).join('')}</div><div class="dw-done" id="dwDone"></div></div><div class="rf-facts" id="dwFacts"><span><b>${teams.length}</b> teams</span><span>Drawn with the browser’s cryptographic random numbers</span></div>`;
     const pool=ps.map(p=>gpName(p)); const slots=k=>ov.querySelector('#dwS'+k), done=ov.querySelector('#dwDone');
     for(let i=0;i<teams.length;i++){ const t=teams[i]; ov.querySelector('#dwLbl').textContent=`Team ${i+1} of ${teams.length}`;
       for(let k=0;k<Math.max(...teams.map(x=>x.length));k++){ const s=slots(k); if(s){ s.textContent=k<t.length?'?':''; s.className='dw-slot'+(k<t.length?'':' empty'); } }
@@ -7108,7 +7122,7 @@ async function resultsPDF(t,opt){
    page counts, and a reload is tried once per build — if the page that comes back is still the old one, the CDN
    hasn't caught up; wait a while before trying that build again. */
 (function(){
-  const ME='20261023034318', KEY='au_tried', RETRY=10*60*1000; let ready=false, lastCheck=0;
+  const ME='20261023150120', KEY='au_tried', RETRY=10*60*1000; let ready=false, lastCheck=0;
   const typing=()=>{ const a=document.activeElement; return a&&/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)&&a.value&&a.type!=='search'; };
   const safe=()=>!typing()&&(typeof window.__canReload!=='function'||window.__canReload());
   const tried=()=>{ try{ const [b,t]=(sessionStorage.getItem(KEY)||'').split('|'); return b?{build:b,at:+t||0}:null; }catch(_){ return null; } };
