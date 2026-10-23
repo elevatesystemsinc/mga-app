@@ -127,6 +127,14 @@ async def main():
     ok=r['hold'] and r['gd']=='new' and r2['gd']=='new' and r2['name']=='Half-typed name' and r2['shown'] and r2['val']=='Half-typed name'
     print('designer survives a reload; auto-update waits', r, r2, 'OK' if ok else 'FAIL'); bad+=not ok
     await pg.evaluate("()=>{ GD=null; view.gdesign=null; go('games'); }")
+    # pops on par 3s is per competition: the skins pot can switch it on while the stroke pot keeps the classic allocation
+    r=await pg.evaluate("""()=>{ designGame(null); const d=GD.draft; d.pots.push(newPot('skins',d)); const sk=d.pots.find(p=>p.kind==='skins'); render();
+      const box=document.getElementById('gdNP3_'+sk.id), other=document.getElementById('gdNP3_'+d.pots[0].id); box.checked=true; box.dispatchEvent(new Event('change'));
+      $('gdSave').click(); const g=GAME()||db.games[db.games.length-1]; const s2=g.pots.find(p=>p.kind==='skins');
+      const r={boxes:!!box&&!!other, skinsFlag:!!s2.rules.noPar3, strokeFlag:!!g.pots[0].rules.noPar3, compSk:potComp(g,s2).noPar3, compSt:potComp(g,g.pots[0]).noPar3, gameLevel:'noPar3' in g};
+      deleteGame(g); return r; }""")
+    ok=r['boxes'] and r['skinsFlag'] and not r['strokeFlag'] and r['compSk'] and not r['compSt'] and not r['gameLevel']
+    print('no pops per competition', r, 'OK' if ok else 'FAIL'); bad+=not ok
     r=await pg.evaluate("""()=>{ go('games'); designGame(null); const d=GD.draft; d.name='Friday game'; d.date='2026-05-01'; d.pots[0].entry=20; d.pots[0].rules.scoring='gross';
       const sk=newPot('skins',d,{entry:5}); sk.rules.skins={net:false,grossBeatsNet:false,validate:'none',mode:'pot'}; d.pots.push(sk); render(); const designer=!!document.getElementById('gdSave'); document.getElementById('gdSave').click();
       const g=GAME(); ['p0','p1','p2','p3','p4'].forEach(id=>{ const p=addPlayer(g,{memberId:id}); p.id='gp_'+id; g.pots.forEach(pot=>{ delete pot.inn[p.id]; }); }); const gu=addPlayer(g,{name:'Guest Gus'}); gu.id='gp_guest';

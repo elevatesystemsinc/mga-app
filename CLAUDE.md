@@ -483,8 +483,9 @@ groups, printed scorecards — the printed cards include a live-scoring QR that 
   1–6, `count` (balls that count), `countPattern` ('123'), `scoring`, `allow` (overrides by `allowKey`; defaults in
   `USGA_ALLOW` + `defaultAllow`). `unitOf(pub)` = strokes | points | holes | match drives every leaderboard column.
   Skins (`skinsResult`): gross/net, carry, gross-beats-net, validation by par / net par on the next hole in play order.
-  **No pops on par 3s** (`noPar3` on events, rounds and games — the same checkbox in editEvent, editRound and the game
-  designer; published, kept by `compPub`): `strokesAt(pub,c,set,h,ph)` in golfcore is the one place per-hole strokes come
+  **No pops on par 3s** (`noPar3` on Golf events and tournament rounds; in a small group's game it is **per competition**,
+  `pot.rules.noPar3`, carried by `potComp` → `COMP_KEYS` → `compPub`; the same checkbox in editEvent, editRound and on each
+  competition card in the game designer): `strokesAt(pub,c,set,h,ph)` in golfcore is the one place per-hole strokes come
   from (boards, skins, matches, team nets, printed cards, the phones). With the switch a par 3 never gives or takes a
   stroke and the playing handicap is spread over the other holes by stroke index (`strokeIdx3`); a plus handicap gives
   strokes back from the easiest non-par-3 hole up. Without it, the classic 18-hole allocation (`strokesOn`). Index
