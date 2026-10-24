@@ -15,6 +15,9 @@ async def main():
     A=await b.new_context(); await cloud(A,fdb)
     pg,errs=await open_hub(A,'club'); await pg.evaluate("()=>migrateFromHub()"); await pg.close()
     hub,herr=await open_hub(A,'mga'); await settled([hub])
+    # the organization's own hub offers admin links (so one can be made from a phone): the Board page of an association, the Members page of a group
+    r=await hub.evaluate("()=>{ go('board'); return {card:!!document.getElementById('ogKeys'), btn:!!document.getElementById('ogNewKey'), input:!!document.getElementById('ogKL')}; }")
+    check('admin links card on the organization hub',r['card'] and r['btn'] and r['input'],json.dumps(r))
     # --- 1. the template → a draft with three sections, every answer type, comment boxes; nothing identifying asked
     r=await hub.evaluate("""()=>{ go('surveys'); document.getElementById('svTpl').click(); const s=db.surveys[0];
       return {nav:navItems().map(x=>x[0]).includes('surveys'), secs:s.sections.map(x=>[x.title,x.questions.length,x.comments]), types:[...new Set(svQuestions(s).map(q=>q.type))].sort(),

@@ -1160,6 +1160,7 @@ function renderInner(){
   const m=$('main');
   ({dash:vDash,tournaments:vTournaments,tournament:vTournament,members:vMembers,board:vBoard,budget:vBudget,treasury:vTreasury,golf:vGolf,orgs:vOrgs,pick:vPicker,collections:vCollections,games:vGames,ledger:vLedger,library:vLibrary,logins:vLogins,surveys:vSurveys}[view.page]||vDash)(m);
   if(view.page==='board'&&!isClub()&&typeof loginsCard==='function') loginsCard(m,ORG_ID);
+  if(!isClub()&&((db.kind==='group'&&view.page==='members')||(db.kind!=='group'&&view.page==='board'))) adminLinksCard(m,curOrg());
 }
 
 /* ---------- Organization picker / first-run set-up (shown when no organization is open) ---------- */
@@ -1226,9 +1227,7 @@ function editOrg(o,kind){
       (o?'':`<p class="hint">The id becomes the address (${esc(orgURL('misfits'))}) and can’t change later. Leave it blank to use the short name.</p>`)+
       (o?`<label class="check"><input type="checkbox" id="ogA"${o.archived?' checked':''}>Archived — hidden from the picker; its data is kept</label>`:'')+
       (o&&kind==='association'?`<label class="check"><input type="checkbox" id="ogH"${o.hubRow?' checked':''}>Keep in two-way sync with the MGA Hub (hub.wcccmga.org)</label><p class="hint">Edits on either site reach the other within about half a minute while someone has this hub or the club hub open.</p>`:'')+
-      (o&&CLOUD&&sessionOK&&!KEYMODE?`<div class="fld" style="margin-top:6px"><span class="lbl">Admin links</span><div class="mini" id="ogKeys"><div class="mr"><span class="muted">Loading…</span></div></div>
-        <div style="display:flex;gap:8px;align-items:center;margin-top:8px"><input class="inp" id="ogKL" placeholder="Who it’s for, e.g. Dave (organizer)" aria-label="Link label" style="flex:1"><button class="btn sm" type="button" id="ogNewKey">${I.plus}New admin link</button></div>
-        <div id="ogKeyNew"></div><p class="hint">Whoever opens an admin link runs the ${esc(o.short||o.name)} hub without the board password — and can reach nothing else in the club (they see the directory and can add people to it). Revoke a link here at any time.</p></div>`:''),
+      (o&&CLOUD&&sessionOK&&!KEYMODE?`<div class="fld" style="margin-top:6px"><span class="lbl">Admin links</span>${adminLinksBlock(o)}</div>`:''),
     wire:r=>{ if(o&&CLOUD&&sessionOK&&!KEYMODE) adminLinks(r,o); },
     save:()=>{ const name=fv('ogN'); if(!name){ toast('Give it a name'); return false; }
       if(o){ Object.assign(o,{name,short:fv('ogS'),archived:$('ogA').checked}); if($('ogH')) o.hubRow=$('ogH').checked?'main':''; return; }
@@ -1238,6 +1237,14 @@ function editOrg(o,kind){
 }
 
 /* admin links for one organization: the list (from hub_keys), revoke, and create — the key itself is shown once */
+function adminLinksBlock(o){ return `<div class="mini" id="ogKeys"><div class="mr"><span class="muted">Loading…</span></div></div>
+        <div style="display:flex;gap:8px;align-items:center;margin-top:8px;flex-wrap:wrap"><input class="inp" id="ogKL" placeholder="Who it’s for, e.g. Dave (organizer)" aria-label="Link label" style="flex:1 1 180px"><button class="btn sm" type="button" id="ogNewKey">${I.plus}New admin link</button></div>
+        <div id="ogKeyNew"></div><p class="hint">Whoever opens an admin link runs the ${esc(o.short||o.name)} hub without the board password — and can reach nothing else in the club (they see the directory and can add people to it). One link per person, so one can be revoked without the others. Revoke here at any time.</p>`; }
+/* the same block as a card on the organization's own hub (a group's Members page, an association's Board page) — so a
+   link can be made from a phone without going back to the club hub's Organizations editor */
+function adminLinksCard(m,o){ if(!o||!CLOUD||!sessionOK||KEYMODE||SCOPED) return; const card=document.createElement('div'); card.className='card pad'; card.style.marginTop='18px';
+  card.innerHTML=`<div class="cardhead" style="padding:0 0 10px;border:0"><div><h2 class="h2">Admin links</h2><span class="muted">Let someone run the ${esc(o.short||o.name)} hub from their phone without the board password.</span></div></div>`+adminLinksBlock(o);
+  m.appendChild(card); adminLinks(card,o); }
 async function adminLinks(r,o){
   const L=r.querySelector('#ogKeys'), N=r.querySelector('#ogKeyNew');
   const list=async()=>{ const {data,error}=await tq(sb.from('hub_keys').select('id,label,created_at,revoked_at')).eq('org_id',o.id);
@@ -1247,8 +1254,9 @@ async function adminLinks(r,o){
     L.querySelectorAll('[data-revoke]').forEach(b=>b.onclick=async()=>{ if(!confirm('Revoke this link? It stops working right away.')) return; const {error:e}=await sb.from('hub_keys').update({revoked_at:new Date().toISOString()}).eq('id',b.dataset.revoke); if(e) toast(e.message); else { toast('Link revoked'); list(); } }); };
   r.querySelector('#ogNewKey').onclick=async()=>{ const b=r.querySelector('#ogNewKey'); b.disabled=true;
     try{ const res=await newAdminLink(o,r.querySelector('#ogKL').value.trim()); r.querySelector('#ogKL').value='';
-      N.innerHTML=`<div class="banner" style="margin-top:8px;display:flex;flex-direction:column;gap:6px"><b>Send this link to the organizer — it is shown only once.</b><code style="word-break:break-all;font-size:12.5px">${esc(res.url)}</code><div class="actions"><button class="btn sm" type="button" id="ogCopy">Copy link</button></div></div>`;
-      r.querySelector('#ogCopy').onclick=()=>{ navigator.clipboard&&navigator.clipboard.writeText(res.url); toast('Link copied'); }; list(); }
+      N.innerHTML=`<div class="banner" style="margin-top:8px;display:flex;flex-direction:column;gap:6px"><b>Send this link to the organizer — it is shown only once.</b><code style="word-break:break-all;font-size:12.5px">${esc(res.url)}</code><div class="actions"><button class="btn sm" type="button" id="ogCopy">Copy link</button>${navigator.share?'<button class="btn sm pri" type="button" id="ogShareK">Send…</button>':''}</div></div>`;
+      r.querySelector('#ogCopy').onclick=async()=>{ try{ await navigator.clipboard.writeText(res.url); toast('Link copied'); }catch(_){ prompt('Copy this link:',res.url); } };
+      const shb=r.querySelector('#ogShareK'); if(shb) shb.onclick=()=>navigator.share({title:`${o.short||o.name} hub — admin link`,text:`Your admin link for the ${o.short||o.name} hub (keep it private):`,url:res.url}).catch(()=>{}); list(); }
     catch(e){ toast(e.message||'Could not create the link'); } b.disabled=false; };
   list();
 }
@@ -7198,7 +7206,7 @@ async function resultsPDF(t,opt){
    page counts, and a reload is tried once per build — if the page that comes back is still the old one, the CDN
    hasn't caught up; wait a while before trying that build again. */
 (function(){
-  const ME='20261023220747', KEY='au_tried', RETRY=10*60*1000; let ready=false, lastCheck=0;
+  const ME='20261024212842', KEY='au_tried', RETRY=10*60*1000; let ready=false, lastCheck=0;
   const typing=()=>{ const a=document.activeElement; return a&&/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)&&a.value&&a.type!=='search'; };
   const safe=()=>!typing()&&(typeof window.__canReload!=='function'||window.__canReload());
   const tried=()=>{ try{ const [b,t]=(sessionStorage.getItem(KEY)||'').split('|'); return b?{build:b,at:+t||0}:null; }catch(_){ return null; } };
