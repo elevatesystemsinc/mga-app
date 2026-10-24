@@ -344,6 +344,26 @@ async def main():
     ok=ok and r2['pages']>=1 and len(r2['names'])==4 and r2['grid']==4*4 and r2['back']
     print('game sheet + designer', r2, 'OK' if r2['pages']>=1 and r2['grid']==16 else 'FAIL')   # 4 players left × 4 competitions
     print('payouts + ledger', r, 'OK' if ok else 'FAIL'); bad+=not ok
+    # the quick setup: who's playing (last game's players ticked) → what are we playing (same as last time / starters) → share;
+    # More options opens the full designer with the same draft; a reload keeps the half-done setup
+    rq=await pg.evaluate("""()=>{ const before=gamesData().length, last=seasonGames()[0]; quickGame(); const s1=!!document.getElementById('qgNext'), preTicked=document.querySelectorAll('.qpick.on').length, lastN=last.players.length;
+      const q=document.getElementById('qgQ'); q.value='zed'; q.dispatchEvent(new Event('input')); const hit=document.querySelector('#qgQ ~ .qgrid [data-qp]'); const hitName=hit&&hit.textContent; if(hit) hit.click(); const cleared=document.getElementById('qgQ').value==='';
+      document.getElementById('qgGuest').value='Guest Gina'; document.getElementById('qgGuestAdd').click(); const nPick=Object.keys(QG.picked).length+QG.guests.length; document.getElementById('qgNext').click();
+      const s2=!!document.getElementById('qgCreate'), hasLast=!!document.querySelector('[data-qs="last"].on'); document.querySelector('[data-qs="s:skins"]').click(); document.querySelector('[data-qs="s:quota"]').click(); const starters=QG.starters.slice(), setOff=QG.set===null;
+      document.getElementById('qgDay').click(); document.getElementById('qgName').value='Quick game'; document.getElementById('qgName').dispatchEvent(new Event('change')); document.getElementById('qgDay').click();
+      document.getElementById('qgCreate').click(); const g=gamesData().find(x=>x.id===QG.gameId), ev=gameEvent(g); const s3=!!document.getElementById('qgOpen'), link=document.querySelector('.qlink').textContent;
+      document.getElementById('qgOpen').click(); const onGame=!!document.getElementById('gmDesign')&&view.gameId===g.id;
+      return {before, after:gamesData().length, s1, preTicked, lastN, hitName, cleared, nPick, s2, hasLast, starters, setOff, s3, link:link.includes('score.html?e='), name:g.name, players:g.players.length, pots:g.pots.map(p=>[p.kind,p.rules.game,p.entry,Object.keys(p.inn).length]), live:ev&&ev.status, groups:ev&&ev.groups.map(x=>x.players.length), onGame, course:[g.course,g.tee]}; }""")
+    okq=rq['after']==rq['before']+1 and rq['s1'] and rq['preTicked']>=1 and rq['hitName'].startswith('Zed') and rq['cleared'] and rq['s2'] and rq['hasLast'] and rq['starters']==['skins','quota'] and rq['setOff'] and rq['s3'] and rq['link'] and rq['name']=='Quick game' and rq['players']==rq['nPick'] and [p[1] for p in rq['pots']]==['skins','quota'] and all(p[3]==rq['players'] for p in rq['pots']) and rq['live']=='live' and sum(rq['groups'])==rq['players'] and rq['onGame']
+    print('quick setup: three steps to a live game', rq, 'OK' if okq else 'FAIL'); bad+=not okq
+    rq2=await pg.evaluate("""()=>{ const n=gamesData().length; quickGame(true); const g=gamesData().find(x=>x.id===QG.gameId), last=seasonGames()[1]; const again={n:gamesData().length-n, step:QG.step, same:JSON.stringify(g.pots.map(p=>[p.kind,p.rules.game,p.entry]))===JSON.stringify(last.pots.map(p=>[p.kind,p.rules.game,p.entry])), players:g.players.length===last.players.length, fresh:g.pots.every(p=>!p.payouts.length&&!p.teams)};
+      QG=null; view.gquick=null; quickGame(); QG.step=2; render(); document.getElementById('qgMore').click(); const more={gd:view.gdesign, pots:GD.draft.pots.length, players:GD.draft.players.length, designer:!!document.getElementById('gdSave')}; GD=null; view.gdesign=null;
+      quickGame(); document.querySelector('.qpick.on').click(); return {again, more, picked:Object.keys(QG.picked).length}; }""")
+    await pg.reload(); await pg.wait_for_timeout(700)
+    rq3=await pg.evaluate("()=>({quick:view.gquick, step:QG&&QG.step, picked:QG&&Object.keys(QG.picked).length, shown:!!document.getElementById('qgNext')})")
+    okq2=rq2['again']['n']==1 and rq2['again']['step']==3 and rq2['again']['same'] and rq2['again']['players'] and rq2['again']['fresh'] and rq2['more']['gd']=='new' and rq2['more']['pots']>=1 and rq2['more']['designer'] and rq3['quick'] and rq3['step']==1 and rq3['picked']==rq2['picked'] and rq3['shown']
+    print('quick setup: same as last time, more options, reload keeps it', rq2, rq3, 'OK' if okq2 else 'FAIL'); bad+=not okq2
+    await pg.evaluate("()=>{ QG=null; view.gquick=null; gamesData().filter(g=>/Quick game|Saturday|game/.test(g.name)&&g.id!==seasonGames().slice(-1)[0].id).slice(0,2); }")
     print('  group errors', errs); bad+=bool(errs)
     await b.close()
   sys.exit(1 if bad else 0)

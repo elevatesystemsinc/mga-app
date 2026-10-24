@@ -120,6 +120,7 @@ function settlement(g){
 /* ---------- Games list ---------- */
 function vGames(m){
   gamesData();
+  if(view.gquick) return vQuick(m);
   if(view.gdesign) return vGameDesign(m);
   if(view.gameId&&GAME()) return vGame(m,GAME());
   view.gameId=null;
@@ -127,11 +128,11 @@ function vGames(m){
   const tot=gs.reduce((a,g)=>{ a.money+=gameMoney(g).total; a.players+=g.players.length; return a; },{money:0,players:0});
   const cols='grid-template-columns:120px minmax(0,1.5fr) minmax(0,1fr) 80px 100px 110px 40px';
   const row=g=>{ const mo=gameMoney(g), ev=gameEvent(g); return `<div class="tr num click" data-game="${g.id}" style="${cols}"><span>${g.date?shortDate(g.date).replace(/, \d{4}$/,''):'TBD'}${g.time?`<br><small class="muted">${fmtTime(g.time)}</small>`:''}</span><div class="cell2"><b class="trunc" style="color:var(--navy)">${esc(gameTitle(g))}</b><small class="trunc">${esc(gameName(g))}${ev&&isLiveNow(ev)?' · <span class="pos">● live</span>':''}</small></div><span class="muted">${g.players.length} player${g.players.length===1?'':'s'}${mo.unpaid&&!isUpcoming(g)?` · <span class="neg">${mo.unpaid} unpaid</span>`:''}</span><span class="r">${gMoney(mo.entry)}</span><span class="r">${gMoney(mo.total)}</span><span>${g.status==='settled'?'<span class="chip navy">Settled</span>':Math.abs(mo.left)>0.004&&!isUpcoming(g)?`<span class="chip warn">${gMoney(mo.left)} to pay out</span>`:isUpcoming(g)?'<span class="chip">Upcoming</span>':'<span class="chip ok">Paid out</span>'}</span><span class="ib">${I.chev}</span></div>`; };
-  m.innerHTML=head('Games',`The ${esc(orgShort())}’s ${Y()} season: who played, what went in, what was paid out.`,btn('New game','gmNew','pri',I.plus))+`
+  m.innerHTML=head('Games',`The ${esc(orgShort())}’s ${Y()} season: who played, what went in, what was paid out.`,(gs.length?btn('Same as last time','gmAgain',''):'')+btn('New game','gmNew','pri',I.plus))+`
   <div class="grid g3">${kpi('Games this season',String(gs.length),`${past.length} played · ${up.length} upcoming`)}${kpi('Money through the group',gMoney(tot.money),'every pot, all games')}${kpi('Player-games',String(tot.players),gs.length?`${(tot.players/gs.length).toFixed(1)} players a game`:'')}</div>
   <div class="card" style="overflow:hidden">${gs.length?`<div class="tw"><div class="t" style="min-width:760px"><div class="tr th" style="${cols}"><span>Date</span><span>Game</span><span>Players</span><span class="r">All in</span><span class="r">Pots</span><span>Status</span><span></span></div>${up.concat(past).map(row).join('')}</div></div>`
-  :`<div class="empty"><b>No games yet</b><span>Design the regular game: who plays, the competitions (stroke play, a best ball with a blind draw, skins, dots…), the entries and how it pays. Then score it live and settle up.</span><button class="btn pri" id="gmNew2">${I.plus}New game</button></div>`}</div>`;
-  $('gmNew').onclick=()=>designGame(null); const n2=$('gmNew2'); if(n2) n2.onclick=()=>designGame(null);
+  :`<div class="empty"><b>No games yet</b><span>Three taps from your phone: who’s playing, what you’re playing, share the link. Everyone scores on their phones and the group finishes the game itself — skins, the draw, the money.</span><button class="btn pri" id="gmNew2">${I.plus}New game</button></div>`}</div>`;
+  $('gmNew').onclick=()=>quickGame(); const n2=$('gmNew2'); if(n2) n2.onclick=()=>quickGame(); const ag=$('gmAgain'); if(ag) ag.onclick=()=>quickGame(true);
   m.querySelectorAll('[data-game]').forEach(r=>r.onclick=()=>{ view.gameId=r.dataset.game; render(); });
 }
 
@@ -139,16 +140,127 @@ function vGames(m){
    Works on a draft (GD) so nothing is saved until "Save game". For a new game the draft starts from the last game:
    same players, same competitions, today's date. */
 let GD=null;
+/* a fresh draft: today, and the last game's name, course, tee, timing, rules and (unless told otherwise) its players
+   and competitions — the regular game is the default everywhere */
+function draftFromLast(opt){ opt=opt||{}; const last=seasonGames()[0], today=new Date().toISOString().slice(0,10);
+  const d={id:uid(),season:Y(),status:'open',name:last?last.name:'',date:today,time:last?last.time||'':'',course:last?last.course:'oak',tee:last?last.tee||'White':'White',notes:'',rules:last?last.rules||'':'',hcp:last?last.hcp||'full':'full',payWhen:last?last.payWhen||'after':'after',settle:last?last.settle||'pot':'pot',golfEventId:'',players:[],pots:[]};
+  if(last&&opt.players!==false) last.players.forEach(p=>d.players.push({id:uid(),memberId:p.memberId||'',name:p.name||'',paid:false,extraIn:0,gpid:''}));
+  if(opt.pots!==false){ if(last) copyPots(last.pots,d); else d.pots.push(newPot('stroke',d)); }
+  return d; }
+/* the competitions of one game copied onto a draft: same rules and entries, nobody paid, no teams, no results */
+function copyPots(pots,d){ pots.forEach(p=>{ const np=JSON.parse(JSON.stringify(p)); np.id=uid(); np.payouts=[]; delete np.teams; delete np.draw; delete np.tally; delete np.sitOut; delete np.calledOut; np.inn=Object.fromEntries(d.players.map(x=>[x.id,true])); d.pots.push(np); }); }
+/* a draft becomes a game (or updates one): the scoring event follows — date, tee times, the default course and tee */
+function commitGameDraft(d,existing){
+  let g=existing||null; const wasCourse=g?g.course:null, wasTee=g?g.tee:null;
+  if(g){ syncTo(g,d); } else { g=d; gamesData().push(g); }
+  const ev=ensureGameEvent(g); ev.date=g.date; ev.groups.forEach(gr=>{ if(!gr.teeTime&&g.time) gr.teeTime=g.time; }); applyGameDefaults(g,ev,{course:wasCourse!==g.course,tee:wasTee!==g.tee}); publishEvent(ev);
+  persist(); return g; }
 function designGame(g){
-  const last=seasonGames()[0], today=new Date().toISOString().slice(0,10);
-  if(g) GD={id:g.id,draft:JSON.parse(JSON.stringify(g))};
-  else { const d={id:uid(),season:Y(),status:'open',name:last?last.name:'',date:today,time:last?last.time||'':'',course:last?last.course:'oak',notes:'',payWhen:last?last.payWhen||'after':'after',settle:last?last.settle||'pot':'pot',golfEventId:'',players:[],pots:[]};
-    if(last){ last.players.forEach(p=>d.players.push({id:uid(),memberId:p.memberId||'',name:p.name||'',paid:false,extraIn:0,gpid:''}));
-      last.pots.forEach(p=>{ const np=JSON.parse(JSON.stringify(p)); np.id=uid(); np.payouts=[]; delete np.teams; delete np.draw; delete np.tally; np.inn=Object.fromEntries(d.players.map(x=>[x.id,true])); d.pots.push(np); }); }
-    else { d.pots.push(newPot('stroke',d)); }
-    GD={id:null,draft:d}; }
-  view.gdesign=GD.id||'new'; view.gameId=null; go('games');
+  if(g) GD={id:g.id,draft:JSON.parse(JSON.stringify(g))}; else GD={id:null,draft:draftFromLast()};
+  view.gdesign=GD.id||'new'; view.gquick=null; view.gameId=null; go('games');
 }
+
+/* ---------- Quick setup: a new game from a phone, in three steps ----------
+   The person setting up a small group's game is on a phone and has probably never used an app like this. So: who's
+   playing (tap the names — last time's are already ticked), what are we playing (same as last time, a past game, or
+   starter games in plain words), share the link. Everything the full designer asks for is a default here — today,
+   last game's course, tee and rules, after the round, pot settlement, full handicaps, the usual payout split — and
+   "More options" opens the designer with the same draft. "Same as last time" on the Games page skips even that. */
+let QG=null;
+const STARTERS=[
+  {id:'skins',title:'Skins',text:'$5 a man · net, gross beats net · one pot divided by the skins won · called out from the cards after the round',make:d=>newPot('skins',d,{entry:5})},
+  {id:'stroke',title:'Stroke play',text:'$20 a man · lowest net score wins · the usual split for the size of the field',make:d=>newPot('stroke',d,{entry:20})},
+  {id:'blinddraw',title:'Blind-draw partners',text:'$10 a man · partners drawn after the round · best ball from everyone’s own card',make:d=>newPot('blinddraw',d,{entry:10})},
+  {id:'quota',title:'Quota',text:'$10 a man · points against your quota (36 less your handicap) · most over wins',make:d=>newPot('quota',d,{entry:10})},
+  {id:'teamnassau',title:'Team Nassau',text:'Four-man best ball · front, back and 18 · $5 · $5 · $10 a man · teams picked by hand',make:d=>newPot('teamnassau',d)},
+  {id:'dots',title:'Dots',text:'$2 a man · birdies and eagles from the cards, sandies and greenies by hand',make:d=>newPot('dots',d,{entry:2})}];
+const potsText=pots=>pots.filter(p=>p.kind!=='manual').map(p=>`${p.name} ${gMoney(p.entry)}`).join(' · ')||'no competitions';
+const dayName=date=>{ const d=parseD(date); return d?d.toLocaleDateString('en-US',{weekday:'long'})+' game':'Game'; };
+function quickGame(again){
+  const last=seasonGames()[0], d=draftFromLast({players:false,pots:false}); if(!d.name) d.name=dayName(d.date);
+  QG={step:1,d,picked:{},guests:[],set:last?'last':null,starters:[],dayOpen:false,q:'',gameId:null};
+  if(last) last.players.forEach(p=>{ if(p.memberId) QG.picked[p.memberId]=true; else if(p.name) QG.guests.push(p.name); });
+  view.gquick=true; view.gdesign=null; view.gameId=null;
+  if(again&&last){ quickCreate(); return; }
+  go('games');
+}
+/* the draft from the choices: players, then the competitions (a whole past game, or the starters picked) */
+function quickBuild(){ const Q=QG, d=Q.d; d.players=[]; d.pots=[];
+  Object.keys(Q.picked).forEach(id=>d.players.push({id:uid(),memberId:id,name:'',paid:false,extraIn:0,gpid:''})); Q.guests.forEach(n=>d.players.push({id:uid(),memberId:'',name:n,paid:false,extraIn:0,gpid:''}));
+  const src=Q.set==='last'?seasonGames()[0]:Q.set&&Q.set.startsWith('prev:')?gamesData().find(g=>g.id===Q.set.slice(5)):null;
+  if(src) copyPots(src.pots,d); else Q.starters.forEach(id=>{ const S=STARTERS.find(x=>x.id===id); if(S) d.pots.push(S.make(d)); });
+  return d; }
+function quickCreate(){ const d=quickBuild(); if(!d.players.length){ toast('Pick who’s playing first'); return; } if(!d.pots.length){ toast('Pick what you’re playing'); return; }
+  const g=commitGameDraft(d,null); QG.step=3; QG.gameId=g.id; render(); window.scrollTo(0,0); }
+/* past games with a different set of competitions than the last one, newest first */
+function pastSets(){ const gs=seasonGames(), sig=g=>g.pots.filter(p=>p.kind!=='manual').map(p=>[p.kind,p.rules.game,p.entry,p.rules.scoring,p.rules.teamSize||'',p.rules.teamsBy||''].join(':')).sort().join('|');
+  const seen=new Set(gs.length?[sig(gs[0])]:[]), out=[]; for(const g of gs.slice(1)){ const k=sig(g); if(!g.pots.length||seen.has(k)) continue; seen.add(k); out.push(g); if(out.length>=3) break; } return out; }
+function vQuick(m){
+  const Q=QG; if(!Q){ view.gquick=null; return vGames(m); }
+  if(Q.step===3){ const g=gamesData().find(x=>x.id===Q.gameId); if(!g){ QG=null; view.gquick=null; return vGames(m); } return vQuickShare(m,g); }
+  const last=seasonGames()[0], top=(n,title,sub)=>`<div class="crumb"><button id="qgGames">Games</button><span class="muted">/</span><span class="muted">New game</span></div><div class="qstep"><span class="qn">Step ${n} of 3</span><h1 class="h1">${title}</h1>${sub?`<p class="sub">${sub}</p>`:''}</div>`;
+  const nPicked=Object.keys(Q.picked).length+Q.guests.length;
+  if(Q.step===1){
+    const pool=gamePool(), byId=new Map(pool.map(x=>[x.id,x])), members=pool.filter(x=>x.inGroup), before=new Set(); gamesData().forEach(g=>g.players.forEach(p=>{ if(p.memberId&&byId.has(p.memberId)&&!byId.get(p.memberId).inGroup) before.add(p.memberId); }));
+    const played=pool.filter(x=>before.has(x.id)), shown=new Set([...members,...played].map(x=>x.id)), extra=Object.keys(Q.picked).filter(id=>!shown.has(id)&&byId.has(id)).map(id=>byId.get(id));
+    const q=Q.q.toLowerCase().trim(), hits=q?pool.filter(x=>!shown.has(x.id)&&!Q.picked[x.id]&&memberName(x).toLowerCase().includes(q)).slice(0,8):[];
+    const chip=x=>`<button type="button" class="qpick${Q.picked[x.id]?' on':''}" data-qp="${x.id}"><span>${esc(memberName(x))}</span>${x.hcp!==''&&x.hcp!=null?`<small>${esc(idxTxt(parseIndex(x.hcp)))}</small>`:''}</button>`;
+    m.innerHTML=top(1,'Who’s playing?',last?'Last time’s players are already ticked — tap to change.':'Tap everyone who’s in.')+`
+      ${members.length?`<div class="qsec">The ${esc(orgShort())}</div><div class="qgrid">${members.map(chip).join('')}</div>`:''}
+      ${played.length?`<div class="qsec">Played before</div><div class="qgrid">${played.map(chip).join('')}</div>`:''}
+      ${extra.length?`<div class="qsec">Also playing</div><div class="qgrid">${extra.map(chip).join('')}</div>`:''}
+      <div class="qsec">Anyone else at the club</div><input class="inp" id="qgQ" value="${esc(Q.q)}" placeholder="Type a name…" autocomplete="off" style="height:46px;font-size:16px">
+      ${hits.length?`<div class="qgrid" style="margin-top:8px">${hits.map(chip).join('')}</div>`:q?'<p class="hint">Nobody by that name in the club directory — add them as a guest.</p>':''}
+      <div class="qsec">Guests</div>${Q.guests.length?`<div class="qgrid" style="margin-bottom:8px">${Q.guests.map((n,i)=>`<button type="button" class="qpick on" data-qg="${i}"><span>${esc(n)}</span><small>✕</small></button>`).join('')}</div>`:''}
+      <div style="display:flex;gap:8px"><input class="inp" id="qgGuest" placeholder="Guest’s name" style="height:46px;font-size:16px;flex:1"><button class="btn" id="qgGuestAdd" type="button" style="min-width:0">Add</button></div>
+      <div class="qbar"><button class="btn pri" id="qgNext"${nPicked?'':' disabled'}>Next · ${nPicked} playing</button></div>`;
+    m.querySelectorAll('[data-qp]').forEach(b=>b.onclick=()=>{ const id=b.dataset.qp; if(Q.picked[id]) delete Q.picked[id]; else Q.picked[id]=true; Q.q=''; if(document.activeElement&&document.activeElement.blur) document.activeElement.blur(); render(); });   // blur: a phone keeps the search box focused, and render would keep its text
+    m.querySelectorAll('[data-qg]').forEach(b=>b.onclick=()=>{ Q.guests.splice(+b.dataset.qg,1); render(); });
+    const qi=$('qgQ'); qi.oninput=()=>{ Q.q=qi.value; render(); const e=$('qgQ'); if(e){ e.focus(); e.setSelectionRange(e.value.length,e.value.length); } };
+    const addG=()=>{ const n=$('qgGuest').value.trim(); if(!n) return; Q.guests.push(n); render(); $('qgGuest')&&$('qgGuest').focus(); }; $('qgGuestAdd').onclick=addG; $('qgGuest').onkeydown=e=>{ if(e.key==='Enter'){ e.preventDefault(); addG(); } };
+    $('qgNext').onclick=()=>{ Q.step=2; render(); window.scrollTo(0,0); };
+  } else {
+    const d=Q.d, courses=golfData().courses||WCCC_COURSES, c=courseById(d.course)||courses[0], prev=pastSets(), lib=new Set(enabledGames().map(x=>x.id)), starters=STARTERS.filter(S=>lib.has(S.id)||S.id==='stroke');
+    const built=quickBuild(), per=sum(built.pots.filter(p=>p.kind!=='manual'),p=>n0(p.entry)), total=sum(built.pots,p=>potTotal(built,p));
+    const opt=(key,title,text,on)=>`<button type="button" class="qopt${on?' on':''}" data-qs="${esc(key)}"><b>${esc(title)}</b><span>${esc(text)}</span></button>`;
+    m.innerHTML=top(2,'What are we playing?','Pick a whole game from before, or build one from the starters.')+`
+      <div class="card pad qday"><div class="cell2" style="min-width:0"><b>${esc(d.name||dayName(d.date))} · ${esc(shortDate(d.date))}${d.time?' · '+esc(fmtTime(d.time)):''}</b><small>${esc(c?c.name:'Course TBD')} · ${esc(d.tee||'White')} tees</small></div><button class="btn sm" id="qgDay" type="button">${Q.dayOpen?'Done':'Change'}</button></div>
+      ${Q.dayOpen?`<div class="card pad" style="display:flex;flex-direction:column;gap:12px">${field('Name','qgName',d.name,{ph:'e.g. Thursday game'})}<div class="frow2">${field('Date','qgDate',d.date,{type:'date'})}${field('Tee time','qgTime',d.time||'',{type:'time'})}</div><div class="frow2">${field('Course','qgCourse',d.course,{type:'select',options:courses.map(x=>[x.id,x.name])})}${field('Tee','qgTee',d.tee||'White',{type:'select',options:((c||{tees:[]}).tees||[]).map(t=>[t.name,t.name])})}</div></div>`:''}
+      ${last?`<div class="qsec">From before</div>${opt('last','Same as last time',potsText(last.pots)+' — '+gameWhen(last),Q.set==='last')}${prev.map(g=>opt('prev:'+g.id,gameTitle(g)+' · '+shortDate(g.date),potsText(g.pots),Q.set==='prev:'+g.id)).join('')}`:''}
+      <div class="qsec">${last?'Or build the game — tap all that apply':'Tap all that apply'}</div>${starters.map(S=>opt('s:'+S.id,S.title,S.text,!Q.set&&Q.starters.includes(S.id))).join('')}
+      <div class="card pad" style="display:flex;justify-content:space-between;gap:12px;align-items:center"><div class="cell2"><b>${built.pots.length?`Each player puts in ${gMoney(per)}`:'Nothing picked yet'}</b><small>${built.players.length} playing${built.pots.length?` · ${gMoney(total)} in the pots · ${esc(potsText(built.pots))}`:''}</small></div></div>
+      <p class="hint">Everything else — the payout split, handicaps, pops on par 3s, the house rules — has a sensible default. <a href="#" id="qgMore">More options</a> opens the full designer with this game in it.</p>
+      <div class="qbar"><button class="btn" id="qgPrev">Back</button><button class="btn pri" id="qgCreate"${built.pots.length&&built.players.length?'':' disabled'}>Create the game</button></div>`;
+    m.querySelectorAll('[data-qs]').forEach(b=>b.onclick=()=>{ const k=b.dataset.qs; if(k.startsWith('s:')){ const id=k.slice(2); Q.set=null; Q.starters=Q.starters.includes(id)?Q.starters.filter(x=>x!==id):Q.starters.concat(id); } else { Q.set=Q.set===k?null:k; } render(); });
+    const readDay=()=>{ if(!Q.dayOpen) return; d.name=fv('qgName'); d.date=fv('qgDate')||d.date; d.time=fv('qgTime'); d.course=fv('qgCourse'); d.tee=fv('qgTee')||d.tee; const cc=courseById(d.course); if(cc&&!cc.tees.some(t=>t.name===d.tee)) d.tee=(cc.tees[0]||{}).name||'White'; };
+    $('qgDay').onclick=()=>{ readDay(); Q.dayOpen=!Q.dayOpen; render(); };
+    if(Q.dayOpen){ const cs=$('qgCourse'); cs.onchange=()=>{ readDay(); render(); }; ['qgName','qgDate','qgTime','qgTee'].forEach(id=>{ const e=$(id); if(e) e.onchange=readDay; }); }
+    $('qgPrev').onclick=()=>{ readDay(); Q.step=1; render(); window.scrollTo(0,0); };
+    $('qgCreate').onclick=()=>{ readDay(); quickCreate(); };
+    $('qgMore').onclick=e=>{ e.preventDefault(); readDay(); const dd=quickBuild(); if(!dd.pots.length) dd.pots.push(newPot('stroke',dd)); GD={id:null,draft:dd}; QG=null; view.gquick=null; view.gdesign='new'; render(); window.scrollTo(0,0); };
+  }
+  $('qgGames').onclick=()=>{ QG=null; view.gquick=null; render(); };
+}
+/* step 3: the game exists — send the players the link */
+function vQuickShare(m,g){
+  const ev=gameEvent(g), link=scoringLink(ev), pots=g.pots.filter(p=>p.kind!=='manual');
+  m.innerHTML=`<div class="crumb"><button id="qgGames">Games</button><span class="muted">/</span><span class="muted">${esc(gameTitle(g))}</span></div><div class="qstep"><span class="qn">Step 3 of 3 · ready</span><h1 class="h1">${esc(gameTitle(g))}</h1><p class="sub">${esc(gameWhen(g))} · ${g.players.length} playing · ${esc(potsText(pots))}</p></div>
+    <div class="card pad" style="display:flex;flex-direction:column;gap:12px"><div><b>Send everyone the scoring link.</b><span class="muted"> They open it on their phone and type their group ID — it’s on the groups below and on the game sheet.</span></div>
+      <a class="qlink" href="${esc(link)}" target="_blank" rel="noopener">${esc(link)}</a>
+      <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn pri" id="qgSend" style="flex:1">Send the link…</button><button class="btn" id="qgCopy" style="flex:1">Copy link</button></div>
+      <div id="qgQR" style="display:flex;justify-content:center"></div></div>
+    <div class="card" style="overflow:hidden"><div class="cardhead"><div><h2 class="h2">Groups</h2><span class="muted">Each group scores under its own ID — move people around on the game page.</span></div></div>
+      <div class="mini" style="margin:0 22px 14px">${ev.groups.map(grp=>`<div class="mr" style="grid-template-columns:90px minmax(0,1fr)"><b>${esc(grp.code)}</b><span>${esc(grp.players.map(p=>p.name).join(', '))||'<span class="muted">empty</span>'}</span></div>`).join('')}</div></div>
+    <div class="card pad" style="display:flex;flex-direction:column;gap:10px"><b>For the group chat</b><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" id="qgImg1" style="flex:1">Rules image</button><button class="btn" id="qgImg2" style="flex:1">Groups image</button></div><p class="hint" style="margin:0">After the round the players finish the game themselves on the scoring page — close scoring, call out the skins, draw, pay out.</p></div>
+    <div class="qbar"><button class="btn pri" id="qgOpen">Open the game</button></div>`;
+  $('qgGames').onclick=()=>{ QG=null; view.gquick=null; render(); };
+  $('qgOpen').onclick=()=>{ QG=null; view.gquick=null; view.gameId=g.id; render(); window.scrollTo(0,0); };
+  $('qgCopy').onclick=async()=>{ try{ await navigator.clipboard.writeText(link); toast('Link copied'); }catch(_){ prompt('Copy this link:',link); } };
+  $('qgSend').onclick=async()=>{ const text=`${gameTitle(g)} · ${gameWhen(g)}\n${potsText(pots)}\nScore here: ${link}\nGroup IDs: ${ev.groups.map(gr=>gr.code+' — '+gr.players.map(p=>p.name.split(' ')[0]).join(', ')).join(' · ')}`; if(navigator.share){ try{ await navigator.share({title:gameTitle(g),text}); return; }catch(_){ } } try{ await navigator.clipboard.writeText(text); toast('Message copied — paste it into the group chat'); }catch(_){ prompt('Copy this:',text); } };
+  $('qgImg1').onclick=()=>sheetImage(g,1); $('qgImg2').onclick=()=>sheetImage(g,2);
+  loadQR().then(()=>{ const el=$('qgQR'); if(!el||typeof qrcode!=='function') return; const q=qrcode(0,'M'); q.addData(link); q.make(); el.innerHTML=`<div style="width:160px">${q.createSvgTag({cellSize:4,margin:0,scalable:true})}</div>`; },()=>{});
+}
+function loadQR(){ if(typeof qrcode==='function') return Promise.resolve(); return new Promise((ok,bad)=>{ let i=0; const next=()=>{ if(i>=QR_SRC.length) return bad(new Error('no qr')); const s=document.createElement('script'); s.src=QR_SRC[i++]; s.onload=ok; s.onerror=next; document.head.appendChild(s); }; next(); }); }
 function vGameDesign(m){
   if(!GD){ view.gdesign=null; render(); return; }
   const d=GD.draft, courses=golfData().courses, isNew=!GD.id;
@@ -227,11 +339,8 @@ function vGameDesign(m){
     const bad=d.pots.find(p=>p.kind==='format'&&p.rules.places&&p.rules.places.length&&p.rules.places.reduce((a,b)=>a+b,0)!==100); if(bad){ toast(`${bad.name||'A competition'}: the payout places add up to ${bad.rules.places.reduce((a,b)=>a+b,0)}% — make it 100%`); return; }
     if(d.pots.filter(potOneBall).length&&d.pots.some(p=>p.kind==='format'&&!potOneBall(p))){ toast('A one-ball game can’t share the round with own-ball competitions'); return; }
     if(d.pots.filter(potOneBall).length>1){ toast('Only one one-ball game per round'); return; }
-    let g=GD.id?gamesData().find(x=>x.id===GD.id):null; const wasCourse=g?g.course:null, wasTee=g?g.tee:null;
-    if(g){ syncTo(g,d); } else { g=d; gamesData().push(g); }
-    GD=null; view.gdesign=null; view.gameId=g.id;
-    const ev=ensureGameEvent(g); ev.date=g.date; ev.groups.forEach(gr=>{ if(!gr.teeTime&&g.time) gr.teeTime=g.time; }); applyGameDefaults(g,ev,{course:wasCourse!==g.course,tee:wasTee!==g.tee}); publishEvent(ev);
-    persist(); render(); toast(GD?'Saved':'Game saved'); };
+    const g=commitGameDraft(d,GD.id?gamesData().find(x=>x.id===GD.id):null);
+    GD=null; view.gdesign=null; view.gameId=g.id; render(); toast('Game saved'); };
 }
 
 /* ---------- one game (the day's sheet) ---------- */

@@ -392,7 +392,7 @@ function persist(){
 }
 function pushAll(){ openDocs().forEach(D=>pushCloud(D)); }
 /* safe to reload for an update: nothing unsaved, not mid-save, no editor open */
-window.__canReload=()=>!(typeof drawerOpen==='function'&&drawerOpen())&&!(typeof view!=='undefined'&&view&&view.gdesign)&&!document.querySelector('.rf-show')&&openDocs().every(D=>!D.pushing&&(!CLOUD||!sessionOK||!D.base||!docChanged(D)));
+window.__canReload=()=>!(typeof drawerOpen==='function'&&drawerOpen())&&!(typeof view!=='undefined'&&view&&(view.gdesign||view.gquick))&&!document.querySelector('.rf-show')&&openDocs().every(D=>!D.pushing&&(!CLOUD||!sessionOK||!D.base||!docChanged(D)));
 async function fetchRow(id){
   if(KEYMODE){ const {data,error}=await keyRPC('hub_key_read',{p_id:id}); if(error) throw error; return data||null; }
   if(SCOPED&&id==='club'){ const {data,error}=await sb.rpc('scoped_read',{p_tenant:TENANT,p_id:id}); if(error) throw error; return data||null; }   // the cut-down club document

@@ -177,7 +177,21 @@ Tournament = { id, name, season, days, startDate, field:[{id,memberId,team,paid,
   → 'par'/'netpar'). There is no distinguished main game. Money: a player's in = Σ entries of the pots they are in
   (+ extras), out = Σ payouts across pots (`gpIn`/`gpOut`); `settlement(g)` gives per-player in/out/net and
   `settleUp()` the fewest payments for net settlement; the Ledger's net = out − in + adjustments.
-  - **Designer** (`designGame(g|null)` → `vGameDesign`, draft in `GD`): the day (name, date, course, pay timing,
+  - **Quick setup — New game on a phone** (`quickGame(again)` → `vQuick`, draft in `QG`, `view.gquick`; the owner, Oct 2026:
+    "replace it is the way we want for the new game, and have the more options button"): **New game** is three steps —
+    *Who's playing* (tap the names: the group's members, people who have played before, anyone at the club through a
+    search, guests by name; last game's players come pre-ticked), *What are we playing* (**Same as last time** and up
+    to three other past games with a different set of competitions, `pastSets()`; or build it from `STARTERS` in plain
+    words — skins, stroke play, blind-draw partners, quota, team Nassau, dots — tap all that apply; the day's name,
+    date, course and tee sit in one row behind Change), *Share* (`vQuickShare`: the scoring link, Send… / Copy, a QR
+    through `loadQR`, the groups with their IDs, the sheet images, Open the game). Everything the full designer asks
+    for is a default: today, last game's course / tee / rules / timing, after the round, pot settlement, full
+    handicaps, the usual split. **More options** opens the designer with the same draft (`quickBuild()` →
+    `GD`). **Same as last time** on the Games page (`quickGame(true)`) creates the game in one tap and lands on the
+    share step. `draftFromLast(opt)` / `copyPots` / `commitGameDraft(d, existing)` are shared with the designer. The
+    half-done setup survives a reload (`_qg` in `rememberView`) and blocks the auto-update like the designer.
+  - **Designer** (`designGame(g|null)` → `vGameDesign`, draft in `GD`; reached from the game page's Design and from
+    More options — no longer the New game button): the day (name, date, course, pay timing,
     settlement), competitions (`newPot(catalogId,g)` + per-kind rule panels), who's in (member picker, guests, the
     players × pots checkbox grid). A new game starts from the last one (players + competitions). One-ball games
     (scramble/foursomes/greensome) cannot share a round with own-ball competitions.
@@ -476,8 +490,8 @@ groups, printed scorecards — the printed cards include a live-scoring QR that 
 
 - **Built Oct 2026 (the Finish tab):** `wrap-setup.sql` (applied to the project) + the scoring page's Finish tab + the hub's
   `wrapSync`: the players close scoring, call out the skins, draw and record the payouts from their phones (§2, small groups).
-  Next on the owner's list: the **phone-first game setup** for small groups ("Same as last time" + a three-step quick setup,
-  the full designer behind More options) — proposed, not yet built.
+  Then the **phone-first game setup** (quick setup, §2): New game = three steps, Same as last time = one tap, the full
+  designer behind More options.
 - **Built Oct 2026 (surveys):** `src/surveys.js` + `survey.html` + `survey-setup.sql` (applied to the project); the MGA's first
   survey comes from `memberSurveyTemplate()`.
 - **Built Oct 2026 (tenants, portal, logins):** `tenants-setup.sql` + `portal-setup.sql`, `src/portal.js` (the client

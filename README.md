@@ -92,6 +92,16 @@ format's team score and handicap math, with worked examples.
 
 ## Small groups
 
+**Setting up a game from a phone.** New game is three steps. *Who's playing*: tap the names — the group's members,
+anyone who has played before, anyone else at the club through the search box, guests by name; last time's players
+come already ticked. *What are we playing*: **Same as last time**, one of the group's other past games, or build it
+from the starters in plain words (skins, stroke play, blind-draw partners, quota, team Nassau, dots — tap all that
+apply); the day's name, date, course and tee sit in one line behind Change. *Share*: the scoring link with Send and
+Copy, a QR code, the groups with their IDs, the sheet images. Everything else — the payout split, handicaps, pops on
+par 3s, house rules, who is in which competition — has a sensible default and lives behind **More options**, which
+opens the full designer with the same game in it. **Same as last time** on the Games page creates today's game in one
+tap.
+
 A small group's hub is the regular game, and small tournaments when it wants them (the same Tournaments page as an
 association, with the Calcutta, meals and the rest switched on per tournament).
 
