@@ -608,30 +608,29 @@ function skinsCallout(g,pot){
   const total=potTotal(g,pot), per=rules.mode==='hole', val=skinValue(rules,total,r), validating=rules.validate&&rules.validate!=='none';
   const idx=h=>order.indexOf(h);
   // the line for each hole; a won skin's verdict is only shown once its validation hole has been called
+  const revealed=new Set();   // skins whose verdict has been flashed on screen
   const lineFor=(h,upto)=>{ const w=winAt[h], L=lowAt(h); if(!L) return {h,txt:'No scores on this hole yet',cls:'muted'};
     if(w){ const name=`${w.name} · ${w.score}${rules.net&&w.net!==w.score?' (net '+w.net+')':''}`, worth=per?`${w.count>1?w.count+' holes':'1 hole'} · ${gMoney(val*w.count)}`:`skin · ${gMoney(val)}`;
-      if(validating&&w.checkHole!=null&&idx(w.checkHole)>=upto) return {h,txt:name,sub:`skin — validates on hole ${w.checkHole}`,cls:'pending'};
+      if(validating&&w.checkHole!=null&&!revealed.has(w.hole)) return {h,txt:name,sub:`skin — validates on hole ${w.checkHole}`,cls:'pending'};
       if(w.status==='lead') return {h,txt:name,sub:`leading — ${w.open} still to play the hole`,cls:'pending'};
       if(w.status==='won') return {h,txt:name,sub:worth+(validating&&w.checkHole!=null?' · validated on hole '+w.checkHole:''),cls:'won'};
       if(w.status==='void') return {h,txt:name,sub:`didn’t validate on hole ${w.checkHole}${per?' — carried on':' — no skin'}`,cls:'void'};
       return {h,txt:name,sub:`waiting on hole ${w.checkHole}`,cls:'pending'}; }
     return {h,txt:L.who.length>1?`${L.who.map(x=>x.name.split(' ')[0]).join(', ')} tied at ${L.low}`:`${L.who[0].name} low, but not outright`,sub:per?'carries over':'no skin',cls:'muted'}; };
-  pot.calledOut=true; persist();
   const ov=document.createElement('div'); ov.className='rf-show'; document.body.appendChild(ov);
   try{ const fs=ov.requestFullscreen&&ov.requestFullscreen(); if(fs&&fs.catch) fs.catch(()=>{}); }catch(_){}
   let i=0, flash=null;   // flash: the verdict interstitial shown before the next hole's result
-  const close=()=>{ if(document.fullscreenElement) document.exitFullscreen().catch(()=>{}); ov.remove(); document.removeEventListener('keydown',key); render(); };
+  const close=()=>{ if(i>=order.length&&!pot.calledOut){ pot.calledOut=true; persist(); } if(document.fullscreenElement) document.exitFullscreen().catch(()=>{}); ov.remove(); document.removeEventListener('keydown',key); render(); };
   const paint=()=>{ const shown=order.slice(0,i).map(h=>lineFor(h,i)); const done=i>=order.length;
     ov.innerHTML=`<div class="rf-top"><img src="${typeof crestSrc==='function'?crestSrc():'flagstick-crest-light.svg'}" alt=""><div><div class="rf-k">${esc(orgName())} · ${esc(gameTitle(g))}</div><div class="rf-h">${esc(pot.name)} — from the cards</div></div><button class="rf-x" id="skClose" aria-label="Close">✕</button></div>
       ${flash?`<div class="rf-stage sk-flash ${flash.ok?'ok':'bad'}"><div class="sk-flash-h">Hole ${flash.w.hole} · ${esc(flash.w.name)}</div><div class="sk-flash-big">${flash.ok?'Validated':'Didn’t validate'}</div><div class="sk-flash-s">${flash.ok?`${esc((SKIN_VALID_LABEL[rules.validate]||'').replace(' or better on the next hole','').toLowerCase())} or better on hole ${flash.w.checkHole} — the skin stands`:`missed ${esc((SKIN_VALID_LABEL[rules.validate]||'').replace(' or better on the next hole','').toLowerCase())} on hole ${flash.w.checkHole}${per?' — carried on':' — no skin'}`}</div><button class="rf-go" id="skNext">Hole ${flash.w.checkHole}</button><div class="rf-hint">or press the space bar</div></div>`
       :`<div class="rf-stage" style="justify-content:flex-start;padding-top:26px"><div class="rf-lbl">${done?'All 18 holes':'Hole by hole · '+skinsRuleText(rules)}</div>
         <div class="sk-list">${shown.map(l=>`<div class="sk-line ${l.cls}"><b>${l.h}</b><div><span>${esc(l.txt)}</span>${l.sub?`<small>${esc(l.sub)}</small>`:''}</div></div>`).join('')}</div>
-        ${done?`<div class="rf-sum" style="margin-top:14px"><span>${per?`${r.total} of 18 holes won`:`${r.total} skin${r.total===1?'':'s'}`} · ${gMoney(total)} pot</span><b>${r.total?gMoney(val)+(per?' a hole':' a skin'):'No skins today'}</b><small>${Object.entries(r.per).map(([pid,n])=>{ const p=g.players.find(x=>x.id===pid); return `${p?gpName(p):'—'} ${n}`; }).join(' · ')}${r.pending?' · '+r.pending+' still pending':''}</small></div>`
-          :`<button class="rf-go" id="skNext">${i?'Next hole':'Start at hole '+order[0]}</button><div class="rf-hint">or press the space bar</div>`}</div>`}
-      <div class="rf-facts"><span><b>${byG.size}</b> in the skins</span><span><b>${gMoney(total)}</b> pot</span>${done&&!flash?`<button class="rf-go" id="skFin" style="margin-left:auto">Done</button>`:''}</div>`;
+        ${done?`<div class="rf-sum" style="margin-top:14px"><span>${per?`${r.total} of 18 holes won`:`${r.total} skin${r.total===1?'':'s'}`} · ${gMoney(total)} pot</span><b>${r.total?gMoney(val)+(per?' a hole':' a skin'):'No skins today'}</b><small>${Object.entries(r.per).map(([pid,n])=>{ const p=g.players.find(x=>x.id===pid); return `${p?gpName(p):'—'} ${n}`; }).join(' · ')}${r.pending?' · '+r.pending+' still pending':''}</small></div>`:''}</div>`}
+      <div class="rf-facts sk-bar"><span><b>${byG.size}</b> in the skins</span><span><b>${gMoney(total)}</b> pot</span>${done&&!flash?`<button class="rf-go" id="skFin" style="margin-left:auto">Done</button>`:`<button class="rf-go" id="skNext" style="margin-left:auto">${flash?'Show hole '+order[i]:i?'Next hole':'Start at hole '+order[0]}</button>`}</div>`;
     ov.querySelector('#skClose').onclick=close; const nx=ov.querySelector('#skNext'); if(nx) nx.onclick=next; const fin=ov.querySelector('#skFin'); if(fin) fin.onclick=close; };
-  const next=()=>{ if(flash){ flash=null; i++; paint(); const el=ov.querySelector('.sk-list'); if(el) el.scrollTop=el.scrollHeight; return; }
-    const nh=order[i]; const w=validating&&nh!=null?r.wins.find(x=>x.checkHole===nh&&x.status!=='pending'):null;   // a skin decided by the hole about to be called
+  const next=()=>{ if(flash){ revealed.add(flash.w.hole); flash=null; i++; paint(); const el=ov.querySelector('.sk-list'); if(el) el.scrollTop=el.scrollHeight; return; }
+    const nh=order[i]; const w=validating&&nh!=null?r.wins.find(x=>x.checkHole===nh&&x.status!=='pending'&&!revealed.has(x.hole)):null;   // a skin decided by the hole about to be called
     if(w){ flash={w,ok:w.status==='won'}; paint(); return; }
     i++; paint(); const el=ov.querySelector('.sk-list'); if(el) el.scrollTop=el.scrollHeight; };
   const key=e=>{ if(e.key==='Escape') close(); if(e.code==='Space'){ e.preventDefault(); const b=ov.querySelector('#skNext')||ov.querySelector('#skFin'); if(b) b.click(); } };
