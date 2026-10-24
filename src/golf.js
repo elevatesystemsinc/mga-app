@@ -71,7 +71,7 @@ function publicEvent(ev){
   return {slug:ev.slug,name:ev.name,date:ev.date,status:ev.status,club:(CLUB&&CLUB.name)||CLUB_META.name,org:ORG_ID,courses,
     groups:ev.groups.map(g=>({id:g.id,label:g.label||'',course:g.course,startHole:+g.startHole||1,teeTime:g.teeTime||'',players:g.players.map(p=>{ const h=playerHcp(ev,g,p); return {id:p.id,name:p.name,tee:p.tee||ev.defaultTee||'White',set:p.set||'M',ch:h.ch,ph:h.ph,flight:p.flight||'',team:evTeam(ev)?(p.team||ftm.get(p.memberId)||''):''}; })})),
     format:ev.format||'stroke',front:ev.front,back:ev.back,teamSize:ev.teamSize||(isTeamEvent(ev)||ev.format==='match'&&ev.teamSize>=2?2:1),count:ev.count||1,countPattern:ev.countPattern||'',quotaBase:ev.quotaBase||36,cap:ev.cap||'',matchScoring:ev.matchScoring||'holes',matchForm:ev.matchForm||'',matchBy:ev.matchBy||'holes',noPar3:!!ev.noPar3,points:ev.points||{},game:ev.game||'',allow:Object.assign({},ev.allow||{}),scoring:ev.scoring||'gross',flights:(ev.flights&&ev.flights.names)||[],
-    comps:ev.gameId&&typeof gameComps==='function'?gameComps(ev):[]};
+    comps:ev.gameId&&typeof gameComps==='function'?gameComps(ev):[],game:ev.gameId&&typeof gameInfo==='function'?gameInfo(ev):null};
 }
 
 /* ---------- publishing + scores ---------- */
@@ -454,23 +454,6 @@ function editFieldPlayer(ev,x){
    Teams drawn across the event's players: at random, ABCD (one from each handicap tier), or balanced (snake by
    handicap). Before the round the groups are then built around the teams; after it, the draw is scored from the
    individual rounds (teams may span groups). Re-draw any time; the draw is remembered on the event. */
-function shuffled(a){ a=a.slice(); for(let i=a.length-1;i>0;i--){ const j=secureInt(i+1); [a[i],a[j]]=[a[j],a[i]]; } return a; }
-/* the handicap tiers for an A-B-C… draw: the field sorted by index and cut into `size` even buckets, A the lowest */
-const TIER_LETTERS='ABCDEF';
-function drawTiers(players,size,idxOf){ size=Math.max(2,+size||2);
-  const sorted=players.slice().sort((a,b)=>(idxOf(a)??99)-(idxOf(b)??99)||a.name.localeCompare(b.name));
-  return Array.from({length:size},(_,k)=>{ const ps=sorted.slice(Math.round(k*sorted.length/size),Math.round((k+1)*sorted.length/size)); const ix=ps.map(idxOf).filter(x=>x!=null);
-    return {letter:TIER_LETTERS[k]||String(k+1),players:ps,lo:ix.length?Math.min(...ix):null,hi:ix.length?Math.max(...ix):null}; }); }
-function drawTeams(players,size,method,idxOf){
-  size=Math.max(2,+size||2); const n=Math.ceil(players.length/size), teams=Array.from({length:n},()=>[]);
-  if(method==='random'){ shuffled(players).forEach((p,i)=>teams[i%n].push(p)); return teams; }
-  const sorted=players.slice().sort((a,b)=>(idxOf(a)??99)-(idxOf(b)??99)||a.name.localeCompare(b.name));
-  if(method==='abcd'){ // one player from each handicap tier per team: tier A is dealt first, so slot k of every team is its tier-k player
-    const tiers=drawTiers(players,size,idxOf).map(t=>shuffled(t.players));
-    tiers.forEach(tier=>tier.forEach((p,i)=>{ if(i<n) teams[i].push(p); else teams[secureInt(n)].push(p); })); return teams; }
-  // snake: 1..n then n..1, repeat
-  sorted.forEach((p,i)=>{ const round=Math.floor(i/n), k=i%n; teams[round%2?n-1-k:k].push(p); }); return teams;
-}
 function drawPartners(ev){
   const all=evPlayers(ev).map(x=>x.p), idxOf=p=>effIndex(ev,p).idx, hasScores=Object.keys(scoresFor(ev)||{}).length>0, tools=enabledGames().filter(g=>g.tool);
   const prev=ev.draw;

@@ -332,11 +332,12 @@ async def main():
       return {had, stillInEv, stillScored, afterCancel, afterSave, players:g.players.length}; }""")
     ok7b=r7b['had']>0 and r7b['stillInEv'] and r7b['stillScored']==r7b['had'] and r7b['afterCancel']['inGame'] and r7b['afterCancel']['inEv'] and r7b['afterCancel']['scores']==r7b['had'] and not r7b['afterSave']['inGame'] and not r7b['afterSave']['inEv'] and r7b['afterSave']['scores']==0 and not r7b['afterSave']['lb'] and r7b['players']==4
     ok=ok and ok7b; print('remove a player from the designer', r7b, 'OK' if ok7b else 'FAIL')
-    # what the live leaderboard carries: competitions marked live (skins only when switched on), with players and teams
-    r8=await pg.evaluate("""()=>{ const g=GAME(), ev=gameEvent(g); const pub=publicEvent(ev); const names=pub.comps.map(c=>c.name); skinsRulesOf(g.pots[1]).live=true; g.pots[0].rules.live=false; const pub2=publicEvent(ev); const names2=pub2.comps.map(c=>c.name);
+    # what the live leaderboard carries: every format and skins competition, flagged live or not (the phones keep the quiet
+    # ones off the board until the Finish tab calls them out), with players, teams and the money fields
+    r8=await pg.evaluate("""()=>{ const g=GAME(), ev=gameEvent(g); const pub=publicEvent(ev); const live=c=>c.live!==false; const names=pub.comps.filter(live).map(c=>c.name); const quiet=pub.comps.filter(c=>!live(c)).map(c=>c.name); const sk=pub.comps.find(c=>c.kind==='skins'); skinsRulesOf(g.pots[1]).live=true; g.pots[0].rules.live=false; const pub2=publicEvent(ev); const names2=pub2.comps.filter(live).map(c=>c.name);
       const bd=pub2.comps.find(c=>c.format==='bestball'); const cp=compPub(pub2,bd); const rows=eventBoard(cp,scoresFor(ev),{sort:'gross'}).filter(r=>r.n); g.pots[0].rules.live=true; skinsRulesOf(g.pots[1]).live=false;
-      return {names, names2, bdTeams:bd&&bd.teams?Object.keys(bd.teams).length:0, rows:rows.length, team:rows[0]&&rows[0].team}; }""")
-    ok=ok and r8['names']==['Stroke play','Blind-draw partners'] and r8['names2']==['Skins','Blind-draw partners'] and r8['bdTeams']==3 and r8['rows']==2 and r8['team']
+      return {names, names2, quiet, money:[sk.entry,sk.total,sk.teamsBy,typeof pub.game.settle], bdTeams:bd&&bd.teams?Object.keys(bd.teams).length:0, rows:rows.length, team:rows[0]&&rows[0].team}; }""")
+    ok=ok and r8['names']==['Stroke play','Blind-draw partners'] and r8['names2']==['Skins','Blind-draw partners'] and r8['quiet']==['Skins'] and r8['money'][0]>0 and r8['money'][1]>=r8['money'][0] and r8['money'][3]=='string' and r8['bdTeams']==3 and r8['rows']==2 and r8['team']
     print('live leaderboard competitions', r8, 'OK' if r8['names2']==['Skins','Blind-draw partners'] and r8['rows']==2 else 'FAIL')
     # the game sheet PDF and the designer round-trip
     r2=await pg.evaluate("""async()=>{ const g=GAME(); const doc=await gameSheetPDF(g,{returnDoc:true}); const n=doc.getNumberOfPages(); designGame(g); const names=GD.draft.pots.map(p=>p.name); const grid=document.querySelectorAll('[data-gdin]').length; document.getElementById('gdSave').click(); return {pages:n, names, grid, back:!!document.getElementById('gmSheet')}; }""")

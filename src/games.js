@@ -117,13 +117,6 @@ function settlement(g){
   const rows=g.players.map(p=>({p,name:gpName(p),inn:gpIn(g,p),out:gpOut(g,p)})).map(r=>Object.assign(r,{net:Math.round((r.out-r.inn)*100)/100})).sort((a,b)=>b.net-a.net||a.name.localeCompare(b.name));
   return {rows,inn:sum(rows,r=>r.inn),out:sum(rows,r=>r.out),transfers:settleUp(rows)};
 }
-/* the fewest payments that square everyone up: biggest debtor pays biggest creditor, and so on */
-function settleUp(rows){
-  const cr=rows.filter(r=>r.net>0.004).map(r=>({name:r.name,left:Math.round(r.net*100)})).sort((a,b)=>b.left-a.left), de=rows.filter(r=>r.net<-0.004).map(r=>({name:r.name,left:Math.round(-r.net*100)})).sort((a,b)=>b.left-a.left), out=[];
-  let i=0,j=0; while(i<de.length&&j<cr.length){ const x=Math.min(de[i].left,cr[j].left); if(x>0) out.push({from:de[i].name,to:cr[j].name,amount:x/100}); de[i].left-=x; cr[j].left-=x; if(!de[i].left) i++; if(!cr[j].left) j++; }
-  return out;
-}
-
 /* ---------- Games list ---------- */
 function vGames(m){
   gamesData();
@@ -246,7 +239,8 @@ function vGame(m,g){
   let ev=gameEvent(g); if(!ev){ ev=ensureGameEvent(g); golfSave(ev); }
   const mo=gameMoney(g), live=ev.status==='live', after=(g.payWhen||'after')==='after', S=settlement(g), scored=Object.keys(scoresFor(ev)||{}).length>0;
   if(CLOUD&&sessionOK&&!golfScores[ev.id]) setTimeout(()=>loadScores(ev),0);
-  publishIfChanged(ev);
+  publishIfChanged(ev); wrapSync(g,ev);
+  const W=g.wrap||{}, fromCourse=(at,by)=>`from the course by Group ${esc(by||'?')} · ${new Date(at).toLocaleTimeString([],{hour:'numeric',minute:'2-digit'})}`;
   const pots=g.pots.filter(p=>p.kind!=='manual'), link=scoringLink(ev);
   const gridCols=`grid-template-columns:minmax(150px,1fr) ${pots.map(()=>'84px').join(' ')} 76px 90px 40px`;
   const grid=`<div class="card" style="overflow:hidden"><div class="cardhead"><div><h2 class="h2">Who’s in</h2><span class="muted">${g.players.length} playing · ${mo.unpaid?`<span class="neg">${mo.unpaid} still to pay in</span>`:g.players.length?'everyone has paid in':''}</span></div><div class="actions"><button class="btn sm" id="gmAllPaid">Mark all paid</button><button class="btn sm pri" id="gmAdd">${I.plus}Add players</button></div></div>
@@ -271,6 +265,7 @@ function vGame(m,g){
       ${S.rows.map(r=>`<div class="tr num" style="grid-template-columns:minmax(160px,1fr) 100px 100px 110px"><b class="trunc">${esc(r.name)}</b><span class="r">${gMoney(r.inn)}</span><span class="r ${r.out?'pos':'muted'}">${r.out?gMoney(r.out):'—'}</span><b class="r ${netCls(r.net)}">${gSigned(r.net)}</b></div>`).join('')}</div></div>
       ${g.settle==='net'?`<div style="padding:14px 22px;border-top:1px solid var(--line)"><span class="lbl">Who pays whom</span>${S.transfers.length?`<div class="mini" style="margin-top:6px">${S.transfers.map(t=>`<div class="mr num" style="grid-template-columns:minmax(0,1fr) 90px"><span>${esc(t.from)} <span class="muted">pays</span> ${esc(t.to)}</span><b class="r">${gMoney(t.amount)}</b></div>`).join('')}</div>`:'<p class="muted" style="margin:6px 0 0">Nothing to settle yet.</p>'}</div>`:''}`:''}</div>`;
   const liveCard=`<div class="card pad" style="display:flex;flex-direction:column;gap:12px"><div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px"><h2 class="h2">Live scoring</h2>${live?'<button class="btn sm" id="gmClose">Close scoring</button>':'<button class="btn sm" id="gmOpen">Reopen scoring</button>'}</div>
+    ${W.closedAt?`<p class="hint" style="margin:0">Scoring closed ${fromCourse(W.closedAt,W.closedBy)}${W.paidAt?` · payouts recorded ${fromCourse(W.paidAt,W.paidBy)}`:''}. The players finish a game themselves on the scoring page’s Finish tab; Reopen scoring clears that and takes the game back.</p>`:''}
     <div class="cell2"><span class="lbl">Scoring link — players enter their group ID</span><a href="${esc(link)}" target="_blank" rel="noopener" class="trunc" style="font-weight:600">${esc(link)}</a></div>
     <div class="actions"><button class="btn sm" id="gmCopy">Copy link</button><a class="btn sm" href="${esc(link)}&view=board" target="_blank" rel="noopener">Leaderboard screen</a><button class="btn sm" id="gmGroups">Groups</button></div>
     <div class="mini">${ev.groups.map(grp=>`<div class="mr" style="grid-template-columns:minmax(0,1fr) auto"><div class="cell2"><b>Group ${esc(grp.code)}</b><small>${esc(grp.players.map(p=>p.name.split(' ')[0]).join(', '))}${grp.teeTime?' · '+fmtTime(grp.teeTime):grp.startHole>1?' · hole '+grp.startHole:''}</small></div><button class="btn sm" data-gsheet="${grp.id}">Enter scores</button></div>`).join('')||'<div class="mr"><span class="muted">Groups appear as players are added.</span></div>'}</div>
@@ -464,10 +459,17 @@ function potComp(g,pot){
   const E=potEngine(pot), c={id:pot.id,name:pot.name,kind:pot.kind,players:potPlayers(g,pot).map(p=>p.gpid).filter(Boolean),teams:potIsTeam(pot)&&potTeamsKnown(pot)?pot.teams:null,sitOut:pot.sitOut||[],scoring:pot.rules.scoring||'gross'};
   COMP_KEYS.forEach(k=>{ if(k!=='scoring'&&E[k]!==undefined) c[k]=E[k]; }); c.noPar3=!!pot.rules.noPar3; c.points=pot.rules.points||{};   // pops on par 3s and the point table are each competition's own call
   if(pot.kind==='skins'){ const sk=skinsRulesOf(pot); c.skins={net:sk.net,grossBeatsNet:sk.grossBeatsNet,validate:sk.validate,carry:sk.carry,mode:sk.mode}; c.scoring=sk.net?'net':'gross'; }
+  // for the Finish tab on the phones: whether it is on the live board, what goes in and how it pays (never who has paid)
+  c.live=potLive(pot); c.entry=n0(pot.entry); c.total=potTotal(g,pot); c.places=(pot.rules.places||[]).slice(); c.teamsBy=pot.rules.teamsBy||'hand'; if(pot.rules.nassau) c.nassau=Object.assign({},nassauStakes(pot));
   return c;
 }
-/* the competitions shown on the live leaderboard for a game's event (dots are tallied by hand, so never) */
-function gameComps(ev){ const g=gamesData().find(x=>x.id===ev.gameId); if(!g) return []; return g.pots.filter(p=>(p.kind==='format'||p.kind==='skins')&&potLive(p)).map(p=>potComp(g,p)); }
+/* the competitions a game's event carries to the phones: every format and skins pot (dots are tallied by hand, so never);
+   the scoring page keeps the ones with live=false off the leaderboard until the Finish tab calls them out */
+function gameComps(ev){ const g=gamesData().find(x=>x.id===ev.gameId); if(!g) return []; return g.pots.filter(p=>p.kind==='format'||p.kind==='skins').map(p=>potComp(g,p)); }
+/* the rest of what the Finish tab needs to show who's owed what: how the game settles, extras in, the hand-tallied pots */
+function gameInfo(ev){ const g=gamesData().find(x=>x.id===ev.gameId); if(!g) return null;
+  return {payWhen:g.payWhen||'after',settle:g.settle||'pot',extras:Object.fromEntries(g.players.filter(p=>p.gpid&&n0(p.extraIn)).map(p=>[p.gpid,n0(p.extraIn)])),
+    others:g.pots.filter(p=>p.kind==='dots'||p.kind==='manual').map(p=>({id:p.id,name:p.name,kind:p.kind,entry:n0(p.entry),players:potPlayers(g,p).map(x=>x.gpid).filter(Boolean)}))}; }
 /* the public event cut down to one competition: its players, its format, its teams */
 function potPub(g,pot){ const ev=gameEvent(g); if(!ev) return null; return compPub(publicEvent(ev),potComp(g,pot)); }
 /* ---------- the Pays editor: one row per place, a percentage from a list, add / remove places ----------
@@ -490,17 +492,6 @@ function wirePays(card,pot,after){
   const add=box.querySelector('[data-pladd]'); if(add) add.onclick=()=>{ const a=cur(); const last=a[a.length-1]||10, take=Math.min(last,Math.max(5,Math.round(last/2/5)*5)); a[a.length-1]=last-take>=5?last-take:last; a.push(take); pot.rules.places=a; after(); };
   const auto=box.querySelector('[data-plauto]'); if(auto) auto.onclick=e=>{ e.preventDefault(); pot.rules.places=[]; after(); };
 }
-function defaultPcts(n){ return n<=5?[100]:n<=8?[60,40]:n<=15?[50,30,20]:[40,30,20,10]; }
-/* places × percentages, ties share the places they cover, cent-exact */
-function splitByFinish(amount,order,pcts){
-  const cents=Math.round(n0(amount)*100), placeC=pcts.map(p=>Math.floor(cents*p/100)); let rem=cents-placeC.reduce((a,b)=>a+b,0); for(let i=0;rem>0;i++,rem--) placeC[i%placeC.length]++;
-  const out=[]; let i=0;
-  while(i<order.length&&i<pcts.length){ const pos=order[i].pos; const tied=order.filter(r=>r.pos===pos); const covered=placeC.slice(i,i+tied.length); const total=covered.reduce((a,b)=>a+b,0);
-    if(!total) break; const each=Math.floor(total/tied.length); let odd=total-each*tied.length;
-    tied.forEach(r=>{ out.push({id:r.id,name:r.name,pos,amount:(each+(odd-->0?1:0))/100}); }); i+=tied.length; }
-  return out;
-}
-const gOrdinal=n=>n+(['th','st','nd','rd'][(n%100>>3^1&&n%10)||0]||'th');
 /* finish order for a pot from a leaderboard: team rows pay each member their share */
 function finishOrder(g,pot,rows){
   const byG=new Map(potPlayers(g,pot).filter(p=>p.gpid).map(p=>[p.gpid,p])), out=[];
@@ -534,14 +525,6 @@ function payFormat(g,pot){
 /* a team Nassau: each segment (front, back, 18) is its own bet — the losing side's stakes go to the winners, a halved
    segment is a push. Payouts are what each player pulls out of the pot: their own stake back on a push or a win,
    plus the opponents' on a win. */
-/* the three bets of each match from the board's rows: `up` is A's lead — holes, or strokes when the match is decided by total score */
-function nassauSegments(rows){
-  const out=[];
-  rows.filter(r=>r.holesUp>=0&&r.segs).forEach(A=>{ const B=rows.find(r=>r!==A&&r.opp===A.name&&r.name===A.opp); if(!B||out.some(m=>m.A===B)) return;
-    const S=k=>A.segs.find(s=>s.k===k)||{v:0,done:false};
-    out.push({A,B,by:A.by||'holes',front:{up:S('F').v,done:S('F').done},back:{up:S('B').v,done:S('B').done},total:{up:S('18').v,done:S('18').done}}); });
-  return out;
-}
 function payNassau(g,pot,rows){
   const st=nassauStakes(pot), M=nassauSegments(rows), byG=new Map(potPlayers(g,pot).filter(p=>p.gpid).map(p=>[p.gpid,p]));
   if(!M.length){ toast('No match yet — pick the teams and get some scores in'); return; }
@@ -691,7 +674,29 @@ function ensureGameEvent(g){
     G.events.push(ev); g.golfEventId=ev.id; }
   syncGameEvent(g,ev); return ev;
 }
-function openScoring(g){ const ev=ensureGameEvent(g); ev.status='live'; golfSave(ev); render(); toast('Scoring is open — share the link'); }
+function openScoring(g){ const ev=ensureGameEvent(g); ev.status='live'; wrapReset(g,ev); golfSave(ev); render(); toast('Scoring is open — share the link'); }
+/* ---------- the wrap-up from the course ----------
+   The scoring page's Finish tab lets anyone with a group ID close scoring, call out the skins, draw the partners and
+   record the computed payouts (wrap-setup.sql: golf_events.wrap, compare-and-swap on wrap.v). The hub reads the wrap
+   with the event (golf_event) whenever a game page renders and takes anything new into the game — once, by wrap.v —
+   then persists and republishes, so the hub, the ledger and every phone end up with the same teams and payouts. */
+const WRAP_AT={};
+function wrapSync(g,ev){ if(!CLOUD||!sessionOK||!ev) return; const now=Date.now(); if(WRAP_AT[ev.id]&&now-WRAP_AT[ev.id]<8000) return; WRAP_AT[ev.id]=now;
+  sb.rpc('golf_event',Object.assign({p_slug:ev.slug.toLowerCase()},typeof TENANT!=='undefined'&&TENANT?{p_tenant:TENANT}:{})).then(r=>{ const w=r&&r.data&&r.data.wrap; if(r.error||!w||!w.v||(g.wrapV||0)>=w.v) return;
+    absorbWrap(g,ev,w); persist(); if(!drawerOpen()&&view.gameId===g.id) render(); },()=>{}); }
+function absorbWrap(g,ev,w){
+  if(w.closedAt&&ev.status==='live') ev.status='final';
+  const byG=new Map(g.players.filter(p=>p.gpid).map(p=>[p.gpid,p]));
+  for(const [cid,d] of Object.entries(w.draws||{})){ const pot=g.pots.find(p=>p.id===cid); if(!pot||(pot.draw&&pot.draw.at===d.at)) continue;
+    pot.teams=Object.assign({},d.teams||{}); pot.sitOut=(d.sitOut||[]).slice(); const log=(pot.draw&&pot.draw.log)||[]; if(pot.draw) log.push({at:d.at,reason:'Re-drawn from the course by Group '+(d.by||'?')});
+    pot.draw={at:d.at,method:d.method||'random',size:+d.size||2,by:d.by||'',log}; }
+  for(const cid of Object.keys(w.callouts||{})){ const pot=g.pots.find(p=>p.id===cid); if(pot) pot.calledOut=true; }
+  if(w.payouts) for(const [cid,x] of Object.entries(w.payouts.comps||{})){ const pot=g.pots.find(p=>p.id===cid); if(!pot) continue;
+    pot.payouts=(x.rows||[]).map(r=>{ const p=byG.get(r.pid); return p?{id:uid(),pid:p.id,amount:Math.round((+r.amount||0)*100)/100,note:r.note||''}:null; }).filter(Boolean); }
+  g.wrapV=w.v; g.wrap={closedAt:w.closedAt||null,closedBy:w.closedBy||'',paidAt:(w.payouts&&w.payouts.at)||null,paidBy:(w.payouts&&w.payouts.by)||''};
+}
+function wrapReset(g,ev){ delete g.wrapV; delete g.wrap; delete WRAP_AT[ev.id]; if(!CLOUD||!sessionOK) return;
+  const q=KEYMODE?keyRPC('hub_key_wrap',{p_event:ev.id,p_wrap:null}):sb.from('golf_events').update({wrap:null}).eq('id',ev.id); q.then(()=>{},()=>{}); }
 /* every game player has a player in the event; newcomers fill groups of four; the event's format follows the game */
 function syncGameEvent(g,ev){
   const have=new Set(evPlayers(ev).map(x=>x.p.id));

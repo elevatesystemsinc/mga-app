@@ -532,3 +532,114 @@ function eventBoard(pub,scores,opt){ opt=opt||{};
   return isTeamEvent(pub)&&(opt.view!=='players'||noPlayers)?teamBoard(pub,scores,opt):leaderboard(pub,scores,opt); }
 function bestBallBoard(pub,scores,opt){ return teamBoard(pub,scores,opt); }
 
+
+/* =====================================================================
+   The draw and the money — shared by the hub and the scoring page's Finish tab, so a game finished from the course
+   (close scoring → call out the skins → draw the partners → record the payouts) comes out exactly as the hub would
+   have it. Nothing here touches the document: pure functions over the published event and the scores.
+   ===================================================================== */
+function shuffled(a){ a=a.slice(); for(let i=a.length-1;i>0;i--){ const j=secureInt(i+1); [a[i],a[j]]=[a[j],a[i]]; } return a; }
+/* the handicap tiers for an A-B-C… draw: the field sorted by index and cut into `size` even buckets, A the lowest */
+const TIER_LETTERS='ABCDEF';
+function drawTiers(players,size,idxOf){ size=Math.max(2,+size||2);
+  const sorted=players.slice().sort((a,b)=>(idxOf(a)??99)-(idxOf(b)??99)||a.name.localeCompare(b.name));
+  return Array.from({length:size},(_,k)=>{ const ps=sorted.slice(Math.round(k*sorted.length/size),Math.round((k+1)*sorted.length/size)); const ix=ps.map(idxOf).filter(x=>x!=null);
+    return {letter:TIER_LETTERS[k]||String(k+1),players:ps,lo:ix.length?Math.min(...ix):null,hi:ix.length?Math.max(...ix):null}; }); }
+function drawTeams(players,size,method,idxOf){
+  size=Math.max(2,+size||2); const n=Math.ceil(players.length/size), teams=Array.from({length:n},()=>[]);
+  if(method==='random'){ shuffled(players).forEach((p,i)=>teams[i%n].push(p)); return teams; }
+  const sorted=players.slice().sort((a,b)=>(idxOf(a)??99)-(idxOf(b)??99)||a.name.localeCompare(b.name));
+  if(method==='abcd'){ // one player from each handicap tier per team: tier A is dealt first, so slot k of every team is its tier-k player
+    const tiers=drawTiers(players,size,idxOf).map(t=>shuffled(t.players));
+    tiers.forEach(tier=>tier.forEach((p,i)=>{ if(i<n) teams[i].push(p); else teams[secureInt(n)].push(p); })); return teams; }
+  // snake: 1..n then n..1, repeat
+  sorted.forEach((p,i)=>{ const round=Math.floor(i/n), k=i%n; teams[round%2?n-1-k:k].push(p); }); return teams;
+}
+/* a full draw for a competition: teams of `size` from `players`; an odd player joins a team (one team of size+1) or
+   sits out. Returns {teams:{pid:'S1'…}, sitOut:[pid], list:[[player…]]} — what is saved before any reveal. */
+function drawFor(players,size,method,idxOf,odd){
+  size=Math.max(2,+size||2); if(players.length<size) return null;
+  let teams=drawTeams(players,size,method||'random',idxOf).filter(t=>t.length), sitOut=[];
+  const short=teams.filter(t=>t.length<size), full=teams.filter(t=>t.length>=size);
+  if(short.length&&full.length){ const left=short.flat(); teams=full; if(odd==='out') sitOut=left.map(p=>p.id); else left.forEach(p=>teams[secureInt(teams.length)].push(p)); }
+  const map={}; teams.forEach((t,i)=>t.forEach(p=>{ map[p.id]='S'+(i+1); }));
+  return {teams:map,sitOut,list:teams};
+}
+/* ---- payouts ---- */
+function defaultPcts(n){ return n<=5?[100]:n<=8?[60,40]:n<=15?[50,30,20]:[40,30,20,10]; }
+const gOrdinal=n=>n+(['th','st','nd','rd'][(n%100>>3^1&&n%10)||0]||'th');
+/* places × percentages, ties share the places they cover, cent-exact */
+function splitByFinish(amount,order,pcts){
+  const cents=Math.round((+amount||0)*100), placeC=pcts.map(p=>Math.floor(cents*p/100)); let rem=cents-placeC.reduce((a,b)=>a+b,0); for(let i=0;rem>0;i++,rem--) placeC[i%placeC.length]++;
+  const out=[]; let i=0;
+  while(i<order.length&&i<pcts.length){ const pos=order[i].pos; const tied=order.filter(r=>r.pos===pos); const covered=placeC.slice(i,i+tied.length); const total=covered.reduce((a,b)=>a+b,0);
+    if(!total) break; const each=Math.floor(total/tied.length); let odd=total-each*tied.length;
+    tied.forEach(r=>{ out.push({id:r.id,name:r.name,pos,amount:(each+(odd-->0?1:0))/100}); }); i+=tied.length; }
+  return out;
+}
+/* cents spread over shares (n per holder), the odd cents to the first holders */
+function splitShares(amount,holders){ const tot=holders.reduce((a,h)=>a+h.n,0); if(!tot) return []; const cents=holders.map(h=>({pid:h.pid,n:h.n,c:Math.floor(amount*100*h.n/tot)})); let rem=Math.round(amount*100)-cents.reduce((a,x)=>a+x.c,0); for(let i=0;rem>0;i++,rem--) cents[i%cents.length].c++; return cents.map(x=>({pid:x.pid,n:x.n,amount:x.c/100})); }
+/* the three bets of each match from the board's rows: `up` is A's lead — holes, or strokes when the match is decided by total score */
+function nassauSegments(rows){
+  const out=[];
+  rows.filter(r=>r.holesUp>=0&&r.segs).forEach(A=>{ const B=rows.find(r=>r!==A&&r.opp===A.name&&r.name===A.opp); if(!B||out.some(m=>m.A===B)) return;
+    const S=k=>A.segs.find(s=>s.k===k)||{v:0,done:false};
+    out.push({A,B,by:A.by||'holes',front:{up:S('F').v,done:S('F').done},back:{up:S('B').v,done:S('B').done},total:{up:S('18').v,done:S('18').done}}); });
+  return out;
+}
+/* the fewest payments that square everyone up: biggest debtor pays biggest creditor, and so on */
+function settleUp(rows){
+  const cr=rows.filter(r=>r.net>0.004).map(r=>({name:r.name,left:Math.round(r.net*100)})).sort((a,b)=>b.left-a.left), de=rows.filter(r=>r.net<-0.004).map(r=>({name:r.name,left:Math.round(-r.net*100)})).sort((a,b)=>b.left-a.left), out=[];
+  let i=0,j=0; while(i<de.length&&j<cr.length){ const x=Math.min(de[i].left,cr[j].left); if(x>0) out.push({from:de[i].name,to:cr[j].name,amount:x/100}); de[i].left-=x; cr[j].left-=x; if(!de[i].left) i++; if(!cr[j].left) j++; }
+  return out;
+}
+/* every event player by id */
+function pubNames(pub){ const m={}; for(const g of pub.groups||[]) for(const p of g.players||[]) m[p.id]=p.name; for(const p of pub.pool||[]) m[p.id]=p.name; return m; }
+/* The computed payout of one published competition from the cards, by its own rules (entry × players in = the pot;
+   `places` or the usual split; a team Nassau segment by segment; skins pot ÷ skins won or per hole). Returns
+   {kind, rows:[{pid,amount,note}], total, lines:[{label,txt,amt}] (what to announce), note (why nothing), standings}.
+   Player ids are the event's. The hub's own Pay out drawers do the same sums with editable amounts. */
+function compPayouts(pub,comp,scores){
+  const total=+comp.total||0, names=pubNames(pub);
+  if(comp.kind==='skins'){ const sk=comp.skins||{}, per=sk.mode==='hole', r=skinsResult(compPub(pub,comp),scores,sk,comp.players);
+    const val=per?total/18:(r.total?total/r.total:0), paid=per?val*r.total:(r.total?total:0);
+    const lines=r.wins.filter(w=>w.status==='won').map(w=>({label:'Hole '+w.hole,txt:`${w.name} · ${w.score}${sk.net&&w.net!==w.score?' (net '+w.net+')':''}`,amt:val*w.count}));
+    if(!r.total) return {kind:'skins',r,val,rows:[],total:0,lines,note:r.pending?'still waiting on a validation hole':per&&r.carried?'no holes won — nothing paid':'no skins today'};
+    const rows=splitShares(paid,Object.entries(r.per).map(([pid,n])=>({pid,n}))).map(x=>({pid:x.pid,amount:x.amount,note:`${x.n} ${per?'hole':'skin'}${x.n===1?'':'s'}`}));
+    return {kind:'skins',r,val,rows,total:paid,lines,note:r.pending?r.pending+' pending':''}; }
+  const cp=compPub(pub,comp), teamy=!!((FORMATS[cp.format]||{}).team)&&(+cp.teamSize||1)>=2;
+  if(((FORMATS[comp.format]||{}).team)&&(+comp.teamSize||1)>=2&&!teamy) return {kind:'finish',rows:[],total:0,lines:[],note:comp.teamsBy==='hand'?'teams not picked yet — in the hub':'partners not drawn yet',standings:[]};
+  const rows=eventBoard(cp,scores,{sort:cp.scoring,view:'teams'});
+  if(cp.format==='match'&&cp.matchScoring==='nassau'&&teamy) return nassauPayouts(pub,comp,rows);
+  const order=rows.filter(r=>r.n).map(r=>({name:r.name,pos:r.pos,members:r.team?(r.members||[]):[r.id]}));
+  if(!order.length) return {kind:'finish',rows:[],total:0,lines:[],note:'no scores',standings:rows};
+  const pcts=(comp.places&&comp.places.length)?comp.places:defaultPcts(order.length);
+  const res=splitByFinish(total,order.map((x,i)=>({id:i,name:x.name,pos:x.pos})),pcts), out=[], lines=[], tied=pos=>res.filter(x=>x.pos===pos).length>1;
+  res.forEach(r=>{ const u=order[r.id], ps=u.members, cents=Math.round(r.amount*100), each=Math.floor(cents/ps.length); let odd=cents-each*ps.length;
+    lines.push({label:(tied(r.pos)?'T':'')+gOrdinal(r.pos),txt:u.name,amt:r.amount,each:ps.length>1?r.amount/ps.length:null});
+    ps.forEach(pid=>out.push({pid,amount:(each+(odd-->0?1:0))/100,note:gOrdinal(r.pos)+(tied(r.pos)?' (tied)':'')})); });
+  return {kind:'finish',rows:out,total:out.reduce((a,x)=>a+x.amount,0),lines,standings:rows};
+}
+function nassauPayouts(pub,comp,rows){
+  const st=Object.assign({front:5,back:5,total:10},comp.nassau||{}), M=nassauSegments(rows), pays=new Map(), lines=[];
+  const add=(pid,amt,note)=>{ const x=pays.get(pid)||{amount:0,notes:[]}; x.amount+=amt; x.notes.push(note); pays.set(pid,x); };
+  if(!M.length) return {kind:'nassau',rows:[],total:0,lines:[],note:'no match yet',standings:rows};
+  for(const m of M) for(const [k,label] of [['front','Front nine'],['back','Back nine'],['total','The 18']]){ const s=+st[k]||0; if(!s) continue; const seg=m[k], a=m.A.members||[], b=m.B.members||[], pool=s*(a.length+b.length);
+    if(!seg.done){ lines.push({label,txt:`${m.A.name} vs ${m.B.name} · not finished`,amt:0}); a.concat(b).forEach(pid=>add(pid,s,label+' · open, stake back')); continue; }
+    if(seg.up===0){ lines.push({label,txt:(m.by==='strokes'?'Tied':'Halved')+' — a push',amt:0}); a.concat(b).forEach(pid=>add(pid,s,label+' · '+(m.by==='strokes'?'tied':'halved'))); continue; }
+    const W=seg.up>0?a:b, each=Math.round(pool*100/W.length)/100, byTxt=m.by==='strokes'?`by ${Math.abs(seg.up)} stroke${Math.abs(seg.up)===1?'':'s'}`:`${Math.abs(seg.up)} up`;
+    lines.push({label,txt:`${(seg.up>0?m.A:m.B).name} ${byTxt}`,amt:pool}); W.forEach(pid=>add(pid,each,`${label} · won ${byTxt}`)); }
+  const out=[...pays.entries()].filter(([,x])=>x.amount>0).map(([pid,x])=>({pid,amount:Math.round(x.amount*100)/100,note:x.notes.join(' · ')}));
+  return {kind:'nassau',rows:out,total:out.reduce((a,x)=>a+x.amount,0),lines,standings:rows};
+}
+/* who put in what, who pulled out what, and who pays whom: from the published competitions (entry × players in, plus
+   the game's extras and its hand-tallied pots) and the recorded payouts {compId:{rows}} */
+function wrapMoney(pub,recorded){
+  const G=pub.game||{}, names=pubNames(pub), inn={}, out={};
+  for(const c of (pub.comps||[]).concat(G.others||[])) for(const pid of c.players||[]) inn[pid]=(inn[pid]||0)+(+c.entry||0);
+  for(const [pid,x] of Object.entries(G.extras||{})) inn[pid]=(inn[pid]||0)+(+x||0);
+  for(const c of Object.values(recorded||{})) for(const r of c.rows||[]) out[r.pid]=(out[r.pid]||0)+(+r.amount||0);
+  const rows=[...new Set([...Object.keys(inn),...Object.keys(out)])].map(pid=>({pid,name:names[pid]||'—',inn:inn[pid]||0,out:out[pid]||0})).map(r=>Object.assign(r,{net:Math.round((r.out-r.inn)*100)/100})).sort((a,b)=>b.net-a.net||a.name.localeCompare(b.name));
+  const S=(a,f)=>a.reduce((t,x)=>t+f(x),0);
+  return {rows,inn:S(rows,r=>r.inn),out:S(rows,r=>r.out),transfers:settleUp(rows)};
+}

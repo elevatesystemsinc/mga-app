@@ -87,6 +87,7 @@ python3 tests/test_sync.py    # migration + two devices on a shared fake databas
 python3 tests/test_score.py   # the public scoring page against the fake: mid-round changes reach open phones/boards
 python3 tests/test_tenants.py # tenants, the portal, staff / board logins and scope, invite links — against the fake
 python3 tests/test_survey.py  # a survey from the template → public link → anonymous answers → results, against the fake
+python3 tests/test_finish.py  # a game wrapped up from the phones (close → skins → draw → payouts) and taken into the hub, against the fake
 git add -A && git commit && git push origin main  # Render deploys main to app.wcccmga.org
 ```
 Tests need `pip install playwright && playwright install chromium` and `cd tests && npm i xlsx@0.18.5`.
@@ -222,6 +223,22 @@ Tournament = { id, name, season, days, startDate, field:[{id,memberId,team,paid,
   - **Deleting**: the designer's "Delete game" (`deleteGame`) removes the game and its scoring event. Deleting an
     event from Golf that belongs to a game or a tournament round removes that game / round too — otherwise
     `ensureGameEvent` / `ensureTournamentScoring` would rebuild it on the next render.
+  - **The Finish tab — a game wrapped up from the course** (`wrap-setup.sql`, score_src.html `renderFinish`/`calloutStage`/
+    `drawStage`, games.js `wrapSync`/`absorbWrap`/`wrapReset`): on the scoring page anyone joined with a group ID (the
+    owner: "any group code is fine") steps through **Close scoring → the skins call-out → the draw → the winners → who's
+    owed what**, in that order. Each step is one `golf_wrap(event, code, action, data, rev)` call, compare-and-swap on
+    `golf_events.wrap.v` (a second phone gets 'conflict' and just shows the result); `close` also sets the public status
+    final and `golf_submit` refuses from then on; the other steps need scoring closed. The phones record only — the
+    computed result, never an edited one: `compPayouts(pub,comp,scores)` / `nassauPayouts` / `wrapMoney` / `drawFor` in
+    **golfcore** are the shared math (the hub's drawers do the same sums with editable amounts), and `potComp` publishes
+    `entry`, `total`, `places`, `nassau`, `teamsBy` and `live` per competition plus `game` (`gameInfo`: settle, extras,
+    the hand-tallied pots) for it. `gameComps` now carries **every** format and skins pot; the scoring page keeps
+    `live:false` ones off the board chips (`liveComps()`). The hub reads the wrap with `golf_event` on every game-page
+    render (`wrapSync`, 8 s throttle) and `absorbWrap` takes anything newer than `g.wrapV` into the game once: event
+    status final, `pot.teams`/`pot.draw`/`pot.sitOut`, `pot.calledOut`, `pot.payouts` (event player ids → game player
+    ids), `g.wrap` for the "from the course by Group …" lines; then persist + republish. Reopen scoring (`openScoring`)
+    clears the wrap (`wrapReset`: a column update, or `hub_key_wrap` on an admin link). Dots and by-hand pots stay in
+    the hub. `tests/test_finish.py` runs the whole thing on two phones and the hub against the fake.
   - Paying: `payFormat` (finish from `potPub` standings via `payByFinish`; `pot.rules.places` are the default splits;
     ties share places, cent-exact; hand-entered positions when there are no scores), `paySkins` (`skinsCalc` →
     `skinsResult`, one pot ÷ skins won; rules on the pot), `payDots`, `payManual`.
@@ -283,7 +300,7 @@ Tournament = { id, name, season, days, startDate, field:[{id,memberId,team,paid,
 | `tenants`, `tenant_users`, `flagstick_admins` + RPC `tenant_lookup(p_host)`, `my_access()` | clients, their board logins, Flagstick's admins (`tenants-setup.sql`); every table below has a `tenant` column |
 | `mga_hub` (tenant, id, data jsonb) | one row per organization per tenant: `club`, `mga`, `lga`, `smga`, `<group id>` — plus `main`, the MGA Hub's row (two-way synced with `mga`), and `sync:<org>`, the sync base. `hub-setup.sql`, `hub-fix-permissions.sql` |
 | `calcutta_share` (tid, token, name, doc, version) + RPC `calcutta_get(p_token)`, `calcutta_put(p_token,p_doc,p_version)` | token links for people without the board login: the **cashier** page (tid = tournament id) and the **registration/check-in** page (tid = tournament id + `:checkin`). `calcutta_put` is version-checked (conflict → retry). `calcutta-setup.sql` |
-| `golf_events`, `golf_scores` + RPC `golf_event`, `golf_join`, `golf_submit` | public live scoring (`golf-setup.sql`). `public.org` names the owning organization. |
+| `golf_events` (+ `wrap`), `golf_scores` + RPC `golf_event`, `golf_join`, `golf_submit`, `golf_wrap`, `hub_key_wrap` | public live scoring (`golf-setup.sql`) and the Finish tab's wrap-up (`wrap-setup.sql`). `public.org` names the owning organization. |
 | `survey_share` (sid, tenant, org, token, status, doc), `survey_responses` (id, tenant, org, sid, answers, day) + RPC `survey_get(p_token)`, `survey_submit(p_token,p_answers)`, `hub_key_survey`, `hub_key_survey_results` | surveys (`survey-setup.sql`): the share row is what the public page shows; a response is answers + the **day** only — no user, e-mail, IP or device, ever. |
 | `hub_keys` (org_id, key_hash, label, revoked_at) + RPC `hub_key_org/read/write/people/golf_event/golf_delete/score/share` | admin links (`admin-links-setup.sql`): security-definer functions that act for exactly one organization. |
 | `mm_tournament` | the retired Member-Member app's row (`supabase-setup.sql`). Archive only — no hub code reads or writes it. |
@@ -457,6 +474,10 @@ groups, printed scorecards — the printed cards include a live-scoring QR that 
 
 ## 6. Status / history
 
+- **Built Oct 2026 (the Finish tab):** `wrap-setup.sql` (applied to the project) + the scoring page's Finish tab + the hub's
+  `wrapSync`: the players close scoring, call out the skins, draw and record the payouts from their phones (§2, small groups).
+  Next on the owner's list: the **phone-first game setup** for small groups ("Same as last time" + a three-step quick setup,
+  the full designer behind More options) — proposed, not yet built.
 - **Built Oct 2026 (surveys):** `src/surveys.js` + `survey.html` + `survey-setup.sql` (applied to the project); the MGA's first
   survey comes from `memberSurveyTemplate()`.
 - **Built Oct 2026 (tenants, portal, logins):** `tenants-setup.sql` + `portal-setup.sql`, `src/portal.js` (the client

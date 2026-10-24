@@ -88,11 +88,40 @@ class FakeDB:
         # the public scoring page's functions, as in golf-setup.sql, over the golf_events / golf_scores tables
         if fn=='golf_event':
             r=next((r for r in self._rows('golf_events') if str(r.get('slug','')).lower()==str(a.get('p_slug','')).strip().lower()),None)
-            return json.dumps({'data':dict(copy.deepcopy(r['public']),id=r['id']) if r else None,'error':None})
+            return json.dumps({'data':dict(copy.deepcopy(r['public']),id=r['id'],wrap=copy.deepcopy(r.get('wrap'))) if r else None,'error':None})
+        # wrap-setup.sql: the wrap-up from the course, compare-and-swap on wrap.v
+        if fn=='golf_wrap':
+            e=next((r for r in self._rows('golf_events') if r['id']==a.get('p_event')),None)
+            if not e: return json.dumps({'data':None,'error':{'message':'Unknown event','code':'P0001'}})
+            who=str(a.get('p_code','')).strip().upper()
+            if who not in (e.get('codes') or {}): return json.dumps({'data':None,'error':{'message':'Unknown group ID','code':'P0001'}})
+            w=copy.deepcopy(e.get('wrap') or {}); cur=int(w.get('v') or 0)
+            if cur!=(a.get('p_rev') if a.get('p_rev') is not None else -1): return json.dumps({'data':None,'error':{'message':'conflict','code':'P0001'}})
+            act=a.get('p_action'); d=a.get('p_data'); now=datetime.datetime.utcnow().isoformat()+'Z'
+            closed=('closedAt' in w) or e['public'].get('status')=='final'
+            if act=='close':
+                if 'closedAt' in w: return json.dumps({'data':None,'error':{'message':'conflict','code':'P0001'}})
+                w['closedAt']=now; w['closedBy']=who; e['public']['status']='final'
+            elif act in ('draw','callout'):
+                if not closed: return json.dumps({'data':None,'error':{'message':'Close scoring first','code':'P0001'}})
+                k=(d or {}).get('comp')
+                if not k: return json.dumps({'data':None,'error':{'message':'Which competition?','code':'P0001'}})
+                if act=='draw': x=dict((d or {})); x.pop('comp',None); x.update(at=now,by=who); w.setdefault('draws',{})[k]=x
+                else: w.setdefault('callouts',{})[k]={'at':now,'by':who}
+            elif act=='payouts':
+                if not closed: return json.dumps({'data':None,'error':{'message':'Close scoring first','code':'P0001'}})
+                if 'payouts' in w: return json.dumps({'data':None,'error':{'message':'conflict','code':'P0001'}})
+                if not isinstance((d or {}).get('comps'),dict): return json.dumps({'data':None,'error':{'message':'Nothing to record','code':'P0001'}})
+                w['payouts']=dict(copy.deepcopy(d),at=now,by=who)
+            else: return json.dumps({'data':None,'error':{'message':'Unknown action','code':'P0001'}})
+            w['v']=cur+1; e['wrap']=w; self.writes['wrap:'+e['id']]+=1
+            return json.dumps({'data':copy.deepcopy(w),'error':None})
         if fn=='golf_join':
             r=next((r for r in self._rows('golf_events') if str(r.get('slug','')).lower()==str(a.get('p_slug','')).strip().lower()),None)
             return json.dumps({'data':(r or {}).get('codes',{}).get(str(a.get('p_code','')).upper()),'error':None})
         if fn=='golf_submit':
+            e=next((r for r in self._rows('golf_events') if r['id']==a.get('p_event')),None)
+            if e and (e['public'].get('status')!='live' or 'closedAt' in (e.get('wrap') or {})): return json.dumps({'data':None,'error':{'message':'Scoring is closed for this event','code':'P0001'}})
             rows=self._rows('golf_scores'); rows[:]=[r for r in rows if not(r['event_id']==a['p_event'] and r['player_id']==a['p_player'] and r['hole']==a['p_hole'])]
             if a.get('p_strokes'): rows.append({'event_id':a['p_event'],'player_id':a['p_player'],'hole':a['p_hole'],'strokes':a['p_strokes']})
             return json.dumps({'data':True,'error':None})
@@ -145,6 +174,10 @@ class FakeDB:
             if not r: return json.dumps({'data':False,'error':None})
             have={m.get('id') for m in r['data'].get('members',[])}; add=[p for p in a['p_people'] if isinstance(p,dict) and p.get('id') and p['id'] not in have]
             if add: r['data']['members']=r['data'].get('members',[])+copy.deepcopy(add); r['data']['_rev']=int(r['data'].get('_rev') or 0)+1; self.writes['club']+=1
+            return json.dumps({'data':True,'error':None})
+        if fn=='hub_key_wrap':
+            e=next((r for r in self._rows('golf_events') if r['id']==a.get('p_event')),None)
+            if e: e['wrap']=copy.deepcopy(a.get('p_wrap'))
             return json.dumps({'data':True,'error':None})
         if fn in('hub_key_golf_event','hub_key_golf_delete','hub_key_score','hub_key_share'): return json.dumps({'data':True,'error':None})
         return err('unknown function '+fn)

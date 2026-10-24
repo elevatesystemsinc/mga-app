@@ -109,7 +109,18 @@ flashes "Didn't validate" before that hole's result. Every other competition has
 leaderboard** switch in the designer, and the live scoring page shows one board per competition that is switched on
 (dots are tallied by hand and never show). Removing a player, from the game page or the designer, takes them out
 of every competition, the scoring event, the leaderboard and live scoring, scores and all. Games are deleted from the designer; deleting a scoring event
-that belongs to a game or a tournament round removes that game or round with it. A game plays **full handicaps, 100% across the board** unless the designer switches to the USGA allowances. The **who's-in grid** ticks every player into every competition
+that belongs to a game or a tournament round removes that game or round with it. A game plays **full handicaps, 100% across the board** unless the designer switches to the USGA allowances.
+
+**The players finish the game themselves.** On the live scoring page, anyone who has joined with a group ID gets a
+**Finish** tab for a game, and walks the room through it in order: **Close scoring** (shows whose cards are complete;
+after it nobody can change a score), **Call out the skins** (the same hole-by-hole reveal, with the validations),
+**Draw the partners** (random, A-B-C by handicap or snake; saved before the reveal), **The winners** (every competition's
+result and what it pays, computed from the cards by the competition's own rules — a tap records exactly what is shown,
+nothing can be edited there) and **Who's owed what** (in, out and net per player; who pays whom when the game settles
+net). Every phone in the game sees the same steps, a step can only be taken once, and the hub picks it all up — the
+event closed, the teams, the skins called out, the payouts in the game and the ledger — the next time the game page is
+open, marked "from the course by Group …". Reopen scoring in the hub takes it back. Dots and winners entered by hand
+stay in the hub. The **who's-in grid** ticks every player into every competition
 they want, so nine can be in the skins while eight play the team game. A new game starts from the last one.
 
 **On the day.** Everyone plays their own ball; every competition is scored live from those cards. A team competition
@@ -159,8 +170,8 @@ so a push is a deploy (see `CLAUDE.md` for the build).
 ## Supabase (same project)
 
 SQL Editor → run `hub-setup.sql` (creates `public.mga_hub` with RLS and realtime), `calcutta-setup.sql`
-(cashier and check-in links), `golf-setup.sql` (live scoring) and `admin-links-setup.sql` (admin links for small
-groups and associations). The hub signs in with the shared board login; admin links work without it.
+(cashier and check-in links), `golf-setup.sql` (live scoring), `admin-links-setup.sql` (admin links for small
+groups and associations) and `wrap-setup.sql` (the Finish tab: games wrapped up from the course). The hub signs in with the shared board login; admin links work without it.
 
 ## Staying up to date
 
