@@ -32,6 +32,17 @@ main{max-width:1180px;margin:0 auto;padding:16px 14px calc(40px + env(safe-area-
 .muted{color:var(--muted)} .pos{color:var(--pos)} .neg{color:var(--neg)}
 /* the course: 18 holes drawn, the groups on the hole they are playing */
 .course{display:grid;grid-template-columns:repeat(9,minmax(0,1fr));gap:6px;padding:6px 10px 12px}
+/* the real course: an aerial map with the hole centerlines; under it a slim bar of hole numbers to tap */
+.map{height:clamp(280px,52vh,560px);width:100%;background:#243528;position:relative;z-index:0}
+.map .leaflet-container{font-family:var(--sans)} .map .leaflet-control-attribution{font-size:9.5px;background:rgba(255,255,255,.7)}
+.mapbar{display:flex;gap:8px;align-items:center;padding:8px 12px;border-top:1px solid var(--line);flex-wrap:wrap} .mapbar .btn{height:32px;font-size:12.5px;padding:0 10px}
+.course.bar{display:grid;grid-template-columns:repeat(18,minmax(0,1fr));gap:4px;padding:8px 10px 10px;overflow:visible}
+.course.bar .hole{height:44px;background:var(--ivory);border-radius:8px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;flex:1 1 0;border:2px solid transparent}
+.course.bar .hole svg,.course.bar .hole .p{display:none} .course.bar .hole .n{position:static;font-size:15px;text-shadow:none} .course.bar .hole .gs{position:static;gap:2px;padding:0}
+.course.bar .gm{min-width:14px;height:14px;font-size:0;border-width:1.5px;padding:0} .course.bar .hole.on{border-color:var(--gold);background:#FBF4E0}
+@media (max-width:640px){ .course.bar{display:grid;grid-template-columns:repeat(9,minmax(0,1fr));overflow:visible} .course.bar .hole{flex:none} }
+.hl{background:rgba(15,42,56,.9);color:#fff;border:1.5px solid var(--goldl);border-radius:999px;width:24px;height:24px;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:12px;font-family:var(--sans);box-shadow:0 1px 4px rgba(0,0,0,.4)} .hl.on{background:var(--goldl);color:var(--navy);border-color:#fff}
+.gmk{background:var(--navy);color:#fff;border:2px solid #fff;border-radius:999px;min-width:28px;height:28px;padding:0 6px;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:11.5px;font-family:var(--sans);box-shadow:0 2px 6px rgba(0,0,0,.45);white-space:nowrap} .gmk.me{background:var(--neg)} .gmk.fin{background:var(--pos)}
 @media (max-width:640px){ .course{display:flex;overflow-x:auto;scrollbar-width:none;padding:6px 10px 12px;-webkit-overflow-scrolling:touch} .course::-webkit-scrollbar{display:none} .hole{flex:0 0 96px} }
 .hole{border:2px solid transparent;border-radius:10px;background:var(--rough);padding:0;position:relative;overflow:hidden;text-align:left}
 .hole svg{display:block;width:100%;height:auto} .hole.on{border-color:var(--gold)} .hole.me{box-shadow:inset 0 0 0 2px var(--navy)}
@@ -91,6 +102,9 @@ const WCCC_COURSES=[
          {name:'Red',rating:{M:{cr:66.7,slope:115},W:{cr:71.7,slope:127}},yards:[410,324,353,107,288,259,304,124,328, 343,407,319,152,301,305,159,324,392]},
          {name:'Green',rating:{M:{cr:60.9,slope:103},W:{cr:63.2,slope:108}},yards:[316,220,219,80,208,176,184,85,221, 260,243,200,96,226,222,98,229,336]}]}
 ];
+/* Hole centerlines (tee → green) for the two courses, from OpenStreetMap (© OpenStreetMap contributors, ODbL) — checked
+   hole by hole against the scorecard yardages. GameCast draws the real course from these; nothing else reads them. */
+const COURSE_GEO={"oak":{"1":[[32.588645,-97.119348],[32.586941,-97.117938],[32.585766,-97.115733]],"2":[[32.584693,-97.116486],[32.583534,-97.115818],[32.582635,-97.115808],[32.581952,-97.116647]],"3":[[32.579855,-97.11635],[32.580534,-97.114067],[32.580664,-97.111698]],"4":[[32.580516,-97.110517],[32.580931,-97.109004]],"5":[[32.58128,-97.108505],[32.581832,-97.106442],[32.581656,-97.104174]],"6":[[32.582122,-97.103725],[32.581381,-97.102688]],"7":[[32.580967,-97.103032],[32.581209,-97.105513],[32.580797,-97.106791]],"8":[[32.580303,-97.107391],[32.580247,-97.10328]],"9":[[32.57975,-97.103814],[32.577838,-97.103612],[32.576388,-97.102616]],"10":[[32.575563,-97.103938],[32.577796,-97.106364]],"11":[[32.578845,-97.107216],[32.579282,-97.106042]],"12":[[32.579672,-97.105703],[32.579906,-97.107719],[32.579806,-97.10947],[32.580236,-97.11083]],"13":[[32.581899,-97.111611],[32.582361,-97.109923],[32.583086,-97.109349],[32.583506,-97.109533]],"14":[[32.58327,-97.110235],[32.582355,-97.111424]],"15":[[32.582137,-97.113137],[32.584108,-97.112858],[32.585113,-97.114073]],"16":[[32.585857,-97.114046],[32.584681,-97.112179],[32.58487,-97.11029]],"17":[[32.586236,-97.111016],[32.586733,-97.112142],[32.588177,-97.113791]],"18":[[32.587858,-97.114155],[32.588039,-97.116554],[32.588871,-97.118277]]},"pecan":{"1":[[32.589558,-97.121692],[32.590911,-97.121538],[32.592092,-97.120376],[32.592669,-97.119377]],"2":[[32.59298,-97.119705],[32.594814,-97.119763],[32.596155,-97.120128]],"3":[[32.595946,-97.121588],[32.593891,-97.121462],[32.592954,-97.12273]],"4":[[32.59295,-97.123061],[32.59254,-97.123027],[32.591769,-97.122615]],"5":[[32.591155,-97.122039],[32.590399,-97.124107],[32.590402,-97.12545]],"6":[[32.590194,-97.125863],[32.588839,-97.123007]],"7":[[32.588526,-97.123138],[32.588175,-97.12538],[32.587468,-97.126396]],"8":[[32.587212,-97.12678],[32.585618,-97.127194]],"9":[[32.585788,-97.126348],[32.587589,-97.123179]],"10":[[32.587577,-97.121485],[32.585772,-97.120436],[32.584283,-97.120309]],"11":[[32.583817,-97.12082],[32.581765,-97.11998],[32.580434,-97.120068]],"12":[[32.581738,-97.119421],[32.579811,-97.119064],[32.578966,-97.118716]],"13":[[32.579332,-97.119383],[32.580148,-97.121086]],"14":[[32.5803,-97.12165],[32.576859,-97.120643]],"15":[[32.576569,-97.120833],[32.577672,-97.122788],[32.579244,-97.123329]],"16":[[32.57945,-97.124134],[32.579925,-97.125746]],"17":[[32.580163,-97.125174],[32.581932,-97.126236],[32.583228,-97.125914]],"18":[[32.58364,-97.125806],[32.585703,-97.124781],[32.58688,-97.122691]]}};
 const RATINGS_VERSION=2; // ratings from the club's printed rating card
 const G_SUM=a=>a.reduce((x,y)=>x+(+y||0),0);
 /* holes in playing order for a group (shotgun starts wrap around) */
@@ -771,8 +785,45 @@ function holeSVG(h,par,groupsHere){
   const bunk=par>=4?`<ellipse cx="${grn.x+(h%3?16:-16)}" cy="${grn.y+16}" rx="6" ry="4" fill="var(--sand)"/>`:`<ellipse cx="${grn.x-12}" cy="${grn.y+14}" rx="6" ry="3.5" fill="var(--sand)"/>`;
   return `<svg viewBox="0 0 ${W} ${H}" aria-hidden="true">${fw}${bunk}<ellipse cx="${grn.x}" cy="${grn.y}" rx="15" ry="11" fill="var(--green)"/><line x1="${grn.x+3}" y1="${grn.y}" x2="${grn.x+3}" y2="${grn.y-16}" stroke="#fff" stroke-width="1.6"/><path d="M${grn.x+3} ${grn.y-16} l 9 3.5 l -9 3.5 z" fill="#C7A13A"/><rect x="${tee.x-9}" y="${tee.y-6}" width="18" height="9" rx="2.5" fill="#A7C7A0"/></svg>`; }
 
+/* ---- the map: the real course (COURSE_GEO: tee → green centerlines, from OpenStreetMap) on aerial imagery ---- */
+let L_=null, MAP=null, mapHost=null, mapLayers=null, mapLines={}, mapFit=false, mapLoading=null, mapFailed=false;
+function loadLeaflet(){ if(window.L) return Promise.resolve(window.L); if(mapLoading) return mapLoading;
+  mapLoading=new Promise((ok,bad)=>{ const css=document.createElement('link'); css.rel='stylesheet'; css.href='https://unpkg.com/leaflet@1.9.4/dist/leaflet.css'; document.head.appendChild(css);
+    const s=document.createElement('script'); s.src='https://unpkg.com/leaflet@1.9.4/dist/leaflet.js'; s.onload=()=>ok(window.L); s.onerror=()=>bad(new Error('leaflet')); document.head.appendChild(s); setTimeout(()=>bad(new Error('timeout')),12000); });
+  return mapLoading; }
+const geoCourses=()=>[...new Set((pub.groups||[]).map(g=>g.course))].filter(c=>typeof COURSE_GEO!=='undefined'&&COURSE_GEO[c]);
+const hasGeo=()=>geoCourses().length>0;
+function holeLine(course,h){ const c=COURSE_GEO[course]||COURSE_GEO[geoCourses()[0]]; return c?c[String(h)]:null; }
+const along=(line,t)=>{ if(!line||line.length<2) return line&&line[0]; const segs=[]; let tot=0; for(let i=0;i<line.length-1;i++){ const d=Math.hypot(line[i+1][0]-line[i][0],(line[i+1][1]-line[i][1])*Math.cos(line[i][0]*Math.PI/180)); segs.push(d); tot+=d; } let want=tot*t; for(let i=0;i<segs.length;i++){ if(want<=segs[i]){ const f=segs[i]?want/segs[i]:0; return [line[i][0]+(line[i+1][0]-line[i][0])*f,line[i][1]+(line[i+1][1]-line[i][1])*f]; } want-=segs[i]; } return line[line.length-1]; };
+/* mount the map into the current card (the same Leaflet map survives every render), then redraw the moving parts */
+function drawMap(pos,fg,moveTo){
+  const slot=$('mapSlot'); if(!slot) return;
+  if(!window.L){ loadLeaflet().then(()=>render(),()=>{ mapFailed=true; render(); }); return; }
+  const L=window.L;
+  if(!mapHost){ mapHost=document.createElement('div'); mapHost.className='map'; }
+  slot.replaceWith(mapHost); mapHost.id='mapSlot';
+  if(!MAP){ MAP=L.map(mapHost,{zoomControl:true,attributionControl:true,scrollWheelZoom:false,zoomSnap:.5}); 
+    L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',{maxZoom:19,attribution:'Imagery © Esri · Holes © OpenStreetMap contributors'}).addTo(MAP);
+    mapLayers=L.layerGroup().addTo(MAP); }
+  MAP.invalidateSize();
+  mapLayers.clearLayers(); mapLines={}; const all=[];
+  for(const course of geoCourses()){ const G=COURSE_GEO[course]; for(let h=1;h<=18;h++){ const line=G[String(h)]; if(!line) continue; all.push(...line); const on=h===holeSel;
+      L.polyline(line,{color:'#fff',weight:on?8:5,opacity:on?.9:.55,lineCap:'round',interactive:false}).addTo(mapLayers);
+      const pl=L.polyline(line,{color:on?'#F2D27A':'#D8B75F',weight:on?4:2.5,opacity:.95,lineCap:'round'}).addTo(mapLayers); pl.on('click',()=>{ holeSel=h; render(true); });
+      L.circleMarker(line[line.length-1],{radius:on?6:4.5,color:'#fff',weight:1.5,fillColor:'#6FAE6B',fillOpacity:1}).addTo(mapLayers);
+      L.marker(along(line,.08),{icon:L.divIcon({className:'',html:`<div class="hl${on?' on':''}">${h}</div>`,iconSize:[24,24],iconAnchor:[12,12]}),keyboard:false}).on('click',()=>{ holeSel=h; render(true); }).addTo(mapLayers);
+      mapLines[course+':'+h]=line; } }
+  // the groups: on the tee of the hole they are playing (spread along the first stretch when several share it); finished groups on 18's green
+  const byHole={}; pos.forEach(x=>{ const key=x.cur?x.g.course+':'+x.cur:x.started?x.g.course+':fin':x.g.course+':'+x.order[0]; (byHole[key]=byHole[key]||[]).push(x); });
+  for(const [key,xs] of Object.entries(byHole)){ const [course,hs]=key.split(':'); const line=hs==='fin'?holeLine(course,18):holeLine(course,+hs); if(!line) continue;
+    xs.forEach((x,i)=>{ const pt=hs==='fin'?line[line.length-1]:along(line,.3+i*.1), me=fg&&x.g.id===fg.grp.id, lbl=x.g.label?x.g.label.replace(/^Group\s*/i,''):x.g.code;
+      L.marker(pt,{icon:L.divIcon({className:'',html:`<div class="gmk${me?' me':hs==='fin'?' fin':''}" title="${esc(x.g.players.map(p=>first(p.name)).join(', '))}">${esc(lbl)}</div>`,iconSize:[28,28],iconAnchor:[14,14]}),zIndexOffset:1000}).on('click',()=>{ if(x.cur){ holeSel=x.cur; render(true); } }).addTo(mapLayers); }); }
+  if(!all.length) return;
+  if(moveTo&&holeSel){ const line=holeLine(geoCourses()[0],holeSel); if(line) MAP.flyToBounds(L.latLngBounds(line).pad(.35),{duration:.8,maxZoom:18}); }
+  else if(!mapFit){ MAP.fitBounds(L.latLngBounds(all).pad(.04)); mapFit=true; }
+}
 /* ---- render ---- */
-function render(){ if(!pub) return; setSync();
+function render(moveTo){ if(!pub) return; setSync();
   const groups=pub.groups||[], P=allPlayers(), cs=liveComps(); if(comp==null||(comp&&!cs.some(c=>c.id===comp.id))) comp=cs[0]||false;   // false = the round itself (everyone's own gross / net)
   const c0=pub.courses[(groups[0]||{}).course]||Object.values(pub.courses||{})[0]||{par:{M:[]},hcp:{M:[]},tees:{}};
   const pos=groups.map(g=>Object.assign({g},groupPos(g))), fg=follow?P.find(p=>p.id===follow):null;
@@ -796,7 +847,7 @@ function render(){ if(!pub) return; setSync();
   const val=r=>MATCH?(r.segs?(r.segs.find(s=>s.k==='18')||{}).txt||r.status:r.status):unit==='points'?(r.quota!=null?ptsTxt(r):r.pts+' pts'):unit==='holes'?(r.holesUp>0?'+':'')+r.holesUp:(r.n&&r.toPar!=null?toParTxt(net&&r.netToPar!=null?r.netToPar:r.toPar):'—');
   $('main').innerHTML=`<div class="col">
     <div class="card"><div class="ch"><h2>The course</h2><small>${esc(c0.name||'')} · ${groups.length} group${groups.length===1?'':'s'}${fin.length?` · ${fin.length} finished`:''}${idle.length?` · ${idle.length} not started`:''}</small></div>
-      <div class="course">${holes}</div>
+      ${hasGeo()&&!mapFailed?`<div id="mapSlot" class="map"></div><div class="mapbar"><button class="btn" id="mapAll">Whole course</button><span class="muted" style="font-size:12.5px">Tap a hole number on the map or below · groups sit on the tee of the hole they are playing</span></div><div class="course bar">${holes}</div>`:`<div class="course">${holes}</div>`}
       <div class="legend"><span><span class="gm">A</span>a group on the hole it’s playing</span>${fg?`<span><span class="gm me">●</span>${esc(fg.name)}’s group</span>`:''}${fin.length?`<span>Finished: ${esc(fin.map(x=>x.g.label||x.g.code).join(', '))}</span>`:''}</div></div>
     <div class="card" id="holeCard">${holePanel}</div></div>
    <div class="col">
@@ -807,7 +858,8 @@ function render(){ if(!pub) return; setSync();
       <div class="lb h"><span>Pos</span><span>${MATCH?'Side':'Player'}</span><span class="r">Thru</span><span class="r">${MATCH?'Match':unit==='points'?'Pts':unit==='holes'?'Holes':net?'Net':'To par'}</span></div>
       ${lb.map(r=>`<div class="lb num${fg&&(r.id===fg.id||(r.members||[]).includes(fg.id))?' me':''}"><b>${r.posTxt}</b><span style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(r.name)}</span><span class="r muted">${r.n?r.thru:'—'}</span><span class="tp ${r.n&&String(val(r)).startsWith('−')?'pos':''}">${esc(val(r))}</span></div>`).join('')||'<div class="empty">No scores yet.</div>'}
       <div class="bar"><label class="muted" style="font-size:13px">Follow</label><select class="sel" id="follow"><option value="">Everyone</option>${P.slice().sort((a,b)=>a.name.localeCompare(b.name)).map(p=>`<option value="${esc(p.id)}"${p.id===follow?' selected':''}>${esc(p.name)}</option>`).join('')}</select>${TV?'':`<a class="btn" href="${esc(location.pathname+'?e='+encodeURIComponent(SLUG)+'&view=tv')}" style="margin-left:auto;display:inline-flex;align-items:center;text-decoration:none">TV screen</a>`}</div></div></div>`;
-  document.querySelectorAll('[data-h]').forEach(b=>b.onclick=()=>{ holeSel=+b.dataset.h; render(); if(innerWidth<900) $('holeCard').scrollIntoView({behavior:'smooth',block:'start'}); });
+  document.querySelectorAll('[data-h]').forEach(b=>b.onclick=()=>{ holeSel=+b.dataset.h; render(true); if(innerWidth<900&&!hasGeo()) $('holeCard').scrollIntoView({behavior:'smooth',block:'start'}); });
+  if(hasGeo()&&!mapFailed){ drawMap(pos,fg,moveTo===true); const ma=$('mapAll'); if(ma) ma.onclick=()=>{ mapFit=false; if(MAP){ const all=Object.values(mapLines).flat(); if(all.length) MAP.flyToBounds(window.L.latLngBounds(all).pad(.04),{duration:.8}); mapFit=true; } }; }
   document.querySelectorAll('[data-comp]').forEach(b=>b.onclick=()=>{ comp=cs.find(c=>c.id===b.dataset.comp)||false; render(); });
   const fs=$('follow'); if(fs) fs.onchange=()=>{ follow=fs.value; holeSel=null; render(); };
 }
@@ -823,7 +875,7 @@ async function boot(){
     scores[r.player_id]=scores[r.player_id]||{}; if(p.eventType==='DELETE'){ delete scores[r.player_id][r.hole]; stamps=stamps.filter(x=>!(x.p===r.player_id&&x.h===r.hole)); } else { scores[r.player_id][r.hole]=r.strokes; stamps=stamps.filter(x=>!(x.p===r.player_id&&x.h===r.hole)); stamps.push({p:r.player_id,h:r.hole,s:r.strokes,at:r.updated_at||new Date().toISOString()}); stamps.sort((a,b)=>String(a.at).localeCompare(String(b.at))); }
     if(!TV&&holeSel!=null&&!follow){ /* keep the hole the viewer picked */ } render(); }).subscribe();
   setInterval(refresh,30000); document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='visible') refresh(); });
-  if(TV){ tvTimer=setInterval(()=>{ const pos=(pub.groups||[]).map(groupPos).map(x=>x.cur).filter(Boolean); if(!pos.length) return; const i=pos.indexOf(holeSel); holeSel=pos[(i+1)%pos.length]; render(); },8000); }
+  if(TV){ tvTimer=setInterval(()=>{ const pos=(pub.groups||[]).map(groupPos).map(x=>x.cur).filter(Boolean); if(!pos.length) return; const i=pos.indexOf(holeSel); holeSel=pos[(i+1)%pos.length]; render(true); },8000); }
 }
 boot();
 window.__canReload=()=>true;
@@ -834,7 +886,7 @@ window.__canReload=()=>true;
    page counts, and a reload is tried once per build — if the page that comes back is still the old one, the CDN
    hasn't caught up; wait a while before trying that build again. */
 (function(){
-  const ME='20261025182417', KEY='au_tried', RETRY=10*60*1000; let ready=false, lastCheck=0;
+  const ME='20261025195651', KEY='au_tried', RETRY=10*60*1000; let ready=false, lastCheck=0;
   const typing=()=>{ const a=document.activeElement; return a&&/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)&&a.value&&a.type!=='search'; };
   const safe=()=>!typing()&&(typeof window.__canReload!=='function'||window.__canReload());
   const tried=()=>{ try{ const [b,t]=(sessionStorage.getItem(KEY)||'').split('|'); return b?{build:b,at:+t||0}:null; }catch(_){ return null; } };

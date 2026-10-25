@@ -471,10 +471,16 @@ both golf sections; comment boxes per section and on key questions). Answer keys
 ### GameCast (`gamecast_src.html` → `gamecast.html?e=<slug>`, `&view=tv` for the bar screen, `&follow=<player id>`)
 A spectator page, **read-only**: it reads the same `golf_event` + `golf_scores` (+ realtime) the scoring page reads and never
 writes — built so it cannot disturb a game in progress (the owner, Oct 2026: "don't build it where it messes with the live
-scoring"). Shows **the course** (18 holes drawn as schematic SVGs from par — `holeSVG`; Oak and Pecan have no hole geometry
-in the app, so no aerial map yet: the options discussed were Mapbox satellite with tee/green pins placed once, drawn holes,
-or none), with every group as a marker on the hole it is playing (`groupPos`: first hole in play order not scored by the
-whole group), a **hole panel** (par, hcp, yardage per tee, who is on it, everyone's score on it with a tally, a live skins
+scoring"). Shows **the course on an aerial map**: `COURSE_GEO` in golfcore (tee → green centerlines for all 36 holes, pulled from
+OpenStreetMap's `golf=hole` ways — © OpenStreetMap contributors, ODbL — sorted into Oak / Pecan by the Oak polygon and
+checked hole by hole against the card: every line is within a few yards of the Gold yardage, and runs tee → green), drawn
+with **Leaflet 1.9.4** (unpkg, loaded on demand, `loadLeaflet`; the one map instance `MAP` survives every render by moving
+its host div into the new card) over **Esri World Imagery** tiles (attribution shown; licence to confirm before Flagstick
+sells it — Mapbox is the paid alternative). Gold hole lines with hole-number labels near the tee, green dots, every group as
+a navy marker on the hole it is playing (`groupPos`: first hole in play order not scored by the whole group; finished
+groups on 18's green), tap a line / label / bar number to fly to that hole, Whole course to zoom out; a slim 1–18 bar under
+the map; the schematic SVG cards (`holeSVG`) remain the fallback for a course without geometry or when Leaflet fails to
+load (`mapFailed`), a **hole panel** (par, hcp, yardage per tee, who is on it, everyone's score on it with a tally, a live skins
 comp's state), the **Live feed** (`buildFeed`: scores replayed in `updated_at` order — birdies, eagles, aces, blow-ups, lead
 changes on the chosen competition's board, skins taken/lost **only for skins comps marked live**), the **board** per live
 competition, **Follow** a player (highlights, feed filtered, hole panel on their group). **Quiet competitions stay quiet**:
