@@ -185,7 +185,8 @@ async function boot(){
     const r=p.eventType==='DELETE'?p.old:p.new; if(!r) return; if(queue.some(q=>q.p===r.player_id&&q.h===r.hole)) return;
     scores[r.player_id]=scores[r.player_id]||{}; if(p.eventType==='DELETE') delete scores[r.player_id][r.hole]; else scores[r.player_id][r.hole]=r.strokes;
     if(tab!=='score') render(); }).subscribe();
-  setInterval(refresh,30000); setInterval(()=>{ if(tab==='finish'&&!BIG) refresh(); },10000); document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='visible') refresh(); });
+  setInterval(refresh,30000); setInterval(()=>{ if(tab==='finish'&&!BIG) refresh(); },10000);
+  if(BIG) setInterval(()=>{ const fl=(pub&&pub.flights)||[]; if(fl.length<2||qs.get('flight')) return; lbFlight=fl[(fl.indexOf(lbFlight)+1)%fl.length]; render(); },12000);   // the wall screen walks through the flights, 12 s each; ?flight=A pins one document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='visible') refresh(); });
   const saved=(()=>{ try{ return JSON.parse(localStorage.getItem(KEY)||'null'); }catch(_){ return null; } })();
   const qg=(qs.get('g')||'').trim();
   if(qg&&!BIG){ const ok=await join(qg,true); if(ok) history.replaceState(null,'',location.pathname+'?e='+encodeURIComponent(SLUG)); }
@@ -327,6 +328,7 @@ function renderBoard(fromJoin){
   const flights=pub.flights||[], hasNet=(pub.groups||[]).some(g=>g.players.some(p=>typeof p.ph==='number'||typeof p.ch==='number')), net=lbSort==='net'&&hasNet;
   const mine=new Set((group()||{players:[]}).players.map(p=>p.id));
   if(!BIG&&!lbFlight&&group()&&flights.length){ const me=group().players.find(p=>p.flight); if(me&&renderBoard.first!==false){ lbFlight=me.flight; renderBoard.first=false; } }
+  if(BIG&&flights.length&&!flights.includes(lbFlight)) lbFlight=flights[0];   // the board screen shows one flight at a time (and rotates through them, see boot)
   const BB=isTeamEvent(pub), noPl=eventFormats(pub).some(f=>(FORMATS[f]||{}).entry==='team'), unit=unitOf(pub), MATCH=unit==='match'; if(noPl) lbView='teams';
   const lb=eventBoard(pub,scores,{flight:lbFlight,sort:net?'net':'gross',view:BB?lbView:'players'});
   const valTxt=r=>MATCH?r.status:unit==='points'?ptsTxt(r):unit==='holes'?(r.n?(r.holesUp>0?'+':'')+r.holesUp:'—'):(r.n?toParTxt(net&&r.netToPar!=null?r.netToPar:r.toPar):'—');
@@ -336,7 +338,7 @@ function renderBoard(fromJoin){
    <div class="card" style="overflow:hidden">
    <div class="lb h${mcls}"><span>Pos</span><span>${MATCH?'Side':BB&&lbView==='teams'?'Team':'Player'}</span><span class="r">Thru</span><span class="r">${colHead}</span></div>
    ${lb.map(r=>`<div class="lb num${mcls}${mine.has(r.id)||(r.members||[]).some(id=>mine.has(id))?' me':''}" data-card="${esc(r.groupId)}|${esc(r.team?(r.members||[])[0]:r.id)}" style="cursor:pointer"><b>${r.posTxt}</b><div style="min-width:0"><div style="font-weight:700;${r.team?'line-height:1.25':'overflow:hidden;text-overflow:ellipsis;white-space:nowrap'}" title="${esc(r.name)}">${r.team?r.name.split(' / ').map(esc).join('<br>'):esc(r.name)}</div>${BIG&&!MATCH?'':subLine(r,net)}</div><span class="r muted">${r.n?r.thru:'—'}</span>${(()=>{ if(MATCH) return matchCell(r); if(unit==='points') return `<span class="tp ${r.n?'':'muted'}">${r.n?r.pts:'—'}</span>`; if(unit==='holes') return `<span class="tp ${r.n&&r.holesUp>0?'pos':r.n?'':'muted'}">${r.n?(r.holesUp>0?'+':'')+r.holesUp:'—'}</span>`; const v=net?r.netToPar:r.toPar; return `<span class="tp ${r.n&&v<0?'pos':r.n?'':'muted'}">${r.n&&v!=null?toParTxt(v):'—'}</span>`; })()}</div>`).join('')||'<div class="lb"><span></span><span class="muted">No players yet.</span></div>'}
-  </div><p class="muted" style="text-align:center;font-size:12.5px">${pub.status==='final'?'Final · ':''}${MATCH?formatSummary(pub):(net?'Net':'Gross')+' '+(BB&&lbView==='teams'?formatSummary(pub).toLowerCase():FORMAT_LABEL[playerFormatOf(pub)].toLowerCase())}${BIG?'':' · tap a row for the scorecard'}${lbFlight?' · Flight '+esc(lbFlight):''} · updates live</p>${fromJoin?'<p style="text-align:center"><button class="btn" id="backJoin">Back</button></p>':''}`;
+  </div><p class="muted" style="text-align:center;font-size:12.5px">${pub.status==='final'?'Final · ':''}${MATCH?formatSummary(pub):(net?'Net':'Gross')+' '+(BB&&lbView==='teams'?formatSummary(pub).toLowerCase():FORMAT_LABEL[playerFormatOf(pub)].toLowerCase())}${BIG?'':' · tap a row for the scorecard'}${lbFlight?' · Flight '+esc(lbFlight):''}${BIG&&flights.length>1&&!qs.get('flight')?` · flights ${flights.join(', ')} take turns`:''} · updates live</p>${fromJoin?'<p style="text-align:center"><button class="btn" id="backJoin">Back</button></p>':''}`;
   const bj=$('backJoin'); if(bj) bj.onclick=()=>renderJoin();
   document.querySelectorAll('[data-comp]').forEach(b=>b.onclick=()=>{ lbComp=b.dataset.comp; renderBoard(fromJoin); }); chipIntoView();
   document.querySelectorAll('[data-fl]').forEach(b=>b.onclick=()=>{ lbFlight=b.dataset.fl; renderBoard.first=false; renderBoard(fromJoin); });

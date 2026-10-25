@@ -66,6 +66,19 @@ async def main():
     check('the › arrow records par for an untouched hole and it reaches the server',r['before'] is None and r['after']==r['par'] and r['hole']==10 and len(srv)==1 and srv[0]['strokes']==r['par'],json.dumps(r))
     r=await sc.evaluate("""async()=>{ const g=group(), order=playOrder(g.startHole); holeIdx=10; renderHole(); const h=order[10]; document.getElementById('prev').click(); return {h, left:(scores.p3||{})[h]||null, hole:holeIdx}; }""")
     check('going back leaves the hole alone',r['left'] is None and r['hole']==9,json.dumps(r))
+    # --- flights on the board: none → no mention of flights; two → the TV shows one at a time and the phone gets tabs
+    r=await tv.evaluate("()=>({txt:document.getElementById('main').textContent, chips:document.querySelectorAll('[data-fl]').length})")
+    check('no flights: nothing about flights on the board screen','Flight' not in r['txt'] and 'flights' not in r['txt'] and r['chips']==0,json.dumps(r)[:200])
+    row2=fdb._rows('golf_events')[0]; saved=copy.deepcopy(row2['public']); row2['public']['flights']=['A','B']
+    for g in row2['public']['groups']:
+        for q in g['players']: q['flight']='A' if q['id']!='p3' else 'B'
+    fl=await tv.evaluate("()=>refresh().then(()=>({flight:lbFlight, title:document.querySelector('h1').textContent, rows:[...document.querySelectorAll('.lb.num')].map(r=>r.children[1].textContent), foot:document.querySelector('main>p.muted').textContent}))")
+    check('two flights: the board screen shows one flight at a time and says the flights take turns',fl['flight']=='A' and 'Flight A' in fl['title'] and fl['rows']==['Ann Able','Bo Baker'] and 'take turns' in fl['foot'],json.dumps(fl))
+    E=await b.new_context(); await cloud(E,fdb,no_session=True); ph=await E.new_page()   # a fresh phone: no remembered group ID
+    await ph.goto(page('score.html')+'?e=test-day'); await ph.wait_for_function("()=>!!pub&&!!document.getElementById('code')")
+    pf=await ph.evaluate("()=>loadScores().then(()=>{ renderBoard(true); return {chips:[...document.querySelectorAll('[data-fl]')].map(b=>b.textContent), rows:document.querySelectorAll('.lb.num').length}; })")
+    check('two flights: the phone board gets a tab per flight',pf['chips']==['All','Flight A','Flight B'] and pf['rows']==3,json.dumps(pf))
+    row2['public']=saved; await ph.close()
     # --- GameCast: read-only follow-along against the same rows — the course with the groups on their holes, the feed, the board
     gc=await D.new_page(); gcerr=[]; gc.on('pageerror',lambda e:gcerr.append(str(e)))
     await gc.goto(page('gamecast.html')+'?e=test-day'); await gc.wait_for_function("()=>!!pub&&document.querySelectorAll('.hole').length===18")
