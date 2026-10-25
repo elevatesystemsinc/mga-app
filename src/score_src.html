@@ -458,28 +458,29 @@ function calloutStage(comp){
   const vtxt=({par:'par',netpar:'net par',bogey:'bogey',netbogey:'net bogey'})[sk.validate]||'';
   const lowAt=h=>{ const rows=[]; for(const g of cp.groups||[]){ const c=cp.courses[g.course]; if(!c) continue; for(const p of g.players){ const s=+((scores[p.id]||{})[h]); if(!s) continue; const k=sk.net&&typeof p.ph==='number'?strokesAt(cp,c,p.set,h,p.ph):0; rows.push({name:p.name,s,net:s-k}); } }
     if(!rows.length) return null; const key=x=>sk.net?x.net:x.s, low=Math.min(...rows.map(key)); return {low,who:rows.filter(x=>key(x)===low)}; };
-  // the hole comes first, then the verdict it decides — never the other way round; a skin's value (pot ÷ skins won) only at the end
+  // a skin reads "needs net par or better on hole N" until its verdict flashes, which happens the moment hole N is called,
+  // before N's own result — never skipping ahead; a skin's value (pot ÷ skins won) only at the end
   const revealed=new Set(); let i=0, flash=null;
   const decidedBy=h=>validating&&h!=null?r.wins.find(x=>x.checkHole===h&&x.status!=='pending'&&!revealed.has(x.hole)):null;
   const madeOn=w=>{ for(const g of cp.groups||[]){ const c=cp.courses[g.course]; if(!c) continue; for(const p of g.players){ if(p.id!==w.pid) continue; const s=+((scores[p.id]||{})[w.checkHole]); if(!s) return ''; const k=sk.net&&typeof p.ph==='number'?strokesAt(cp,c,p.set,w.checkHole,p.ph):0; return `made ${s}${k?' (net '+(s-k)+')':''} on hole ${w.checkHole}`; } } return ''; };
   const lineFor=h=>{ const w=winAt[h], L=lowAt(h); if(!L) return {h,txt:'No scores on this hole',cls:'muted'};
     if(w){ const name=`${w.name} · ${w.score}${sk.net&&w.net!==w.score?' (net '+w.net+')':''}`, fin=i>=order.length, worth=per?`${w.count>1?w.count+' holes':'1 hole'} · ${money(val*w.count)}`:fin?`skin · ${money(val)}`:'skin';
-      if(validating&&w.checkHole!=null&&!revealed.has(w.hole)) return {h,txt:name,sub:`skin — validates on hole ${w.checkHole}`,cls:'pending'};
-      if(w.status==='won') return {h,txt:name,sub:worth+(validating&&w.checkHole!=null?' · validated on hole '+w.checkHole:''),cls:'won'};
-      if(w.status==='void') return {h,txt:name,sub:`didn’t validate on hole ${w.checkHole}${per?' — carried on':' — no skin'}`,cls:'void'};
+      if(validating&&w.checkHole!=null&&!revealed.has(w.hole)) return {h,txt:name,sub:`skin — needs ${vtxt} or better on hole ${w.checkHole} to hold`,cls:'pending'};
+      if(w.status==='won') return {h,txt:name,sub:worth+(validating&&w.checkHole!=null?` · held — ${vtxt} on hole ${w.checkHole}`:''),cls:'won'};
+      if(w.status==='void') return {h,txt:name,sub:`lost — missed ${vtxt} on hole ${w.checkHole}${per?', carried on':', no skin'}`,cls:'void'};
       return {h,txt:name,sub:`waiting on hole ${w.checkHole}`,cls:'pending'}; }
     return {h,txt:L.who.length>1?`${L.who.map(x=>first(x.name)).join(', ')} tied at ${L.low}`:`${L.who[0].name} low, but not outright`,sub:per?'carries over':'no skin',cls:'muted'}; };
   const ov=document.createElement('div'); ov.className='ov'; document.body.appendChild(ov);
   const close=async()=>{ const done=i>=order.length; ov.remove(); if(done&&!((wrap&&wrap.callouts)||{})[comp.id]) await wrapCall('callout',{comp:comp.id}); render(); };
-  const paint=()=>{ const verdict=decidedBy(order[i-1]), done=i>=order.length&&!verdict&&!flash;
+  const paint=()=>{ const done=i>=order.length&&!flash;
     ov.innerHTML=`<div class="hd"><b>${esc(comp.name)}<small>${esc(pub.name)} · from the cards</small></b><button class="x" id="ovX" aria-label="Close">✕</button></div>
       ${flash?`<div class="flash ${flash.ok?'ok':'bad'}"><div class="fh">Hole ${flash.w.hole} · ${esc(flash.w.name)}</div><div class="big">${flash.ok?'Validated':'Didn’t validate'}</div><div class="fs">${esc(madeOn(flash.w)||'')}${flash.ok?` — ${esc(vtxt)} or better, the skin stands`:` — needed ${esc(vtxt)}${per?', carried on':', no skin'}`}</div></div>`
       :`<div class="bd"><div class="lbl">${done?'All 18 holes':'Hole by hole'}</div>${order.slice(0,i).map(lineFor).map(l=>`<div class="skl ${l.cls}"><b>${l.h}</b><div><span>${esc(l.txt)}</span>${l.sub?`<small>${esc(l.sub)}</small>`:''}</div></div>`).join('')}
         ${done?`<div class="lbl" style="margin-top:18px">The skins</div>${r.total?Object.entries(r.per).map(([pid,n])=>`<div class="dsum"><span>${n} ${per?'hole':'skin'}${n===1?'':'s'}</span><b>${esc(pubNames(pub)[pid]||'?')} · ${money(val*n)}</b></div>`).join(''):'<div class="dsum"><span>—</span><b>No skins today — the pot stays put</b></div>'}${r.pending?`<div class="dsum"><span>${r.pending}</span><b>still pending a validation hole</b></div>`:''}`:''}</div>`}
-      <div class="bar"><span><b>${(comp.players||[]).length}</b> in</span><span><b>${money(total)}</b> pot</span>${done?`<button class="go" id="ovGo">Done</button>`:`<button class="go" id="ovGo">${flash?(i>=order.length?'The skins':'Next hole'):verdict?`Hole ${verdict.hole} — did it validate?`:i?'Next hole':'Start at hole '+order[0]}</button>`}</div>`;
+      <div class="bar"><span><b>${(comp.players||[]).length}</b> in</span><span><b>${money(total)}</b> pot</span>${done?`<button class="go" id="ovGo">Done</button>`:`<button class="go" id="ovGo">${flash?'Show hole '+order[i]:i?'Next hole':'Start at hole '+order[0]}</button>`}</div>`;
     ov.querySelector('#ovX').onclick=close; ov.querySelector('#ovGo').onclick=done?close:next; const bd=ov.querySelector('.bd'); if(bd) bd.scrollTop=bd.scrollHeight; };
-  const next=()=>{ if(flash){ revealed.add(flash.w.hole); flash=null; paint(); return; }   // back to the holes, the verdict now on its line
-    const w=decidedBy(order[i-1]); if(w){ flash={w,ok:w.status==='won'}; paint(); return; }   // the hole just called decides a skin: the verdict
+  const next=()=>{ if(flash){ revealed.add(flash.w.hole); flash=null; if(!decidedBy(order[i])) i++; paint(); return; }   // on to the hole itself (or the next verdict it decides)
+    const w=decidedBy(order[i]); if(w){ flash={w,ok:w.status==='won'}; paint(); return; }   // the hole about to be called decides a skin: the verdict first
     i++; paint(); };
   paint();
 }
