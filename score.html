@@ -47,7 +47,8 @@ h1{font-family:var(--serif);font-weight:700;color:var(--navy);font-size:32px;mar
 .pl .sub{font-size:12.5px;color:var(--muted)}
 .step{height:56px;border-radius:12px;border:1px solid var(--line);background:var(--ivory);font-size:28px;font-weight:600;color:var(--navy)}
 .val{height:56px;border-radius:12px;border:2px solid var(--navy);display:flex;align-items:center;justify-content:center;font-size:28px;font-weight:800;background:#fff}
-.val.empty{border-style:dashed;border-color:#CFC6AE;color:#A8A08A}
+/* an untouched hole reads as the par it will be saved as — no grey, nothing to "fix" (the owner: the dashed grey made people think they had to move it) */
+.val.empty{border-color:var(--navy);color:var(--ink)}
 .val.under{background:#E3F0E8;border-color:var(--pos);color:var(--pos)} .val.over{background:#F8E6DF;border-color:var(--neg);color:var(--neg)}
 .strip{display:grid;grid-template-columns:repeat(9,minmax(0,1fr));gap:6px;margin-top:14px}
 .strip button{height:38px;border-radius:8px;border:1px solid var(--line);background:#fff;font-weight:700;font-size:13px;color:var(--muted)}
@@ -1166,7 +1167,7 @@ window.__canReload=()=>!queue.length;
    page counts, and a reload is tried once per build — if the page that comes back is still the old one, the CDN
    hasn't caught up; wait a while before trying that build again. */
 (function(){
-  const ME='20261025164125', KEY='au_tried', RETRY=10*60*1000; let ready=false, lastCheck=0;
+  const ME='20261025164250', KEY='au_tried', RETRY=10*60*1000; let ready=false, lastCheck=0;
   const typing=()=>{ const a=document.activeElement; return a&&/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)&&a.value&&a.type!=='search'; };
   const safe=()=>!typing()&&(typeof window.__canReload!=='function'||window.__canReload());
   const tried=()=>{ try{ const [b,t]=(sessionStorage.getItem(KEY)||'').split('|'); return b?{build:b,at:+t||0}:null; }catch(_){ return null; } };
