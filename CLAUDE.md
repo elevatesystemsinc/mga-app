@@ -296,6 +296,9 @@ Tournament = { id, name, season, days, startDate, field:[{id,memberId,team,paid,
     table back on — designer, "Handicaps"): `syncGameEvent` sets `ev.allow={'*':100}`, `pctFor` honours `'*'` for every
     player format (never the per-player scramble tables), `compPub` keeps it, so stroke play, best ball, skins and the
     matches all play full handicaps on the hub and the phones.
+  - **Small-group games never have flights** (the owner, Oct 2026): a game's event page has no Flights tab (Players ·
+    Groups · Leaderboard), `syncGameEvent` leaves `flight` empty, and the boards / GameCast only speak of flights when
+    an event carries them (tournament rounds, Golf events).
   - **Groups & handicaps** (`gameGroupsCard`/`wireGameGroups` on the game page): per group the course, starting hole
     and tee time; per player an index for the day (`p.index` on the event player, blank = the directory index), the
     tee, and CH / PH from `playerHcp`; a Group select moves a player (or starts a new group). **All of it works

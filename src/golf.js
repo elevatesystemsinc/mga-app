@@ -227,6 +227,7 @@ function editEvent(ev){
 
 /* Event detail */
 function vGolfEvent(m,ev){
+  if(ev.gameId&&view.getab==='flights') view.getab='groups';   // small-group games never have flights (the owner, Oct 2026)
   publishIfChanged(ev);
   const pub=publicEvent(ev), lb=leaderboard(pub,scoresFor(ev)), link=scoringLink(ev);
   const t=db.tournaments.find(x=>x.id===ev.tournamentId);
@@ -236,7 +237,7 @@ function vGolfEvent(m,ev){
   <div class="card pad" style="display:flex;gap:12px 20px;align-items:center;flex-wrap:wrap"><div class="cell2" style="flex:1 1 320px;min-width:0"><span class="lbl">Scoring link</span><a href="${esc(link)}" target="_blank" rel="noopener" class="trunc" style="font-weight:600;font-size:15px">${esc(link)}</a><small class="muted">${ev.status==='live'?'Open — groups can enter scores now.':ev.status==='final'?'Closed — the leaderboard is final. Scorers can still view it.':'Draft — the link shows the event but scoring is off until you open it.'}</small></div>
     <div class="actions"><button class="btn sm" id="gCopy">Copy link</button><a class="btn sm" href="${esc(link)}" target="_blank" rel="noopener">Open scoring page</a><a class="btn sm" href="${esc(gamecastLink(ev))}" target="_blank" rel="noopener">GameCast</a><a class="btn sm" href="${esc(link)}&view=board" target="_blank" rel="noopener">Leaderboard screen</a></div></div>
   ${!CLOUD||!sessionOK?`<div class="banner">This device isn’t signed in to the cloud, so the public scoring page can’t see this event. Scores you enter here stay on this device.</div>`:''}
-  <div class="tabs">${[['field','1 · Field'],['flights','2 · Flights'],['groups','3 · Groups'],['board','Leaderboard']].map(([k,l])=>`<button class="tab${view.getab===k?' on':''}" data-get="${k}">${l}</button>`).join('')}</div><div id="gebody" style="display:flex;flex-direction:column;gap:16px"></div>`;
+  <div class="tabs">${(ev.gameId?[['field','1 · Players'],['groups','2 · Groups'],['board','Leaderboard']]:[['field','1 · Field'],['flights','2 · Flights'],['groups','3 · Groups'],['board','Leaderboard']]).map(([k,l])=>`<button class="tab${view.getab===k?' on':''}" data-get="${k}">${l}</button>`).join('')}</div><div id="gebody" style="display:flex;flex-direction:column;gap:16px"></div>`;
   $('gBack').onclick=()=>{ view.geid=null; render(); };
   $('gEdit').onclick=()=>editEvent(ev);
   const op=$('gOpen'); if(op) op.onclick=()=>{ if(!ev.groups.length){ toast('Add at least one group first'); return; } ev.status='live'; golfSave(ev); render(); toast('Scoring is open'); };
@@ -409,7 +410,7 @@ function gField(el,ev){
   const imp=$('gfImp'); if(imp) imp.onclick=()=>importFieldToEvent(ev,t);
   const dr=$('gfDraw'); if(dr) dr.onclick=()=>drawPartners(ev);
   $('gfAdd').onclick=()=>editFieldPlayer(ev,null);
-  const nx=$('gfNext'); if(nx) nx.onclick=()=>{ view.getab='flights'; render(); };
+  const nx=$('gfNext'); if(nx) nx.onclick=()=>{ view.getab=ev.gameId?'groups':'flights'; render(); };   // a small group's game never has flights
   el.querySelectorAll('[data-fp]').forEach(r=>r.onclick=()=>editFieldPlayer(ev,all.find(x=>x.p.id===r.dataset.fp)));
 }
 function importFieldToEvent(ev,t){
