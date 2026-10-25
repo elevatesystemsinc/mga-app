@@ -270,7 +270,8 @@ function renderHole(){
   </div>
   <div class="strip" aria-label="Holes">${order.map((hh,i)=>{ const who=(FORMATS[holeFormat(pub,hh)]||{}).entry==='team'?teams.map(t=>t.captain):g.players; const n=who.filter(p=>(scores[p.id]||{})[hh]).length; return `<button data-go="${i}" class="${n===who.length?'done':n?'part':''}${i===holeIdx?' cur':''}" aria-label="Hole ${hh}">${hh}</button>`; }).join('')}</div>
   <p style="text-align:center;margin-top:18px"><button class="btn" id="leave" style="height:40px;font-size:13px">Not your group? Switch group ID</button></p>`;
-  const bump=(id,d)=>{ const r=rows.find(x=>x.id===id), cur=(scores[id]||{})[h]; const nv=Math.max(1,Math.min(20,(cur||par(r.p))+(cur?d:(d>0?0:-1)))); setStroke(id,h,nv); renderHole(); };
+  // one tap is one stroke either way: an untouched hole already reads par, so + makes it par + 1 and − par − 1
+  const bump=(id,d)=>{ const r=rows.find(x=>x.id===id), cur=(scores[id]||{})[h]; const nv=Math.max(1,Math.min(20,(cur||par(r.p))+d)); setStroke(id,h,nv); renderHole(); };
   document.querySelectorAll('[data-m]').forEach(b=>b.onclick=()=>bump(b.dataset.m,-1));
   document.querySelectorAll('[data-p]').forEach(b=>b.onclick=()=>bump(b.dataset.p,1));
   $('parAll').onclick=()=>{ rows.forEach(r=>{ if(!(scores[r.id]||{})[h]) setStroke(r.id,h,par(r.p)); }); renderHole(); };
