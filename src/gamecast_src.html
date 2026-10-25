@@ -103,7 +103,7 @@ const parOf=(p,h)=>{ const c=pub.courses[p.grp.course]; return c?(c.par[p.set||'
 const relName=r=>r<=-3?'Albatross':r===-2?'Eagle':r===-1?'Birdie':r===0?'Par':r===1?'Bogey':r===2?'Double':'+'+r;
 /* ---- the feed: replayed from the scores in the order they came in ---- */
 function buildFeed(){
-  const P=new Map(allPlayers().map(p=>[p.id,p])), items=[], cp=comp?compPub(pub,comp):pub, sofar={}; let leader=null;
+  const P=new Map(allPlayers().map(p=>[p.id,p])), items=[], cp=comp?compPub(pub,comp):pub, sofar={}; let leader=null;   // comp false/null → the round itself
   const boardLeader=()=>{ try{ const rows=eventBoard(cp,sofar,{sort:cp.scoring||'gross',view:'teams'}).filter(r=>r.n); return rows.length&&rows[0].posTxt&&!rows[0].posTxt.startsWith('T')?rows[0]:null; }catch(_){ return null; } };
   for(const s of stamps){ const p=P.get(s.p); if(!p||!s.s) continue; (sofar[s.p]=sofar[s.p]||{})[s.h]=s.s; const par=parOf(p,s.h), r=s.s-par;
     if(s.s===1) items.push({at:s.at,k:'ace',big:true,who:[s.p],html:`<span class="ic">⛳</span><b>${esc(p.name)}</b> — a hole-in-one on ${s.h}!`});
@@ -125,7 +125,7 @@ function holeSVG(h,par,groupsHere){
 
 /* ---- render ---- */
 function render(){ if(!pub) return; setSync();
-  const groups=pub.groups||[], P=allPlayers(), cs=liveComps(); if(comp==null||(comp&&!cs.some(c=>c.id===comp.id))) comp=cs[0]||null;
+  const groups=pub.groups||[], P=allPlayers(), cs=liveComps(); if(comp==null||(comp&&!cs.some(c=>c.id===comp.id))) comp=cs[0]||false;   // false = the round itself (everyone's own gross / net)
   const c0=pub.courses[(groups[0]||{}).course]||Object.values(pub.courses||{})[0]||{par:{M:[]},hcp:{M:[]},tees:{}};
   const pos=groups.map(g=>Object.assign({g},groupPos(g))), fg=follow?P.find(p=>p.id===follow):null;
   if(holeSel==null) holeSel=fg&&pos.find(x=>x.g.id===fg.grp.id)?.cur||pos.find(x=>x.cur)?.cur||1;
@@ -154,13 +154,13 @@ function render(){ if(!pub) return; setSync();
    <div class="col">
     <div class="card"><div class="ch"><h2>Live</h2><small>${feed.length?feed.length+' moments':'as it happens'}</small></div>
       <div class="feed">${feed.length?feed.slice(0,TV?18:40).map(it=>`<div class="fi${it.big?' big':''}"><time>${when(it.at)}</time><div>${it.html}</div></div>`).join(''):'<div class="empty">Nothing yet — the first birdie, skin or lead change shows here.</div>'}</div></div>
-    <div class="card"><div class="ch"><h2>${esc(comp?comp.name:'Leaderboard')}</h2><small>${esc(MATCH?formatSummary(cp):(net?'net':'gross')+' · '+formatSummary(cp).toLowerCase())}</small></div>
-      ${cs.length>1?`<div class="chips">${cs.map(c=>`<button data-comp="${esc(c.id)}" class="${comp&&comp.id===c.id?'on':''}">${esc(c.name)}</button>`).join('')}</div>`:''}
+    <div class="card"><div class="ch"><h2>${esc(comp?comp.name:cs.length?'Individual':'Leaderboard')}</h2><small>${esc(MATCH?formatSummary(cp):(net?'net':'gross')+' · '+formatSummary(cp).toLowerCase())}</small></div>
+      ${cs.length?`<div class="chips">${cs.map(c=>`<button data-comp="${esc(c.id)}" class="${comp&&comp.id===c.id?'on':''}">${esc(c.name)}</button>`).join('')}<button data-comp="" class="${comp===false?'on':''}">Individual</button></div>`:''}
       <div class="lb h"><span>Pos</span><span>${MATCH?'Side':'Player'}</span><span class="r">Thru</span><span class="r">${MATCH?'Match':unit==='points'?'Pts':unit==='holes'?'Holes':net?'Net':'To par'}</span></div>
       ${lb.map(r=>`<div class="lb num${fg&&(r.id===fg.id||(r.members||[]).includes(fg.id))?' me':''}"><b>${r.posTxt}</b><span style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(r.name)}</span><span class="r muted">${r.n?r.thru:'—'}</span><span class="tp ${r.n&&String(val(r)).startsWith('−')?'pos':''}">${esc(val(r))}</span></div>`).join('')||'<div class="empty">No scores yet.</div>'}
       <div class="bar"><label class="muted" style="font-size:13px">Follow</label><select class="sel" id="follow"><option value="">Everyone</option>${P.slice().sort((a,b)=>a.name.localeCompare(b.name)).map(p=>`<option value="${esc(p.id)}"${p.id===follow?' selected':''}>${esc(p.name)}</option>`).join('')}</select>${TV?'':`<a class="btn" href="${esc(location.pathname+'?e='+encodeURIComponent(SLUG)+'&view=tv')}" style="margin-left:auto;display:inline-flex;align-items:center;text-decoration:none">TV screen</a>`}</div></div></div>`;
   document.querySelectorAll('[data-h]').forEach(b=>b.onclick=()=>{ holeSel=+b.dataset.h; render(); if(innerWidth<900) $('holeCard').scrollIntoView({behavior:'smooth',block:'start'}); });
-  document.querySelectorAll('[data-comp]').forEach(b=>b.onclick=()=>{ comp=cs.find(c=>c.id===b.dataset.comp)||null; render(); });
+  document.querySelectorAll('[data-comp]').forEach(b=>b.onclick=()=>{ comp=cs.find(c=>c.id===b.dataset.comp)||false; render(); });
   const fs=$('follow'); if(fs) fs.onchange=()=>{ follow=fs.value; holeSel=null; render(); };
 }
 async function refresh(){ if(document.visibilityState!=='visible') return; const r=await loadEvent(); if(r==='error'||r==='none') return; await loadScores(); render(); }

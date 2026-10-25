@@ -227,8 +227,9 @@ Tournament = { id, name, season, days, startDate, field:[{id,memberId,team,paid,
     (`rules.live`, default on; skins use `rules.skins.live`, dots never show). `gameComps(ev)` → the live competitions
     as `{id,name,kind,players,teams,sitOut,engine…}`; `publicEvent` publishes them as `comps`, and the scoring page
     (score_src.html: `compChips`, `renderCompBoard`, `renderSkinsBoard`) shows one board per competition — a game opens on
-    its first competition (the raw round board only appears for events without competitions), the chips are one
-    scrolling row, the header drops the date the event name already carries, and a row's sub-line is gross · net
+    its first competition, and the round itself is always there as the last chip — **Individual** (everyone's own
+    gross / net, whatever the games are; "The round" for a one-ball game), the owner, Oct 2026: "even if there isn't
+    an individual game"; GameCast's board has the same tab — the chips are one scrolling row, the header drops the date the event name already carries, and a row's sub-line is gross · net
     (course only when the field is split across courses). `potPub(g,pot)`
     = `compPub(publicEvent(ev), potComp(g,pot))` (golfcore) is the same cut-down used by the game page's standings.
   - **Removing a player is total** (`removePlayer(g,p)`, the game page's ✕ or the designer's ✕ + Save): out of every

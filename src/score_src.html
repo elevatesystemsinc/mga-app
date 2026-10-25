@@ -300,7 +300,10 @@ function showCardFor(gid,pid){
 /* a small-group game's competitions ride along with the event; each is its own board */
 const chipIntoView=()=>{ const on=document.querySelector('.chips button.on'); if(on&&on.scrollIntoView) try{ on.scrollIntoView({block:'nearest',inline:'center'}); }catch(_){ } };
 const liveComps=()=>(pub.comps||[]).filter(c=>c.live!==false);
-function compChips(){ const cs=liveComps(); if(cs.length<2) return ''; return `<div class="chips">${cs.map(c=>`<button data-comp="${esc(c.id)}" class="${lbComp===c.id?'on':''}">${esc(c.name)}</button>`).join('')}</div>`; }
+/* one chip per live competition, plus the round itself — everyone's own gross and net, whatever the games are (the owner:
+   "even if there isn't an individual game") */
+const rawLabel=()=>eventFormats(pub).some(f=>(FORMATS[f]||{}).entry==='team')?'The round':'Individual';
+function compChips(){ const cs=liveComps(); if(!cs.length) return ''; return `<div class="chips">${cs.map(c=>`<button data-comp="${esc(c.id)}" class="${lbComp===c.id?'on':''}">${esc(c.name)}</button>`).join('')}<button data-comp="" class="${lbComp===''?'on':''}">${rawLabel()}</button></div>`; }
 const multiCourse=()=>Object.keys(pub.courses||{}).length>1;
 /* the small line under a name: the course only when the field is split across courses, then the other basis — always
    to par, never a total, because groups further along would always carry the higher total */

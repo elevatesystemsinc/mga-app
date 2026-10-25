@@ -46,6 +46,11 @@ async def main():
     A,ea=await phone('ABC12'); B,eb=await phone('DEF34')
     r=await A.evaluate("()=>{ const f=document.getElementById('tabFinish'); return {shown:!f.hidden, chips:[...document.querySelectorAll('[data-comp]')].map(x=>x.textContent)}; }")
     check('Finish tab offered for a game; the quiet skins stay off the board chips',r['shown'] and 'Skins' not in r['chips'],json.dumps(r))
+    # the board always has the round itself as a tab — everyone's own gross and net — next to the competitions
+    rb=await A.evaluate("""async()=>{ tab='board'; await loadScores(); render(); const chips=[...document.querySelectorAll('[data-comp]')].map(b=>b.textContent); document.querySelector('[data-comp=""]').click(); await new Promise(r=>setTimeout(r,50));
+      return {chips, on:document.querySelector('[data-comp].on').textContent, rows:document.querySelectorAll('.lb.num').length, head:document.querySelector('.lb.h').textContent, sorts:[...document.querySelectorAll('[data-sort]')].map(b=>b.textContent)}; }""")
+    check('board: an Individual tab beside the competitions, with gross / net',rb['chips']==['Stroke play','Blind-draw partners','Individual'] and rb['on']=='Individual' and rb['rows']==4 and rb['sorts']==['Gross','Net'],json.dumps(rb))
+    await A.evaluate("()=>{ tab='score'; render(); }")
     await A.evaluate("()=>{ tab='finish'; return loadScores().then(render); }"); await A.wait_for_function("()=>!!document.getElementById('wfClose')")
     r=await A.evaluate("()=>{ const S=wrapSteps().steps; return {steps:S.map(s=>[s.k,s.state]), cards:document.querySelector('.wstep.now .ln').textContent}; }")
     check('steps in order, close scoring first, every card complete',r['steps']==[['close','now'],['skins','later'],['draw','later'],['winners','later'],['money','later']] and '4 of 4' in r['cards'],json.dumps(r))
