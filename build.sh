@@ -10,13 +10,13 @@ MODULES="core ui logins portal treasury golfcore golf games calccore pdffonts ca
 python3 - <<'PY'
 import os
 B=os.environ['BUILD']; au=open('src/autoupdate.js').read().replace('__BUILD__',B).strip('\n')
-for page,core,marker in [('cashier','calccore','/*CALCCORE*/'),('checkin','ckcore','/*CKCORE*/'),('score','golfcore','/*GOLFCORE*/'),('survey',None,None)]:
+for page,core,marker in [('cashier','calccore','/*CALCCORE*/'),('checkin','ckcore','/*CKCORE*/'),('score','golfcore','/*GOLFCORE*/'),('gamecast','golfcore','/*GOLFCORE*/'),('survey',None,None)]:
     s=open(f'src/{page}_src.html').read()
     assert (not marker or marker in s) and '/*AUTOUPDATE*/' in s, f'{page}: markers missing'
     if marker: s=s.replace(marker,open(f'src/{core}.js').read().strip('\n'))
     open(f'{page}.html','w').write(s.replace('/*AUTOUPDATE*/',au))
 PY
-for f in index cashier checkin score survey; do   # syntax-check every page's script
+for f in index cashier checkin score gamecast survey; do   # syntax-check every page's script
   python3 -c "import re; s=open('$f.html').read(); open('/tmp/_chk_$f.js','w').write('\n'.join(re.findall(r'<script>(.*?)</script>',s,flags=re.S)))"
   node --check "/tmp/_chk_$f.js"
 done

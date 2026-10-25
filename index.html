@@ -3644,6 +3644,7 @@ const CODE_CHARS='ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 function newCode(ev){ let c; do{ c=Array.from({length:5},()=>CODE_CHARS[Math.floor(Math.random()*CODE_CHARS.length)]).join(''); }while(ev.groups.some(g=>g.code===c)); return c; }
 const slugify=s=>String(s||'').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'').slice(0,40)||'event';
 function scoringLink(ev){ return SITE_BASE+'score.html?e='+encodeURIComponent(ev.slug); }
+const gamecastLink=ev=>SITE_BASE+'gamecast.html?e='+encodeURIComponent(ev.slug);   // follow along, no group ID
 function playerIndex(p){ const own=p.index!=null&&String(p.index).trim()!==''?p.index:null; const m=p.memberId?memberById(p.memberId):null; return parseIndex(own!=null?own:(m?m.hcp:null)); }
 /* the index a player plays off in an event: the tournament's partner differential cap (e.g. 10 strokes) pulls the
    higher partner's index down to the lowest partner's index + cap before the course handicap is worked out */
@@ -3825,7 +3826,7 @@ function vGolfEvent(m,ev){
   <div class="phead"><div><h1 class="h1">${esc(ev.name)}</h1><div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">${evStatusChip(ev)}<span class="chip">${ev.date?shortDate(ev.date):'Date TBD'}</span><span class="chip">${evSummary(ev)} · ${ev.scoring==='net'?'net':'gross'}</span>${ev.flights.count?`<span class="chip gold">${ev.flights.count} flights</span>`:''}<span class="chip">${evPlayers(ev).length} players · ${ev.groups.length} groups</span>${t?`<span class="chip">${esc(t.name)}</span>`:''}</div></div>
     <div class="actions">${ev.status==='live'?`<button class="btn" id="gClose">Close scoring</button>`:`<button class="btn pri" id="gOpen">${ev.status==='final'?'Reopen scoring':'Open scoring'}</button>`}<button class="btn" id="gEdit">${I.edit}Details</button></div></div>
   <div class="card pad" style="display:flex;gap:12px 20px;align-items:center;flex-wrap:wrap"><div class="cell2" style="flex:1 1 320px;min-width:0"><span class="lbl">Scoring link</span><a href="${esc(link)}" target="_blank" rel="noopener" class="trunc" style="font-weight:600;font-size:15px">${esc(link)}</a><small class="muted">${ev.status==='live'?'Open — groups can enter scores now.':ev.status==='final'?'Closed — the leaderboard is final. Scorers can still view it.':'Draft — the link shows the event but scoring is off until you open it.'}</small></div>
-    <div class="actions"><button class="btn sm" id="gCopy">Copy link</button><a class="btn sm" href="${esc(link)}" target="_blank" rel="noopener">Open scoring page</a><a class="btn sm" href="${esc(link)}&view=board" target="_blank" rel="noopener">Leaderboard screen</a></div></div>
+    <div class="actions"><button class="btn sm" id="gCopy">Copy link</button><a class="btn sm" href="${esc(link)}" target="_blank" rel="noopener">Open scoring page</a><a class="btn sm" href="${esc(gamecastLink(ev))}" target="_blank" rel="noopener">GameCast</a><a class="btn sm" href="${esc(link)}&view=board" target="_blank" rel="noopener">Leaderboard screen</a></div></div>
   ${!CLOUD||!sessionOK?`<div class="banner">This device isn’t signed in to the cloud, so the public scoring page can’t see this event. Scores you enter here stay on this device.</div>`:''}
   <div class="tabs">${[['field','1 · Field'],['flights','2 · Flights'],['groups','3 · Groups'],['board','Leaderboard']].map(([k,l])=>`<button class="tab${view.getab===k?' on':''}" data-get="${k}">${l}</button>`).join('')}</div><div id="gebody" style="display:flex;flex-direction:column;gap:16px"></div>`;
   $('gBack').onclick=()=>{ view.geid=null; render(); };
@@ -4602,6 +4603,7 @@ function vQuickShare(m,g){
     <div class="card pad" style="display:flex;flex-direction:column;gap:12px"><div><b>Send everyone the scoring link.</b><span class="muted"> They open it on their phone and type their group ID — it’s on the groups below and on the game sheet.</span></div>
       <a class="qlink" href="${esc(link)}" target="_blank" rel="noopener">${esc(link)}</a>
       <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn pri" id="qgSend" style="flex:1">Send the link…</button><button class="btn" id="qgCopy" style="flex:1">Copy link</button></div>
+      <p class="hint" style="margin:0">Spectators: <a href="${esc(gamecastLink(ev))}" target="_blank" rel="noopener">GameCast</a> follows the game live without a group ID.</p>
       <div id="qgQR" style="display:flex;justify-content:center"></div></div>
     <div class="card" style="overflow:hidden"><div class="cardhead"><div><h2 class="h2">Groups</h2><span class="muted">Each group scores under its own ID — move people around on the game page.</span></div></div>
       <div class="mini" style="margin:0 22px 14px">${ev.groups.map(grp=>`<div class="mr" style="grid-template-columns:90px minmax(0,1fr)"><b>${esc(grp.code)}</b><span>${esc(grp.players.map(p=>p.name).join(', '))||'<span class="muted">empty</span>'}</span></div>`).join('')}</div></div>
@@ -4730,7 +4732,7 @@ function vGame(m,g){
   const liveCard=`<div class="card pad" style="display:flex;flex-direction:column;gap:12px"><div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px"><h2 class="h2">Live scoring</h2>${live?'<button class="btn sm" id="gmClose">Close scoring</button>':'<button class="btn sm" id="gmOpen">Reopen scoring</button>'}</div>
     ${W.closedAt?`<p class="hint" style="margin:0">Scoring closed ${fromCourse(W.closedAt,W.closedBy)}${W.paidAt?` · payouts recorded ${fromCourse(W.paidAt,W.paidBy)}`:''}. The players finish a game themselves on the scoring page’s Finish tab; Reopen scoring clears that and takes the game back.</p>`:''}
     <div class="cell2"><span class="lbl">Scoring link — players enter their group ID</span><a href="${esc(link)}" target="_blank" rel="noopener" class="trunc" style="font-weight:600">${esc(link)}</a></div>
-    <div class="actions"><button class="btn sm" id="gmCopy">Copy link</button><a class="btn sm" href="${esc(link)}&view=board" target="_blank" rel="noopener">Leaderboard screen</a><button class="btn sm" id="gmGroups">Groups</button></div>
+    <div class="actions"><button class="btn sm" id="gmCopy">Copy link</button><a class="btn sm" href="${esc(link)}&view=board" target="_blank" rel="noopener">Leaderboard screen</a><a class="btn sm" href="${esc(gamecastLink(ev))}" target="_blank" rel="noopener" title="Follow along live — the course, every group’s hole, the feed, the board; no group ID needed">GameCast</a><button class="btn sm" id="gmGroups">Groups</button></div>
     <div class="mini">${ev.groups.map(grp=>`<div class="mr" style="grid-template-columns:minmax(0,1fr) auto"><div class="cell2"><b>Group ${esc(grp.code)}</b><small>${esc(grp.players.map(p=>p.name.split(' ')[0]).join(', '))}${grp.teeTime?' · '+fmtTime(grp.teeTime):grp.startHole>1?' · hole '+grp.startHole:''}</small></div><button class="btn sm" data-gsheet="${grp.id}">Enter scores</button></div>`).join('')||'<div class="mr"><span class="muted">Groups appear as players are added.</span></div>'}</div>
     <p class="hint">Everyone plays their own ball; every competition is scored from those cards. Enter scores here for anyone who doesn’t use the page.</p></div>`;
   const first=after?[...pots.map(potCard),settleCard]:[grid,...pots.map(potCard),settleCard];
@@ -7457,7 +7459,7 @@ async function resultsPDF(t,opt){
    page counts, and a reload is tried once per build — if the page that comes back is still the old one, the CDN
    hasn't caught up; wait a while before trying that build again. */
 (function(){
-  const ME='20261025164411', KEY='au_tried', RETRY=10*60*1000; let ready=false, lastCheck=0;
+  const ME='20261025165522', KEY='au_tried', RETRY=10*60*1000; let ready=false, lastCheck=0;
   const typing=()=>{ const a=document.activeElement; return a&&/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)&&a.value&&a.type!=='search'; };
   const safe=()=>!typing()&&(typeof window.__canReload!=='function'||window.__canReload());
   const tried=()=>{ try{ const [b,t]=(sessionStorage.getItem(KEY)||'').split('|'); return b?{build:b,at:+t||0}:null; }catch(_){ return null; } };

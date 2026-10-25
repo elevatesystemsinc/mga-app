@@ -66,7 +66,15 @@ async def main():
     check('the › arrow records par for an untouched hole and it reaches the server',r['before'] is None and r['after']==r['par'] and r['hole']==10 and len(srv)==1 and srv[0]['strokes']==r['par'],json.dumps(r))
     r=await sc.evaluate("""async()=>{ const g=group(), order=playOrder(g.startHole); holeIdx=10; renderHole(); const h=order[10]; document.getElementById('prev').click(); return {h, left:(scores.p3||{})[h]||null, hole:holeIdx}; }""")
     check('going back leaves the hole alone',r['left'] is None and r['hole']==9,json.dumps(r))
-    check('no script errors',not errs and not tverr and not pherr and not scerr,json.dumps(errs+tverr+pherr+scerr))
+    # --- GameCast: read-only follow-along against the same rows — the course with the groups on their holes, the feed, the board
+    gc=await D.new_page(); gcerr=[]; gc.on('pageerror',lambda e:gcerr.append(str(e)))
+    await gc.goto(page('gamecast.html')+'?e=test-day'); await gc.wait_for_function("()=>!!pub&&document.querySelectorAll('.hole').length===18")
+    r=await gc.evaluate("""()=>{ const pos=pub.groups.map(g=>Object.assign({label:g.label},groupPos(g))); const markers=[...document.querySelectorAll('.hole .gm')].map(m=>m.closest('.hole').dataset.h+':'+m.textContent);
+      const feed=[...document.querySelectorAll('.fi')].map(f=>f.textContent.trim()); document.querySelector('[data-h="2"]').click(); const hp=document.querySelector('.hp').textContent;
+      return {pos:pos.map(x=>[x.label,x.thru,x.cur]), markers, feedN:feed.length, feed:feed.slice(0,3), lb:[...document.querySelectorAll('.lb.num')].length, hp:hp.slice(0,80), hasBirdie:feed.some(t=>/birdie/i.test(t)), writes:Object.keys(window).filter(k=>/wrap|submit/.test(k)).length}; }""")
+    # Ann/Bo (group 1 off 1) have holes 1–9 → on 10; Cy (group 2 off 2) has 1–9 too, so in play order 2…9 are done and 10 is next (thru 8); Cy's 4s on the par 5s were birdies
+    check('gamecast: groups on the right holes, a feed, a board, a hole story',r['pos']==[['Group 1',9,10],['Group 2',8,10]] and sorted(r['markers'])==['10:1','10:2'] and r['feedN']>=1 and r['hasBirdie'] and r['lb']>=3 and r['hp'].startswith('Hole 2'),json.dumps(r))
+    check('no script errors',not errs and not tverr and not pherr and not scerr and not gcerr,json.dumps(errs+tverr+pherr+scerr+gcerr))
     await b.close()
   print('ALL OK' if not bad else f'{bad} FAILED'); sys.exit(1 if bad else 0)
 asyncio.run(main())

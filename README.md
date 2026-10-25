@@ -59,6 +59,16 @@ on. A tournament's rounds are suggested from its length and team size (change th
 flows into each round's event as players sign up, and the Golf page, the scoring link and the leaderboard are ready
 from day one. The sidebar and dashboards show the leaderboards of events happening today.
 
+
+## GameCast
+
+Every game and event has a **GameCast** link (the game page's Live scoring card, the Golf event page, the share step of a new
+game): a page for everyone who is not scoring — the bar, the spouses, the group chat. No group ID. It shows the course with
+each group on the hole it is playing, a hole's story (par, yardage, who has played it and what they made), a live feed of the
+moments as they come in (birdies, eagles, skins taken, the lead changing hands) and the leaderboard for each competition that is
+on the live board. Follow one player and the page stays on them. `&view=tv` is the bar-screen version that cycles through the
+groups. It only reads; nothing on it can touch the game. Competitions kept quiet for the call-out never appear on it.
+
 ## Rounds & results
 
 Each tournament declares its rounds — one or more per day, each with a format (a day can be scramble on the front

@@ -64,8 +64,9 @@ src/
   cashier_src.html     cashier page   (markers /*CALCCORE*/ /*AUTOUPDATE*/)
   checkin_src.html     check-in page  (markers /*CKCORE*/  /*AUTOUPDATE*/)
   score_src.html       live scoring   (markers /*GOLFCORE*/ /*AUTOUPDATE*/)
+  gamecast_src.html    GameCast: follow a game live, read-only, no group ID (markers /*GOLFCORE*/ /*AUTOUPDATE*/)
   survey_src.html      public survey page (marker /*AUTOUPDATE*/ only)
-build.sh               → index.html, cashier.html, checkin.html, score.html, survey.html, version.json (repo root)
+build.sh               → index.html, cashier.html, checkin.html, score.html, gamecast.html, survey.html, version.json (repo root)
 ```
 `index.html` = `head.html` + one `<script>` of the modules **in the order listed in `build.sh`** + `boot();`.
 Everything shares one global scope (no modules/imports) — later files may call earlier files' functions, and
@@ -462,6 +463,19 @@ and the text answers; the one-response-per-phone mark is a localStorage flag the
 `memberSurveyTemplate()` = the first survey (Thursday night golf · Weekend tournaments · Membership; food-vs-payouts slider in
 both golf sections; comment boxes per section and on key questions). Answer keys: `qid`, `qid:c` (comment), `sec:<id>`.
 `SV_R` (responses) is device-local. `tests/test_survey.py` covers template → link → answers → results → close → delete.
+
+### GameCast (`gamecast_src.html` → `gamecast.html?e=<slug>`, `&view=tv` for the bar screen, `&follow=<player id>`)
+A spectator page, **read-only**: it reads the same `golf_event` + `golf_scores` (+ realtime) the scoring page reads and never
+writes — built so it cannot disturb a game in progress (the owner, Oct 2026: "don't build it where it messes with the live
+scoring"). Shows **the course** (18 holes drawn as schematic SVGs from par — `holeSVG`; Oak and Pecan have no hole geometry
+in the app, so no aerial map yet: the options discussed were Mapbox satellite with tee/green pins placed once, drawn holes,
+or none), with every group as a marker on the hole it is playing (`groupPos`: first hole in play order not scored by the
+whole group), a **hole panel** (par, hcp, yardage per tee, who is on it, everyone's score on it with a tally, a live skins
+comp's state), the **Live feed** (`buildFeed`: scores replayed in `updated_at` order — birdies, eagles, aces, blow-ups, lead
+changes on the chosen competition's board, skins taken/lost **only for skins comps marked live**), the **board** per live
+competition, **Follow** a player (highlights, feed filtered, hole panel on their group). **Quiet competitions stay quiet**:
+`liveComps()` filters `live===false` everywhere. Links: the hub's game page (Live scoring card), the Golf event page, the
+quick setup's share step (`gamecastLink(ev)` in golf.js). `tests/test_score.py` opens it against the fake; smoke renders it.
 
 ### Other
 Checklist (95-task 2026 template, assignees from members/board, notes, print). Golf (courses, WHS, flights,
