@@ -66,16 +66,16 @@ h1{font-family:var(--serif);font-weight:700;color:var(--navy);font-size:32px;mar
 .sc th{font-size:12px;color:var(--muted);font-weight:700;background:var(--ivory)} .sc td:first-child,.sc th:first-child{text-align:left;padding-left:14px}
 .sc tr.tot td{font-weight:800;background:var(--ivory)}
 .banner{background:#F6ECCF;border:1px solid #E5CF8E;color:#5C4410;border-radius:10px;padding:12px 14px;font-size:14px;margin-bottom:14px}
-.big .lb{grid-template-columns:70px minmax(0,1fr) 90px 110px;font-size:26px;padding:16px 24px}
+.big .lb{grid-template-columns:clamp(40px,4.5vw,64px) minmax(0,1fr) clamp(44px,5.5vw,80px) clamp(56px,7vw,100px);font-size:clamp(15px,1.7vw,22px);padding:clamp(10px,1.2vw,16px) clamp(14px,2vw,24px)}
 .chips{display:flex;gap:6px;flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;margin:0 -14px 10px;padding:0 14px 2px;-webkit-overflow-scrolling:touch}.chips::-webkit-scrollbar{display:none}
 .chips button{flex:0 0 auto;height:36px;padding:0 14px;border-radius:999px;border:1px solid var(--line);background:#fff;font-weight:700;font-size:13px;color:var(--muted);white-space:nowrap}.chips button.on{background:var(--navy);border-color:var(--navy);color:#fff}
 .chips.sub button{height:32px;font-size:12.5px;padding:0 12px}
-.lb.sk{grid-template-columns:44px minmax(0,1fr) 40px} .big .lb.sk{grid-template-columns:90px minmax(0,1fr) 110px} .big .lb.h{font-size:18px}
+.lb.sk{grid-template-columns:44px minmax(0,1fr) 40px} .big .lb.sk{grid-template-columns:clamp(44px,5vw,80px) minmax(0,1fr) clamp(44px,6vw,90px)} .big .lb.h{font-size:clamp(12px,1.1vw,15px)}
 .lb.none{display:block;text-align:center;padding:26px 16px}
-.lb.m{grid-template-columns:40px minmax(0,1fr) 36px 92px} .big .lb.m{grid-template-columns:70px minmax(0,1fr) 90px 200px} .big .lb .muted{font-size:18px}
+.lb.m{grid-template-columns:40px minmax(0,1fr) 36px 92px} .big .lb.m{grid-template-columns:clamp(40px,4.5vw,64px) minmax(0,1fr) clamp(36px,5vw,70px) clamp(92px,13vw,190px)} .big .lb .muted{font-size:clamp(12px,1.2vw,16px)}
 .fmtpill{display:inline-block;padding:4px 12px;border-radius:999px;background:#F6ECCF;border:1px solid #E5CF8E;color:#6B4F12;font-weight:800;font-size:12.5px}
 .pop{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--gold);margin-left:6px;vertical-align:2px}
-.big .lb .tp{font-size:30px} .big main{max-width:1100px}
+.big .lb .tp{font-size:clamp(18px,2vw,26px)} .big main{max-width:1100px} .big h1{font-size:clamp(24px,3vw,38px)!important;margin:4px 2px 14px!important;line-height:1.1}
 /* desktop: the same board with room to breathe — a wider card, larger rows, the title above the competitions */
 .ttl{display:none}
 @media (min-width:900px){
@@ -1168,7 +1168,7 @@ window.__canReload=()=>!queue.length;
    page counts, and a reload is tried once per build — if the page that comes back is still the old one, the CDN
    hasn't caught up; wait a while before trying that build again. */
 (function(){
-  const ME='20261025165522', KEY='au_tried', RETRY=10*60*1000; let ready=false, lastCheck=0;
+  const ME='20261025170853', KEY='au_tried', RETRY=10*60*1000; let ready=false, lastCheck=0;
   const typing=()=>{ const a=document.activeElement; return a&&/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)&&a.value&&a.type!=='search'; };
   const safe=()=>!typing()&&(typeof window.__canReload!=='function'||window.__canReload());
   const tried=()=>{ try{ const [b,t]=(sessionStorage.getItem(KEY)||'').split('|'); return b?{build:b,at:+t||0}:null; }catch(_){ return null; } };
