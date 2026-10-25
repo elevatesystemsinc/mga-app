@@ -396,6 +396,19 @@ textarea.inp{height:auto;min-height:84px;padding:10px 12px;resize:vertical}
 .qday{display:flex;align-items:center;justify-content:space-between;gap:12px}.qday b{font-size:16px}
 .qbar{position:sticky;bottom:0;z-index:3;background:var(--ivory);padding:12px 0 calc(12px + env(safe-area-inset-bottom,0px));display:flex;gap:10px;border-top:1px solid var(--line)}.qbar .btn{flex:1;height:50px;font-size:16px;min-width:0}
 .qlink{display:block;word-break:break-all;font-weight:600;padding:12px;border:1px dashed var(--line);border-radius:10px;background:#fff;color:var(--navy)}
+/* the ledger: a list that fits any width — name and the day on the left, the net as the headline on the right */
+.lg .lr{display:grid;grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"who net" "money act";gap:6px 14px;align-items:center;padding:12px 18px;border-top:1px solid var(--line)}
+.lg .lr:first-child{border-top:none} .lg .lr.lh{display:none}
+.lg .lr>.cell2{grid-area:who} .lg .lm{grid-area:money} .lg .lnet{grid-area:net} .lg .lact{grid-area:act;justify-self:end}
+.lg .ln{font-weight:700;font-size:16px;color:var(--navy);line-height:1.2;overflow-wrap:anywhere} .lg .ls{font-size:12.5px;color:var(--muted);margin-top:2px}
+.lg .lm{font-size:13px;color:var(--muted);display:flex;gap:12px;flex-wrap:wrap;font-variant-numeric:tabular-nums} .lg .lm b{color:var(--ink);font-weight:600}
+.lg .lnet{font-weight:800;font-size:19px;text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}
+.lg .lact:empty{display:none} .lg .la{grid-template-areas:"who net" "who act"} .lg .la .lact{align-self:start}
+@media (min-width:1180px){
+  .lg .lr{grid-template-columns:minmax(0,1.3fr) minmax(0,1.5fr) 120px 84px;grid-template-areas:"who money net act";gap:12px 18px;padding:10px 22px}
+  .lg .lr.lh{display:grid;background:var(--ivory);font-size:12px;font-weight:600;color:var(--muted);border-bottom:1px solid var(--line);min-height:40px;padding-top:0;padding-bottom:0} .lg .lh .lm{color:var(--muted)}
+  .lg .la{grid-template-columns:minmax(0,1fr) 120px 40px;grid-template-areas:"who net act"}
+}
 </style>
 </head>
 <body>
@@ -5323,14 +5336,16 @@ async function gameSheetPDF(g,opt){
 function vLedger(m){
   gamesData();
   const rows=ledgerRows(view.lrange), up=rows.filter(r=>r.net>0.004), down=rows.filter(r=>r.net<-0.004);
-  const cols='grid-template-columns:minmax(0,1.6fr) 70px 100px 100px 110px 110px 90px';
   m.innerHTML=head('Ledger',`Who is up and who is down in the ${esc(orgShort())}, ${Y()}. Net = paid out − paid in, plus any side bets or settle-ups recorded.`,btn('Record adjustment','ldAdj','',I.plus))+`
   <div class="toolbar"><div class="seg">${QUARTERS.map(([k,l])=>`<button class="${view.lrange===k?'on':''}" data-lr="${k}">${l}</button>`).join('')}</div>
     <span class="muted" style="margin-left:auto;font-size:13px">${rows.length} player${rows.length===1?'':'s'} · ${up.length} up · ${down.length} down · ${gMoney(sum(rows,r=>r.inn))} through the group</span></div>
-  <div class="card" style="overflow:hidden">${rows.length?`<div class="tw"><div class="t" style="min-width:760px"><div class="tr th" style="${cols}"><span>Player</span><span class="r">Games</span><span class="r">Paid in</span><span class="r">Won</span><span class="r">Adjustments</span><span class="r">Net</span><span></span></div>
-    ${rows.map((r,i)=>`<div class="tr num" style="${cols}"><div class="cell2"><b class="trunc">${i<3&&r.net>0.004?['🥇 ','🥈 ','🥉 '][i]:''}${esc(r.name)}</b><small>${r.memberId?'':'Guest · '}last played ${r.last?shortDate(r.last):'—'}</small></div><span class="r">${r.games}</span><span class="r">${gMoney(r.inn)}</span><span class="r">${gMoney(r.out)}</span><span class="r ${r.adj?'':'muted'}">${r.adj?gSigned(r.adj):'—'}</span><b class="r ${netCls(r.net)}" style="font-size:15px">${gSigned(r.net)}</b><span>${r.memberId&&Math.abs(r.net)>0.004?`<button class="btn sm" data-settle="${r.memberId}" data-net="${r.net}">Settle</button>`:''}</span></div>`).join('')}</div></div>`
+  <div class="card lg" style="overflow:hidden">${rows.length?`<div class="lr lh"><span>Player</span><span class="lm">In · won · adjustments</span><span class="r">Net</span><span></span></div>`+rows.map((r,i)=>`<div class="lr">
+      <div class="cell2"><span class="ln">${i<3&&r.net>0.004?['🥇 ','🥈 ','🥉 '][i]:''}${esc(r.name)}</span><span class="ls">${r.memberId?'':'Guest · '}${r.games} game${r.games===1?'':'s'} · last ${r.last?shortDate(r.last).replace(/, \d{4}$/,''):'—'}</span></div>
+      <div class="lm"><span>In <b>${gMoney(r.inn)}</b></span><span>Won <b>${gMoney(r.out)}</b></span>${r.adj?`<span>Adj <b>${gSigned(r.adj)}</b></span>`:''}</div>
+      <b class="lnet ${netCls(r.net)}">${gSigned(r.net)}</b>
+      <span class="lact">${r.memberId&&Math.abs(r.net)>0.004?`<button class="btn sm" data-settle="${r.memberId}" data-net="${r.net}">Settle</button>`:''}</span></div>`).join('')
   :`<div class="empty"><b>Nothing on the books${view.lrange==='season'?'':' this quarter'}</b><span>Money paid in and out at each game shows up here automatically.</span></div>`}</div>
-  ${(db.ledgerAdj||[]).some(a=>a.season===Y())?`<div class="card" style="overflow:hidden"><div class="cardhead"><h2 class="h2">Adjustments</h2></div><div class="t">${db.ledgerAdj.filter(a=>a.season===Y()).sort((a,b)=>(b.date||'').localeCompare(a.date||'')).map(a=>`<div class="tr num click" data-adj="${a.id}" style="grid-template-columns:110px minmax(0,1fr) minmax(0,1.4fr) 100px 40px"><span>${a.date?shortDate(a.date).replace(/, \d{4}$/,''):'—'}</span><b class="trunc">${esc(memberName(memberById(a.memberId)))}</b><span class="muted trunc">${esc(a.desc||'')}</span><b class="r ${netCls(a.amount)}">${gSigned(a.amount)}</b><span class="ib">${I.edit}</span></div>`).join('')}</div></div>`:''}`;
+  ${(db.ledgerAdj||[]).some(a=>a.season===Y())?`<div class="card lg" style="overflow:hidden"><div class="cardhead"><h2 class="h2">Adjustments</h2></div>${db.ledgerAdj.filter(a=>a.season===Y()).sort((a,b)=>(b.date||'').localeCompare(a.date||'')).map(a=>`<div class="lr la click" data-adj="${a.id}"><div class="cell2"><span class="ln">${esc(memberName(memberById(a.memberId)))}</span><span class="ls">${a.date?shortDate(a.date):'—'}${a.desc?' · '+esc(a.desc):''}</span></div><b class="lnet ${netCls(a.amount)}">${gSigned(a.amount)}</b><span class="lact ib">${I.edit}</span></div>`).join('')}</div>`:''}`;
   m.querySelectorAll('[data-lr]').forEach(b=>b.onclick=()=>{ view.lrange=b.dataset.lr; render(); });
   $('ldAdj').onclick=()=>editAdj(null);
   m.querySelectorAll('[data-adj]').forEach(r=>r.onclick=()=>editAdj(db.ledgerAdj.find(a=>a.id===r.dataset.adj)));
@@ -7442,7 +7457,7 @@ async function resultsPDF(t,opt){
    page counts, and a reload is tried once per build — if the page that comes back is still the old one, the CDN
    hasn't caught up; wait a while before trying that build again. */
 (function(){
-  const ME='20261025163406', KEY='au_tried', RETRY=10*60*1000; let ready=false, lastCheck=0;
+  const ME='20261025164125', KEY='au_tried', RETRY=10*60*1000; let ready=false, lastCheck=0;
   const typing=()=>{ const a=document.activeElement; return a&&/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)&&a.value&&a.type!=='search'; };
   const safe=()=>!typing()&&(typeof window.__canReload!=='function'||window.__canReload());
   const tried=()=>{ try{ const [b,t]=(sessionStorage.getItem(KEY)||'').split('|'); return b?{build:b,at:+t||0}:null; }catch(_){ return null; } };
