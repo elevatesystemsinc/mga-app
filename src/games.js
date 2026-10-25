@@ -68,7 +68,7 @@ const gameWhen=g=>(g.date?shortDate(g.date):'Date TBD')+(g.time?' · '+fmtTime(g
 const isUpcoming=g=>{ const d=parseD(g.date); if(!d) return true; const now=new Date(); now.setHours(0,0,0,0); return d>=now; };
 /* the catalog entry behind a pot and what it implies */
 const potCat=pot=>catalogById(pot.rules.game)||catalogById(pot.kind==='skins'?'skins':pot.kind==='dots'?'dots':'stroke');
-const potEngine=pot=>{ const C=potCat(pot); const E=engineFrom(C,pot.rules.teamSize||(C.sizes?C.sizes[0]:(C.engine.teamSize||1)),pot.rules.count||1); if(E.format==='match'&&pot.rules.matchBy) E.matchBy=pot.rules.matchBy; return E; };
+const potEngine=pot=>{ const C=potCat(pot); const E=engineFrom(C,pot.rules.teamSize||(C.sizes?C.sizes[0]:(C.engine.teamSize||1)),pot.rules.count||1); if(E.format==='match'&&pot.rules.matchBy) E.matchBy=pot.rules.matchBy; if(pot.rules.all918!=null) E.all918=!!pot.rules.all918; return E; };
 const potIsTeam=pot=>pot.kind==='format'&&(()=>{ const E=potEngine(pot); return !!((FORMATS[E.format]||{}).team)&&E.teamSize>=2; })();
 const potOneBall=pot=>pot.kind==='format'&&(FORMATS[potEngine(pot).format]||{}).entry==='team';
 const potTeamsKnown=pot=>!!(pot.teams&&Object.keys(pot.teams).length);
@@ -79,16 +79,19 @@ function potSummary(pot){
   if(pot.kind==='manual') return (potCat(pot).name||'Winners entered by hand');
   const E=potEngine(pot), C=potCat(pot); let s=C.name+(potIsTeam(pot)?` · ${E.teamSize}-player teams`:'')+' · '+(pot.rules.scoring||'gross');
   if(potIsTeam(pot)) s+=' · partners '+TEAMS_BY[pot.rules.teamsBy||'hand'];
-  if(pot.rules.nassau){ const ns=nassauStakes(pot); s+=` · front ${gMoney(ns.front)} · back ${gMoney(ns.back)} · 18 ${gMoney(ns.total)}`; }
+  if(pot.rules.nassau) s+=' · '+stakesText(nassauStakes(pot));
   else if(pot.rules.places&&pot.rules.places.length) s+=' · pays '+pot.rules.places.join(' / ')+'%';
   return s;
 }
 const nassauStakes=pot=>Object.assign({front:5,back:5,total:10},pot.rules.nassau||{});
+/* the bets in words: only the ones with money on them; one bet on the 18 = winner takes the pot */
+const stakesText=ns=>{ const b=[]; if(n0(ns.front)>0) b.push('front '+gMoney(ns.front)); if(n0(ns.back)>0) b.push('back '+gMoney(ns.back)); if(n0(ns.total)>0) b.push('18 '+gMoney(ns.total)); return b.length===1&&n0(ns.total)>0?`${gMoney(ns.total)} on the 18 — winner takes the pot`:b.join(' · ')||'no stakes'; };
 function newPot(game,g,extra){
   const kind=kindOfGame(game), C=catalogById(game)||catalogById('stroke');
   const pot={id:uid(),kind,name:C.name.replace(/ \(.*$/,''),entry:kind==='manual'?0:5,inn:Object.fromEntries((g&&kind!=='manual'?g.players:[]).map(p=>[p.id,true])),rules:{game},payouts:[]};
   if(kind==='format'){ Object.assign(pot.rules,{scoring:'net',teamSize:C.engine.teamSize||(C.sizes?C.sizes[0]:1),count:1,teamsBy:(C.engine.draw==='after'?'after':'hand'),places:[]}); pot.entry=20;
-    if(C.engine.format==='match'&&C.engine.matchScoring==='nassau'&&(C.engine.teamSize||1)>1){ pot.rules.nassau={front:5,back:5,total:10}; pot.entry=20; } }
+    if(C.engine.format==='match'&&C.engine.matchScoring==='nassau'&&(C.engine.teamSize||1)>1){ pot.rules.nassau=C.id==='waltz123'?{front:0,back:0,total:20}:{front:5,back:5,total:10}; pot.entry=20; }   // the waltz: one bet, winner takes the pot
+    if(C.engine.all918) pot.rules.all918=true; }
   if(kind==='skins'){ pot.rules.skins={net:true,grossBeatsNet:true,validate:'netpar',mode:'pot',live:false}; }
   if(kind==='dots'){ pot.rules.dots=Object.assign({},DOTS_DEFAULT); pot.entry=2; }
   return Object.assign(pot,extra||{});
@@ -173,6 +176,7 @@ const STARTERS=[
   {id:'blinddraw',title:'Blind-draw partners',text:'$10 a man · partners drawn after the round · best ball from everyone’s own card',make:d=>newPot('blinddraw',d,{entry:10})},
   {id:'quota',title:'Quota',text:'$10 a man · points against your quota (36 less your handicap) · most over wins',make:d=>newPot('quota',d,{entry:10})},
   {id:'teamnassau',title:'Team Nassau',text:'Four-man best ball · front, back and 18 · $5 · $5 · $10 a man · teams picked by hand',make:d=>newPot('teamnassau',d)},
+  {id:'waltz123',title:'Waltz (1-2-3)',text:'Team against team · $20 a man · one ball counts, then two, then three, every ball on 9 and 18 · lowest total takes the whole pot',make:d=>newPot('waltz123',d)},
   {id:'dots',title:'Dots',text:'$2 a man · birdies and eagles from the cards, sandies and greenies by hand',make:d=>newPot('dots',d,{entry:2})}];
 const potsText=pots=>pots.filter(p=>p.kind!=='manual').map(p=>`${p.name} ${gMoney(p.entry)}`).join(' · ')||'no competitions';
 const dayName=date=>{ const d=parseD(date); return d?d.toLocaleDateString('en-US',{weekday:'long'})+' game':'Game'; };
@@ -279,7 +283,7 @@ function vGameDesign(m){
         ${pot.kind==='format'?`<div class="fld"><span class="lbl">Scored</span>${seg('gdS_'+pot.id,[['gross','Gross'],['net','Net']],pot.rules.scoring||'gross')}</div>`:pot.kind==='skins'?`<div class="fld"><span class="lbl">Scored</span>${seg('gdS_'+pot.id,[['gross','Gross'],['net','Net']],sk.net?'net':'gross')}</div>`:pot.kind==='dots'?`<div class="fld"><span class="lbl">Birdies &amp; eagles</span>${seg('gdS_'+pot.id,[['gross','Gross'],['net','Net']],dr.net?'net':'gross')}</div>`:'<div></div>'}</div>
       ${pot.kind==='format'?`<div class="frow2">${team||C.sizes?field('Players per team','gdT_'+pot.id,E.teamSize,{type:'select',options:(C.sizes||[E.teamSize]).map(n=>[n,n+' players'])}):paysEditor(d,pot)}
           ${team?field('Partners','gdB_'+pot.id,pot.rules.teamsBy||'hand',{type:'select',options:[['hand','Picked by hand'],['before','Drawn before the round'],['after','Drawn after the round (blind draw)']]}):(C.count&&E.teamSize>1?field('Balls that count','gdC_'+pot.id,E.count,{type:'select',options:Array.from({length:Math.max(1,E.teamSize-1)},(_,k)=>[k+1,(k+1)+' of '+E.teamSize])}):'<div></div>')}</div>
-        ${team&&E.format==='match'&&E.matchScoring==='nassau'?(()=>{ const ns=nassauStakes(pot); return `<div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px">${field('Front worth $','gdNF_'+pot.id,ns.front,{type:'number'})}${field('Back worth $','gdNB_'+pot.id,ns.back,{type:'number'})}${field('18 worth $','gdNT_'+pot.id,ns.total,{type:'number'})}</div>${field('Each segment goes to','gdNBy_'+pot.id,E.matchBy||'holes',{type:'select',options:[['strokes','the lower total score (the counted balls added up)'],['holes','the side that wins more holes (match play)']]})}<p class="hint" style="margin:-6px 0 0">Per player, each segment: the losing side pays the winning side; a tied segment is a push. The entry above is what each player has at stake in all three.</p>`; })()
+        ${team&&E.format==='match'&&E.matchScoring==='nassau'?(()=>{ const ns=nassauStakes(pot); return `<div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px">${field('Front worth $','gdNF_'+pot.id,ns.front,{type:'number'})}${field('Back worth $','gdNB_'+pot.id,ns.back,{type:'number'})}${field('18 worth $','gdNT_'+pot.id,ns.total,{type:'number'})}</div>${field('Each segment goes to','gdNBy_'+pot.id,E.matchBy||'holes',{type:'select',options:[['strokes','the lower total score (the counted balls added up)'],['holes','the side that wins more holes (match play)']]})}${E.countPattern==='123w'?`<label class="check"><input type="checkbox" id="gdAll_${pot.id}"${E.all918?' checked':''}>Every ball counts on 9 and 18</label>`:''}<p class="hint" style="margin:-6px 0 0">Per player, each bet: the losing side pays the winning side; a tied bet is a push. Put $0 on the front and the back for one bet on the 18 — the winning side takes the whole pot. The entry above is what each player has at stake in all.</p>`; })()
           :team?`<div class="frow2">${paysEditor(d,pot,true)}${C.count&&E.teamSize>1?field('Balls that count','gdC_'+pot.id,E.count,{type:'select',options:Array.from({length:Math.max(1,E.teamSize-1)},(_,k)=>[k+1,(k+1)+' of '+E.teamSize])}):'<div></div>'}</div>`:''}`:''}
       ${pot.kind==='skins'?`<div class="frow2">${field('Format','gdMode_'+pot.id,sk.mode,{type:'select',options:[['pot','Skins pot — divided by the skins won'],['hole','Per hole — the pot split over 18 holes, ties carry over']]})}${field('Validation on the next hole','gdV_'+pot.id,sk.validate||'none',{type:'select',options:Object.entries(SKIN_VALID_LABEL)})}</div>
           <div class="fld"><span class="lbl">Rules</span><label class="check"><input type="checkbox" id="gdGBN_${pot.id}"${sk.grossBeatsNet?' checked':''}${sk.net?'':' disabled'}>Gross beats net on a tied hole</label><label class="check"><input type="checkbox" id="gdLive_${pot.id}"${sk.live?' checked':''}>Show skins on the live leaderboard during the round</label></div>
@@ -316,7 +320,7 @@ function vGameDesign(m){
       if(pot.kind==='format'){ const pf=potEngine(pot).format; if(POINT_FORMATS.includes(pf)&&$('gdPt_'+pot.id+'_0')){ const t=readPoints(document,'gdPt_'+pot.id,pf); pot.rules.points=t?{[pf]:t}:{}; } }
       const S=$('gdS_'+pot.id); if(S){ const sc=S.dataset.val; if(pot.kind==='format') pot.rules.scoring=sc; if(pot.kind==='skins'){ skinsRulesOf(pot).net=sc==='net'; if(sc!=='net') skinsRulesOf(pot).grossBeatsNet=false; } if(pot.kind==='dots') dotsRules(pot).net=sc==='net'; }
       if(pot.kind==='format'){ pot.rules.live=$('gdLive_'+pot.id)?$('gdLive_'+pot.id).checked:pot.rules.live!==false; if($('gdT_'+pot.id)) pot.rules.teamSize=+v('gdT'); if($('gdC_'+pot.id)) pot.rules.count=+v('gdC'); if($('gdB_'+pot.id)) pot.rules.teamsBy=v('gdB'); 
-        if($('gdNF_'+pot.id)){ pot.rules.nassau={front:n0(v('gdNF')),back:n0(v('gdNB')),total:n0(v('gdNT'))}; pot.entry=pot.rules.nassau.front+pot.rules.nassau.back+pot.rules.nassau.total; if($('gdNBy_'+pot.id)) pot.rules.matchBy=v('gdNBy'); } }
+        if($('gdNF_'+pot.id)){ pot.rules.nassau={front:n0(v('gdNF')),back:n0(v('gdNB')),total:n0(v('gdNT'))}; pot.entry=pot.rules.nassau.front+pot.rules.nassau.back+pot.rules.nassau.total; if($('gdNBy_'+pot.id)) pot.rules.matchBy=v('gdNBy'); if($('gdAll_'+pot.id)) pot.rules.all918=$('gdAll_'+pot.id).checked; } }
       if(pot.kind==='skins'){ const sk=skinsRulesOf(pot); sk.grossBeatsNet=$('gdGBN_'+pot.id).checked&&sk.net; sk.mode=v('gdMode')==='hole'?'hole':'pot'; sk.carry=sk.mode==='hole'; sk.live=$('gdLive_'+pot.id).checked; sk.validate=v('gdV')||'none'; }
       if(pot.kind==='dots'){ const dr=pot.rules.dots=dotsRules(pot); dr.birdie=n0(v('gdDb')); dr.eagle=n0(v('gdDe')); dr.kinds=v('gdDk').split(',').map(s=>s.trim()).filter(Boolean); } } };
   m.querySelectorAll('.gd-pot').forEach(card=>{ const pot=d.pots.find(x=>x.id===card.dataset.pot);
@@ -894,7 +898,7 @@ function potRulesText(pot){
   else { const E=potEngine(pot), C=potCat(pot), team=potIsTeam(pot), sc=(pot.rules.scoring||'gross');
     let what=C.desc||C.name; if(pot.rules.points&&POINT_FORMATS.includes(E.format)&&pot.rules.points[E.format]) what=what.replace(/\s*\([^)]*\)/,''); bits.push(`${sc==='net'?'Net':'Gross'} — ${what}${/[.!?]$/.test(what)?'':'.'}`);
     if(team) bits.push(`${E.teamSize}-player teams${E.count&&E.count<E.teamSize?`, best ${E.count} of ${E.teamSize} count`:''}; partners ${TEAMS_BY[pot.rules.teamsBy||'hand']}.`);
-    if(pot.rules.nassau){ const ns=nassauStakes(pot); bits.push(`Front ${gMoney(ns.front)} · back ${gMoney(ns.back)} · 18 ${gMoney(ns.total)} per player, each to the side with the ${(E.matchBy||'holes')==='strokes'?'lower total score':'most holes'}.`); }
+    if(pot.rules.nassau){ const ns=nassauStakes(pot), one=n0(ns.front)<=0&&n0(ns.back)<=0; bits.push(`${one?`${gMoney(ns.total)} per player on the 18 — the winning side takes the whole pot`:stakesText(ns).replace(/^front/,'Front')+' per player, each bet'} to the side with the ${(E.matchBy||'holes')==='strokes'?'lower total score':'most holes'}${E.countPattern==='123w'&&E.all918?'; every ball counts on 9 and 18':''}.`); }
     else if(pot.rules.places&&pot.rules.places.length) bits.push(`Pays ${pot.rules.places.map((x,i)=>`${x}% to ${ordinal(i+1)}`).join(', ')}.`);
     else bits.push('Pays the usual split for the field.');
     if(pot.rules.points&&POINT_FORMATS.includes(E.format)&&pot.rules.points[E.format]){ const t=pot.rules.points[E.format]; bits.push(`Points: ${PTS_ROWS.map(([k,l])=>`${l.toLowerCase().replace(' or worse','+')} ${t[k]??0}`).join(', ')}.`); } }

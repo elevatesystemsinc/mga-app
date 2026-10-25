@@ -425,6 +425,7 @@ const GAME_CATALOG=[
   {id:'nassau',name:'Nassau (front · back · 18)',group:'Match play',engine:{format:'match',teamSize:1,matchScoring:'nassau'},desc:'Three singles bets in one match: front nine, back nine and the eighteen — a point for each.',hcp:'100% of the difference'},
   {id:'fourballmatch',name:'Four-ball match play',group:'Match play',engine:{format:'match',teamSize:2},sizes:[2],desc:'Two against two, best net ball of each side on every hole.',hcp:'90%, everyone off the low man'},
   {id:'waltz321',name:'Reverse waltz (3-2-1, all on 9 & 18)',group:'Match play',engine:{format:'match',teamSize:4,matchScoring:'nassau',countPattern:'321',matchBy:'strokes'},sizes:[2,3,4,5,6],desc:'Team against team, three bets: the front, the back and the 18 — each goes to the side with the lower total of its counted balls. Each hole counts the best three balls, then two, then one, repeating from the first hole — and every ball on 9 and 18.',hcp:'full handicaps (100%), strokes where they fall'},
+  {id:'waltz123',name:'Waltz (1-2-3)',group:'Match play',engine:{format:'match',teamSize:4,matchScoring:'nassau',countPattern:'123w',matchBy:'strokes',all918:true},sizes:[2,3,4,5,6],desc:'Team against team by total score: each hole counts the best ball, then the best two, then three, repeating — and every ball on 9 and 18 when that switch is on. One bet on the 18 by default (the winning side takes the whole pot); put money on the front and back for a Nassau.',hcp:'100% · club default'},
   {id:'teamnassau',name:'Team Nassau (best ball)',group:'Match play',engine:{format:'match',teamSize:4,matchScoring:'nassau'},sizes:[2,3,4,5,6],desc:'Team against team, best ball of each side on every hole; points for the front, the back and the 18.',hcp:'100% of the difference, everyone off the low man'},
   {id:'hilo',name:'Hi-Lo (low ball · high ball)',group:'Match play',engine:{format:'match',teamSize:2,matchScoring:'hilo'},sizes:[2],desc:'Two against two, two points a hole: the better low ball and the better high ball.',hcp:'90%, everyone off the low man'},
   {id:'foursomesmatch',name:'Foursomes match play',group:'Match play',engine:{format:'match',teamSize:2,matchForm:'foursomes'},sizes:[2],desc:'Alternate shot, one ball per side, hole by hole.',hcp:'50% of combined, difference'},
@@ -464,7 +465,7 @@ function enabledGames(){ const dis=(typeof CLUB!=='undefined'&&CLUB&&CLUB.games&
 /* the catalog entry that best describes an event's format fields (for display) */
 /* how a Nassau is decided: the event/competition's own matchBy, else by what it is — the reverse waltz (count pattern
    321) has always been total score, so an older published copy without the field still reads right on the phones */
-function matchByOf(pub){ if(pub.matchBy==='strokes'||pub.matchBy==='holes') return pub.matchBy; return pub.game==='waltz321'||(pub.matchScoring==='nassau'&&pub.countPattern==='321')?'strokes':'holes'; }
+function matchByOf(pub){ if(pub.matchBy==='strokes'||pub.matchBy==='holes') return pub.matchBy; return pub.game==='waltz321'||pub.game==='waltz123'||(pub.matchScoring==='nassau'&&(pub.countPattern==='321'||pub.countPattern==='123w'))?'strokes':'holes'; }
 function catalogOf(pub){ const f=pub.format||'stroke'; return GAME_CATALOG.find(g=>!g.side&&!g.tool&&g.engine.format===f&&(g.engine.countPattern||'')===(pub.countPattern||'')&&(g.engine.matchScoring||'holes')===(pub.matchScoring||'holes')&&(g.engine.matchForm||'')===(pub.matchForm||'')&&(g.engine.quotaBase||36)===(+pub.quotaBase||36)&&(g.engine.cap||'')===(pub.cap||'')&&(f!=='match'||(g.engine.teamSize||1)===(pub.teamSize>=2?2:1)))||GAME_CATALOG.find(g=>g.engine.format===f)||GAME_CATALOG[0]; }
 const TEAM_FORMATS=Object.keys(FORMATS).filter(k=>FORMATS[k].team===true);
 /* points per hole by score to par (d): standard Stableford, the modified (pro-tour) table, and quota points (gross) */
@@ -500,7 +501,7 @@ function holeFormat(pub,h){ return pub.format==='split'?(h<=9?pub.front:pub.back
 /* A published event may carry `comps`: the competitions of a small-group game that are shown live, each with its own
    engine fields, players and (when known) teams. compPub() cuts the event down to one of them; a team competition
    whose partners are not drawn yet is shown as individual stroke play. */
-const COMP_KEYS=['format','teamSize','count','countPattern','quotaBase','cap','matchScoring','matchForm','matchBy','scoring','noPar3','points'];
+const COMP_KEYS=['format','teamSize','count','countPattern','quotaBase','cap','matchScoring','matchForm','matchBy','scoring','noPar3','points','all918','nassau'];
 function compPub(pub,comp){
   const out=Object.assign({},pub,{allow:pub.allow&&pub.allow['*']!=null?{'*':pub.allow['*']}:{},flights:[]}); COMP_KEYS.forEach(k=>{ if(comp[k]!==undefined) out[k]=comp[k]; });
   const inP=new Set(comp.players||[]), teams=comp.teams||null, teamy=!!teams&&Object.keys(teams).length>0, isTeamFmt=!!((FORMATS[out.format]||{}).team)&&(+out.teamSize||1)>=2;
@@ -517,7 +518,7 @@ function playerFormatOf(pub){ return eventFormats(pub).find(f=>FORMATS[f]&&FORMA
 /* an individual's unit on their own row (team Stableford players still count points) */
 function formatSummary(pub){ const n=teamSizeOf(pub), k=countOf(pub), P=pub.countPattern, one=f=>{ const F=FORMATS[f]||FORMATS.stroke; let l=F.label;
     if(F.count) l=P==='123'?'1-2-3 best ball':P==='123rot'?'Cha-cha-cha':P==='par345'?'1-2-3 by par':P==='yellow'?`Yellow ball (${n}-player)`:l+` (best ${k} of ${n})`; else if(F.team===true&&!F.size) l+=` (${n}-player)`;
-    if(f==='match') l=pub.matchScoring==='nassau'?(matchByOf(pub)==='strokes'?'Nassau by total score':'Nassau'):pub.matchScoring==='hilo'?'Hi-Lo':pub.matchForm==='foursomes'?'Foursomes match play':n>=2?'Four-ball match play':'Singles match play';
+    if(f==='match') l=pub.matchScoring==='nassau'?(P==='321'?'Reverse waltz (3-2-1)':P==='123w'?'Waltz (1-2-3)':'Nassau')+(matchByOf(pub)==='strokes'?(P==='321'||P==='123w'?'':' by total score'):(P==='321'||P==='123w'?' · match play':'')):pub.matchScoring==='hilo'?'Hi-Lo':pub.matchForm==='foursomes'?'Foursomes match play':n>=2?'Four-ball match play':'Singles match play';
     if(f==='quota'&&+pub.quotaBase===39) l='Chicago (quota 39)'; if(f==='stroke'&&pub.cap==='nddb') l='Maximum score'; if(POINT_FORMATS.includes(f)&&pointsCustom(pub,f)) l+=' · own point table'; return l; };
   return pub.format==='split'?`Front: ${one(pub.front)} · Back: ${one(pub.back)}`:one(pub.format||'stroke'); }
 /* a player's playing handicap for a per-player format in this event (from their course handicap) */
@@ -534,6 +535,7 @@ const scrambleTeamPH=(pub,members)=>teamPH(pub,'scramble',members);
 function countOn(pub,fmt,h,size,par){ if(fmt==='aggregate') return size; if(!(FORMATS[fmt]&&FORMATS[fmt].count)) return 1;
   const P=pub.countPattern; if(P==='123') return Math.min(size,h<=6?1:h<=12?2:3); if(P==='123rot') return Math.min(size,((h-1)%3)+1); if(P==='par345') return Math.min(size,par>=5?3:par===4?2:1);
   if(P==='321') return Math.min(size,h%9===0?size:[3,2,1][(h-1)%3]);   // reverse waltz: 3, 2, 1 balls by hole number; every ball on 9 and 18
+  if(P==='123w') return Math.min(size,pub.all918&&h%9===0?size:((h-1)%3)+1);   // waltz: 1, 2, 3 balls by hole number; every ball on 9 and 18 when all918 is on
   return Math.min(size,countOf(pub)); }
 /* yellow ball: on each hole one player's ball is designated (rotating through the team in order) and must count,
    plus the best of the others */
@@ -639,8 +641,10 @@ function matchBoard(pub,scores,opt){
         st={txt:'',over:done,won:vT>0?1:vT<0?-1:0}; }
       // by total score a side's figure is its own counted balls to par (what the group reads on the wall); by holes, up/down
       const segTxt=(v,started,rel)=>!started?'—':by==='strokes'?toParTxt(rel):(v>0?v+' up':v<0?(-v)+' dn':'AS');
-      const nassauPts=sign=>{ if(sc!=='nassau') return null; return segsA.reduce((t,s)=>t+(!s.done?0:(sign*s.v>0?1:sign*s.v<0?0:0.5)),0); };
-      const sideSegs=sign=>segsA&&segsA.map(s=>{ const rel=sign>0?s.relA:s.relB, started=sign>0?(s.startedA??s.started):(s.startedB??s.started); return {k:s.k,label:s.label,v:sign*s.v,rel,done:s.done,started,txt:segTxt(sign*s.v,started,rel)}; });
+      // a bet with nothing on it (front or back at $0 — winner takes the pot on the 18) is neither shown nor scored
+      const stakes=pub.nassau&&typeof pub.nassau==='object'?pub.nassau:null, liveSeg=s=>!stakes||s.k==='18'||(+(s.k==='F'?stakes.front:stakes.back)||0)>0;
+      const nassauPts=sign=>{ if(sc!=='nassau') return null; return segsA.filter(liveSeg).reduce((t,s)=>t+(!s.done?0:(sign*s.v>0?1:sign*s.v<0?0:0.5)),0); };
+      const sideSegs=sign=>segsA&&segsA.filter(liveSeg).map(s=>{ const rel=sign>0?s.relA:s.relB, started=sign>0?(s.startedA??s.started):(s.startedB??s.started); return {k:s.k,label:s.label,v:sign*s.v,rel,done:s.done,started,txt:segTxt(sign*s.v,started,rel)}; });
       // each side's row points at its own group (its scorecard), not the match's first group — two foursomes playing each other are in different carts
       const mk=(S,O,sign,won,lost)=>{ const sg=(S.groups&&S.groups[0])||g, scs=pub.courses[sg.course]||c; return {id:S.key,name:S.members.map(p=>p.name).join(' / '),members:S.members.map(p=>p.id),opp:O.members.map(p=>p.name).join(' / '),group:sg.label||'',groupId:sg.id,course:sg.course,courseName:scs.name,
         n:nSide?nSide[S===A?'A':'B']:played,thru:(nSide?nSide[S===A?'A':'B']:played)===18||st.over?'F':String(nSide?nSide[S===A?'A':'B']:played),
@@ -1162,7 +1166,7 @@ window.__canReload=()=>!queue.length;
    page counts, and a reload is tried once per build — if the page that comes back is still the old one, the CDN
    hasn't caught up; wait a while before trying that build again. */
 (function(){
-  const ME='20261025020145', KEY='au_tried', RETRY=10*60*1000; let ready=false, lastCheck=0;
+  const ME='20261025163406', KEY='au_tried', RETRY=10*60*1000; let ready=false, lastCheck=0;
   const typing=()=>{ const a=document.activeElement; return a&&/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)&&a.value&&a.type!=='search'; };
   const safe=()=>!typing()&&(typeof window.__canReload!=='function'||window.__canReload());
   const tried=()=>{ try{ const [b,t]=(sessionStorage.getItem(KEY)||'').split('|'); return b?{build:b,at:+t||0}:null; }catch(_){ return null; } };

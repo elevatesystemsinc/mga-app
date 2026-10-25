@@ -283,6 +283,14 @@ Tournament = { id, name, season, days, startDate, field:[{id,memberId,team,paid,
     designer's stake fields; entry = their sum); `payNassau` settles segment by segment (losers' stakes to the
     winners, a halve is a push, an unfinished segment returns the stake). `pickTeams` has "Teams = the groups".
     A competition can be added to a game at any point from Design; standings pick up the scores already on the cards.
+    **The waltz** (`waltz123`, pattern `123w`, Oct 2026): the reverse waltz the other way round — 1, 2, 3 balls by hole
+    number, repeating; **`all918`** (engine field, `pot.rules.all918`, the designer's "Every ball counts on 9 and 18",
+    default on for the waltz; in `COMP_KEYS` / `EV_GAME_KEYS`) makes 9 and 18 count every ball. **Stakes may be $0**:
+    `newPot` gives the waltz `{front:0,back:0,total:20}` — one bet, the winning side takes the whole pot; the reverse
+    waltz keeps 5/5/10 but either can be zeroed in the designer. A bet with $0 on it is neither shown nor scored:
+    `compPub` carries `nassau` (stakes) so `matchBoard` filters the segments (`liveSeg`) out of `segs`, `status` and
+    `pts`; `payNassau` / `nassauPayouts` skip it; `stakesText` reads "$20 on the 18 — winner takes the pot". The
+    quick setup has a Waltz starter.
   - **Handicaps are 100% across the board** in a group's game (`g.hcp` 'full', the default; 'usga' switches the USGA
     table back on — designer, "Handicaps"): `syncGameEvent` sets `ev.allow={'*':100}`, `pctFor` honours `'*'` for every
     player format (never the per-player scramble tables), `compPub` keeps it, so stroke play, best ball, skins and the

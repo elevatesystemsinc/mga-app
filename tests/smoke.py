@@ -315,6 +315,15 @@ async def main():
       const pub=potPub(g,pot), rows=eventBoard(pub,scoresFor(ev),{sort:pub.scoring}); payNassau(g,pot,rows); const prev=document.getElementById('pnPrev').textContent; document.getElementById('dSave').click();
       const out=Object.fromEntries(pot.payouts.map(x=>[x.pid,x.amount])); const sumOut=Math.round(pot.payouts.reduce((a,x)=>a+x.amount,0)*100)/100; g.pots.pop(); render();
       return {sides:rows.length, status:rows[0].status, entry:pot.entry, summary:potSummary(pot), sumOut, out, prev:prev.slice(0,160)}; }""")
+    # the waltz (1-2-3, every ball on 9 & 18): one bet on the 18 by default — front and back at $0 are neither shown nor scored; the winning side takes the pot
+    r6w=await pg.evaluate("""()=>{ const g=GAME(), ev=gameEvent(g); const pot=newPot('waltz123',g); pot.rules.teamSize=3; g.pots.push(pot); const gp=id=>g.players.find(p=>p.id===id).gpid;
+      pot.inn={}; ['gp_p0','gp_p1','gp_p2','gp_p3','gp_p4','gp_guest'].forEach(id=>pot.inn[id]=true); pot.teams={[gp('gp_p0')]:'S1',[gp('gp_p1')]:'S1',[gp('gp_p2')]:'S1',[gp('gp_p3')]:'S2',[gp('gp_p4')]:'S2',[gp('gp_guest')]:'S2'};
+      const E=potEngine(pot), pub=potPub(g,pot), par=4, k=h=>countOn(pub,'bestball',h,4,par), kOff=h=>countOn(Object.assign({},pub,{all918:false}),'bestball',h,4,par);
+      const rows=eventBoard(pub,scoresFor(ev),{sort:pub.scoring}); payNassau(g,pot,rows); const prev=document.getElementById('pnPrev').textContent; document.getElementById('dSave').click();
+      const sumOut=Math.round(pot.payouts.reduce((a,x)=>a+x.amount,0)*100)/100, winners=pot.payouts.map(x=>x.pid).sort(); g.pots.pop(); render();
+      return {engine:[E.countPattern,E.matchBy,E.all918], stakes:pot.rules.nassau, entry:pot.entry, counts:[1,2,3,4,9,18].map(k), countsOff:[9,18].map(kOff), segs:rows[0].segs.map(x=>x.k), status:rows[0].status, summary:potSummary(pot), prevHasFront:/Front nine/.test(prev), sumOut, winners, label:formatSummary(pub)}; }""")
+    ok6w=r6w['engine']==['123w','strokes',True] and r6w['stakes']=={'front':0,'back':0,'total':20} and r6w['entry']==20 and r6w['counts']==[1,2,3,1,4,4] and r6w['countsOff']==[3,3] and r6w['segs']==['18'] and r6w['status'].startswith('18 ') and 'winner takes the pot' in r6w['summary'] and not r6w['prevHasFront'] and r6w['sumOut']==120 and r6w['winners']==['gp_p0','gp_p1','gp_p2'] and r6w['label'].startswith('Waltz (1-2-3)')
+    ok=ok and ok6w; print('waltz 1-2-3: all on 9 & 18, one bet, winner takes the pot', r6w, 'OK' if ok6w else 'FAIL')
     # Ann/Bo/Cy (4s, with birdies) beat Di/Ed/Gus (5s and 6s) on total score in every segment: the winners split 6 × 20 = 120, 40 each
     ok=ok and r6['sides']==2 and r6['entry']==20 and 'front $5' in r6['summary'] and r6['sumOut']==120 and all(abs(r6['out'].get(k,0)-40)<0.01 for k in ['gp_p0','gp_p1','gp_p2']) and __import__('re').match(r'^F [−+E]\S* · B [−+E]\S* · 18 [−+E]', r6['status'])
     print('mid-round team Nassau', r6, 'OK' if r6['sumOut']==120 and r6['sides']==2 else 'FAIL')
