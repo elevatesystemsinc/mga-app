@@ -212,8 +212,11 @@ Tournament = { id, name, season, days, startDate, field:[{id,memberId,team,paid,
     gives the worth of one skin / hole; `skinsRulesOf(pot)` normalises and derives `carry` from the mode.
   - **Quiet skins**: `rules.skins.live` (default off) keeps skins off the game page during the round; "Call out the
     skins" opens `skinsCallout(g,pot)` (full-screen, one hole per tap in play order) and sets `pot.calledOut`. A won
-    skin shows as pending until its validation hole is called; stepping onto that hole first flashes the verdict
-    full-screen (`sk-flash`: red "Didn't validate" / green "Validated"), then shows the hole's result.
+    skin shows as pending until its validation hole is called **and** the verdict has been flashed: the hole comes
+    first, then the button reads "Hole N — did it validate?", then the verdict full-screen (`sk-flash`: red "Didn't
+    validate" / green "Validated", with what the player made on the validation hole), never the other way round (the
+    owner, Oct 2026: "not spoil validation or not validated before"). A skin's dollar value (pot ÷ skins won) only shows
+    once all 18 are called. The phone's `calloutStage` (Finish tab) runs the same sequence.
   - **Published copy stays current**: `publishIfChanged(ev)` (golf.js) runs on every render of a game page, a Golf
     event page and a tournament's Rounds tab — it republishes when `publicEvent(ev)` differs from what this session
     last sent (`PUB_SIG`), so a new build that changes derived data (competitions, handicaps, `matchBy`…) reaches the

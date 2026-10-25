@@ -293,11 +293,12 @@ async def main():
       await setScore(ev,gp('gp_p1'),3,6);   // Bo bogeys hole 3 (par 5) after his birdie on 2 → the hole-2 skin doesn't validate
       skinsCallout(g,pot); const nxt=()=>document.getElementById('skNext'); nxt().click(); nxt().click();   // holes 1 and 2 shown
       const pend=document.querySelector('.sk-line.pending')&&document.body.textContent.includes('validates on hole 3');
-      nxt().click(); const flash=document.querySelector('.sk-flash.bad'); const big=flash?flash.querySelector('.sk-flash-big').textContent:''; nxt().click();
+      nxt().click(); const early=!!document.querySelector('.sk-flash')||[...document.querySelectorAll('.sk-line')].some(l=>/validate/.test(l.textContent)&&!/validates on/.test(l.textContent));   // hole 3 shown first — no verdict yet
+      const ask=nxt().textContent; nxt().click(); const flash=document.querySelector('.sk-flash.bad'); const big=flash?flash.querySelector('.sk-flash-big').textContent:''; const made=flash?flash.querySelector('.sk-flash-s').textContent:''; nxt().click();
       const after=[...document.querySelectorAll('.sk-line')].map(l=>l.className.replace('sk-line ','')); const voidTxt=document.body.textContent.includes('didn’t validate on hole 3');
-      document.getElementById('skClose').click(); g.pots.pop(); await setScore(ev,gp('gp_p1'),3,4); return {pend, big, after, voidTxt}; }""")
-    ok=ok and r4['pend'] and r4['big']=='Didn’t validate' and r4['after'][:3]==['muted','void','pending'] and r4['voidTxt']   # hole 3: Ann's 4 on the par 5 is a new skin, pending hole 4
-    print('call-out validation flash', r4, 'OK' if r4['big']=='Didn’t validate' and r4['after'][:3]==['muted','void','pending'] else 'FAIL')
+      document.getElementById('skClose').click(); g.pots.pop(); await setScore(ev,gp('gp_p1'),3,4); return {pend, early, ask, big, made, after, voidTxt}; }""")
+    ok4=r4['pend'] and not r4['early'] and r4['ask'].startswith('Hole 2') and r4['big']=='Didn’t validate' and 'made 6 on hole 3' in r4['made'] and r4['after'][:3]==['muted','void','pending'] and r4['voidTxt']   # hole 3 first, then the verdict; hole 3: Ann's 4 on the par 5 is a new skin, pending hole 4
+    ok=ok and ok4; print('call-out validation flash: the hole first, then the verdict', r4, 'OK' if ok4 else 'FAIL')
     # groups & handicaps on the game page: move a player, change a tee, set an index for the day → CH/PH follow
     r5=await pg.evaluate("""()=>{ const g=GAME(), ev=gameEvent(g); view.gameId=g.id; go('games'); const gp=id=>g.players.find(p=>p.id===id).gpid; const q=sel=>document.querySelector(sel);
       const before=ev.groups.map(x=>x.players.length); const mv=q(`[data-gmove="${gp('gp_p4')}"]`); mv.value=ev.groups[0].id; mv.dispatchEvent(new Event('change'));
