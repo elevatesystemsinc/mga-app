@@ -60,6 +60,7 @@ src/
   raffle.js            50/50 Drawing tab, drawing screen, official record PDF
   payouts.js           Calcutta payouts math (calcPayouts, ties) + Results / Payouts sub-tabs
   surveys.js           Surveys: anonymous member surveys (sections → questions, public link, results, CSV)
+  billing.js           Member accounts & billing (module 'billing', club hub, staff only): acct_items / acct_statements, statements PDF
   autoupdate.js        version.json polling + safe reload (__BUILD__ placeholder)                     [shared]
   cashier_src.html     cashier page   (markers /*CALCCORE*/ /*AUTOUPDATE*/)
   checkin_src.html     check-in page  (markers /*CKCORE*/  /*AUTOUPDATE*/)
@@ -89,6 +90,7 @@ python3 tests/test_score.py   # the public scoring page against the fake: mid-ro
 python3 tests/test_tenants.py # tenants, the portal, staff / board logins and scope, invite links — against the fake
 python3 tests/test_survey.py  # a survey from the template → public link → anonymous answers → results, against the fake
 python3 tests/test_finish.py  # a game wrapped up from the phones (close → skins → draw → payouts) and taken into the hub, against the fake
+python3 tests/test_billing.py # member accounts: staff post / pay / void / statements, dues → the account, board logins kept out, against the fake
 git add -A && git commit && git push origin main  # Render deploys main to app.wcccmga.org
 ```
 Tests need `pip install playwright && playwright install chromium` and `cd tests && npm i xlsx@0.18.5`.
@@ -332,6 +334,7 @@ Tournament = { id, name, season, days, startDate, field:[{id,memberId,team,paid,
 | `calcutta_share` (tid, token, name, doc, version) + RPC `calcutta_get(p_token)`, `calcutta_put(p_token,p_doc,p_version)` | token links for people without the board login: the **cashier** page (tid = tournament id) and the **registration/check-in** page (tid = tournament id + `:checkin`). `calcutta_put` is version-checked (conflict → retry). `calcutta-setup.sql` |
 | `golf_events` (+ `wrap`), `golf_scores` + RPC `golf_event`, `golf_join`, `golf_submit`, `golf_wrap`, `hub_key_wrap` | public live scoring (`golf-setup.sql`) and the Finish tab's wrap-up (`wrap-setup.sql`). `public.org` names the owning organization. |
 | `survey_share` (sid, tenant, org, token, status, doc), `survey_responses` (id, tenant, org, sid, answers, day) + RPC `survey_get(p_token)`, `survey_submit(p_token,p_answers)`, `hub_key_survey`, `hub_key_survey_results` | surveys (`survey-setup.sql`): the share row is what the public page shows; a response is answers + the **day** only — no user, e-mail, IP or device, ever. |
+| `acct_items`, `acct_statements` + `can_staff(p_tenant)` | member accounts & billing (`billing-setup.sql`): the club's ledger, staff only. |
 | `hub_keys` (org_id, key_hash, label, revoked_at) + RPC `hub_key_org/read/write/people/golf_event/golf_delete/score/share` | admin links (`admin-links-setup.sql`): security-definer functions that act for exactly one organization. |
 | `mm_tournament` | the retired Member-Member app's row (`supabase-setup.sql`). Archive only — no hub code reads or writes it. |
 
@@ -486,6 +489,31 @@ changes on the chosen competition's board, skins taken/lost **only for skins com
 competition, **Follow** a player (highlights, feed filtered, hole panel on their group). **Quiet competitions stay quiet**:
 `liveComps()` filters `live===false` everywhere. Links: the hub's game page (Live scoring card), the Golf event page, the
 quick setup's share step (`gamecastLink(ev)` in golf.js). `tests/test_score.py` opens it against the fake; smoke renders it.
+
+### Member accounts & billing (`billing.js`, `billing-setup.sql`, module `billing`, `tests/test_billing.py`)
+**Each club bills its own members; Flagstick bills the club** (the owner, Oct 2026) — so there is no payment processor in
+Flagstick: the club's ledger lives here, the club collects the way it always has (its own terminal, checks, ACH, cash) and the
+office records it. The first piece of the Club-management tier. Rows live in real tables, not the organization documents:
+`acct_items` (one row per **charge / payment / credit** on a member: `member_id` = the directory person, `source` dues | fnb |
+proshop | tee | facility | lesson | fee | manual, `ref` = the source record, `amount` always positive — `kind` gives the sign,
+`method` + `reference` on payments, `posted` date, `void_at`/`void_reason` — a void is never a delete) and `acct_statements`
+(one row per member per run: period, opening, charges, payments, closing, due, `run_id`). RLS = `can_staff(tenant)` (role
+`staff` in `tenant_users`, or a Flagstick admin): board logins, scoped logins and admin links never see it (`acctOn()` =
+club hub + `hasModule('billing')` + not key mode + not scoped; the nav item and both pages obey it). `ACCT` caches the
+ledger per visit (reloaded in the background when older than 20 s — other staff post too); local mode (tests, file://)
+keeps the same shapes in localStorage (`acctKey()`). `acctPost(o)` is the one way anything lands on an account;
+`acctVoid(item, reason)`. **Dues collection → the account**: *Put on account* posts the association's charge once (`acctPostDues`,
+`ref` = the dues charge id) and *Collected* posts the matching payment once (`acctCollectDues`) — the club has the money, the
+association is credited in its own books as before. Pages: **Member accounts** (`vAccounts`: outstanding / credits / this
+month, Owing · In credit · With activity · Everyone, search by name / number / e-mail, Post charge, Record payment, Run
+statements, Export balances CSV, Settings = due days + the message on statements, in `CLUB.billing`) and the **account**
+(`vAccount`: newest first with a running balance, void with a reason via prompt, Credit, Statement PDF, the member's
+statements). **Run statements** closes a period for everyone with a balance or activity (period end defaults to the last day
+of the previous month; each member's statement starts the day after their last one, or at their first item), saves the rows
+and downloads one branded PDF with a page per member (`statementsPDF`: band, account block, balance due, the period's items
+with a running balance, closing line, the club's message). `openDrawer` now awaits an async `save` (the Save button is
+disabled until it lands). Coming next in this tier: bookings (tee sheet, courts, pools, lessons — needs member sign-in) and
+POS (F&B + pro shop) posting to these accounts.
 
 ### Other
 Checklist (95-task 2026 template, assignees from members/board, notes, print). Golf (courses, WHS, flights,

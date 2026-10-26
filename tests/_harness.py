@@ -224,7 +224,10 @@ class FakeDB:
                 if old: old.update(copy.deepcopy(row))
                 else: row.setdefault('created_at',datetime.datetime.utcnow().isoformat()+'Z'); rows.append(copy.deepcopy(row))
                 return json.dumps({'data':None,'error':None})
-            if op=='insert': row=dict(a['payload']); row.setdefault('id',str(uuid.uuid4())); row.setdefault('created_at',datetime.datetime.utcnow().isoformat()+'Z'); row.setdefault('at',row['created_at']); row.setdefault('revoked_at',None); rows.append(row); return json.dumps({'data':None,'error':None})
+            if op=='insert':   # one row or a list of rows, as supabase-js takes them
+                for row in ([dict(x) for x in a['payload']] if isinstance(a['payload'],list) else [dict(a['payload'])]):
+                    row.setdefault('id',str(uuid.uuid4())); row.setdefault('created_at',datetime.datetime.utcnow().isoformat()+'Z'); row.setdefault('at',row['created_at']); row.setdefault('revoked_at',None); rows.append(row)
+                return json.dumps({'data':None,'error':None})
             if op=='update':
                 for r in hits: r.update(a['payload'])
                 return json.dumps({'data':[{'id':r.get('id')} for r in hits],'error':None})

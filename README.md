@@ -175,6 +175,19 @@ club hub's **Dues collection** page: the club exports the open charges for its b
 one by one), marks them *on account*, and when the money is in marks them *collected* — that records the payment on
 the member in the association's books, credited to the association. The club's own budget and treasury never count it.
 
+## Member accounts (billing)
+
+Each club bills its own members — Flagstick only bills the club — so the club's ledger lives in the club hub under
+**Member accounts** (staff logins only; it appears once Flagstick turns the billing module on for the club). Every member
+has an account: dues put on account from Dues collection land there, the office posts charges by hand (pro shop, food &
+beverage, tee times, facilities, lessons, fees) and records payments as they come in (card, check, ACH, cash, with the check
+number or last four) and credits; a mistake is **voided with a reason**, never deleted. The list shows who owes what, who is
+in credit, and what was charged and received this month; search by name, member number or e-mail; **Export balances** gives
+a CSV. **Run statements** closes a period for everyone with a balance or activity (by default the month just ended),
+keeps each statement on the member's account and downloads one PDF with a branded page per member for the office to send:
+balance forward, the period's items with a running balance, the closing balance, the due date (Settings: days after the
+period ends) and the club's message. Members pay the club the way they always have; nothing here moves money.
+
 ## The club calendar
 
 The club's Tournaments page and dashboard also list every association's and small group's tournaments — name, dates,

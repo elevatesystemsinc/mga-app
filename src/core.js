@@ -277,7 +277,7 @@ let TENANCY=false, TENANT=null, TENANT_INFO=null, ACCESS=null;   // ACCESS = my_
 const MODULE_CATALOG=[
   {id:'golf',    name:'Golf management', base:true, desc:'The package: the club directory, tournaments, rounds and results, live scoring and formats, the game library, associations (MGA, LGA, SMGA…), small groups, dues collection, the club’s treasury and budget'},
   {id:'club',    name:'Club management', soon:true, desc:'Run the whole club through Flagstick: membership, member numbers, statements and the club’s operations — with the toggles below'},
-  {id:'billing', name:'Member billing',  soon:true, desc:'Member accounts, charges, statements and payment collection'},
+  {id:'billing', name:'Member billing',  desc:'Member accounts: charges from dues, the shop and bookings, payments recorded by the club, statements'},
   {id:'pos',     name:'Point of sale',   soon:true, desc:'Food & beverage and pro shop charges to member accounts'},
 ];
 const PLAN_PRESETS={golf:{golf:true},club:{golf:true,club:true,billing:true,pos:true}};

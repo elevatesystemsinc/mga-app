@@ -151,6 +151,14 @@ async def main():
           return {open, statuses:s.duesCharges.map(x=>x.status), c:[c.status,!!c.chargedAt,!!c.collectedAt], pay:pay&&[pay.amount,pay.method], orgRows, noDues, raffleOff:!featuresHTML('x',{}).includes('50/50')}; }""")
         ok=r['open']>=2 and r['statuses'].count('collected')==1 and r['statuses'].count('charged')==r['open']-1 and r['c']==['collected',True,True] and r['pay']==[r['pay'][0],'Club account'] and r['orgRows']>=1 and r['noDues'] and r['raffleOff']
         print('club collects dues + sees the calendar, no club dues/raffle', r, 'OK' if ok else 'FAIL'); bad+=not ok
+        # member accounts (local mode keeps the ledger in localStorage): dues put on account landed there; post, pay, void, statements
+        r=await pg.evaluate("""async()=>{ go('accounts'); await new Promise(r=>setTimeout(r,300)); const nav=navItems().some(x=>x[0]==='accounts'); const dues=ACCT.items.filter(i=>i.source==='dues').length;
+          const first=document.querySelector('[data-acct]'); const id=first.dataset.acct; first.click(); await acctPost({member_id:id,kind:'charge',source:'proshop',amount:25,descr:'Glove'}); await acctPost({member_id:id,kind:'payment',amount:100,method:'cash'}); render();
+          const rows=[...document.querySelectorAll('#main .lg .lr')].map(r=>r.querySelector('.lnet').textContent); const bal=balanceOf(id);
+          go('accounts'); document.getElementById('acRun').click(); document.getElementById('rsEnd').value=todayISO(); document.getElementById('dSave').click(); await new Promise(r=>setTimeout(r,900));
+          const st=ACCT.stmts.length, saved=JSON.parse(localStorage.getItem(acctKey())); return {nav, dues, rows, bal, st, saved:[saved.items.length,saved.stmts.length]}; }""")
+        ok=r['nav'] and r['dues']==4 and len(r['rows'])==3 and r['st']>=1 and r['saved'][0]==r['dues']+2 and r['saved'][1]==r['st']
+        print('club: member accounts from dues, posts, statements (local ledger)', r, 'OK' if ok else 'FAIL'); bad+=not ok
       print('  errors after checks', errs); bad+=bool(errs)
     # --- small group: games, live scoring, payouts by finish + skins, ledger
     pg=await b.new_page(); errs=[]; pg.on('pageerror',lambda e,errs=errs:errs.append(str(e))); await local(pg); await pg.goto(page('index.html')+'?org=club'); await pg.wait_for_timeout(500)
