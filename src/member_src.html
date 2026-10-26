@@ -87,7 +87,7 @@ async function load(){
   const {data,error}=await sb.rpc('member_me',{p_tenant:TENANT});
   if(error){ if(/function|schema cache/i.test(error.message||'')) return msg('Not ready','The member portal is not switched on for this club yet.'); return msg('Something went wrong',error.message||''); }
   if(!data||!data.member){ $('hOut').hidden=false; const {data:{session}}=await sb.auth.getSession(); return msg('We couldn’t find your account',`${(session&&session.user&&session.user.email)||'This e-mail'} isn’t on ${data&&data.club?data.club+'’s':'the club’s'} directory. Ask the club office to add it, then sign in again.`,'<div class="acts"><button class="btn" id="out2">Sign out</button></div>'),($('out2').onclick=signOut); }
-  ME=data; $('hOut').hidden=false; $('hTitle').textContent=[ME.member.first,ME.member.last].filter(Boolean).join(' ')||'My account'; render();
+  ME=data; $('hOut').hidden=false; $('hTitle').textContent=[ME.member.first,ME.member.last].filter(Boolean).join(' ')||'My account'; if(ME.brand){ const im=document.querySelector('.top img'); im.src=ME.brand; im.style.width='auto'; im.style.maxWidth='120px'; } render();
 }
 async function signOut(){ await sb.auth.signOut(); ME=null; signIn(); }
 function render(){
@@ -145,7 +145,7 @@ async function pay(amount,autopay){ const r=await fn({action:'pay',amount,autopa
 async function setupAutopay(){ const r=await fn({action:'setup'}); if(r&&r.url) location.href=r.url; }
 async function autopayOff(){ if(!confirm('Turn autopay off? Your saved card is removed; you pay each statement yourself.')) return; const {error}=await sb.rpc('member_autopay_off',{p_tenant:TENANT}); if(error){ toast(error.message); return; } await load(); toast('Autopay is off'); }
 function loadJsPDF(){ if(window.jspdf) return Promise.resolve(); return new Promise((res,rej)=>{ const sc=document.createElement('script'); sc.src='https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js'; sc.onload=()=>res(); sc.onerror=()=>rej(new Error('Couldn’t load the PDF maker — check the connection')); document.head.appendChild(sc); }); }
-async function crestPNG(){ try{ const r=await fetch('flagstick-crest-light.png'); const b=await r.blob(); return await new Promise(ok=>{ const fr=new FileReader(); fr.onload=()=>ok(fr.result); fr.readAsDataURL(b); }); }catch(_){ return null; } }
+async function crestPNG(){ if(ME&&ME.brand) return ME.brand; try{ const r=await fetch('flagstick-crest-light.png'); const b=await r.blob(); return await new Promise(ok=>{ const fr=new FileReader(); fr.onload=()=>ok(fr.result); fr.readAsDataURL(b); }); }catch(_){ return null; } }
 async function statementPDF(s){ if(!s) return; try{ await loadJsPDF(); }catch(e){ toast(e.message); return; }
   const doc=new window.jspdf.jsPDF({unit:'pt',format:'letter'}); bcFonts(doc); const m=ME.member, items=(ME.items||[]).filter(i=>i.posted>=s.period_start&&i.posted<=s.period_end);
   statementPage(doc,{club:ME.club,name:[m.first,m.last].filter(Boolean).join(' '),lines:[m.memberNo?'Member #'+m.memberNo:'',m.address1||'',[m.city,m.state,m.zip].filter(Boolean).join(', '),m.email||''],s,items,msg:ME.message||'',crest:await crestPNG(),idx:0,n:1});

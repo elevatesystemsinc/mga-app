@@ -919,10 +919,10 @@ async function gameSheetPDF(g,opt){
   const players=evPlayers(ev).length||g.players.length;
   font('PublicSans','normal',8.6,[214,218,220]); const sub=doc.splitTextToSize([gameWhen(g),course?course.name+(tee?' · '+tee+' tees':''):'',`${players} player${players===1?'':'s'}`,allIn?gMoney(allIn)+' all in':''].filter(Boolean).join('  ·  '),R2-L-90); const bandH=78+Math.max(0,sub.length-1)*11;
   doc.setFillColor(...GOLD); doc.roundedRect(L,32,R2-L,bandH+4,8,8,'F'); doc.setFillColor(...NAVY); doc.roundedRect(L,32,R2-L,bandH,8,8,'F'); doc.rect(L,32+bandH-12,R2-L,8,'F');
-  if(crest) doc.addImage(crest,'PNG',L+18,44,56*850/1024,56);
-  font('PublicSansXB','normal',6.8,GOLDL); doc.text(`${(orgName()||'').toUpperCase()}${CLUB&&CLUB.name?' · '+CLUB.name.toUpperCase():''}`,L+80,58,{charSpace:1.2});
-  font('Cormorant','bold',26,WHITE); doc.text(gameTitle(g),L+80,84);
-  font('PublicSans','normal',8.6,[214,218,220]); doc.text(sub,L+80,100);
+  const cw=drawCrest(doc,crest,L+18,44,56), TX=L+18+(cw||47)+15;
+  font('PublicSansXB','normal',6.8,GOLDL); doc.text(`${(orgName()||'').toUpperCase()}${CLUB&&CLUB.name?' · '+CLUB.name.toUpperCase():''}`,TX,58,{charSpace:1.2});
+  font('Cormorant','bold',26,WHITE); doc.text(gameTitle(g),TX,84);
+  font('PublicSans','normal',8.6,[214,218,220]); doc.text(sub,TX,100);
   let y=32+bandH+26;
   const need=h=>{ if(y+h>H-36){ doc.addPage(); page(); y=44; } };
   const section=(label,note)=>{ need(48); font('PublicSansXB','normal',7.6,GOLDDK); doc.text(label.toUpperCase(),L,y,{charSpace:1.2}); if(note){ font('PublicSans','normal',8,MUTED); doc.text(note,R2,y,{align:'right'}); } y+=7; doc.setDrawColor(...GOLD); doc.setLineWidth(1.2); doc.line(L,y,R2,y); y+=16; };

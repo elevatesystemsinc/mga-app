@@ -68,3 +68,6 @@ language sql security definer set search_path = public as $$
 $$;
 revoke all on function public.member_autopay_off(text) from public;
 grant execute on function public.member_autopay_off(text) to authenticated;
+
+-- the club's white-label logo for the member portal header (Settings → Branding); re-run member_me after adding:
+--   'brand', club -> 'brand' ->> 'logo',

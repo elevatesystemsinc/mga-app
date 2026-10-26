@@ -107,10 +107,10 @@ async function payoutsPDF(t,opt){
   const subTxt=`${dateRange(t)}${AM?` · ${fmt(P.total)} to ${P.people.length} ${P.people.length===1?'person':'people'}`:''}${complete?'':' · results not complete — as of '+new Date().toLocaleString()}`;
   font('PublicSans','normal',8.4,[214,218,220]); const sub=doc.splitTextToSize(subTxt,R2-L-90); const bandH=74+Math.max(0,sub.length-1)*11;
   doc.setFillColor(...GOLD); doc.roundedRect(L,32,R2-L,bandH+4,8,8,'F'); doc.setFillColor(...NAVY); doc.roundedRect(L,32,R2-L,bandH,8,8,'F'); doc.rect(L,32+bandH-12,R2-L,8,'F');
-  if(crest) doc.addImage(crest,'PNG',L+16,42,54*850/1024,54);
-  font('PublicSansXB','normal',6.8,GOLDL); doc.text(`${(orgName()||'').toUpperCase()} · ${t.season||''}`,L+76,56,{charSpace:1.2});
-  font('Cormorant','bold',24,[255,255,255]); doc.text(`${t.name} — ${title}`,L+76,80);
-  font('PublicSans','normal',8.4,[214,218,220]); doc.text(sub,L+76,96);
+  const lw=drawCrest(doc,crest,L+16,42,54), TX=L+16+(lw||45)+15;
+  font('PublicSansXB','normal',6.8,GOLDL); doc.text(`${(orgName()||'').toUpperCase()} · ${t.season||''}`,TX,56,{charSpace:1.2});
+  font('Cormorant','bold',24,[255,255,255]); doc.text(`${t.name} — ${title}`,TX,80);
+  font('PublicSans','normal',8.4,[214,218,220]); doc.text(sub,TX,96);
   let y=32+bandH+26;
   const need=h=>{ if(y+h>H-44){ doc.addPage(); page(); y=48; } };
   const section=(label,note)=>{ need(40); font('PublicSansXB','normal',7.4,GOLDDK); doc.text(label.toUpperCase(),L,y,{charSpace:1.1}); if(note){ font('PublicSans','normal',8,MUTED); doc.text(note,R2,y,{align:'right'}); } y+=6; doc.setDrawColor(...GOLD); doc.setLineWidth(1); doc.line(L,y,R2,y); y+=12; };

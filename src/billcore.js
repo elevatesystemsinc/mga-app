@@ -7,15 +7,18 @@ const BC_METHOD={card:'Card',check:'Check',ach:'ACH / bank',cash:'Cash',other:'O
 const bcFmt=v=>{ const x=parseFloat(v)||0; return (x<0?'−$':'$')+Math.abs(x).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}); };
 const bcDate=iso=>iso?new Date(String(iso).slice(0,10)+'T12:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}):'—';
 const bcSign=i=>i.kind==='charge'?(parseFloat(i.amount)||0):-(parseFloat(i.amount)||0);
+/* a logo in a PDF band: fitted to the height, width by its own proportions (at most 2.6× the height); returns the width drawn */
+function crestW(doc,src,h){ let w=h*850/1024; try{ const p=doc.getImageProperties(src); if(p&&p.width&&p.height) w=Math.min(h*2.6,h*p.width/p.height); }catch(_){} return w; }
+function drawCrest(doc,src,x,y,h){ if(!src) return 0; const w=crestW(doc,src,h); try{ doc.addImage(src,'PNG',x,y,w,h); }catch(_){ return 0; } return w; }
 function bcFonts(doc){ [['ps400','PS-400.ttf','PublicSans','normal'],['ps700','PS-700.ttf','PublicSans','bold'],['ps800','PS-800.ttf','PublicSansXB','normal'],['cg700','CG-700.ttf','Cormorant','bold']].forEach(([k,f,fam,st])=>{ doc.addFileToVFS(f,PDF_FONTS[k]); doc.addFont(f,fam,st); }); }
 function statementPage(doc,ctx){
   const L=40,R2=572,W=612,H=792, s=ctx.s, font=(f,st,z,col)=>{ doc.setFont(f,st); doc.setFontSize(z); doc.setTextColor(...col); };
   doc.setFillColor(...BC_IVORY); doc.rect(0,0,W,H,'F');
   doc.setFillColor(...BC_GOLD); doc.roundedRect(L,32,R2-L,82,8,8,'F'); doc.setFillColor(...BC_NAVY); doc.roundedRect(L,32,R2-L,78,8,8,'F'); doc.rect(L,32+66,R2-L,8,'F');
-  if(ctx.crest) doc.addImage(ctx.crest,'PNG',L+16,42,54*850/1024,54);
-  font('PublicSansXB','normal',6.8,BC_GOLDL); doc.text(String(ctx.club||'').toUpperCase(),L+76,56,{charSpace:1.2});
-  font('Cormorant','bold',24,[255,255,255]); doc.text('Member statement',L+76,80);
-  font('PublicSans','normal',8.4,[214,218,220]); doc.text(`${bcDate(s.period_start)} – ${bcDate(s.period_end)} · due ${bcDate(s.due)}`,L+76,96);
+  const cw=drawCrest(doc,ctx.crest,L+16,42,54), TX=L+16+(cw||45)+15;
+  font('PublicSansXB','normal',6.8,BC_GOLDL); doc.text(String(ctx.club||'').toUpperCase(),TX,56,{charSpace:1.2});
+  font('Cormorant','bold',24,[255,255,255]); doc.text('Member statement',TX,80);
+  font('PublicSans','normal',8.4,[214,218,220]); doc.text(`${bcDate(s.period_start)} – ${bcDate(s.period_end)} · due ${bcDate(s.due)}`,TX,96);
   let y=140; font('PublicSansXB','normal',7.4,BC_GOLDDK); doc.text('ACCOUNT',L,y,{charSpace:1.1}); doc.text('BALANCE DUE',R2,y,{align:'right',charSpace:1.1}); y+=6; doc.setDrawColor(...BC_GOLD); doc.setLineWidth(1); doc.line(L,y,R2,y); y+=16;
   font('PublicSans','bold',12,BC_INK); doc.text(ctx.name||'Member',L,y); font('Cormorant','bold',26,s.closing>0.004?BC_RED:BC_INK); doc.text(bcFmt(Math.max(0,s.closing)),R2,y+4,{align:'right'});
   font('PublicSans','normal',8.6,BC_MUTED); const lines=(ctx.lines||[]).filter(Boolean); lines.forEach((t,i)=>doc.text(t,L,y+14+i*11));

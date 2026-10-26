@@ -82,7 +82,7 @@ class FakeDB:
             t=next((t for t in self._rows('tenants') if t['slug']==a['p_tenant']),{})
             facs=[f for f in ((club.get('booking') or {}).get('facilities') or []) if f.get('members',True)]
             bks=sorted([b for b in self._rows('bookings') if b.get('tenant','wccc')==a['p_tenant'] and b['member_id']==m['id'] and b['status'] in ('booked','checked_in') and b['date']>=datetime.date.today().isoformat()],key=lambda b:(b['date'],b['time']))
-            return json.dumps({'data':{'member':{k:m.get(k) for k in ('id','first','last','memberNo','email','address1','city','state','zip','status')},'club':club.get('name'),'message':(club.get('billing') or {}).get('message'),'items':items,'statements':st,'facilities':facs,'bookings':bks,'autopay':u['autopay'],'pm_label':u['pm_label'],'online':bool(t.get('stripe_account')) and bool((t.get('stripe_status') or {}).get('charges_enabled'))},'error':None})
+            return json.dumps({'data':{'member':{k:m.get(k) for k in ('id','first','last','memberNo','email','address1','city','state','zip','status')},'club':club.get('name'),'message':(club.get('billing') or {}).get('message'),'items':items,'statements':st,'facilities':facs,'bookings':bks,'brand':(club.get('brand') or {}).get('logo'),'autopay':u['autopay'],'pm_label':u['pm_label'],'online':bool(t.get('stripe_account')) and bool((t.get('stripe_status') or {}).get('charges_enabled'))},'error':None})
         if fn in ('member_slots','member_book','member_cancel'):   # booking-setup.sql, in miniature
             me=next((u for u in self.auth_users if u['id']==self.me),None); em=(me or {}).get('email','').lower()
             club=self.get('mga_hub','club',a['p_tenant']) or {}; m=next((x for x in club.get('members',[]) if str(x.get('email','')).lower()==em),None)
@@ -280,7 +280,7 @@ class FakeDB:
             rows=self._rows(t); hits=[r for r in rows if self._col_match(r,a['filters'])]
             if op=='select': return json.dumps({'data':(copy.deepcopy(hits[0]) if hits else None) if a['single'] else copy.deepcopy(hits),'error':None})
             if op=='upsert':
-                row=dict(a['payload']); key=('user_id','tenant') if 'user_id' in row and 'tenant' in row else ('user_id',) if 'user_id' in row else ('slug',) if 'slug' in row else ('sid',) if 'sid' in row else ('id',)
+                row=dict(a['payload']); key=('user_id','tenant') if 'user_id' in row and 'tenant' in row else ('user_id',) if 'user_id' in row else ('slug',) if 'slug' in row else ('sid',) if 'sid' in row else ('tenant','org') if 'org' in row and 'id' not in row else ('id',)
                 old=next((r for r in rows if all(r.get(k)==row.get(k) for k in key)),None)
                 if old: old.update(copy.deepcopy(row))
                 else: row.setdefault('created_at',datetime.datetime.utcnow().isoformat()+'Z'); rows.append(copy.deepcopy(row))

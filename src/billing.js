@@ -171,8 +171,9 @@ async function mailStatements(list){ list=(list||[]).filter(s=>{ const p=personB
   if(!acctCloud()){ toast('E-mail goes out from the live site — downloading the PDFs instead'); await statementsPDF(list); return 0; }
   const club=(CLUB&&CLUB.name)||CLUB_META.name; let sent=0, fail='';
   for(const s of list){ const p=personById(s.member_id); const doc=await statementsPDF([s],{returnDoc:true}); if(!doc) break; const b64=doc.output('datauristring').split(',')[1];
-    const {data,error}=await sb.functions.invoke('mail',{body:{tenant:TENANT,to:p.email,subject:`${club} — statement through ${dateTxt(s.period_end)}`,text:`Your ${club} statement for ${dateTxt(s.period_start)} – ${dateTxt(s.period_end)} is attached. Balance due: ${fmt2(Math.max(0,s.closing))}${s.closing>0.004?', by '+dateTxt(s.due):''}.\n\n${acctSettings().message||''}`,attachments:[{filename:`statement-${s.period_end}.pdf`,content:b64}]}});
-    if(error||(data&&data.error)){ fail=(error&&error.message)||(data&&data.error)||'failed'; break; }
+    const text=`Your ${club} statement for ${dateTxt(s.period_start)} – ${dateTxt(s.period_end)} is attached. Balance due: ${fmt2(Math.max(0,s.closing))}${s.closing>0.004?', by '+dateTxt(s.due):''}.\n\n${acctSettings().message||''}`;
+    const data=await sendMail({to:p.email,subject:`${club} — statement through ${dateTxt(s.period_end)}`,text,html:mailHTML({title:'Your statement',paragraphs:[`Your statement for <b>${dateTxt(s.period_start)} – ${dateTxt(s.period_end)}</b> is attached.`,`Balance due: <b>${fmt2(Math.max(0,s.closing))}</b>${s.closing>0.004?', by '+dateTxt(s.due):''}.`,esc(acctSettings().message||'')].filter(Boolean),cta:acctSettings().online&&acctSettings().online.charges_enabled?{href:portalLink(),label:'View & pay online'}:null}),attachments:[{filename:`statement-${s.period_end}.pdf`,content:b64}]});
+    if(data.error){ fail=data.error; break; }
     const patch={sent_at:new Date().toISOString()}; await sb.from('acct_statements').update(patch).eq('id',s.id); Object.assign(s,patch); sent++; }
   if(fail){ toast(/not found|404|Failed to send a request|not configured/i.test(fail)?'The mail function isn’t deployed or has no key (docs/tenancy.md) — download the PDFs instead':'E-mail stopped: '+fail); }
   else toast(`${sent} statement${sent===1?'':'s'} e-mailed`); return sent; }

@@ -261,10 +261,10 @@ async function surveyPDF(s,R,opt){
   const subTxt=`${n} response${n===1?'':'s'}${days.length?` · ${svDay(days[0])}${days.length>1&&days[days.length-1]!==days[0]?' – '+svDay(days[days.length-1]):''}`:''} · ${s.status==='open'?'still open':'closed'} · anonymous — no respondent is identified anywhere in this report`;
   font('PublicSans','normal',8.4,[214,218,220]); const sub=doc.splitTextToSize(subTxt,R2-L-90); const bandH=74+Math.max(0,sub.length-1)*11;
   doc.setFillColor(...GOLD); doc.roundedRect(L,32,R2-L,bandH+4,8,8,'F'); doc.setFillColor(...NAVY); doc.roundedRect(L,32,R2-L,bandH,8,8,'F'); doc.rect(L,32+bandH-12,R2-L,8,'F');
-  if(crest) doc.addImage(crest,'PNG',L+16,42,54*850/1024,54);
-  font('PublicSansXB','normal',6.8,GOLDL); doc.text(`${(svOrgName()||'').toUpperCase()} · ${(CLUB&&CLUB.name||'').toUpperCase()}`,L+76,56,{charSpace:1.2});
-  font('Cormorant','bold',22,[255,255,255]); doc.text(doc.splitTextToSize(`${s.title} — Results`,R2-L-90)[0],L+76,80);
-  font('PublicSans','normal',8.4,[214,218,220]); doc.text(sub,L+76,96);
+  const lw=drawCrest(doc,crest,L+16,42,54), TX=L+16+(lw||45)+15;
+  font('PublicSansXB','normal',6.8,GOLDL); doc.text(`${(svOrgName()||'').toUpperCase()} · ${(CLUB&&CLUB.name||'').toUpperCase()}`,TX,56,{charSpace:1.2});
+  font('Cormorant','bold',22,[255,255,255]); doc.text(doc.splitTextToSize(`${s.title} — Results`,R2-L-90)[0],TX,80);
+  font('PublicSans','normal',8.4,[214,218,220]); doc.text(sub,TX,96);
   let y=32+bandH+26;
   const need=h=>{ if(y+h>H-44){ doc.addPage(); page(); y=48; } };
   const section=(label,note)=>{ need(54); font('PublicSansXB','normal',7.4,GOLDDK); doc.text(label.toUpperCase(),L,y,{charSpace:1.1}); y+=6; doc.setDrawColor(...GOLD); doc.setLineWidth(1); doc.line(L,y,R2,y); y+=14;

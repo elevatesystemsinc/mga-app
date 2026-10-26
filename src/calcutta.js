@@ -534,7 +534,7 @@ async function exportOrder(t){
    gets an empty Bought by / Price line (the slideshow shows pre-buys; bettors fill it in themselves). */
 function loadJsPDF(){ if(window.jspdf) return Promise.resolve();
   return new Promise((res,rej)=>{ const sc=document.createElement('script'); sc.src='https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js'; sc.onload=()=>res(); sc.onerror=()=>rej(new Error('Couldn’t load the PDF maker — check the connection')); document.head.appendChild(sc); }); }
-async function crestPNG(){ const s=typeof crestSrc==='function'?crestSrc():''; if(s&&s.startsWith('data:')) return s;
+async function crestPNG(){ const bl=typeof brandLogo==='function'?brandLogo():null; if(bl) return bl; const s=typeof crestSrc==='function'?crestSrc():''; if(s&&s.startsWith('data:')) return s;
   const r=await fetch(CREST_URL); const b=await r.blob(); return await new Promise(ok=>{ const fr=new FileReader(); fr.onload=()=>ok(fr.result); fr.readAsDataURL(b); }); }
 async function downloadBidSheet(t){
   const c=calc(t);
@@ -556,8 +556,7 @@ async function downloadBidSheet(t){
     const y=32, h=compact?46:76;
     doc.setFillColor(...GOLD); doc.roundedRect(L,y,CW,h,8,8,'F');
     doc.setFillColor(...NAVY); doc.roundedRect(L,y,CW,h-4,8,8,'F'); doc.rect(L,y+h-12,CW,8,'F');
-    const ch=compact?30:52, cw=ch*850/1024, cx=L+16, cy=y+(h-4-ch)/2;
-    if(crest) doc.addImage(crest,'PNG',cx,cy,cw,ch);
+    const ch=compact?30:52, cx=L+16, cy=y+(h-4-ch)/2, cw=crest?drawCrest(doc,crest,cx,cy,ch):ch*850/1024;
     const tx=cx+cw+14;
     font('PublicSansXB','normal',compact?6:6.6,GOLDL); doc.text(kicker,tx,y+(compact?17:22),{charSpace:1.25});
     font('Cormorant','bold',compact?16:25,[255,255,255]); doc.text(title,tx,y+(compact?35:48));

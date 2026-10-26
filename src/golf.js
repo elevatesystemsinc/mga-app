@@ -617,7 +617,7 @@ const groupLink=(ev,grp)=>scoringLink(ev)+'&g='+encodeURIComponent(grp.code);
    get its address instead. */
 const CREST_URL=SITE_BASE+'flagstick-crest-light.png', CREST_IMG=new Image(); let CREST_DATA='';
 try{ CREST_IMG.src=CREST_URL; }catch(_){}
-function crestSrc(){ if(CREST_DATA) return CREST_DATA;
+function crestSrc(){ const bl=typeof brandLogo==='function'?brandLogo():null; if(bl) return bl; if(CREST_DATA) return CREST_DATA;
   try{ if(CREST_IMG.complete&&CREST_IMG.naturalWidth){ const c=document.createElement('canvas'); c.width=CREST_IMG.naturalWidth; c.height=CREST_IMG.naturalHeight; c.getContext('2d').drawImage(CREST_IMG,0,0); CREST_DATA=c.toDataURL('image/png'); return CREST_DATA; } }catch(_){}
   return CREST_URL; }
 function printCardHTML(ev,pub,grp,teamKeyOnly){

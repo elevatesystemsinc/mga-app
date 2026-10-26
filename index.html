@@ -420,6 +420,9 @@ textarea.inp{height:auto;min-height:84px;padding:10px 12px;resize:vertical}
 @media (max-width:640px){ .sheet{font-size:12px} .sheet .st{padding:8px 6px;font-size:12px} }
 .kv{display:flex;gap:12px;padding:6px 0;border-top:1px solid var(--line);align-items:flex-start} .kv>.muted:first-child{flex:0 0 120px;font-size:13px;padding-top:2px} .kv>span:last-child{flex:1 1 0;min-width:0;overflow-wrap:anywhere}
 @media (max-width:640px){ .kv>.muted:first-child{flex-basis:96px} }
+.brandbox{display:flex;align-items:center;gap:14px;padding:12px;border:1px solid var(--line);border-radius:12px;background:var(--ivory)} .brandbox img{height:64px;max-width:200px;object-fit:contain;background:var(--navy);border-radius:8px;padding:6px}
+.setupcard{border:1px solid var(--line);border-radius:12px;padding:14px 16px;display:flex;flex-direction:column;gap:6px;background:#fff} .setupcard b{font-size:16px;color:var(--navy)} .setupcard .actions{margin-top:6px;flex-wrap:wrap}
+.lastt{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:12px;padding:10px 12px;border-radius:10px;background:var(--ivory);border:1px solid var(--line);font-size:13px} .lastt span{flex:1;min-width:0}
 .lg .lact:empty{display:none} .lg .la{grid-template-areas:"who net" "who act"} .lg .la .lact{align-self:start}
 @media (min-width:1180px){
   .lg .lr{grid-template-columns:minmax(0,1.3fr) minmax(0,1.5fr) 120px 84px;grid-template-areas:"who money net act";gap:12px 18px;padding:10px 22px}
@@ -1094,24 +1097,24 @@ const I={
   ledger:svg('<rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/>'),
   plus:svg('<path d="M12 5v14M5 12h14"/>'), edit:svg('<path d="M4 20h4L19 9l-4-4L4 16z"/>'), x:svg('<path d="M6 6l12 12M18 6L6 18"/>'),
   search:svg('<circle cx="11" cy="11" r="6.5"/><path d="M20 20l-4-4"/>'), chev:svg('<path d="M9 6l6 6-6 6"/>'),
-  down:svg('<path d="M12 4v12M6 11l6 6 6-6M5 20h14"/>'), cart:svg('<path d="M3 4h2l2.4 11h11L21 7H6"/><circle cx="9" cy="19" r="1.5"/><circle cx="17" cy="19" r="1.5"/>'), cal:svg('<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/>'), menu:svg('<path d="M4 7h16M4 12h16M4 17h16"/>'),
+  gear:svg('<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 00.3 1.8l.1.1a2 2 0 11-2.8 2.8l-.1-.1a1.7 1.7 0 00-1.8-.3 1.7 1.7 0 00-1 1.5V21a2 2 0 11-4 0v-.1a1.7 1.7 0 00-1.1-1.5 1.7 1.7 0 00-1.8.3l-.1.1a2 2 0 11-2.8-2.8l.1-.1a1.7 1.7 0 00.3-1.8 1.7 1.7 0 00-1.5-1H3a2 2 0 110-4h.1a1.7 1.7 0 001.5-1.1 1.7 1.7 0 00-.3-1.8l-.1-.1a2 2 0 112.8-2.8l.1.1a1.7 1.7 0 001.8.3H9a1.7 1.7 0 001-1.5V3a2 2 0 114 0v.1a1.7 1.7 0 001 1.5 1.7 1.7 0 001.8-.3l.1-.1a2 2 0 112.8 2.8l-.1.1a1.7 1.7 0 00-.3 1.8V9a1.7 1.7 0 001.5 1H21a2 2 0 110 4h-.1a1.7 1.7 0 00-1.5 1z"/>'), down:svg('<path d="M12 4v12M6 11l6 6 6-6M5 20h14"/>'), cart:svg('<path d="M3 4h2l2.4 11h11L21 7H6"/><circle cx="9" cy="19" r="1.5"/><circle cx="17" cy="19" r="1.5"/>'), cal:svg('<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/>'), menu:svg('<path d="M4 7h16M4 12h16M4 17h16"/>'),
   trash:svg('<path d="M4 7h16M10 7V4h4v3M6 7l1 13h10l1-13"/>'), check:svg('<path d="M5 12l5 5 9-10"/>'), refresh:svg('<path d="M20 11a8 8 0 10-2.3 5.7"/><path d="M20 4v7h-7"/>'),
 };
 I.org=svg('<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18M9 20v-6h6v6"/>');
 I.survey=svg('<rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4V3h6v2M9 11h6M9 15h4"/>');
 I.lib=svg('<path d="M4 5h5a3 3 0 013 3v12a2 2 0 00-2-2H4z"/><path d="M20 5h-5a3 3 0 00-3 3v12a2 2 0 012-2h6z"/>');
 I.coins=svg('<ellipse cx="12" cy="6" rx="7" ry="3"/><path d="M5 6v12c0 1.7 3.1 3 7 3s7-1.3 7-3V6"/><path d="M5 12c0 1.7 3.1 3 7 3s7-1.3 7-3"/>');
-const NAV=[['dash','Dashboard',I.home],['tournaments','Tournaments',I.flag],['members','Members',I.users],['collections','Dues collection',I.coins],['accounts','Member accounts',I.ledger],['billsetup','Billing setup',I.shield],['pos','Register',I.cart],['postickets','Tickets',I.ledger],['posmenu','Menus & products',I.lib],['proshop','Pro shop',I.cart],['teesheet','Tee sheet',I.flag],['bookings','Bookings',I.cal],['board','Board',I.shield],['budget','Season budget',I.ledger],['orgs','Organizations',I.org],['library','Game library',I.lib],['logins','Logins',I.shield],['surveys','Surveys',I.survey]];
+const NAV=[['dash','Dashboard',I.home],['tournaments','Tournaments',I.flag],['members','Members',I.users],['collections','Dues collection',I.coins],['accounts','Member accounts',I.ledger],['billsetup','Billing setup',I.shield],['pos','Register',I.cart],['postickets','Tickets',I.ledger],['posmenu','Menus & products',I.lib],['proshop','Pro shop',I.cart],['teesheet','Tee sheet',I.flag],['bookings','Bookings',I.cal],['settings','Settings',I.gear],['board','Board',I.shield],['budget','Season budget',I.ledger],['orgs','Organizations',I.org],['library','Game library',I.lib],['logins','Logins',I.shield],['surveys','Surveys',I.survey]];
 /* which pages each kind of organization gets (associations get everything) */
-const ORG_NAV={club:['dash','tournaments','golf','teesheet','library','proshop','pos','postickets','posmenu','members','accounts','collections','billsetup','logins','bookings','orgs','library','budget','treasury','surveys','logins'],association:['dash','tournaments','golf','members','board','treasury','budget','surveys'],group:['dash','tournaments','golf','members','surveys']};
+const ORG_NAV={club:['dash','tournaments','golf','teesheet','library','proshop','pos','postickets','posmenu','members','accounts','collections','billsetup','logins','bookings','orgs','library','budget','treasury','surveys','logins','settings'],association:['dash','tournaments','golf','members','board','treasury','budget','surveys','settings'],group:['dash','tournaments','golf','members','surveys','settings']};
 /* the rail: which entries show for this organization, gated by module and role. Keys that are views of another page
    (teesheet → bookings, proshop → pos, posmenu → possetup) are listed in NAV_PAGE; NAV_OWNS says which pages light an entry up. */
 const NAV_PAGE={teesheet:'bookings',proshop:'pos',posmenu:'possetup'};
 const NAV_OWNS={tournaments:['tournaments','tournament'],accounts:['accounts','account'],bookings:['bookings','booksetup'],teesheet:['bookings'],pos:['pos'],proshop:['pos'],posmenu:['possetup']};
-const NAV_SECTIONS={club:[['',['dash']],['Golf',['tournaments','golf','teesheet','library','proshop']],['Food & beverage',['pos','postickets','posmenu']],['Membership',['members','accounts','collections','billsetup','logins']],['Club',['bookings','orgs','treasury','budget','surveys']]],
-  association:[['',['dash']],['Golf',['tournaments','golf']],['Membership',['members','board']],['Money',['treasury','budget']],['',['surveys']]],
-  group:[['',['dash']],['Golf',['games','ledger','tournaments','golf']],['',['members','surveys']]]};
-const NAV_GATE={logins:()=>canManageLogins(),accounts:()=>typeof acctOn==='function'&&acctOn(),billsetup:()=>typeof acctOn==='function'&&acctOn(),pos:()=>typeof posOn==='function'&&posOn(),postickets:()=>typeof posOn==='function'&&posOn(),posmenu:()=>typeof posOn==='function'&&posOn(),
+const NAV_SECTIONS={club:[['',['dash']],['Golf',['tournaments','golf','teesheet','library','proshop']],['Food & beverage',['pos','postickets','posmenu']],['Membership',['members','accounts','collections','billsetup','logins']],['Club',['bookings','orgs','treasury','budget','surveys']],['',['settings']]],
+  association:[['',['dash']],['Golf',['tournaments','golf']],['Membership',['members','board']],['Money',['treasury','budget']],['',['surveys','settings']]],
+  group:[['',['dash']],['Golf',['games','ledger','tournaments','golf']],['',['members','surveys','settings']]]};
+const NAV_GATE={settings:()=>!KEYMODE,logins:()=>canManageLogins(),accounts:()=>typeof acctOn==='function'&&acctOn(),billsetup:()=>typeof acctOn==='function'&&acctOn(),pos:()=>typeof posOn==='function'&&posOn(),postickets:()=>typeof posOn==='function'&&posOn(),posmenu:()=>typeof posOn==='function'&&posOn(),
   proshop:()=>typeof posOn==='function'&&posOn()&&posSettings().outlets.some(o=>o.kind==='proshop'),bookings:()=>typeof bookOn==='function'&&bookOn(),teesheet:()=>typeof bookOn==='function'&&bookOn()&&bookSettings().facilities.some(f=>f.kind==='tee')};
 function navItems(){ const allow=ORG_NAV[db.kind]; return NAV.filter(([k])=>(!allow||allow.includes(k))&&(!NAV_GATE[k]||NAV_GATE[k]())).map(([k,l,ic])=>[k,k==='members'&&isClub()?'Directory':k==='golf'&&isClub()?'Events & live scoring':k==='bookings'&&isClub()?'Courts, pool & lessons':l,ic]); }
 /* is this rail entry the one lit for the page on screen? a view of a shared page looks at that page's state */
@@ -1228,7 +1231,7 @@ function renderInner(){
   $('nav').innerHTML=navHTML(items,live);
   $('nav').querySelectorAll('[data-go]').forEach(b=>b.onclick=()=>navGo(b.dataset.go));
   const m=$('main');
-  ({dash:vDash,tournaments:vTournaments,tournament:vTournament,members:vMembers,board:vBoard,budget:vBudget,treasury:vTreasury,golf:vGolf,orgs:vOrgs,pick:vPicker,collections:vCollections,games:vGames,ledger:vLedger,library:vLibrary,logins:vLogins,surveys:vSurveys,accounts:vAccounts,account:vAccount,billsetup:vBillSetup,pos:vPos,postickets:vPosTickets,possetup:vPosSetup,bookings:vBookings,booksetup:vBookSetup}[view.page]||vDash)(m);
+  ({dash:vDash,tournaments:vTournaments,tournament:vTournament,members:vMembers,board:vBoard,budget:vBudget,treasury:vTreasury,golf:vGolf,orgs:vOrgs,pick:vPicker,collections:vCollections,games:vGames,ledger:vLedger,library:vLibrary,logins:vLogins,surveys:vSurveys,accounts:vAccounts,account:vAccount,billsetup:vBillSetup,pos:vPos,postickets:vPosTickets,possetup:vPosSetup,bookings:vBookings,booksetup:vBookSetup,settings:vSettings}[view.page]||vDash)(m);
   if(view.page==='board'&&!isClub()&&typeof loginsCard==='function') loginsCard(m,ORG_ID);
   if(!isClub()&&((db.kind==='group'&&view.page==='members')||(db.kind!=='group'&&view.page==='board'))) adminLinksCard(m,curOrg());
 }
@@ -4257,7 +4260,7 @@ const groupLink=(ev,grp)=>scoringLink(ev)+'&g='+encodeURIComponent(grp.code);
    get its address instead. */
 const CREST_URL=SITE_BASE+'flagstick-crest-light.png', CREST_IMG=new Image(); let CREST_DATA='';
 try{ CREST_IMG.src=CREST_URL; }catch(_){}
-function crestSrc(){ if(CREST_DATA) return CREST_DATA;
+function crestSrc(){ const bl=typeof brandLogo==='function'?brandLogo():null; if(bl) return bl; if(CREST_DATA) return CREST_DATA;
   try{ if(CREST_IMG.complete&&CREST_IMG.naturalWidth){ const c=document.createElement('canvas'); c.width=CREST_IMG.naturalWidth; c.height=CREST_IMG.naturalHeight; c.getContext('2d').drawImage(CREST_IMG,0,0); CREST_DATA=c.toDataURL('image/png'); return CREST_DATA; } }catch(_){}
   return CREST_URL; }
 function printCardHTML(ev,pub,grp,teamKeyOnly){
@@ -5321,10 +5324,10 @@ async function gameSheetPDF(g,opt){
   const players=evPlayers(ev).length||g.players.length;
   font('PublicSans','normal',8.6,[214,218,220]); const sub=doc.splitTextToSize([gameWhen(g),course?course.name+(tee?' · '+tee+' tees':''):'',`${players} player${players===1?'':'s'}`,allIn?gMoney(allIn)+' all in':''].filter(Boolean).join('  ·  '),R2-L-90); const bandH=78+Math.max(0,sub.length-1)*11;
   doc.setFillColor(...GOLD); doc.roundedRect(L,32,R2-L,bandH+4,8,8,'F'); doc.setFillColor(...NAVY); doc.roundedRect(L,32,R2-L,bandH,8,8,'F'); doc.rect(L,32+bandH-12,R2-L,8,'F');
-  if(crest) doc.addImage(crest,'PNG',L+18,44,56*850/1024,56);
-  font('PublicSansXB','normal',6.8,GOLDL); doc.text(`${(orgName()||'').toUpperCase()}${CLUB&&CLUB.name?' · '+CLUB.name.toUpperCase():''}`,L+80,58,{charSpace:1.2});
-  font('Cormorant','bold',26,WHITE); doc.text(gameTitle(g),L+80,84);
-  font('PublicSans','normal',8.6,[214,218,220]); doc.text(sub,L+80,100);
+  const cw=drawCrest(doc,crest,L+18,44,56), TX=L+18+(cw||47)+15;
+  font('PublicSansXB','normal',6.8,GOLDL); doc.text(`${(orgName()||'').toUpperCase()}${CLUB&&CLUB.name?' · '+CLUB.name.toUpperCase():''}`,TX,58,{charSpace:1.2});
+  font('Cormorant','bold',26,WHITE); doc.text(gameTitle(g),TX,84);
+  font('PublicSans','normal',8.6,[214,218,220]); doc.text(sub,TX,100);
   let y=32+bandH+26;
   const need=h=>{ if(y+h>H-36){ doc.addPage(); page(); y=44; } };
   const section=(label,note)=>{ need(48); font('PublicSansXB','normal',7.6,GOLDDK); doc.text(label.toUpperCase(),L,y,{charSpace:1.2}); if(note){ font('PublicSans','normal',8,MUTED); doc.text(note,R2,y,{align:'right'}); } y+=7; doc.setDrawColor(...GOLD); doc.setLineWidth(1.2); doc.line(L,y,R2,y); y+=16; };
@@ -6131,7 +6134,7 @@ async function exportOrder(t){
    gets an empty Bought by / Price line (the slideshow shows pre-buys; bettors fill it in themselves). */
 function loadJsPDF(){ if(window.jspdf) return Promise.resolve();
   return new Promise((res,rej)=>{ const sc=document.createElement('script'); sc.src='https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js'; sc.onload=()=>res(); sc.onerror=()=>rej(new Error('Couldn’t load the PDF maker — check the connection')); document.head.appendChild(sc); }); }
-async function crestPNG(){ const s=typeof crestSrc==='function'?crestSrc():''; if(s&&s.startsWith('data:')) return s;
+async function crestPNG(){ const bl=typeof brandLogo==='function'?brandLogo():null; if(bl) return bl; const s=typeof crestSrc==='function'?crestSrc():''; if(s&&s.startsWith('data:')) return s;
   const r=await fetch(CREST_URL); const b=await r.blob(); return await new Promise(ok=>{ const fr=new FileReader(); fr.onload=()=>ok(fr.result); fr.readAsDataURL(b); }); }
 async function downloadBidSheet(t){
   const c=calc(t);
@@ -6153,8 +6156,7 @@ async function downloadBidSheet(t){
     const y=32, h=compact?46:76;
     doc.setFillColor(...GOLD); doc.roundedRect(L,y,CW,h,8,8,'F');
     doc.setFillColor(...NAVY); doc.roundedRect(L,y,CW,h-4,8,8,'F'); doc.rect(L,y+h-12,CW,8,'F');
-    const ch=compact?30:52, cw=ch*850/1024, cx=L+16, cy=y+(h-4-ch)/2;
-    if(crest) doc.addImage(crest,'PNG',cx,cy,cw,ch);
+    const ch=compact?30:52, cx=L+16, cy=y+(h-4-ch)/2, cw=crest?drawCrest(doc,crest,cx,cy,ch):ch*850/1024;
     const tx=cx+cw+14;
     font('PublicSansXB','normal',compact?6:6.6,GOLDL); doc.text(kicker,tx,y+(compact?17:22),{charSpace:1.25});
     font('Cormorant','bold',compact?16:25,[255,255,255]); doc.text(title,tx,y+(compact?35:48));
@@ -6804,10 +6806,10 @@ async function surveyPDF(s,R,opt){
   const subTxt=`${n} response${n===1?'':'s'}${days.length?` · ${svDay(days[0])}${days.length>1&&days[days.length-1]!==days[0]?' – '+svDay(days[days.length-1]):''}`:''} · ${s.status==='open'?'still open':'closed'} · anonymous — no respondent is identified anywhere in this report`;
   font('PublicSans','normal',8.4,[214,218,220]); const sub=doc.splitTextToSize(subTxt,R2-L-90); const bandH=74+Math.max(0,sub.length-1)*11;
   doc.setFillColor(...GOLD); doc.roundedRect(L,32,R2-L,bandH+4,8,8,'F'); doc.setFillColor(...NAVY); doc.roundedRect(L,32,R2-L,bandH,8,8,'F'); doc.rect(L,32+bandH-12,R2-L,8,'F');
-  if(crest) doc.addImage(crest,'PNG',L+16,42,54*850/1024,54);
-  font('PublicSansXB','normal',6.8,GOLDL); doc.text(`${(svOrgName()||'').toUpperCase()} · ${(CLUB&&CLUB.name||'').toUpperCase()}`,L+76,56,{charSpace:1.2});
-  font('Cormorant','bold',22,[255,255,255]); doc.text(doc.splitTextToSize(`${s.title} — Results`,R2-L-90)[0],L+76,80);
-  font('PublicSans','normal',8.4,[214,218,220]); doc.text(sub,L+76,96);
+  const lw=drawCrest(doc,crest,L+16,42,54), TX=L+16+(lw||45)+15;
+  font('PublicSansXB','normal',6.8,GOLDL); doc.text(`${(svOrgName()||'').toUpperCase()} · ${(CLUB&&CLUB.name||'').toUpperCase()}`,TX,56,{charSpace:1.2});
+  font('Cormorant','bold',22,[255,255,255]); doc.text(doc.splitTextToSize(`${s.title} — Results`,R2-L-90)[0],TX,80);
+  font('PublicSans','normal',8.4,[214,218,220]); doc.text(sub,TX,96);
   let y=32+bandH+26;
   const need=h=>{ if(y+h>H-44){ doc.addPage(); page(); y=48; } };
   const section=(label,note)=>{ need(54); font('PublicSansXB','normal',7.4,GOLDDK); doc.text(label.toUpperCase(),L,y,{charSpace:1.1}); y+=6; doc.setDrawColor(...GOLD); doc.setLineWidth(1); doc.line(L,y,R2,y); y+=14;
@@ -7046,10 +7048,10 @@ async function rfRecord(t){
   const page=()=>{ doc.setFillColor(...IVORY); doc.rect(0,0,W,H,'F'); };
   page();
   doc.setFillColor(...GOLD); doc.roundedRect(L,32,R2-L,78,8,8,'F'); doc.setFillColor(...NAVY); doc.roundedRect(L,32,R2-L,74,8,8,'F'); doc.rect(L,94,R2-L,8,'F');
-  if(crest) doc.addImage(crest,'PNG',L+16,42,54*850/1024,54);
-  font('PublicSansXB','normal',6.8,GOLDL); doc.text(`${(t.name||'').toUpperCase()} · ${t.season||''} · MGA 50/50`,L+76,56,{charSpace:1.2});
-  font('Cormorant','bold',24,[255,255,255]); doc.text('Final Drawing — Official Record',L+76,80);
-  font('PublicSans','normal',8.4,[214,218,220]); doc.text(`Generated ${new Date().toLocaleString()}`,L+76,96);
+  const lw=drawCrest(doc,crest,L+16,42,54), TX=L+16+(lw||45)+15;
+  font('PublicSansXB','normal',6.8,GOLDL); doc.text(`${(t.name||'').toUpperCase()} · ${t.season||''} · MGA 50/50`,TX,56,{charSpace:1.2});
+  font('Cormorant','bold',24,[255,255,255]); doc.text('Final Drawing — Official Record',TX,80);
+  font('PublicSans','normal',8.4,[214,218,220]); doc.text(`Generated ${new Date().toLocaleString()}`,TX,96);
   let y=130; const sec=s=>{ font('PublicSansXB','normal',7.4,GOLDDK); doc.text(s.toUpperCase(),L,y,{charSpace:1.1}); y+=6; doc.setDrawColor(...GOLD); doc.setLineWidth(1); doc.line(L,y,R2,y); y+=14; };
   const kv=(k,v,mono)=>{ font('PublicSans','bold',9,MUTED); doc.text(k,L,y); font(mono?'PublicSans':'PublicSans',mono?'bold':'normal',9.4,INK); const lines=doc.splitTextToSize(String(v),R2-L-150); doc.text(lines,L+150,y); y+=13*lines.length+1; };
   sec('Ticket list');
@@ -7199,10 +7201,10 @@ async function payoutsPDF(t,opt){
   const subTxt=`${dateRange(t)}${AM?` · ${fmt(P.total)} to ${P.people.length} ${P.people.length===1?'person':'people'}`:''}${complete?'':' · results not complete — as of '+new Date().toLocaleString()}`;
   font('PublicSans','normal',8.4,[214,218,220]); const sub=doc.splitTextToSize(subTxt,R2-L-90); const bandH=74+Math.max(0,sub.length-1)*11;
   doc.setFillColor(...GOLD); doc.roundedRect(L,32,R2-L,bandH+4,8,8,'F'); doc.setFillColor(...NAVY); doc.roundedRect(L,32,R2-L,bandH,8,8,'F'); doc.rect(L,32+bandH-12,R2-L,8,'F');
-  if(crest) doc.addImage(crest,'PNG',L+16,42,54*850/1024,54);
-  font('PublicSansXB','normal',6.8,GOLDL); doc.text(`${(orgName()||'').toUpperCase()} · ${t.season||''}`,L+76,56,{charSpace:1.2});
-  font('Cormorant','bold',24,[255,255,255]); doc.text(`${t.name} — ${title}`,L+76,80);
-  font('PublicSans','normal',8.4,[214,218,220]); doc.text(sub,L+76,96);
+  const lw=drawCrest(doc,crest,L+16,42,54), TX=L+16+(lw||45)+15;
+  font('PublicSansXB','normal',6.8,GOLDL); doc.text(`${(orgName()||'').toUpperCase()} · ${t.season||''}`,TX,56,{charSpace:1.2});
+  font('Cormorant','bold',24,[255,255,255]); doc.text(`${t.name} — ${title}`,TX,80);
+  font('PublicSans','normal',8.4,[214,218,220]); doc.text(sub,TX,96);
   let y=32+bandH+26;
   const need=h=>{ if(y+h>H-44){ doc.addPage(); page(); y=48; } };
   const section=(label,note)=>{ need(40); font('PublicSansXB','normal',7.4,GOLDDK); doc.text(label.toUpperCase(),L,y,{charSpace:1.1}); if(note){ font('PublicSans','normal',8,MUTED); doc.text(note,R2,y,{align:'right'}); } y+=6; doc.setDrawColor(...GOLD); doc.setLineWidth(1); doc.line(L,y,R2,y); y+=12; };
@@ -7243,15 +7245,18 @@ const BC_METHOD={card:'Card',check:'Check',ach:'ACH / bank',cash:'Cash',other:'O
 const bcFmt=v=>{ const x=parseFloat(v)||0; return (x<0?'−$':'$')+Math.abs(x).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}); };
 const bcDate=iso=>iso?new Date(String(iso).slice(0,10)+'T12:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}):'—';
 const bcSign=i=>i.kind==='charge'?(parseFloat(i.amount)||0):-(parseFloat(i.amount)||0);
+/* a logo in a PDF band: fitted to the height, width by its own proportions (at most 2.6× the height); returns the width drawn */
+function crestW(doc,src,h){ let w=h*850/1024; try{ const p=doc.getImageProperties(src); if(p&&p.width&&p.height) w=Math.min(h*2.6,h*p.width/p.height); }catch(_){} return w; }
+function drawCrest(doc,src,x,y,h){ if(!src) return 0; const w=crestW(doc,src,h); try{ doc.addImage(src,'PNG',x,y,w,h); }catch(_){ return 0; } return w; }
 function bcFonts(doc){ [['ps400','PS-400.ttf','PublicSans','normal'],['ps700','PS-700.ttf','PublicSans','bold'],['ps800','PS-800.ttf','PublicSansXB','normal'],['cg700','CG-700.ttf','Cormorant','bold']].forEach(([k,f,fam,st])=>{ doc.addFileToVFS(f,PDF_FONTS[k]); doc.addFont(f,fam,st); }); }
 function statementPage(doc,ctx){
   const L=40,R2=572,W=612,H=792, s=ctx.s, font=(f,st,z,col)=>{ doc.setFont(f,st); doc.setFontSize(z); doc.setTextColor(...col); };
   doc.setFillColor(...BC_IVORY); doc.rect(0,0,W,H,'F');
   doc.setFillColor(...BC_GOLD); doc.roundedRect(L,32,R2-L,82,8,8,'F'); doc.setFillColor(...BC_NAVY); doc.roundedRect(L,32,R2-L,78,8,8,'F'); doc.rect(L,32+66,R2-L,8,'F');
-  if(ctx.crest) doc.addImage(ctx.crest,'PNG',L+16,42,54*850/1024,54);
-  font('PublicSansXB','normal',6.8,BC_GOLDL); doc.text(String(ctx.club||'').toUpperCase(),L+76,56,{charSpace:1.2});
-  font('Cormorant','bold',24,[255,255,255]); doc.text('Member statement',L+76,80);
-  font('PublicSans','normal',8.4,[214,218,220]); doc.text(`${bcDate(s.period_start)} – ${bcDate(s.period_end)} · due ${bcDate(s.due)}`,L+76,96);
+  const cw=drawCrest(doc,ctx.crest,L+16,42,54), TX=L+16+(cw||45)+15;
+  font('PublicSansXB','normal',6.8,BC_GOLDL); doc.text(String(ctx.club||'').toUpperCase(),TX,56,{charSpace:1.2});
+  font('Cormorant','bold',24,[255,255,255]); doc.text('Member statement',TX,80);
+  font('PublicSans','normal',8.4,[214,218,220]); doc.text(`${bcDate(s.period_start)} – ${bcDate(s.period_end)} · due ${bcDate(s.due)}`,TX,96);
   let y=140; font('PublicSansXB','normal',7.4,BC_GOLDDK); doc.text('ACCOUNT',L,y,{charSpace:1.1}); doc.text('BALANCE DUE',R2,y,{align:'right',charSpace:1.1}); y+=6; doc.setDrawColor(...BC_GOLD); doc.setLineWidth(1); doc.line(L,y,R2,y); y+=16;
   font('PublicSans','bold',12,BC_INK); doc.text(ctx.name||'Member',L,y); font('Cormorant','bold',26,s.closing>0.004?BC_RED:BC_INK); doc.text(bcFmt(Math.max(0,s.closing)),R2,y+4,{align:'right'});
   font('PublicSans','normal',8.6,BC_MUTED); const lines=(ctx.lines||[]).filter(Boolean); lines.forEach((t,i)=>doc.text(t,L,y+14+i*11));
@@ -7439,8 +7444,9 @@ async function mailStatements(list){ list=(list||[]).filter(s=>{ const p=personB
   if(!acctCloud()){ toast('E-mail goes out from the live site — downloading the PDFs instead'); await statementsPDF(list); return 0; }
   const club=(CLUB&&CLUB.name)||CLUB_META.name; let sent=0, fail='';
   for(const s of list){ const p=personById(s.member_id); const doc=await statementsPDF([s],{returnDoc:true}); if(!doc) break; const b64=doc.output('datauristring').split(',')[1];
-    const {data,error}=await sb.functions.invoke('mail',{body:{tenant:TENANT,to:p.email,subject:`${club} — statement through ${dateTxt(s.period_end)}`,text:`Your ${club} statement for ${dateTxt(s.period_start)} – ${dateTxt(s.period_end)} is attached. Balance due: ${fmt2(Math.max(0,s.closing))}${s.closing>0.004?', by '+dateTxt(s.due):''}.\n\n${acctSettings().message||''}`,attachments:[{filename:`statement-${s.period_end}.pdf`,content:b64}]}});
-    if(error||(data&&data.error)){ fail=(error&&error.message)||(data&&data.error)||'failed'; break; }
+    const text=`Your ${club} statement for ${dateTxt(s.period_start)} – ${dateTxt(s.period_end)} is attached. Balance due: ${fmt2(Math.max(0,s.closing))}${s.closing>0.004?', by '+dateTxt(s.due):''}.\n\n${acctSettings().message||''}`;
+    const data=await sendMail({to:p.email,subject:`${club} — statement through ${dateTxt(s.period_end)}`,text,html:mailHTML({title:'Your statement',paragraphs:[`Your statement for <b>${dateTxt(s.period_start)} – ${dateTxt(s.period_end)}</b> is attached.`,`Balance due: <b>${fmt2(Math.max(0,s.closing))}</b>${s.closing>0.004?', by '+dateTxt(s.due):''}.`,esc(acctSettings().message||'')].filter(Boolean),cta:acctSettings().online&&acctSettings().online.charges_enabled?{href:portalLink(),label:'View & pay online'}:null}),attachments:[{filename:`statement-${s.period_end}.pdf`,content:b64}]});
+    if(data.error){ fail=data.error; break; }
     const patch={sent_at:new Date().toISOString()}; await sb.from('acct_statements').update(patch).eq('id',s.id); Object.assign(s,patch); sent++; }
   if(fail){ toast(/not found|404|Failed to send a request|not configured/i.test(fail)?'The mail function isn’t deployed or has no key (docs/tenancy.md) — download the PDFs instead':'E-mail stopped: '+fail); }
   else toast(`${sent} statement${sent===1?'':'s'} e-mailed`); return sent; }
@@ -7607,7 +7613,7 @@ async function statementsPDF(list,opt){ opt=opt||{};
    member (or a walk-in), tap the products, close the ticket to the member's account (one acct_items charge with tax and
    service charge broken out — statements, minimums and the GL all see it) or as cash / card taken at the register.
    Outlets, products and stock counts live in CLUB.pos; tickets are rows in pos_tickets (pos-setup.sql). */
-const POS={tickets:null,loading:false,at:0,cur:null,outlet:'',cat:'',q:'',day:''};
+const POS={tickets:null,loading:false,at:0,cur:null,outlet:'',cat:'',q:'',day:'',last:null};
 const posOn=()=>!!CLUB&&isClub()&&hasModule('pos')&&!KEYMODE&&!SCOPED;
 const posKey=()=>'fs_pos_'+((typeof TENANT!=='undefined'&&TENANT)||'local');
 function posSettings(){ CLUB.pos=CLUB.pos||{}; const p=CLUB.pos;
@@ -7630,6 +7636,24 @@ function newTicket(outletId){ const o=outletOf(outletId)||posSettings().outlets[
 function addLine(t,prod,custom){ const o=outletOf(t.outlet), bi=itemOf(o&&o.item)||{}; const l=prod?{id:uid(),pid:prod.id,name:prod.name,qty:1,price:n0(prod.price),taxable:prod.taxable!=null?!!prod.taxable:!!bi.taxable,svc:prod.svc!=null?!!prod.svc:!!bi.svc}:{id:uid(),pid:null,name:custom.name||'Open item',qty:1,price:n0(custom.price),taxable:custom.taxable!=null?custom.taxable:!!bi.taxable,svc:custom.svc!=null?custom.svc:!!bi.svc};
   const same=prod&&t.lines.find(x=>x.pid===prod.id&&x.price===l.price); if(same) same.qty++; else t.lines.push(l); }
 const ticketText=t=>t.lines.map(l=>(l.qty>1?l.qty+'× ':'')+l.name).join(', ');
+/* the receipt: a narrow branded slip (the club's logo, the outlet, the lines, the money, how it was paid) */
+async function receiptPDF(t,opt){ opt=opt||{}; try{ await loadJsPDF(); }catch(e){ toast(e.message); return null; }
+  const o=outletOf(t.outlet)||{name:t.outlet}, b=acctSettings(), crest=await crestPNG().catch(()=>null), lines=t.lines||[], who=t.member_id?memberName(personById(t.member_id)||{})||'Member':t.guest||'Walk-in';
+  const W=227, L=14, R=W-14, rowsH=lines.length*13, H=250+rowsH+(n0(t.svc)?13:0)+(n0(t.tax)?13:0)+(n0(t.tip)?13:0)+(t.note?13:0);
+  const doc=new window.jspdf.jsPDF({unit:'pt',format:[W,H]}); bcFonts(doc); const font=(f,s,z,c)=>{ doc.setFont(f,s); doc.setFontSize(z); doc.setTextColor(...c); }; const INK=[20,34,43], MUTED=[86,98,106], NAVY=[15,42,56];
+  let y=18; if(crest){ const h=34, w=crestW(doc,crest,h); if(drawCrest(doc,crest,(W-w)/2,y,h)) y+=h+8; }
+  font('Cormorant','bold',15,NAVY); doc.text(brandName(),W/2,y,{align:'center'}); y+=13; font('PublicSans','bold',9,INK); doc.text(o.name,W/2,y,{align:'center'}); y+=11;
+  font('PublicSans','normal',7.5,MUTED); doc.text(new Date(t.closed_at||t.created_at).toLocaleString('en-US',{month:'short',day:'numeric',year:'numeric',hour:'numeric',minute:'2-digit'}),W/2,y,{align:'center'}); y+=10; doc.text(`Ticket ${String(t.id).slice(0,8).toUpperCase()} · ${who}`,W/2,y,{align:'center'}); y+=12;
+  doc.setDrawColor(199,161,58); doc.setLineWidth(.6); doc.line(L,y,R,y); y+=11;
+  font('PublicSans','normal',8.5,INK); for(const l of lines){ doc.text(doc.splitTextToSize(`${n0(l.qty)>1?n0(l.qty)+' × ':''}${l.name}`,R-L-50)[0],L,y); doc.text(fmt2(n0(l.qty)*n0(l.price)),R,y,{align:'right'}); y+=13; }
+  doc.setDrawColor(225,217,198); doc.line(L,y-4,R,y-4); y+=4; const tot=(k,v,bold)=>{ font('PublicSans',bold?'bold':'normal',bold?10:8.5,INK); doc.text(k,L,y); doc.text(v,R,y,{align:'right'}); y+=bold?15:13; };
+  tot('Subtotal',fmt2(t.subtotal)); if(n0(t.svc)) tot(`Service charge ${n0(b.svc.rate)}%`,fmt2(t.svc)); if(n0(t.tax)) tot(`Tax ${n0(b.tax.rate)}%`,fmt2(t.tax)); if(n0(t.tip)) tot('Tip',fmt2(t.tip)); tot('Total',fmt2(t.total),true);
+  font('PublicSans','normal',8,MUTED); doc.text(t.status==='void'?`VOID — ${t.void_reason||''}`:t.paid==='account'?'Charged to member account':t.paid==='cash'?'Paid in cash':t.paid==='card'?'Paid by card':'Paid',W/2,y,{align:'center'}); y+=11; if(t.note){ doc.text(doc.splitTextToSize(t.note,R-L)[0],W/2,y,{align:'center'}); y+=13; }
+  y+=6; font('PublicSans','normal',7.5,MUTED); doc.text(`Thank you — ${brandName()}`,W/2,y,{align:'center'});
+  const name=`receipt-${String(t.id).slice(0,8)}.pdf`; if(opt.returnDoc) return doc; if(typeof deliverFile==='function') await deliverFile(doc.output('blob'),name,'Receipt'); else doc.save(name); return doc; }
+async function emailReceipt(t){ const p=t.member_id?personById(t.member_id):null; if(!p||!p.email){ toast('No e-mail on file for this member'); return; } const doc=await receiptPDF(t,{returnDoc:true}); if(!doc) return; const o=outletOf(t.outlet)||{name:t.outlet};
+  const r=await sendMail({to:p.email,subject:`${brandName()} — ${o.name} receipt`,text:`Your receipt from ${o.name}: ${ticketText(t)} — ${fmt2(t.total)}${t.paid==='account'?', charged to your member account':''}.`,html:mailHTML({title:`${esc(o.name)} receipt`,paragraphs:[`${esc(ticketText(t))}`,`Total <b>${fmt2(t.total)}</b>${t.paid==='account'?', charged to your member account':''}. The receipt is attached.`]}),attachments:[{filename:`receipt-${String(t.id).slice(0,8)}.pdf`,content:doc.output('datauristring').split(',')[1]}]});
+  toast(r.error?stripeMsgLike(r.error):'Receipt e-mailed'); }
 async function closeTicket(t,paid){
   const o=outletOf(t.outlet), m=ticketTotals(t); if(!t.lines.length){ toast('Nothing on the ticket'); return false; }
   Object.assign(t,m,{paid,status:'closed',closed_at:new Date().toISOString()});
@@ -7667,6 +7691,7 @@ function vPos(m){
       <div class="lines">${t.lines.length?t.lines.map(l=>`<div class="ln"><div class="cell2"><b>${esc(l.name)}</b><small>${fmt2(l.price)}${l.svc?' · svc':''}${l.taxable?' · tax':''}</small></div><div class="qty"><button class="ib" data-lq="${l.id}" data-d="-1">−</button><b>${n0(l.qty)}</b><button class="ib" data-lq="${l.id}" data-d="1">+</button></div><b class="r">${fmt2(l.qty*l.price)}</b><button class="ib" data-lx="${l.id}" aria-label="Remove">${I.x}</button></div>`).join(''):'<p class="muted" style="margin:6px 0 10px">Tap products to add them.</p>'}</div>
       <div class="tot"><span>Subtotal</span><b>${fmt2(tot.subtotal)}</b>${tot.svc?`<span>Service charge ${n0(b.svc.rate)}%</span><b>${fmt2(tot.svc)}</b>`:''}${tot.tax?`<span>Tax ${n0(b.tax.rate)}%</span><b>${fmt2(tot.tax)}</b>`:''}${o.kind==='fnb'?`<span>Tip</span><span class="r"><input class="inp r" id="psTip" inputmode="decimal" value="${t.tip?t.tip:''}" placeholder="0" style="height:32px;width:90px;display:inline-block"></span>`:''}<span class="big">Total</span><b class="big">${fmt2(tot.total)}</b></div>
       <div class="acts" style="margin-top:12px;display:grid;grid-template-columns:1fr 1fr;gap:8px"><button class="btn pri" id="psAcct" style="grid-column:1/-1"${mem&&acctOn()&&t.lines.length?'':' disabled'}>Charge to account</button><button class="btn" id="psCash"${t.lines.length?'':' disabled'}>Cash</button><button class="btn" id="psCard"${t.lines.length?'':' disabled'}>Card</button><button class="btn" id="psHold"${t.lines.length?'':' disabled'}>Hold</button>${held.length?`<button class="btn" id="psHeld">On hold · ${held.length}</button>`:'<span></span>'}</div>
+      ${POS.last&&POS.last.outlet===o.id?`<div class="lastt"><span>Last ticket · ${fmt2(POS.last.total)} · ${esc(POS.last.member_id?memberName(personById(POS.last.member_id)||{}):POS.last.guest||'Walk-in')}</span><button class="btn sm" id="psLastR">${I.down}Receipt</button>${POS.last.member_id&&(personById(POS.last.member_id)||{}).email?`<button class="btn sm" id="psLastE">E-mail it</button>`:''}</div>`:''}
       <p class="hint">${acctOn()?'Charge to account posts one line on the member’s statement with tax and service charge broken out.':'Member billing is off: tickets are cash or card at the register.'}</p></div></div>`;
   m.querySelectorAll('[data-po]').forEach(x=>x.onclick=()=>{ if(POS.cur.lines.length&&!confirm('Switch outlets? The ticket on screen is cleared (Hold keeps it).')) return; POS.outlet=x.dataset.po; POS.cur=null; POS.cat=''; render(); });
   m.querySelectorAll('[data-pc]').forEach(x=>x.onclick=()=>{ POS.cat=x.dataset.pc; render(); });
@@ -7681,7 +7706,8 @@ function vPos(m){
   m.querySelectorAll('[data-lq]').forEach(x=>x.onclick=()=>{ const l=t.lines.find(y=>y.id===x.dataset.lq); l.qty=Math.max(0,n0(l.qty)+(+x.dataset.d)); if(!l.qty) t.lines=t.lines.filter(y=>y!==l); render(); });
   m.querySelectorAll('[data-lx]').forEach(x=>x.onclick=()=>{ t.lines=t.lines.filter(y=>y.id!==x.dataset.lx); render(); });
   const tip=$('psTip'); if(tip) tip.onchange=()=>{ t.tip=n0(tip.value); render(); };
-  const done=async paid=>{ if(await closeTicket(t,paid)){ toast(paid==='account'?`${fmt2(t.total)} charged to ${memberName(personById(t.member_id))}`:`${fmt2(t.total)} ${paid} — ticket closed`); POS.cur=newTicket(o.id); render(); } };
+  const done=async paid=>{ if(await closeTicket(t,paid)){ toast(paid==='account'?`${fmt2(t.total)} charged to ${memberName(personById(t.member_id))}`:`${fmt2(t.total)} ${paid} — ticket closed`); POS.last=Object.assign({},t); POS.cur=newTicket(o.id); render(); } };
+  const lr=$('psLastR'); if(lr) lr.onclick=()=>receiptPDF(POS.last); const le=$('psLastE'); if(le) le.onclick=()=>emailReceipt(POS.last);
   $('psAcct').onclick=()=>done('account'); $('psCash').onclick=()=>done('cash'); $('psCard').onclick=()=>done('card');
   $('psHold').onclick=()=>{ POS.tickets=(POS.tickets||[]).filter(x=>x.id!==t.id).concat([Object.assign({},t)]); posLocalWrite(); if(acctCloud()) sb.from('pos_tickets').upsert(trow(Object.assign({},t))).then(()=>{}); POS.cur=newTicket(o.id); toast('Ticket on hold'); render(); };
   const ph=$('psHeld'); if(ph) ph.onclick=()=>openDrawer({kicker:o.name,title:'Tickets on hold',body:held.map(x=>`<button class="btn" data-hh="${x.id}" style="width:100%;justify-content:space-between;margin-bottom:8px"><span>${esc(x.member_id?memberName(personById(x.member_id)||{}):x.guest||'Walk-in')} · ${esc(ticketText(x))}</span><b>${fmt2(ticketTotals(x).total)}</b></button>`).join(''),wire:r=>{ r.querySelectorAll('[data-hh]').forEach(x=>x.onclick=()=>{ const h=held.find(y=>y.id===x.dataset.hh); POS.tickets=POS.tickets.filter(y=>y.id!==h.id); if(acctCloud()) sb.from('pos_tickets').delete().eq('id',h.id).then(()=>{}); posLocalWrite(); POS.cur=h; POS.outlet=h.outlet; closeDrawer(); render(); }); }});
@@ -7694,8 +7720,8 @@ function vPosTickets(m){ if(!posOn()){ go('dash'); return; } if(POS.tickets==nul
   m.innerHTML=`<div class="crumb"><button id="ptBack">Point of sale</button><span class="muted">/</span><span class="muted">Tickets</span></div>`+head('Tickets',`Everything closed on ${dateTxt(day)}.`,btn('CSV','ptCsv','',I.down))+`
     <div class="toolbar"><input class="inp" type="date" id="ptDay" value="${day}" style="height:38px;width:170px"></div>
     <div class="grid g4">${kpi('Sales',fmt2(sum(live,t=>t.total)),`${live.length} ticket${live.length===1?'':'s'}`)}${kpi('To accounts',fmt2(by('account')),`${live.filter(t=>t.paid==='account').length} tickets`)}${kpi('Cash & card',fmt2(by('cash')+by('card')),`cash ${fmt2(by('cash'))} · card ${fmt2(by('card'))}`)}${kpi('Tax · service · tips',fmt2(sum(live,t=>t.tax)),`service ${fmt2(sum(live,t=>t.svc))} · tips ${fmt2(sum(live,t=>t.tip))}`)}</div>
-    <div class="card lg" style="overflow:hidden">${all.length?all.map(t=>{ const o=outletOf(t.outlet)||{name:t.outlet}; const who=t.member_id?memberName(personById(t.member_id)||{})||'Member':t.guest||'Walk-in'; return `<div class="lr${t.status==='void'?' void':''}"><div class="cell2"><span class="ln">${esc(who)} <span class="chip" style="height:20px;font-size:11px">${esc(o.name)}</span>${t.status==='void'?' <span class="chip warn">void</span>':''}</span><span class="ls">${new Date(t.closed_at||t.created_at).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'})} · ${esc(ticketText(t))}${t.status==='void'?' · '+esc(t.void_reason||''):''}</span></div><div class="lm"><span>${t.paid==='account'?'on account':esc(t.paid||'')}</span></div><b class="lnet">${fmt2(t.total)}</b><span class="lact">${t.status==='void'?'':`<button class="ib" data-tv="${t.id}" aria-label="Void">${I.x}</button>`}</span></div>`; }).join(''):`<div class="empty"><b>No tickets</b><span>Nothing was closed on this day.</span></div>`}</div>`;
-  $('ptBack').onclick=()=>go('pos'); $('ptDay').onchange=()=>{ POS.day=$('ptDay').value; render(); };
+    <div class="card lg" style="overflow:hidden">${all.length?all.map(t=>{ const o=outletOf(t.outlet)||{name:t.outlet}; const who=t.member_id?memberName(personById(t.member_id)||{})||'Member':t.guest||'Walk-in'; return `<div class="lr${t.status==='void'?' void':''}"><div class="cell2"><span class="ln">${esc(who)} <span class="chip" style="height:20px;font-size:11px">${esc(o.name)}</span>${t.status==='void'?' <span class="chip warn">void</span>':''}</span><span class="ls">${new Date(t.closed_at||t.created_at).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'})} · ${esc(ticketText(t))}${t.status==='void'?' · '+esc(t.void_reason||''):''}</span></div><div class="lm"><span>${t.paid==='account'?'on account':esc(t.paid||'')}</span></div><b class="lnet">${fmt2(t.total)}</b><span class="lact" style="display:flex;gap:2px"><button class="ib" data-tr="${t.id}" aria-label="Receipt">${I.down}</button>${t.status==='void'?'':`<button class="ib" data-tv="${t.id}" aria-label="Void">${I.x}</button>`}</span></div>`; }).join(''):`<div class="empty"><b>No tickets</b><span>Nothing was closed on this day.</span></div>`}</div>`;
+  $('ptBack').onclick=()=>go('pos'); $('ptDay').onchange=()=>{ POS.day=$('ptDay').value; render(); }; m.querySelectorAll('[data-tr]').forEach(x=>x.onclick=()=>receiptPDF(all.find(y=>y.id===x.dataset.tr)));
   m.querySelectorAll('[data-tv]').forEach(x=>x.onclick=async()=>{ const t=all.find(y=>y.id===x.dataset.tv); const reason=prompt(`Void the ${fmt2(t.total)} ticket? Say why; it stays on the record${t.acct_item?' and the account charge is voided too':''}.`); if(reason==null) return; if(!reason.trim()){ toast('A reason is needed'); return; } if(await voidTicket(t,reason.trim())) render(); });
   $('ptCsv').onclick=()=>{ const qq=v=>'"'+String(v??'').replace(/"/g,'""')+'"'; dl([['Time','Outlet','Who','Lines','Subtotal','Service','Tax','Tip','Total','Paid','Status'].map(qq).join(',')].concat(all.map(t=>[new Date(t.closed_at||t.created_at).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'}),(outletOf(t.outlet)||{}).name||t.outlet,t.member_id?memberName(personById(t.member_id)||{}):t.guest||'Walk-in',ticketText(t),n0(t.subtotal).toFixed(2),n0(t.svc).toFixed(2),n0(t.tax).toFixed(2),n0(t.tip).toFixed(2),n0(t.total).toFixed(2),t.paid,t.status].map(qq).join(','))).join('\n'),'text/csv',`tickets-${day}.csv`); };
 }
@@ -7708,8 +7734,8 @@ function vPosSetup(m){ if(!posOn()){ go('dash'); return; } const P=posSettings()
   $('pxBack').onclick=()=>go('pos'); $('pxNewO').onclick=()=>outletDrawer(null); $('pxNewP').onclick=()=>productDrawer(null); $('pxCsv').onclick=importProducts;
   m.querySelectorAll('[data-eo]').forEach(x=>x.onclick=()=>outletDrawer(outletOf(x.dataset.eo))); m.querySelectorAll('[data-ep]').forEach(x=>x.onclick=()=>productDrawer(productOf(x.dataset.ep)));
 }
-function outletDrawer(o){ const P=posSettings(), b=acctSettings();
-  openDrawer({kicker:'Point of sale',title:o?o.name:'New outlet',body:field('Name','oN',o?o.name:'',{ph:'Grill · Halfway house · Pro shop'})+pair(field('Kind','oK',o?o.kind:'fnb',{type:'select',options:[['fnb','Food & beverage (service charge, tip)'],['proshop','Pro shop / retail']]}),field('Bills to the account as','oI',o?o.item:'fnb',{type:'select',options:b.items.filter(x=>!['finance','late','min'].includes(x.id)).map(x=>[x.id,x.name])})),
+function outletDrawer(o,kind){ const P=posSettings(), b=acctSettings();
+  openDrawer({kicker:'Point of sale',title:o?o.name:(kind==='proshop'?'New shop outlet':kind==='fnb'?'New restaurant':'New outlet'),body:field('Name','oN',o?o.name:'',{ph:kind==='proshop'?'Golf shop':'Creekside Grill · Nines Bistro · Halfway house'})+pair(field('Kind','oK',o?o.kind:(kind||'fnb'),{type:'select',options:[['fnb','Food & beverage (service charge, tip)'],['proshop','Pro shop / retail']]}),field('Bills to the account as','oI',o?o.item:'fnb',{type:'select',options:b.items.filter(x=>!['finance','late','min'].includes(x.id)).map(x=>[x.id,x.name])})),
     save:()=>{ const name=fv('oN'); if(!name){ toast('Name the outlet'); return false; } const d={name,kind:fv('oK'),item:fv('oI')}; if(o) Object.assign(o,d); else P.outlets.push(Object.assign({id:uid()},d)); persist(); },
     del:o&&P.outlets.length>1?()=>{ if(!confirm(`Remove ${o.name}? Its products go with it.`)) return false; P.products=P.products.filter(x=>x.outlet!==o.id); P.outlets=P.outlets.filter(x=>x!==o); if(POS.outlet===o.id) POS.outlet=''; persist(); }:null}); }
 function productDrawer(x){ const P=posSettings();
@@ -7822,14 +7848,90 @@ async function sheetPDF(f,day){ try{ await loadJsPDF(); }catch(e){ toast(e.messa
   const crest=await crestPNG().catch(()=>null), doc=new window.jspdf.jsPDF({unit:'pt',format:'letter'}); bcFonts(doc);
   const NAVY=[15,42,56],GOLD=[199,161,58],GOLDL=[216,183,95],GOLDDK=[126,95,26],IVORY=[251,250,245],INK=[20,34,43],MUTED=[86,98,106]; const L=40,R=572,W=612,H=792, font=(ff,s,z,c)=>{ doc.setFont(ff,s); doc.setFontSize(z); doc.setTextColor(...c); };
   const club=(CLUB&&CLUB.name)||CLUB_META.name, rows=bkLive(f.id,day), slots=slotsOf(f), units=Array.from({length:f.units},(_,i)=>i+1);
-  const page=()=>{ doc.setFillColor(...IVORY); doc.rect(0,0,W,H,'F'); doc.setFillColor(...GOLD); doc.roundedRect(L,32,R-L,82,8,8,'F'); doc.setFillColor(...NAVY); doc.roundedRect(L,32,R-L,78,8,8,'F'); doc.rect(L,98,R-L,8,'F'); if(crest) doc.addImage(crest,'PNG',L+16,42,54*850/1024,54);
-    font('PublicSansXB','normal',6.8,GOLDL); doc.text(String(club).toUpperCase(),L+76,56,{charSpace:1.2}); font('Cormorant','bold',24,[255,255,255]); doc.text(f.name,L+76,80); font('PublicSans','normal',8.4,[214,218,220]); doc.text(new Date(day+'T12:00').toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric',year:'numeric'}),L+76,96); return 134; };
+  const page=()=>{ doc.setFillColor(...IVORY); doc.rect(0,0,W,H,'F'); doc.setFillColor(...GOLD); doc.roundedRect(L,32,R-L,82,8,8,'F'); doc.setFillColor(...NAVY); doc.roundedRect(L,32,R-L,78,8,8,'F'); doc.rect(L,98,R-L,8,'F'); const lw=drawCrest(doc,crest,L+16,42,54), TX=L+16+(lw||45)+15;
+    font('PublicSansXB','normal',6.8,GOLDL); doc.text(String(club).toUpperCase(),TX,56,{charSpace:1.2}); font('Cormorant','bold',24,[255,255,255]); doc.text(f.name,TX,80); font('PublicSans','normal',8.4,[214,218,220]); doc.text(new Date(day+'T12:00').toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric',year:'numeric'}),TX,96); return 134; };
   let y=page(); const cw=(R-L-64)/f.units;
   font('PublicSansXB','normal',7.4,GOLDDK); doc.text('TIME',L,y,{charSpace:1.1}); units.forEach((u,i)=>doc.text(unitName(f,u).toUpperCase(),L+64+i*cw,y,{charSpace:1.1})); y+=6; doc.setDrawColor(...GOLD); doc.setLineWidth(1); doc.line(L,y,R,y); y+=12;
   for(const t of slots){ const lines=units.map(u=>rows.filter(b=>b.time===t&&b.unit===u).map(b=>(b.players||[]).map(p=>p.name).join(', ')||bkName(b)).join(' · ')); const hts=lines.map((s,i)=>doc.splitTextToSize(s||'',cw-8).length); const h=Math.max(1,...hts)*11+5;
     if(y+h>H-50){ y=page(); } font('PublicSans','bold',9,INK); doc.text(t12(t),L,y); font('PublicSans','normal',9,lines.some(Boolean)?INK:MUTED); lines.forEach((s,i)=>{ doc.text(doc.splitTextToSize(s||'—',cw-8),L+64+i*cw,y); }); y+=h; doc.setDrawColor(225,217,198); doc.setLineWidth(.5); doc.line(L,y-4,R,y-4); }
   font('PublicSans','normal',7,MUTED); doc.text(`${club} · ${f.name} · printed ${new Date().toLocaleString('en-US',{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'})}`,W/2,H-28,{align:'center'});
   const name=`${f.id}-${day}.pdf`; if(typeof deliverFile==='function') await deliverFile(doc.output('blob'),name,f.name); else doc.save(name); }
+/* ============ Settings — white label (branding, outgoing e-mail) and the module setup ============
+   Every hub (the club, each association, each small group) has Settings. Branding: the organization's own logo on
+   statements, receipts, sheets, PDFs, e-mails and the member portal — an association keeps its own, else the club's,
+   else the Flagstick crest. E-mail: the organization's own sender (wcccmga.org for the MGA, the club's domain for the
+   club), sent by Flagstick's mailer or through the organization's Microsoft 365 (an Azure app with Mail.Send); the
+   settings live in mail_settings (mail-setup.sql), the secret is write-only here. The club's Settings also gathers
+   the setup of each module: restaurants and the golf shop (POS outlets), billing, facilities, the game library. */
+const MAILS={row:null,loaded:false};
+const mailKey=()=>'fs_mail_'+((typeof TENANT!=='undefined'&&TENANT)||'local')+'_'+ORG_ID;
+function brandOf(){ if(db&&db.brand&&db.brand.logo) return db.brand; if(CLUB&&CLUB.brand&&CLUB.brand.logo) return CLUB.brand; return null; }
+const brandLogo=()=>{ const b=brandOf(); return b?b.logo:null; };
+const brandName=()=>(db&&db.name)||(CLUB&&CLUB.name)||CLUB_META.name;
+async function mailLoad(force){ if(MAILS.loaded&&!force) return MAILS.row; MAILS.loaded=true;
+  if(!acctCloud()){ try{ MAILS.row=JSON.parse(localStorage.getItem(mailKey())||'null'); }catch(_){ MAILS.row=null; } return MAILS.row; }
+  const r=await tq(sb.from('mail_settings').select('*').eq('org',ORG_ID)).maybeSingle(); MAILS.row=r.error?null:(r.data||null); return MAILS.row; }
+async function mailSave(row){ row=Object.assign({org:ORG_ID,updated_at:new Date().toISOString(),updated_by:whoAmI()},row);
+  if(!acctCloud()){ MAILS.row=Object.assign({},MAILS.row||{},row); try{ localStorage.setItem(mailKey(),JSON.stringify(MAILS.row)); }catch(_){} return true; }
+  const {error}=await sb.from('mail_settings').upsert(trow(row),{onConflict:'tenant,org'}); if(error){ toast('Couldn’t save: '+error.message); return false; } MAILS.row=Object.assign({},MAILS.row||{},row); return true; }
+/* one way out for every e-mail the hub sends: the organization's sender settings travel with the message */
+async function sendMail(msg){ if(!acctCloud()||!sb.functions) return {error:'E-mail goes out from the live site'};
+  try{ const {data,error}=await sb.functions.invoke('mail',{body:Object.assign({tenant:TENANT,org:ORG_ID},msg)}); if(error) return {error:error.message||'failed'}; return data||{error:'no reply'}; }catch(e){ return {error:e.message||'failed'}; } }
+/* a branded HTML e-mail: the logo, the organization's name, the paragraphs, a quiet footer — no Flagstick mark */
+function mailHTML(o){ const logo=brandLogo(), name=brandName(), paras=(o.paragraphs||[]).map(p=>`<p style="margin:0 0 12px;font:15px/1.5 -apple-system,Segoe UI,Helvetica,Arial,sans-serif;color:#14222B">${p}</p>`).join('');
+  return `<!doctype html><html><body style="margin:0;background:#F4F0E6;padding:24px 12px"><table role="presentation" width="100%" cellspacing="0" cellpadding="0"><tr><td align="center"><table role="presentation" width="560" style="max-width:560px;background:#fff;border:1px solid #E3DCC9;border-radius:12px" cellspacing="0" cellpadding="0">
+    <tr><td style="background:#0F2A38;border-radius:12px 12px 0 0;padding:18px 24px;border-bottom:4px solid #C7A13A">${logo?`<img src="${logo}" alt="${esc(name)}" style="height:48px;max-width:220px;object-fit:contain;display:block;margin-bottom:8px">`:''}<div style="font:700 18px Georgia,serif;color:#fff">${esc(name)}</div></td></tr>
+    <tr><td style="padding:22px 24px 8px"><h1 style="margin:0 0 14px;font:700 24px Georgia,serif;color:#0F2A38">${esc(o.title||'')}</h1>${paras}${o.cta?`<p style="margin:18px 0 6px"><a href="${esc(o.cta.href)}" style="display:inline-block;background:#0F2A38;color:#fff;text-decoration:none;font:700 14px -apple-system,Segoe UI,Helvetica,Arial,sans-serif;padding:12px 20px;border-radius:10px">${esc(o.cta.label)}</a></p>`:''}</td></tr>
+    <tr><td style="padding:10px 24px 20px;font:12.5px -apple-system,Segoe UI,Helvetica,Arial,sans-serif;color:#56626A;border-top:1px solid #E3DCC9">${esc(o.footer||name)}</td></tr></table></td></tr></table></body></html>`; }
+/* ---------- the page ---------- */
+function vSettings(m){
+  if(KEYMODE){ go('dash'); return; } const club=isClub(), b=brandOf(), own=db.brand&&db.brand.logo, mine=MAILS.row;
+  if(!MAILS.loaded){ mailLoad().then(()=>render()); }
+  const prov=(mine&&mine.provider)||'resend';
+  m.innerHTML=head('Settings',`${esc(db.name)} — branding, outgoing e-mail${club?' and the setup of each module':''}.`)+`
+    <div class="grid g2" style="align-items:start">
+      <div class="card"><div class="cardhead"><div><h2 class="h2">Branding</h2><span class="muted">Your logo on statements, receipts, sheets, PDFs, e-mails${club?' and the member portal':''}</span></div></div>
+        <div style="padding:0 22px 18px"><div class="brandbox">${b?`<img src="${b.logo}" alt="">`:`<img src="${SITE_BASE}flagstick-crest-light.png" alt="" style="opacity:.6">`}<div class="cell2"><b>${b?(own?'Your logo':club?'Your logo':'The club’s logo'):'No logo yet'}</b><small>${b?`${b.w}×${b.h}${own?'':club?'':' · from the club — add your own to replace it on this organization’s output'}`:'Until you add one, output carries the Flagstick crest.'}</small></div></div>
+          <div class="actions" style="margin-top:12px"><label class="btn pri" style="cursor:pointer">${I.plus}${own?'Replace logo':'Upload logo'}<input type="file" id="stLogo" accept="image/png,image/jpeg,image/svg+xml,image/webp" hidden></label>${own?`<button class="btn" id="stLogoX">Remove</button>`:''}</div>
+          <p class="hint">PNG or JPG, ideally on a transparent or white background; it is resized to 600 px and stored with ${club?'the club':'this organization'}. The app itself stays Flagstick; what goes out to members carries ${club?'the club':'you'}.</p></div></div>
+      <div class="card"><div class="cardhead"><div><h2 class="h2">Outgoing e-mail</h2><span class="muted">Statements, receipts and notices come from ${esc(db.name)}, not from Flagstick</span></div></div>
+        <div style="padding:0 22px 18px">${!MAILS.loaded?'<p class="muted">Loading…</p>':`
+          <div class="kv"><span class="muted">Sender</span><span>${mine&&mine.from_email?`<b>${esc(mine.from_name||db.name)}</b> &lt;${esc(mine.from_email)}&gt;`:'<span class="muted">Not set — mail goes out as Flagstick</span>'}</span></div>
+          <div class="kv"><span class="muted">Replies to</span><span>${esc((mine&&mine.reply_to)||'—')}</span></div>
+          <div class="kv"><span class="muted">Sent through</span><span>${prov==='m365'?`Microsoft 365${mine&&mine.mailbox?' · '+esc(mine.mailbox):''}${mine&&mine.m365_client?' · app registered':' · <span class="neg">app not registered yet</span>'}`:'Flagstick’s mailer'+(mine&&mine.from_email?' · the domain must be verified with Flagstick':'')}</span></div>
+          <div class="actions" style="margin-top:12px"><button class="btn pri" id="stMail">${I.edit}E-mail settings</button><button class="btn" id="stTest">Send a test</button></div>
+          <p class="hint">${prov==='m365'?'Microsoft 365: an Azure app registration with the Graph permission Mail.Send (application), admin-consented; its tenant id, client id and secret go in E-mail settings and the secret is never shown again.':'Flagstick’s mailer sends from your address once your domain is verified with Flagstick (SPF/DKIM records we give you). Or switch to Microsoft 365 to send straight from your own mailbox.'}</p>`}</div></div>
+    </div>
+    ${club?`<div class="card"><div class="cardhead"><div><h2 class="h2">Module setup</h2><span class="muted">Where each part of the club is set up</span></div></div><div class="grid g3" style="padding:0 22px 20px">
+      ${posOn()?`<div class="setupcard"><b>Food &amp; beverage</b><span class="muted">${posSettings().outlets.filter(o=>o.kind==='fnb').map(o=>esc(o.name)).join(' · ')||'No restaurants yet'}</span><div class="actions"><button class="btn sm" id="stFnb">${I.plus}Restaurant</button><button class="btn sm" data-go2="possetup">Menus &amp; products</button></div></div>
+      <div class="setupcard"><b>Golf shop</b><span class="muted">${posSettings().outlets.filter(o=>o.kind==='proshop').map(o=>esc(o.name)).join(' · ')||'No shop outlet yet'}</span><div class="actions"><button class="btn sm" id="stShop">${I.plus}Shop outlet</button><button class="btn sm" data-go2="possetup">Products &amp; stock</button></div></div>`:''}
+      ${acctOn()?`<div class="setupcard"><b>Member billing</b><span class="muted">${acctSettings().classes.length} membership class${acctSettings().classes.length===1?'':'es'} · tax ${n0(acctSettings().tax.rate)}% · service ${n0(acctSettings().svc.rate)}%</span><div class="actions"><button class="btn sm" data-go2="billsetup">Billing setup</button></div></div>`:''}
+      ${bookOn()?`<div class="setupcard"><b>Bookings</b><span class="muted">${bookSettings().facilities.map(f=>esc(f.name)).join(' · ')}</span><div class="actions"><button class="btn sm" data-go2="booksetup">Facilities</button></div></div>`:''}
+      <div class="setupcard"><b>Golf</b><span class="muted">The games the club plays, courses and tees</span><div class="actions"><button class="btn sm" data-go2="library">Game library</button><button class="btn sm" data-go2="golf">Events &amp; courses</button></div></div>
+      <div class="setupcard"><b>Organizations &amp; logins</b><span class="muted">${(CLUB.orgs||[]).filter(o=>!o.archived).length} organizations</span><div class="actions"><button class="btn sm" data-go2="orgs">Organizations</button>${canManageLogins()?`<button class="btn sm" data-go2="logins">Logins</button>`:''}</div></div>
+    </div></div>`:''}
+    ${club?'':`<div class="card pad"><b>Restaurants, the shop, billing and facilities</b> are set up by the club on its own hub; this organization’s Settings cover its own branding and e-mail.</div>`}`;
+  const up=$('stLogo'); if(up) up.onchange=()=>{ const f=up.files[0]; if(!f) return; logoFromFile(f).then(br=>{ db.brand=Object.assign(db.brand||{},br); persist(); toast('Logo saved'); render(); }).catch(e=>toast(e.message||'Couldn’t read that image')); };
+  const lx=$('stLogoX'); if(lx) lx.onclick=()=>{ if(!confirm('Remove the logo?')) return; delete db.brand.logo; delete db.brand.w; delete db.brand.h; persist(); render(); };
+  const sm=$('stMail'); if(sm) sm.onclick=mailDrawer; const st=$('stTest'); if(st) st.onclick=async()=>{ const to=prompt('Send a test e-mail to',(typeof ACCESS!=='undefined'&&ACCESS&&ACCESS.email)||''); if(!to) return; const r=await sendMail({to,subject:`${db.name} — test e-mail`,text:`This is a test from ${db.name}’s hub. If you can read it, outgoing e-mail is working.`,html:mailHTML({title:'Test e-mail',paragraphs:[`This is a test from ${esc(db.name)}’s hub. If you can read it, outgoing e-mail is working.`]})}); toast(r.error?stripeMsgLike(r.error):'Sent — check the inbox'); };
+  const fnb=$('stFnb'); if(fnb) fnb.onclick=()=>outletDrawer(null,'fnb'); const shop=$('stShop'); if(shop) shop.onclick=()=>outletDrawer(null,'proshop');
+  m.querySelectorAll('[data-go2]').forEach(x=>x.onclick=()=>go(x.dataset.go2));
+}
+const stripeMsgLike=e=>/not configured|Failed to send a request|404|not found/i.test(e||'')?'The mail function isn’t deployed or has no key yet (docs/tenancy.md)':e;
+/* a logo file → a PNG data URL no larger than 600 px on its long side, with its size */
+function logoFromFile(file){ return new Promise((res,rej)=>{ if(file.size>6e6) return rej(new Error('That file is over 6 MB')); const url=URL.createObjectURL(file), img=new Image();
+  img.onload=()=>{ const k=Math.min(1,600/Math.max(img.naturalWidth,img.naturalHeight)); const w=Math.max(1,Math.round(img.naturalWidth*k)), h=Math.max(1,Math.round(img.naturalHeight*k)); const c=document.createElement('canvas'); c.width=w; c.height=h; c.getContext('2d').drawImage(img,0,0,w,h); URL.revokeObjectURL(url); res({logo:c.toDataURL('image/png'),w,h,at:new Date().toISOString()}); };
+  img.onerror=()=>{ URL.revokeObjectURL(url); rej(new Error('Couldn’t read that image')); }; img.src=url; }); }
+function mailDrawer(){ const r=MAILS.row||{};
+  openDrawer({kicker:'Settings',title:'Outgoing e-mail',wide:true,
+    body:pair(field('From name','mlN',r.from_name||db.name),field('From address','mlF',r.from_email||'',{ph:'statements@wcccmga.org'}))+field('Replies go to','mlR',r.reply_to||'',{ph:'office@wcccmga.org'})+
+      field('Sent through','mlP',r.provider||'resend',{type:'select',options:[['resend','Flagstick’s mailer (your domain verified with Flagstick)'],['m365','Microsoft 365 — straight from your own mailbox']]})+
+      `<div id="mlM" ${(r.provider||'resend')==='m365'?'':'hidden'}>${field('Mailbox that sends','mlBox',r.mailbox||'',{ph:'statements@wcccmga.org'})}${pair(field('Azure tenant id','mlT',r.m365_tenant||''),field('App (client) id','mlC',r.m365_client||''))}${field('Client secret','mlS','',{type:'password',ph:r.m365_secret?'•••••• (saved — enter to replace)':'from the app registration'})}
+      <p class="hint">In Azure: App registrations → New → API permissions → Microsoft Graph → Application → <b>Mail.Send</b> → grant admin consent → Certificates &amp; secrets → new client secret. Optionally limit the app to this mailbox with an Exchange application access policy. The hub stores the ids here and the secret write-only; only the mail function reads it.</p></div>`,
+    wire:x=>{ x.querySelector('#mlP').onchange=()=>{ x.querySelector('#mlM').hidden=fv('mlP')!=='m365'; }; },
+    save:async()=>{ const from=fv('mlF'); if(from&&!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(from)){ toast('Check the from address'); return false; }
+      const row={provider:fv('mlP'),from_name:fv('mlN'),from_email:from||null,reply_to:fv('mlR')||null,mailbox:fv('mlBox')||null,m365_tenant:fv('mlT')||null,m365_client:fv('mlC')||null}; if(fv('mlS')) row.m365_secret=fv('mlS');
+      if(!(await mailSave(row))) return false; toast('E-mail settings saved'); }}); }
 /* =====================================================================
    Club Hub — Tournament rounds & results. A tournament declares its rounds (one or more per day, each with a
    format: e.g. Saturday scramble/shamble split, Sunday best ball); one button builds the scoring events from the
@@ -8079,10 +8181,10 @@ async function resultsPDF(t,opt){
   font('PublicSans','normal',8.4,[214,218,220]); const sub=doc.splitTextToSize(`${dateRange(t)} · ${rounds.map(r=>`${dayLabel(t,r.day).split(' · ')[0]}: ${formatSummary(r)}`).join(' · ')} · ${R.unit==='strokes'?(t.resultsBasis||'net')+' to par':R.unit}${R.final?'':' · as of '+new Date().toLocaleString()}`,R2-L-90);
   const bandH=74+Math.max(0,sub.length-1)*11;
   doc.setFillColor(...GOLD); doc.roundedRect(L,32,R2-L,bandH+4,8,8,'F'); doc.setFillColor(...NAVY); doc.roundedRect(L,32,R2-L,bandH,8,8,'F'); doc.rect(L,32+bandH-12,R2-L,8,'F');
-  if(crest) doc.addImage(crest,'PNG',L+16,42,54*850/1024,54);
-  font('PublicSansXB','normal',6.8,GOLDL); doc.text(`${(orgName()||'').toUpperCase()} · ${t.season||''}`,L+76,56,{charSpace:1.2});
-  font('Cormorant','bold',24,[255,255,255]); doc.text(`${t.name} — ${R.final?'Final Results':'Results'}`,L+76,80);
-  font('PublicSans','normal',8.4,[214,218,220]); doc.text(sub,L+76,96);
+  const lw=drawCrest(doc,crest,L+16,42,54), TX=L+16+(lw||45)+15;
+  font('PublicSansXB','normal',6.8,GOLDL); doc.text(`${(orgName()||'').toUpperCase()} · ${t.season||''}`,TX,56,{charSpace:1.2});
+  font('Cormorant','bold',24,[255,255,255]); doc.text(`${t.name} — ${R.final?'Final Results':'Results'}`,TX,80);
+  font('PublicSans','normal',8.4,[214,218,220]); doc.text(sub,TX,96);
   let y=32+bandH+26;
   const flights=[...new Set(R.list.map(u=>u.flight))].sort((a,b)=>(a||'~').localeCompare(b||'~'));
   const head=label=>{ if(y>H-80){ doc.addPage(); page(); y=48; } font('PublicSansXB','normal',7.4,GOLDDK); doc.text(label.toUpperCase(),L,y,{charSpace:1.1}); y+=6; doc.setDrawColor(...GOLD); doc.setLineWidth(1); doc.line(L,y,R2,y); y+=12;
@@ -8106,7 +8208,7 @@ async function resultsPDF(t,opt){
    page counts, and a reload is tried once per build — if the page that comes back is still the old one, the CDN
    hasn't caught up; wait a while before trying that build again. */
 (function(){
-  const ME='20261026232208', KEY='au_tried', RETRY=10*60*1000; let ready=false, lastCheck=0;
+  const ME='20261026233637', KEY='au_tried', RETRY=10*60*1000; let ready=false, lastCheck=0;
   const typing=()=>{ const a=document.activeElement; return a&&/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)&&a.value&&a.type!=='search'; };
   const safe=()=>!typing()&&(typeof window.__canReload!=='function'||window.__canReload());
   const tried=()=>{ try{ const [b,t]=(sessionStorage.getItem(KEY)||'').split('|'); return b?{build:b,at:+t||0}:null; }catch(_){ return null; } };

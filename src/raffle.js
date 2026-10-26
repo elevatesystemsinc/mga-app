@@ -202,10 +202,10 @@ async function rfRecord(t){
   const page=()=>{ doc.setFillColor(...IVORY); doc.rect(0,0,W,H,'F'); };
   page();
   doc.setFillColor(...GOLD); doc.roundedRect(L,32,R2-L,78,8,8,'F'); doc.setFillColor(...NAVY); doc.roundedRect(L,32,R2-L,74,8,8,'F'); doc.rect(L,94,R2-L,8,'F');
-  if(crest) doc.addImage(crest,'PNG',L+16,42,54*850/1024,54);
-  font('PublicSansXB','normal',6.8,GOLDL); doc.text(`${(t.name||'').toUpperCase()} · ${t.season||''} · MGA 50/50`,L+76,56,{charSpace:1.2});
-  font('Cormorant','bold',24,[255,255,255]); doc.text('Final Drawing — Official Record',L+76,80);
-  font('PublicSans','normal',8.4,[214,218,220]); doc.text(`Generated ${new Date().toLocaleString()}`,L+76,96);
+  const lw=drawCrest(doc,crest,L+16,42,54), TX=L+16+(lw||45)+15;
+  font('PublicSansXB','normal',6.8,GOLDL); doc.text(`${(t.name||'').toUpperCase()} · ${t.season||''} · MGA 50/50`,TX,56,{charSpace:1.2});
+  font('Cormorant','bold',24,[255,255,255]); doc.text('Final Drawing — Official Record',TX,80);
+  font('PublicSans','normal',8.4,[214,218,220]); doc.text(`Generated ${new Date().toLocaleString()}`,TX,96);
   let y=130; const sec=s=>{ font('PublicSansXB','normal',7.4,GOLDDK); doc.text(s.toUpperCase(),L,y,{charSpace:1.1}); y+=6; doc.setDrawColor(...GOLD); doc.setLineWidth(1); doc.line(L,y,R2,y); y+=14; };
   const kv=(k,v,mono)=>{ font('PublicSans','bold',9,MUTED); doc.text(k,L,y); font(mono?'PublicSans':'PublicSans',mono?'bold':'normal',9.4,INK); const lines=doc.splitTextToSize(String(v),R2-L-150); doc.text(lines,L+150,y); y+=13*lines.length+1; };
   sec('Ticket list');

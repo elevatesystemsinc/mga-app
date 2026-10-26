@@ -201,6 +201,37 @@ async def main():
     r=await p5.evaluate("""async()=>{ const b=[...document.querySelectorAll('[data-bx]')].pop(); b.click(); await new Promise(r=>setTimeout(r,900)); return {left:ME.bookings.filter(b=>b.facility==='tennis').length, bal:Math.round((ME.items.reduce((t,i)=>t+sign(i),0)-window.BAL0)*100)/100, fee:ME.items.filter(i=>i.ref&&i.ref.startsWith('bk:')).length}; }""")
     bad+=check('the member cancels: the booking goes, the fee is voided, the balance is back to zero',r['left']==0 and r['bal']==0 and r['fee']==0,r)
     fdb.me='u-pro@wccc.org'
+    # ---- 5f. settings: branding and outgoing e-mail; the logo reaches the PDFs, the portal and the receipts; the MGA has its own Settings
+    LOGO='data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAIAAAABCAYAAAD0In+KAAAADElEQVQIW2NkYGD4DwABBAEAX+XDCQAAAABJRU5ErkJggg=='
+    r=await p1.evaluate("""async()=>{ go('settings'); await new Promise(r=>setTimeout(r,500)); const nav=navItems().map(x=>x[0]); const h1=document.querySelector('#main h1').textContent; const cards=[...document.querySelectorAll('#main h2')].map(x=>x.textContent);
+      const before=await crestPNG().catch(()=>''); db.brand={logo:'%s',w:2,h:1,at:'x'}; persist(); const after=await crestPNG(); const src=crestSrc();
+      document.getElementById('stMail').click(); await new Promise(r=>setTimeout(r,100)); document.getElementById('mlN').value='Walnut Creek Country Club'; document.getElementById('mlF').value='statements@walnutcreekcountryclub.com'; document.getElementById('mlR').value='office@walnutcreekcountryclub.com'; document.getElementById('mlP').value='m365'; document.getElementById('mlP').dispatchEvent(new Event('change')); document.getElementById('mlBox').value='statements@walnutcreekcountryclub.com'; document.getElementById('mlT').value='tenant-guid'; document.getElementById('mlC').value='client-guid'; document.getElementById('mlS').value='s3cret'; document.getElementById('dSave').click(); await new Promise(r=>setTimeout(r,500));
+      render(); await new Promise(r=>setTimeout(r,100)); const sender=document.querySelector('#main .kv span:last-child').textContent; const setup=[...document.querySelectorAll('.setupcard b')].map(x=>x.textContent);
+      return {nav:nav.includes('settings'), h1, cards, before:!before.startsWith('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAIAAAABCAYAAAD0In+KAAAADElEQVQIW2NkYGD4DwABBAEAX+XDCQAAAABJRU5ErkJggg=='), after:after==='%s', src:src==='%s', sender, setup}; }""" % (LOGO,LOGO,LOGO))
+    bad+=check('club Settings: branding, outgoing e-mail and the module setup; the logo replaces the crest on every output',r['nav'] and r['h1']=='Settings' and r['cards'][:3]==['Branding','Outgoing e-mail','Module setup'] and r['before'] and r['after'] and r['src'] and 'statements@walnutcreekcountryclub.com' in r['sender'] and r['setup']==['Food & beverage','Golf shop','Member billing','Bookings','Golf','Organizations & logins'],r)
+    ms=[x for x in fdb._rows('mail_settings')]
+    bad+=check('mail_settings row for the club: Microsoft 365 with the app ids and the secret',len(ms)==1 and ms[0]['org']=='club' and ms[0]['provider']=='m365' and ms[0]['m365_secret']=='s3cret' and ms[0]['mailbox']=='statements@walnutcreekcountryclub.com' and ms[0]['tenant']=='wccc',ms)
+    r=await p1.evaluate("""async()=>{ go('account',{acctId:'p1'}); await new Promise(r=>setTimeout(r,200)); const n=await mailStatements([stmtsOf('p1')[0]]); return n; }""")
+    last=fdb.mails[-1]
+    bad+=check('a statement e-mail now carries the organization and a branded HTML body',r==1 and last['org']=='club' and '<html' in last['html'] and 'Walnut Creek Country Club' in last['html'] and LOGO in last['html'],{k:last[k] for k in ('org','to','subject')})
+    async with p1.expect_download() as dl: await p1.evaluate("()=>{ go('postickets'); return new Promise(r=>setTimeout(()=>{ document.querySelector('[data-tr]').click(); r(); },300)); }")
+    d=await dl.value; pdf=open(await d.path(),'rb').read()
+    bad+=check('a receipt PDF from the tickets page',d.suggested_filename.startswith('receipt-') and pdf[:4]==b'%PDF',d.suggested_filename)
+    await p1.evaluate("()=>{ POS.outlet='grill'; POS.cur=null; go('pos'); }"); await p1.wait_for_timeout(200)
+    r=await p1.evaluate("""async()=>{ document.querySelector('[data-pp]').click(); const pm=document.getElementById('psM'); pm.value='1042'; pm.dispatchEvent(new Event('input')); document.querySelector('[data-pk]').click(); await new Promise(r=>setTimeout(r,100)); document.getElementById('psCash').click(); await new Promise(r=>setTimeout(r,500)); return {last:!!POS.last, bar:document.querySelector('.lastt')?.textContent, mailBtn:!!document.getElementById('psLastE')}; }""")
+    bad+=check('after closing a ticket the register offers its receipt (and e-mail when the member has an address)',r['last'] and r['bar'] and 'Last ticket' in r['bar'] and not r['mailBtn'],r)
+    # the MGA's hub: its own Settings (branding + e-mail), no module setup; its own sender row
+    pm_,em_=await open_page(c1,'?org=mga&tenant=app.wcccmga.org')
+    r=await pm_.evaluate("""async()=>{ go('settings'); await new Promise(r=>setTimeout(r,500)); const cards=[...document.querySelectorAll('#main h2')].map(x=>x.textContent); const brand=document.querySelector('.brandbox b').textContent;
+      document.getElementById('stMail').click(); await new Promise(r=>setTimeout(r,100)); document.getElementById('mlN').value='WCCC MGA'; document.getElementById('mlF').value='board@wcccmga.org'; document.getElementById('dSave').click(); await new Promise(r=>setTimeout(r,500)); return {cards, brand, nav:navItems().map(x=>x[0]).includes('settings')}; }""")
+    ms=sorted((x['org'],x['from_email']) for x in fdb._rows('mail_settings'))
+    bad+=check('the MGA hub: Settings with the club’s logo until it adds its own; its own sender on wcccmga.org',r['nav'] and r['cards']==['Branding','Outgoing e-mail'] and r['brand']=='The club’s logo' and ms==[('club','statements@walnutcreekcountryclub.com'),('mga','board@wcccmga.org')],(r,ms))
+    await pm_.close()
+    # the portal header carries the club's logo
+    fdb.me='u-ann@x.org'; await p5.reload(); await p5.wait_for_function("()=>!!ME",timeout=10000)
+    r=await p5.evaluate("()=>({brand:ME.brand===%r, img:document.querySelector('.top img').src.startsWith('data:image/png')})" % LOGO)
+    bad+=check('the member portal shows the club’s logo',r['brand'] and r['img'],r)
+    fdb.me='u-pro@wccc.org'
     # ---- 6. a board login: no nav item, the page redirects; a club without the module: locked page, no nav item
     fdb.me='u-mgaboard@x.org'
     c3=await b.new_context(); await cloud(c3,fdb)
