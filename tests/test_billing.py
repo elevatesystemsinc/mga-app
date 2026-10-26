@@ -202,12 +202,12 @@ async def main():
     bad+=check('the member cancels: the booking goes, the fee is voided, the balance is back to zero',r['left']==0 and r['bal']==0 and r['fee']==0,r)
     fdb.me='u-pro@wccc.org'
     # ---- 5f. settings: branding and outgoing e-mail; the logo reaches the PDFs, the portal and the receipts; the MGA has its own Settings
-    LOGO='data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAIAAAABCAYAAAD0In+KAAAADElEQVQIW2NkYGD4DwABBAEAX+XDCQAAAABJRU5ErkJggg=='
     r=await p1.evaluate("""async()=>{ go('settings'); await new Promise(r=>setTimeout(r,500)); const nav=navItems().map(x=>x[0]); const h1=document.querySelector('#main h1').textContent; const cards=[...document.querySelectorAll('#main h2')].map(x=>x.textContent);
-      const before=await crestPNG().catch(()=>''); db.brand={logo:'%s',w:2,h:1,at:'x'}; persist(); const after=await crestPNG(); const src=crestSrc();
+      const before=await crestPNG().catch(()=>''); const cv=document.createElement('canvas'); cv.width=160; cv.height=80; const cx=cv.getContext('2d'); cx.fillStyle='#0F2A38'; cx.fillRect(0,0,160,80); cx.fillStyle='#C7A13A'; cx.fillRect(20,20,120,40); window.LOGO=cv.toDataURL('image/png'); db.brand={logo:window.LOGO,w:160,h:80,at:'x'}; persist(); const after=await crestPNG(); const src=crestSrc();
       document.getElementById('stMail').click(); await new Promise(r=>setTimeout(r,100)); document.getElementById('mlN').value='Walnut Creek Country Club'; document.getElementById('mlF').value='statements@walnutcreekcountryclub.com'; document.getElementById('mlR').value='office@walnutcreekcountryclub.com'; document.getElementById('mlP').value='m365'; document.getElementById('mlP').dispatchEvent(new Event('change')); document.getElementById('mlBox').value='statements@walnutcreekcountryclub.com'; document.getElementById('mlT').value='tenant-guid'; document.getElementById('mlC').value='client-guid'; document.getElementById('mlS').value='s3cret'; document.getElementById('dSave').click(); await new Promise(r=>setTimeout(r,500));
       render(); await new Promise(r=>setTimeout(r,100)); const sender=document.querySelector('#main .kv span:last-child').textContent; const setup=[...document.querySelectorAll('.setupcard b')].map(x=>x.textContent);
-      return {nav:nav.includes('settings'), h1, cards, before:!before.startsWith('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAIAAAABCAYAAAD0In+KAAAADElEQVQIW2NkYGD4DwABBAEAX+XDCQAAAABJRU5ErkJggg=='), after:after==='%s', src:src==='%s', sender, setup}; }""" % (LOGO,LOGO,LOGO))
+      return {nav:nav.includes('settings'), h1, cards, logo:window.LOGO, before:before!==window.LOGO, after:after===window.LOGO, src:src===window.LOGO, sender, setup}; }""")
+    LOGO=r['logo']
     bad+=check('club Settings: branding, outgoing e-mail and the module setup; the logo replaces the crest on every output',r['nav'] and r['h1']=='Settings' and r['cards'][:3]==['Branding','Outgoing e-mail','Module setup'] and r['before'] and r['after'] and r['src'] and 'statements@walnutcreekcountryclub.com' in r['sender'] and r['setup']==['Food & beverage','Golf shop','Member billing','Bookings','Golf','Organizations & logins'],r)
     ms=[x for x in fdb._rows('mail_settings')]
     bad+=check('mail_settings row for the club: Microsoft 365 with the app ids and the secret',len(ms)==1 and ms[0]['org']=='club' and ms[0]['provider']=='m365' and ms[0]['m365_secret']=='s3cret' and ms[0]['mailbox']=='statements@walnutcreekcountryclub.com' and ms[0]['tenant']=='wccc',ms)
@@ -229,7 +229,7 @@ async def main():
     await pm_.close()
     # the portal header carries the club's logo
     fdb.me='u-ann@x.org'; await p5.reload(); await p5.wait_for_function("()=>!!ME",timeout=10000)
-    r=await p5.evaluate("()=>({brand:ME.brand===%r, img:document.querySelector('.top img').src.startsWith('data:image/png')})" % LOGO)
+    r=await p5.evaluate("(L)=>({brand:ME.brand===L, img:document.querySelector('.top img').src.startsWith('data:image/png')})",LOGO)
     bad+=check('the member portal shows the club’s logo',r['brand'] and r['img'],r)
     fdb.me='u-pro@wccc.org'
     # ---- 6. a board login: no nav item, the page redirects; a club without the module: locked page, no nav item

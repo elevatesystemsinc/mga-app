@@ -217,6 +217,16 @@ ahead members may book, whether members may book it at all, and a fee that goes 
 the sheet, check people in, cancel, and print the day's sheet. Members book from the **member portal** inside the same
 rules — the next days, open and taken slots, their own bookings with Cancel.
 
+## Settings: your own brand on everything that goes out
+
+Every hub — the club and each association — has **Settings**. **Branding:** upload your logo and it replaces the Flagstick
+crest on statements, receipts, the tee sheet, results sheets, game sheets, printed scorecards, e-mails and the member
+portal; an association can carry its own logo, otherwise the club's. **Outgoing e-mail:** statements and receipts come
+from your own address (the MGA from wcccmga.org, the club from its own domain), either through Flagstick's mailer once
+your domain is verified, or straight out of your own Microsoft 365 mailbox through an app registration you control.
+The club's Settings also gathers the setup of each module: restaurants (Creekside Grill, Nines Bistro…) and the golf
+shop, billing, facilities, the game library.
+
 ## The club calendar
 
 The club's Tournaments page and dashboard also list every association's and small group's tournaments — name, dates,

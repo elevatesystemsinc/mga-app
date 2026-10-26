@@ -65,6 +65,7 @@ src/
                        minimums, finance charges, aging, statements, GL export, Stripe Connect, the mail function
   pos.js               Point of sale (module 'pos'): outlets, products & stock, the register, tickets to accounts or cash / card
   bookings.js          Bookings (module 'club'): the tee sheet, courts, pool, lessons — the sheet, check-in, fees, the printed sheet
+  settings.js          Settings: white-label branding (the logo on every output), outgoing e-mail per organization (Resend / Microsoft 365), module setup
   autoupdate.js        version.json polling + safe reload (__BUILD__ placeholder)                     [shared]
   cashier_src.html     cashier page   (markers /*CALCCORE*/ /*AUTOUPDATE*/)
   checkin_src.html     check-in page  (markers /*CKCORE*/  /*AUTOUPDATE*/)
@@ -353,6 +354,7 @@ Tournament = { id, name, season, days, startDate, field:[{id,memberId,team,paid,
 | `acct_items`, `acct_statements` + `can_staff(p_tenant)` | member accounts & billing (`billing-setup.sql`): the club's ledger, staff only. |
 | `member_users`, `tenants.stripe_account/stripe_status` + RPC `member_me(p_tenant)`, `member_autopay_off(p_tenant)` | the member portal and online payments (`member-setup.sql`); Edge Functions `mail`, `stripe`, `stripe-webhook`. |
 | `pos_tickets` | point of sale tickets (`pos-setup.sql`), staff only. |
+| `mail_settings` (tenant, org) | each organization's outgoing e-mail sender and provider (`mail-setup.sql`); RLS `can_org`. |
 | `bookings` + RPC `member_id_of`, `member_slots`, `member_book`, `member_cancel` | bookings (`booking-setup.sql`): staff on the sheet, members through the security-definer functions that enforce the facility's rules. |
 | `hub_keys` (org_id, key_hash, label, revoked_at) + RPC `hub_key_org/read/write/people/golf_event/golf_delete/score/share` | admin links (`admin-links-setup.sql`): security-definer functions that act for exactly one organization. |
 | `mm_tournament` | the retired Member-Member app's row (`supabase-setup.sql`). Archive only — no hub code reads or writes it. |
@@ -586,6 +588,26 @@ localStorage. `acctPost(o)` is the one way anything lands on an account.
   books through `member_book(tenant, facility, date, time, unit, players, note)` — the database enforces the rules
   (hours, slot grid, lead days, capacity, one a day, office-only, suspended members, the fee posted to acct_items) — and
   cancels through `member_cancel` (voids the fee). `member_slots` gives a day's taken slots without names.
+
+### Settings — white label and module setup (`settings.js`, `mail-setup.sql`)
+Every hub has **Settings** (last entry on the rail; not in key mode). **Branding:** `db.brand = {logo (PNG data URL ≤ 600 px,
+from `logoFromFile`), w, h, at}` on the club or the organization; `brandOf()` / `brandLogo()` = the organization's own logo,
+else the club's, else nothing — and `crestPNG()` (calcutta.js) / `crestSrc()` (golf.js) prefer it, so every PDF band
+(`drawCrest(doc, src, x, y, h)` in billcore fits any logo shape and returns the width; the band text starts after it),
+the printed scorecards, the draw / call-out overlays, the game sheet, receipts, e-mails and the member portal header
+(`member_me` → `brand`) carry the club's or the association's own mark; the app chrome stays Flagstick. **Outgoing
+e-mail** (the owner, Oct 2026: the MGA's domain is wcccmga.org, the club's walnutcreekcountryclub.com): one row per
+organization in `mail_settings` (RLS `can_org`): `provider` resend | m365, `from_name`, `from_email`, `reply_to`,
+`mailbox`, `m365_tenant`, `m365_client`, `m365_secret` (write-only in the hub — `mailDrawer` never shows it). `sendMail(msg)`
+is the one way out (adds `tenant` + `org`); the Edge Function `mail` resolves the organization's row (falling back to the
+club's, then Flagstick's `MAIL_FROM`), sends through Resend with that from / reply-to, or through **Microsoft 365**
+(client-credentials token from login.microsoftonline.com → Graph `users/{mailbox}/sendMail` with attachments; the Azure
+app needs the application permission Mail.Send with admin consent). `mailHTML({title, paragraphs, cta, footer})` is the
+branded HTML body (logo + organization name, no Flagstick mark); statements and receipts use it. **Module setup** (club
+only): restaurants and the golf shop are POS outlets (`outletDrawer(null,'fnb'|'proshop')`), plus links to Billing setup,
+Facilities, the Game library, Organizations and Logins. **Receipts** (`receiptPDF(t)`, pos.js): a narrow branded slip —
+logo, outlet, lines, service / tax / tip, total, how it was paid — from the tickets page, the register's "Last ticket" bar,
+and by e-mail to the member (`emailReceipt`).
 
 ### Other
 Checklist (95-task 2026 template, assignees from members/board, notes, print). Golf (courses, WHS, flights,
