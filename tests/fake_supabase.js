@@ -7,7 +7,7 @@
     eq(k,v){ this.filters.push(['eq',k,v]); return this; } is(k,v){ this.filters.push(['is',k,v]); return this; } order(){ return this; } maybeSingle(){ this.single=true; return this; } single(){ this.single=true; return this; }
     then(ok,bad){ return call(this.op,{table:this.t,payload:this.payload,filters:this.filters,single:this.single}).then(ok,bad); } }
   window.supabase={createClient(){ return {
-    auth:{getSession:async()=>({data:{session:(window.MM_CONFIG||{}).noSession?null:{user:{email:'board@test'}}}}),signInWithPassword:async()=>({error:null}),signOut:async()=>({}),signUp:async({email})=>({data:{user:{id:'u-'+email}},error:null}),updateUser:async()=>({data:{},error:null}),verifyOtp:async()=>({data:{},error:null}),resetPasswordForEmail:async()=>({data:{},error:null})},
+    auth:{getSession:async()=>({data:{session:(window.MM_CONFIG||{}).noSession?null:{user:{email:'board@test'}}}}),signInWithPassword:async()=>({error:null}),signOut:async()=>({}),signUp:async({email})=>({data:{user:{id:'u-'+email}},error:null}),updateUser:async()=>({data:{},error:null}),verifyOtp:async()=>({data:{},error:null}),signInWithOtp:async()=>({data:{},error:null}),onAuthStateChange:()=>({data:{subscription:{unsubscribe(){}}}}),resetPasswordForEmail:async()=>({data:{},error:null})},
     functions:{invoke(name,o){ return call('fn',{name,body:(o&&o.body)||{}}); }},
     from(t){ return new Q(t); },
     rpc(fn,args){ return call('rpc',{fn,args:args||{}}); },

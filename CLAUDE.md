@@ -60,14 +60,17 @@ src/
   raffle.js            50/50 Drawing tab, drawing screen, official record PDF
   payouts.js           Calcutta payouts math (calcPayouts, ties) + Results / Payouts sub-tabs
   surveys.js           Surveys: anonymous member surveys (sections → questions, public link, results, CSV)
-  billing.js           Member accounts & billing (module 'billing', club hub, staff only): acct_items / acct_statements, statements PDF
+  billcore.js          the member statement PDF page (statementPage), shared by the hub and the member portal            [shared]
+  billing.js           Member accounts & billing (module 'billing', club hub, staff only): classes, the monthly run, tax/service,
+                       minimums, finance charges, aging, statements, GL export, Stripe Connect, the mail function
   autoupdate.js        version.json polling + safe reload (__BUILD__ placeholder)                     [shared]
   cashier_src.html     cashier page   (markers /*CALCCORE*/ /*AUTOUPDATE*/)
   checkin_src.html     check-in page  (markers /*CKCORE*/  /*AUTOUPDATE*/)
   score_src.html       live scoring   (markers /*GOLFCORE*/ /*AUTOUPDATE*/)
   gamecast_src.html    GameCast: follow a game live, read-only, no group ID (markers /*GOLFCORE*/ /*AUTOUPDATE*/)
   survey_src.html      public survey page (marker /*AUTOUPDATE*/ only)
-build.sh               → index.html, cashier.html, checkin.html, score.html, gamecast.html, survey.html, version.json (repo root)
+  member_src.html      the member portal: sign in by e-mail link, balance, statements, pay online, autopay (markers /*PDFFONTS*/ /*BILLCORE*/ /*AUTOUPDATE*/)
+build.sh               → index.html, cashier.html, checkin.html, score.html, gamecast.html, survey.html, member.html, version.json (repo root)
 ```
 `index.html` = `head.html` + one `<script>` of the modules **in the order listed in `build.sh`** + `boot();`.
 Everything shares one global scope (no modules/imports) — later files may call earlier files' functions, and
@@ -335,6 +338,7 @@ Tournament = { id, name, season, days, startDate, field:[{id,memberId,team,paid,
 | `golf_events` (+ `wrap`), `golf_scores` + RPC `golf_event`, `golf_join`, `golf_submit`, `golf_wrap`, `hub_key_wrap` | public live scoring (`golf-setup.sql`) and the Finish tab's wrap-up (`wrap-setup.sql`). `public.org` names the owning organization. |
 | `survey_share` (sid, tenant, org, token, status, doc), `survey_responses` (id, tenant, org, sid, answers, day) + RPC `survey_get(p_token)`, `survey_submit(p_token,p_answers)`, `hub_key_survey`, `hub_key_survey_results` | surveys (`survey-setup.sql`): the share row is what the public page shows; a response is answers + the **day** only — no user, e-mail, IP or device, ever. |
 | `acct_items`, `acct_statements` + `can_staff(p_tenant)` | member accounts & billing (`billing-setup.sql`): the club's ledger, staff only. |
+| `member_users`, `tenants.stripe_account/stripe_status` + RPC `member_me(p_tenant)`, `member_autopay_off(p_tenant)` | the member portal and online payments (`member-setup.sql`); Edge Functions `mail`, `stripe`, `stripe-webhook`. |
 | `hub_keys` (org_id, key_hash, label, revoked_at) + RPC `hub_key_org/read/write/people/golf_event/golf_delete/score/share` | admin links (`admin-links-setup.sql`): security-definer functions that act for exactly one organization. |
 | `mm_tournament` | the retired Member-Member app's row (`supabase-setup.sql`). Archive only — no hub code reads or writes it. |
 
@@ -490,30 +494,60 @@ competition, **Follow** a player (highlights, feed filtered, hole panel on their
 `liveComps()` filters `live===false` everywhere. Links: the hub's game page (Live scoring card), the Golf event page, the
 quick setup's share step (`gamecastLink(ev)` in golf.js). `tests/test_score.py` opens it against the fake; smoke renders it.
 
-### Member accounts & billing (`billing.js`, `billing-setup.sql`, module `billing`, `tests/test_billing.py`)
-**Each club bills its own members; Flagstick bills the club** (the owner, Oct 2026) — so there is no payment processor in
-Flagstick: the club's ledger lives here, the club collects the way it always has (its own terminal, checks, ACH, cash) and the
-office records it. The first piece of the Club-management tier. Rows live in real tables, not the organization documents:
-`acct_items` (one row per **charge / payment / credit** on a member: `member_id` = the directory person, `source` dues | fnb |
-proshop | tee | facility | lesson | fee | manual, `ref` = the source record, `amount` always positive — `kind` gives the sign,
-`method` + `reference` on payments, `posted` date, `void_at`/`void_reason` — a void is never a delete) and `acct_statements`
-(one row per member per run: period, opening, charges, payments, closing, due, `run_id`). RLS = `can_staff(tenant)` (role
-`staff` in `tenant_users`, or a Flagstick admin): board logins, scoped logins and admin links never see it (`acctOn()` =
-club hub + `hasModule('billing')` + not key mode + not scoped; the nav item and both pages obey it). `ACCT` caches the
-ledger per visit (reloaded in the background when older than 20 s — other staff post too); local mode (tests, file://)
-keeps the same shapes in localStorage (`acctKey()`). `acctPost(o)` is the one way anything lands on an account;
-`acctVoid(item, reason)`. **Dues collection → the account**: *Put on account* posts the association's charge once (`acctPostDues`,
-`ref` = the dues charge id) and *Collected* posts the matching payment once (`acctCollectDues`) — the club has the money, the
-association is credited in its own books as before. Pages: **Member accounts** (`vAccounts`: outstanding / credits / this
-month, Owing · In credit · With activity · Everyone, search by name / number / e-mail, Post charge, Record payment, Run
-statements, Export balances CSV, Settings = due days + the message on statements, in `CLUB.billing`) and the **account**
-(`vAccount`: newest first with a running balance, void with a reason via prompt, Credit, Statement PDF, the member's
-statements). **Run statements** closes a period for everyone with a balance or activity (period end defaults to the last day
-of the previous month; each member's statement starts the day after their last one, or at their first item), saves the rows
-and downloads one branded PDF with a page per member (`statementsPDF`: band, account block, balance due, the period's items
-with a running balance, closing line, the club's message). `openDrawer` now awaits an async `save` (the Save button is
-disabled until it lands). Coming next in this tier: bookings (tee sheet, courts, pools, lessons — needs member sign-in) and
-POS (F&B + pro shop) posting to these accounts.
+### Member accounts & billing (`billing.js`, `billcore.js`, `billing-setup.sql`, `member-setup.sql`, module `billing`, `tests/test_billing.py`)
+**Flagstick is the club's billing system (replacing Club Essentials); each club bills its own members, Flagstick bills the
+club** (the owner, Oct 2026). The club's accounts receivable live in real tables, staff only: `acct_items` (one row per
+**charge / payment / credit**: `member_id` = the directory person, `item` = the catalog item it was billed as, `source`, `gl`,
+`amount` = the total with `tax` and `svc` (service charge) broken out, `ref` = the source record / idempotency key, `method` +
+`reference` on payments, `posted`, `void_at`/`void_reason` — a void is never a delete), `acct_statements` (one row per member
+per run: period, opening, charges, payments, closing, due, `run_id`, `sent_at`) and `member_users` (who has signed in to the
+portal, autopay and the card on file). RLS = `can_staff(tenant)`; board logins, scoped logins and admin links never see any of
+it (`acctOn()`). `ACCT` caches the ledger per visit (background reload after 20 s); local mode keeps the same shapes in
+localStorage. `acctPost(o)` is the one way anything lands on an account.
+- **Setup in `CLUB.billing`** (`acctSettings()`): `items` (the catalog: `DEFAULT_ITEMS` dues, cart, locker, trail, capital, F&B,
+  unspent minimum, pro shop, guest, tee, facility, lesson, finance charge, late fee, other — each with `source`, `gl`,
+  `taxable`, `svc`), `classes` (membership classes: `charges:[{itemId, amount, every month|quarter|year, month}]`,
+  `minimum:{amount, every}`), `tax.rate`, `svc.rate`, `finance:{pct,min}`, `lateFee.amount`, `dueDays`, `message`, `gl`
+  (AR, cash, tax payable, service charge, credits), `runs` (billing runs done), `online` (the Stripe snapshot). A person
+  carries `p.billing = {class, status active|loa|suspended|resigned, since, until}` (`pBilling`; the Directory editor and
+  the account page's Membership drawer).
+- **Money math**: `chargeFor(itemId, base)` → `{amount, tax, svc, net}` (service charge on F&B, tax on net + service where
+  taxable). **Run monthly billing** (`billingPlan(ym)` / `runBilling`): every class charge due in the month (`dueThisMonth`)
+  to every billable member (`billable`: a class, not Inactive, not on leave, resigned only through `until`), prorated by days
+  (`prorate`) for a mid-month join or resignation, plus **unspent F&B minimums** for periods that closed the month before
+  (spend = net F&B charges; the minimum itself prorated by the member's share of the period); idempotent by `ref`
+  (`run:<ym>:<charge id>:<member>`, `min:<period>:<member>`). **Aging** (`agingOf`): payments and credits settle the oldest
+  charges first (FIFO), the rest bucketed current / 31–60 / 61–90 / 90+. **Run statements** first posts `lateCharges()` —
+  a finance charge (`finance.pct` on what is still owed from the previous statement after its due date) and the late fee,
+  dated the period end, refs `fc:`/`lf:<statement id>` — then one statement per member with a balance or activity
+  (`buildStatement`), one PDF with a page per member (`statementsPDF` → `statementPage` in **billcore.js**, shared with
+  the portal), optionally e-mails each (`mailStatements` → Edge Function **`mail`**, Resend; `sent_at`) and charges autopay
+  cards (`autopayRun`). **GL export** (`glJournal` / `glExportCSV`): a month's journal — AR debit and item revenue / service
+  charge / sales tax credits per charge, cash against AR per payment, credits as adjustments — with a summary by account.
+- **Pages**: Member accounts (`vAccounts`: outstanding, past due by bucket, charged / received this month; Owing · Past due ·
+  In credit · With activity · Everyone; search; Post charge (item picker with the tax / service preview), Record payment,
+  Run monthly billing, Run statements, Export balances (with aging columns), GL export, Billing setup), the account
+  (`vAccount`: aging on the balance, Membership, running ledger with tax / service detail, void with a reason, statements,
+  e-mail the latest), **Billing setup** (`vBillSetup`: Online payments & the member portal card, classes, items, Rates &
+  accounts, Statement rules).
+- **Dues collection → the account**: *Put on account* posts the association's charge once (`acctPostDues`), *Collected* the
+  matching payment once (`acctCollectDues`); the association is credited in its own books as before.
+- **The member portal** (`member_src.html` → `member.html`, markers `/*PDFFONTS*/` `/*BILLCORE*/` `/*AUTOUPDATE*/`): a member
+  signs in with a one-time e-mail link (Supabase Auth OTP, no password; the e-mail must be on the club directory);
+  `member_me(tenant)` (security definer) returns only that member's account — balance, activity, statements (PDF built in
+  the browser with `statementPage`), autopay state, and `online` (whether the club takes payments). **Online payments** go
+  to the **club's own Stripe account** (Stripe Connect, Standard): Billing setup → *Connect with Stripe* (`stripeConnect`
+  → Edge Function **`stripe`** `connect` → onboarding link; `status` refreshes `tenants.stripe_status` and the hub's
+  `b.online`); the portal's Pay / Other amount / Set up autopay call `pay` / `setup` (Stripe Checkout, card or US bank
+  account; `pay` with "save this card" sets `setup_future_usage`), `member_autopay_off` turns it off; the **`stripe-webhook`**
+  function (no JWT, signature-checked, listens to connected-account events) posts each `payment_intent.succeeded` as a
+  payment once (`ref` = `stripe:<pi>`), saves the card for autopay, posts refunds; `autopay_run` (staff, from Run
+  statements) charges each autopay member's balance due off-session. Flagstick takes no application fee. Secrets:
+  `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `RESEND_API_KEY`, `MAIL_FROM` (docs/tenancy.md §6). Without the keys the
+  functions answer "not configured" and the hub / portal say so; the fake (`_harness.py`) emulates `member_me`,
+  `member_autopay_off`, a `mail` that records what it sent and a `stripe` that is never configured.
+- Coming next in this tier: POS (F&B + pro shop posting to these accounts, minimums from real spend) and bookings (tee
+  sheet, courts, pools, lessons) on the member sign-in built here.
 
 ### Other
 Checklist (95-task 2026 template, assignees from members/board, notes, print). Golf (courses, WHS, flights,

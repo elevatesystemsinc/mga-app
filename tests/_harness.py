@@ -16,7 +16,7 @@ async def local(pg):
 def page(name): return 'file://'+os.path.join(ROOT,name)
 
 class FakeDB:
-    def __init__(self): self.rows={}; self.writes=collections.Counter(); self.reads=0; self.tenancy=False; self.admin=False; self.user_tenants=['wccc']; self.grants=None; self.me='u-board'; self.auth_users=[]; self.fn=True
+    def __init__(self): self.rows={}; self.writes=collections.Counter(); self.reads=0; self.tenancy=False; self.admin=False; self.user_tenants=['wccc']; self.grants=None; self.me='u-board'; self.auth_users=[]; self.fn=True; self.mails=[]
     # portal-setup.sql: a login (auth user + tenant_users row). role 'staff' | 'org'; orgs; manage
     def seed_login(self,email,tenant=None,role='staff',orgs=(),manage=False,name='',admin=False):
         uid='u-'+email; self.auth_users.append({'id':uid,'email':email,'password':'pw','created_at':'2026-01-01T00:00:00Z','last_sign_in_at':None,'confirmed':True,'name':name})
@@ -69,6 +69,22 @@ class FakeDB:
             grants=self.grants if self.grants is not None else [{'tenant':r['tenant'],'role':r['role'],'orgs':r['orgs'],'manage':r.get('manage',False),'name':r.get('name','')} for r in self._rows('tenant_users') if r['user_id']==self.me]
             tenants=sorted({g['tenant'] for g in grants}|set(self.user_tenants)) if self.grants is None and not self._rows('tenant_users') else sorted({g['tenant'] for g in grants})
             return json.dumps({'data':{'admin':self.admin,'tenants':tenants,'grants':grants,'user_id':self.me,'email':'board@test'},'error':None})
+        if fn=='member_me':
+            me=next((u for u in self.auth_users if u['id']==self.me),None); em=(me or {}).get('email','').lower()
+            club=self.get('mga_hub','club',a['p_tenant']) or {}
+            m=next((x for x in club.get('members',[]) if str(x.get('email','')).lower()==em),None)
+            if not em or not m: return json.dumps({'data':{'member':None,'reason':'not a member' if em else 'not signed in','club':club.get('name')},'error':None})
+            rows=self._rows('member_users'); u=next((r for r in rows if r['tenant']==a['p_tenant'] and r['member_id']==m['id']),None)
+            if not u: u={'tenant':a['p_tenant'],'member_id':m['id'],'email':em,'user_id':self.me,'autopay':False,'stripe_customer':None,'stripe_pm':None,'pm_label':None,'created_at':'2026-10-26T00:00:00Z','last_seen':None}; rows.append(u)
+            u['last_seen']='2026-10-26T12:00:00Z'
+            items=sorted([i for i in self._rows('acct_items') if i.get('tenant','wccc')==a['p_tenant'] and i['member_id']==m['id'] and not i.get('void_at')],key=lambda i:(i.get('posted',''),i.get('created_at','')))
+            st=sorted([x for x in self._rows('acct_statements') if x.get('tenant','wccc')==a['p_tenant'] and x['member_id']==m['id']],key=lambda x:x['period_end'],reverse=True)
+            t=next((t for t in self._rows('tenants') if t['slug']==a['p_tenant']),{})
+            return json.dumps({'data':{'member':{k:m.get(k) for k in ('id','first','last','memberNo','email','address1','city','state','zip','status')},'club':club.get('name'),'message':(club.get('billing') or {}).get('message'),'items':items,'statements':st,'autopay':u['autopay'],'pm_label':u['pm_label'],'online':bool(t.get('stripe_account')) and bool((t.get('stripe_status') or {}).get('charges_enabled'))},'error':None})
+        if fn=='member_autopay_off':
+            for r in self._rows('member_users'):
+                if r['tenant']==a['p_tenant'] and r.get('user_id')==self.me: r['autopay']=False; r['stripe_pm']=None; r['pm_label']=None
+            return json.dumps({'data':True,'error':None})
         if fn=='scoped_read':
             g=self._my_grant(a['p_tenant']); d=self.get('mga_hub',a['p_id'],a['p_tenant'])
             if self.admin or (g and (g['role']=='staff' or a['p_id'] in g['orgs'])): self.reads+=1; return json.dumps({'data':d,'error':None})
@@ -181,7 +197,10 @@ class FakeDB:
             return json.dumps({'data':True,'error':None})
         if fn in('hub_key_golf_event','hub_key_golf_delete','hub_key_score','hub_key_share'): return json.dumps({'data':True,'error':None})
         return err('unknown function '+fn)
-    def _fn(self,name,b):   # supabase/functions/admin-users, in miniature
+    def _fn(self,name,b):   # supabase/functions/admin-users, in miniature; mail records what was sent; stripe is never configured here
+        if name=='mail' and self.fn:
+            self.mails.append(b); return json.dumps({'data':{'ok':True,'id':'m-'+str(len(self.mails))},'error':None})
+        if name=='stripe' and self.fn: return json.dumps({'data':{'error':'not configured: set STRIPE_SECRET_KEY'},'error':None})
         if name!='admin-users' or not self.fn: return json.dumps({'data':None,'error':{'name':'FunctionsFetchError','message':'Failed to send a request to the Edge Function'}})
         act=b.get('action'); email=str(b.get('email','')).strip().lower()
         is_admin=self.admin; g=self._my_grant(b.get('tenant')) if b.get('tenant') else None

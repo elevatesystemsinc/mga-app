@@ -7192,6 +7192,38 @@ async function payoutsPDF(t,opt){
   doc.save(`${(t.name||'Tournament').replace(/[^\w]+/g,'-')}-calcutta-${AM?'payouts':'winners'}.pdf`); toast(AM?'Payouts PDF downloaded':'Winners PDF downloaded');
 }
 
+/* ============ billcore — the member statement PDF, shared by the hub and the member portal ============
+   statementPage(doc, ctx) draws one statement on the current page. ctx = {club, name, lines:[address lines], s:{period_start,
+   period_end, due, opening, charges, payments, closing, issued_at}, items:[{posted, descr, kind, amount, method, reference}],
+   msg, crest (PNG data URL or null), idx, n}. bcFonts(doc) registers the brand fonts from PDF_FONTS. Pure: no app globals. */
+const BC_NAVY=[15,42,56],BC_GOLD=[199,161,58],BC_GOLDL=[216,183,95],BC_GOLDDK=[126,95,26],BC_IVORY=[251,250,245],BC_INK=[20,34,43],BC_MUTED=[86,98,106],BC_RED=[161,64,43],BC_GREEN=[31,107,74];
+const BC_METHOD={card:'Card',check:'Check',ach:'ACH / bank',cash:'Cash',other:'Other'};
+const bcFmt=v=>{ const x=parseFloat(v)||0; return (x<0?'−$':'$')+Math.abs(x).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}); };
+const bcDate=iso=>iso?new Date(String(iso).slice(0,10)+'T12:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}):'—';
+const bcSign=i=>i.kind==='charge'?(parseFloat(i.amount)||0):-(parseFloat(i.amount)||0);
+function bcFonts(doc){ [['ps400','PS-400.ttf','PublicSans','normal'],['ps700','PS-700.ttf','PublicSans','bold'],['ps800','PS-800.ttf','PublicSansXB','normal'],['cg700','CG-700.ttf','Cormorant','bold']].forEach(([k,f,fam,st])=>{ doc.addFileToVFS(f,PDF_FONTS[k]); doc.addFont(f,fam,st); }); }
+function statementPage(doc,ctx){
+  const L=40,R2=572,W=612,H=792, s=ctx.s, font=(f,st,z,col)=>{ doc.setFont(f,st); doc.setFontSize(z); doc.setTextColor(...col); };
+  doc.setFillColor(...BC_IVORY); doc.rect(0,0,W,H,'F');
+  doc.setFillColor(...BC_GOLD); doc.roundedRect(L,32,R2-L,82,8,8,'F'); doc.setFillColor(...BC_NAVY); doc.roundedRect(L,32,R2-L,78,8,8,'F'); doc.rect(L,32+66,R2-L,8,'F');
+  if(ctx.crest) doc.addImage(ctx.crest,'PNG',L+16,42,54*850/1024,54);
+  font('PublicSansXB','normal',6.8,BC_GOLDL); doc.text(String(ctx.club||'').toUpperCase(),L+76,56,{charSpace:1.2});
+  font('Cormorant','bold',24,[255,255,255]); doc.text('Member statement',L+76,80);
+  font('PublicSans','normal',8.4,[214,218,220]); doc.text(`${bcDate(s.period_start)} – ${bcDate(s.period_end)} · due ${bcDate(s.due)}`,L+76,96);
+  let y=140; font('PublicSansXB','normal',7.4,BC_GOLDDK); doc.text('ACCOUNT',L,y,{charSpace:1.1}); doc.text('BALANCE DUE',R2,y,{align:'right',charSpace:1.1}); y+=6; doc.setDrawColor(...BC_GOLD); doc.setLineWidth(1); doc.line(L,y,R2,y); y+=16;
+  font('PublicSans','bold',12,BC_INK); doc.text(ctx.name||'Member',L,y); font('Cormorant','bold',26,s.closing>0.004?BC_RED:BC_INK); doc.text(bcFmt(Math.max(0,s.closing)),R2,y+4,{align:'right'});
+  font('PublicSans','normal',8.6,BC_MUTED); const lines=(ctx.lines||[]).filter(Boolean); lines.forEach((t,i)=>doc.text(t,L,y+14+i*11));
+  if(s.closing<-0.004){ font('PublicSans','normal',8.6,BC_GREEN); doc.text(`Credit on account ${bcFmt(-s.closing)} — nothing due`,R2,y+16,{align:'right'}); }
+  y+=14+Math.max(lines.length,2)*11+18;
+  font('PublicSansXB','normal',7.4,BC_GOLDDK); doc.text('THIS PERIOD',L,y,{charSpace:1.1}); y+=6; doc.line(L,y,R2,y); y+=12;
+  const col=(txt,x,al)=>doc.text(txt,x,y,{align:al||'left'}); font('PublicSans','bold',7.6,BC_MUTED); col('DATE',L); col('DESCRIPTION',L+64); col('CHARGES',R2-110,'right'); col('PAYMENTS',R2-36,'right'); col('BALANCE',R2,'right'); y+=10;
+  const row=(d,t,c,pm,b,bold)=>{ if(y>H-120){ doc.addPage(); doc.setFillColor(...BC_IVORY); doc.rect(0,0,W,H,'F'); y=60; } font('PublicSans',bold?'bold':'normal',9,BC_INK); doc.text(d,L,y); doc.text(doc.splitTextToSize(t,R2-150-(L+64))[0]||'',L+64,y); doc.text(c,R2-110,y,{align:'right'}); doc.text(pm,R2-36,y,{align:'right'}); font('PublicSans','bold',9,BC_INK); doc.text(b,R2,y,{align:'right'}); y+=14; };
+  let run=parseFloat(s.opening)||0; row('','Balance forward','','',bcFmt(run),true);
+  (ctx.items||[]).forEach(i=>{ run=Math.round((run+bcSign(i))*100)/100; row(new Date(String(i.posted).slice(0,10)+'T12:00').toLocaleDateString('en-US',{month:'short',day:'numeric'}),`${i.descr||''}${i.kind==='payment'&&i.method?' · '+(BC_METHOD[i.method]||i.method)+(i.reference?' '+i.reference:''):''}`,i.kind==='charge'?bcFmt(i.amount):'',i.kind!=='charge'?bcFmt(i.amount):'',bcFmt(run)); });
+  y+=4; doc.setDrawColor(...BC_GOLD); doc.line(L,y,R2,y); y+=14; font('PublicSans','bold',9.5,BC_INK); doc.text(`Charges ${bcFmt(s.charges)} · Payments & credits ${bcFmt(s.payments)}`,L,y); doc.text(`Closing balance ${bcFmt(s.closing)}`,R2,y,{align:'right'}); y+=24;
+  if(ctx.msg){ font('PublicSans','normal',8.6,BC_MUTED); doc.splitTextToSize(ctx.msg,R2-L).forEach(t=>{ doc.text(t,L,y); y+=11; }); }
+  font('PublicSans','normal',7,BC_MUTED); doc.text(`${ctx.club||''} · statement issued ${bcDate(s.issued_at)} · page ${(ctx.idx||0)+1} of ${ctx.n||1}`,W/2,H-28,{align:'center'});
+}
 /* ============ Member accounts & billing (module 'billing' — the club hub, staff only) ============
    Each club bills its own members; Flagstick bills the club. So this is the club's ledger: every member has an
    account, every source of money (dues, food & beverage, the pro shop, tee times, facilities, lessons, fees) posts a
@@ -7199,7 +7231,7 @@ async function payoutsPDF(t,opt){
    Run statements closes a period for everyone. Rows live in acct_items / acct_statements (billing-setup.sql), not in
    the organization documents — many staff, many rows. Local mode (tests, file://) keeps the same shapes in
    localStorage. Board logins and admin links never see any of it. */
-const ACCT={items:null,stmts:null,loading:false,err:'',at:0};
+const ACCT={items:null,stmts:null,users:[],loading:false,err:'',at:0};
 const SOURCES=[['dues','Dues'],['fnb','Food & beverage'],['proshop','Pro shop'],['tee','Tee time'],['facility','Facility'],['lesson','Lesson'],['fee','Fee'],['manual','Other']];
 const SOURCE_NAME=Object.fromEntries(SOURCES);
 const METHODS=[['card','Card'],['check','Check'],['ach','ACH / bank'],['cash','Cash'],['other','Other']];
@@ -7216,7 +7248,8 @@ async function acctLoad(force){
   try{
     if(!acctCloud()){ const L=acctLocalRead(); ACCT.items=L.items; ACCT.stmts=L.stmts; }
     else { const a=await tq(sb.from('acct_items').select('*')); const b=await tq(sb.from('acct_statements').select('*'));
-      if(a.error) throw a.error; if(b.error) throw b.error; ACCT.items=a.data||[]; ACCT.stmts=b.data||[]; }
+      if(a.error) throw a.error; if(b.error) throw b.error; ACCT.items=a.data||[]; ACCT.stmts=b.data||[];
+      const u=await tq(sb.from('member_users').select('*')); ACCT.users=u.error?[]:(u.data||[]); }
     ACCT.at=Date.now();
   }catch(e){ ACCT.err=/relation|does not exist|schema cache/i.test(e.message||'')?'Run billing-setup.sql in Supabase to turn on member accounts.':(e.message||'Couldn’t load the accounts'); ACCT.items=ACCT.items||[]; ACCT.stmts=ACCT.stmts||[]; }
   ACCT.loading=false;
@@ -7280,7 +7313,7 @@ function acctSettings(){
   b.items.forEach(x=>{ if(!x.source) x.source='manual'; if(x.gl==null) x.gl=''; });
   b.classes=b.classes||[]; b.classes.forEach(c=>{ c.charges=c.charges||[]; c.minimum=c.minimum||{amount:0,every:'month'}; });
   b.tax=b.tax||{rate:0}; b.svc=b.svc||{rate:0}; b.finance=b.finance||{pct:0,min:0}; b.lateFee=b.lateFee||{amount:0};
-  b.gl=Object.assign({ar:'1200',cash:'1000',tax:'2300',svc:'4150',credit:'4950'},b.gl||{}); b.runs=b.runs||[];
+  b.gl=Object.assign({ar:'1200',cash:'1000',tax:'2300',svc:'4150',credit:'4950'},b.gl||{}); b.runs=b.runs||[]; b.online=b.online||{connected:false,charges_enabled:false,at:''};
   return b;
 }
 const itemOf=id=>acctSettings().items.find(x=>x.id===id);
@@ -7369,6 +7402,15 @@ async function mailStatements(list){ list=(list||[]).filter(s=>{ const p=personB
     const patch={sent_at:new Date().toISOString()}; await sb.from('acct_statements').update(patch).eq('id',s.id); Object.assign(s,patch); sent++; }
   if(fail){ toast(/not found|404|Failed to send a request|not configured/i.test(fail)?'The mail function isn’t deployed or has no key (docs/tenancy.md) — download the PDFs instead':'E-mail stopped: '+fail); }
   else toast(`${sent} statement${sent===1?'':'s'} e-mailed`); return sent; }
+/* ---- online payments (Stripe Connect through the `stripe` Edge Function; the member portal takes the payments) ---- */
+async function stripeFn(body){ if(!acctCloud()||!sb.functions) return {error:'Online payments work from the live site'}; try{ const {data,error}=await sb.functions.invoke('stripe',{body:Object.assign({tenant:TENANT,return:location.href.split('#')[0]},body)}); if(error) return {error:error.message||'failed'}; return data||{error:'no reply'}; }catch(e){ return {error:e.message||'failed'}; } }
+const stripeMsg=e=>/not configured|Failed to send a request|404|not found/i.test(e||'')?'Online payments aren’t switched on: Flagstick deploys the stripe function and sets its key (docs/tenancy.md).':e;
+async function stripeConnect(){ const r=await stripeFn({action:'connect'}); if(r.error){ toast(stripeMsg(r.error)); return; } if(r.url) location.href=r.url; }
+async function stripeStatus(quiet){ const b=acctSettings(); const r=await stripeFn({action:'status'}); if(r.error){ if(!quiet) toast(stripeMsg(r.error)); return; }
+  b.online={connected:!!r.connected,charges_enabled:!!(r.status&&r.status.charges_enabled),details_submitted:!!(r.status&&r.status.details_submitted),at:new Date().toISOString()}; persist(); if(!quiet) toast(b.online.charges_enabled?'Stripe is connected — members can pay online':b.online.connected?'Stripe account made — finish the onboarding to take payments':'Not connected'); render(); }
+async function autopayRun(){ const r=await stripeFn({action:'autopay_run'}); if(r.error){ toast(stripeMsg(r.error)); return null; } const res=r.results||[], ok=res.filter(x=>x.ok), bad=res.filter(x=>!x.ok);
+  toast(res.length?`Autopay: ${ok.length} charged (${fmt2(sum(ok,x=>x.amount))})${bad.length?' · '+bad.length+' failed':''}`:'No autopay member has a balance due'); await acctLoad(true); return res; }
+const portalLink=()=>(typeof SITE_BASE!=='undefined'&&SITE_BASE?SITE_BASE:location.origin+'/')+'member.html';
 /* ---------- pages ---------- */
 const stmtsOf=mid=>(ACCT.stmts||[]).filter(s=>s.member_id===mid).sort((a,b)=>String(b.period_end).localeCompare(String(a.period_end)));
 function vAccounts(m){
@@ -7406,7 +7448,7 @@ function vAccount(m){
   let run=0; const ledger=items.map(i=>{ if(!i.void_at) run=Math.round((run+itemSign(i))*100)/100; return Object.assign({},i,{run}); }).reverse();
   const bal=balanceOf(p.id), lastStmt=stmts[0], since=lastStmt?items.filter(i=>!i.void_at&&(i.posted||'')>lastStmt.period_end):items.filter(i=>!i.void_at), ag=agingOf(p.id);
   m.innerHTML=`<div class="crumb"><button id="acBack">Member accounts</button><span class="muted">/</span><span class="muted">${esc(memberName(p))}</span></div>
-    <div class="phead"><div><h1 class="h1">${esc(memberName(p))}</h1><div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">${p.memberNo?`<span class="chip navy">#${esc(p.memberNo)}</span>`:''}<span class="chip ${x.status==='active'?'ok':'warn'}">${cls?esc(cls.name):'No class'} · ${esc(BSTATUS_NAME[x.status]||x.status)}</span>${p.email?`<span class="chip">${esc(p.email)}</span>`:''}${p.phone?`<span class="chip">${esc(p.phone)}</span>`:''}</div></div>
+    <div class="phead"><div><h1 class="h1">${esc(memberName(p))}</h1><div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">${p.memberNo?`<span class="chip navy">#${esc(p.memberNo)}</span>`:''}<span class="chip ${x.status==='active'?'ok':'warn'}">${cls?esc(cls.name):'No class'} · ${esc(BSTATUS_NAME[x.status]||x.status)}</span>${p.email?`<span class="chip">${esc(p.email)}</span>`:''}${p.phone?`<span class="chip">${esc(p.phone)}</span>`:''}${(u=>u?`<span class="chip ${u.autopay?'ok':''}">${u.autopay?'Autopay · '+esc(u.pm_label||'card on file'):'Portal · signed in'}</span>`:'')((ACCT.users||[]).find(u=>u.member_id===p.id))}</div></div>
       <div class="actions"><button class="btn" id="acEdit">Membership</button><button class="btn" id="acStmt">${I.down}Statement PDF</button><button class="btn" id="acCredit">Credit</button><button class="btn" id="acPay2">Record payment</button><button class="btn pri" id="acCharge2">${I.plus}Post charge</button></div></div><div class="rule"></div>
     <div class="grid g3">${kpi('Balance',balTxt(bal),bal>0.004?`current ${fmt2(ag.cur)} · 31–60 ${fmt2(ag.d30)} · 61–90 ${fmt2(ag.d60)} · 90+ ${fmt2(ag.d90)}`:bal<-0.004?'the club owes the member':'settled',amtCls(bal))}${kpi('Since last statement',fmt2(sum(since.filter(i=>i.kind==='charge'),i=>i.amount)),`${since.filter(i=>i.kind==='charge').length} charges · ${fmt2(sum(since.filter(i=>i.kind!=='charge'),i=>i.amount))} received`)}${kpi('Last statement',lastStmt?fmt2(lastStmt.closing):'—',lastStmt?`${dateTxt(lastStmt.period_end)} · due ${dateTxt(lastStmt.due)}${lastStmt.sent_at?' · e-mailed':''}`:'none yet')}</div>
     <div class="card lg" style="overflow:hidden"><div class="cardhead"><div><h2 class="h2">Account</h2><span class="muted">Newest first · running balance on the right</span></div></div>
@@ -7445,6 +7487,8 @@ function vBillSetup(m){
   if(!acctOn()){ go('dash'); return; } const b=acctSettings(); const n=cid=>persons().filter(p=>pBilling(p).class===cid&&p.status!=='Inactive').length;
   m.innerHTML=`<div class="crumb"><button id="bsBack">Member accounts</button><span class="muted">/</span><span class="muted">Billing setup</span></div>`+head('Billing setup','Membership classes and what each one is charged, the items the club bills with their tax, service charge and ledger accounts, and the rules for statements.',btn('Statement rules','bsRules','')+btn('Rates & accounts','bsRates','')+btn('New class','bsNewC','pri',I.plus))+`
     <div class="grid g3">${kpi('Classes',b.classes.length,`${persons().filter(p=>pBilling(p).class&&p.status!=='Inactive').length} members in a class`)}${kpi('Sales tax',n0(b.tax.rate)+'%',`service charge ${n0(b.svc.rate)}% on F&B`)}${kpi('Finance charge',n0(b.finance.pct)+'% / month',`${n0(b.lateFee.amount)?fmt2(b.lateFee.amount)+' late fee · ':''}due ${b.dueDays} days after the statement`)}</div>
+    <div class="card"><div class="cardhead"><div><h2 class="h2">Online payments &amp; the member portal</h2><span class="muted">Members sign in with their e-mail at <b>${esc(portalLink())}</b> to see their account, statements and pay</span></div><div class="actions">${b.online.charges_enabled?'<button class="btn sm" id="bsSt">Refresh status</button>':b.online.connected?'<button class="btn sm pri" id="bsCon">Finish Stripe onboarding</button><button class="btn sm" id="bsSt">Refresh status</button>':'<button class="btn sm pri" id="bsCon">Connect with Stripe</button><button class="btn sm" id="bsSt">Check</button>'}</div></div>
+      <p class="hint" style="margin:0">${b.online.charges_enabled?`<span class="chip ok">Connected</span> Payments by card or bank account go straight to the club’s own Stripe account; each one lands on the member’s account here within seconds. ${(ACCT.users||[]).filter(u=>u.autopay).length} member${(ACCT.users||[]).filter(u=>u.autopay).length===1?'':'s'} on autopay — Run statements can charge their balance due.`:b.online.connected?'The Stripe account exists but onboarding isn’t finished — the club’s owner completes it (business details, bank account), then refresh.':'Connect the club’s Stripe account and members can pay their statements online, with autopay if they like. The club keeps its own merchant account; Flagstick never holds the money.'}</p></div>
     <div class="card"><div class="cardhead"><div><h2 class="h2">Membership classes</h2><span class="muted">What a member of each class is billed, and when</span></div></div>
       ${b.classes.length?`<div class="grid g2">${b.classes.map(c=>`<div class="card pad" style="box-shadow:none;border:1px solid var(--line)"><div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px"><div><b style="font-size:17px;color:var(--navy)">${esc(c.name)}</b><div class="muted" style="font-size:12.5px">${n(c.id)} member${n(c.id)===1?'':'s'} · ${fmt2(sum(c.charges.filter(ch=>ch.every==='month'),ch=>ch.amount))} a month</div></div><button class="btn sm" data-ec="${c.id}">Edit</button></div>
         <div style="margin-top:10px;font-size:13.5px">${c.charges.length?c.charges.map(ch=>`<div style="display:flex;justify-content:space-between;gap:10px;padding:4px 0;border-top:1px solid var(--line)"><span>${esc((itemOf(ch.itemId)||{}).name||ch.itemId)} <span class="muted">· ${ch.every==='month'?'monthly':ch.every==='quarter'?'quarterly from '+MONTHS_LONG[(ch.month||1)-1]:'yearly in '+MONTHS_LONG[(ch.month||1)-1]}</span></span><b>${fmt2(ch.amount)}</b></div>`).join(''):'<span class="muted">No charges yet</span>'}${n0(c.minimum.amount)?`<div style="display:flex;justify-content:space-between;gap:10px;padding:4px 0;border-top:1px solid var(--line)"><span>F&amp;B minimum <span class="muted">· ${c.minimum.every==='month'?'monthly':c.minimum.every==='quarter'?'quarterly':'yearly'}, unspent part billed</span></span><b>${fmt2(c.minimum.amount)}</b></div>`:''}</div></div>`).join('')}</div>`
@@ -7452,7 +7496,7 @@ function vBillSetup(m){
     <div class="card" style="overflow:hidden"><div class="cardhead"><div><h2 class="h2">Items the club bills</h2><span class="muted">Each with its revenue account, and whether tax and the service charge apply</span></div><div class="actions"><button class="btn sm" id="bsNewI">${I.plus}Item</button></div></div>
       <div class="t"><div class="tr th" style="grid-template-columns:minmax(140px,1.4fr) 130px 90px 70px 90px 60px"><span>Item</span><span>Kind</span><span>GL account</span><span>Tax</span><span>Service</span><span></span></div>
       ${b.items.map(x=>`<div class="tr" style="grid-template-columns:minmax(140px,1.4fr) 130px 90px 70px 90px 60px"><div class="cell2"><b>${esc(x.name)}</b></div><span class="muted">${esc(SOURCE_NAME[x.source]||x.source)}</span><span class="num">${esc(x.gl||'—')}</span><span>${x.taxable?'yes':'—'}</span><span>${x.svc?'yes':'—'}</span><span class="actions"><button class="ib" data-ei="${x.id}" aria-label="Edit">${I.edit}</button></span></div>`).join('')}</div></div>`;
-  $('bsBack').onclick=()=>go('accounts'); $('bsNewC').onclick=()=>classDrawer(null); $('bsNewI').onclick=()=>itemDrawer(null); $('bsRules').onclick=()=>statementRulesDrawer(); $('bsRates').onclick=()=>ratesDrawer();
+  $('bsBack').onclick=()=>go('accounts'); const bc=$('bsCon'); if(bc) bc.onclick=stripeConnect; const bst=$('bsSt'); if(bst) bst.onclick=()=>stripeStatus(false); $('bsNewC').onclick=()=>classDrawer(null); $('bsNewI').onclick=()=>itemDrawer(null); $('bsRules').onclick=()=>statementRulesDrawer(); $('bsRates').onclick=()=>ratesDrawer();
   m.querySelectorAll('[data-ec]').forEach(x=>x.onclick=()=>classDrawer(classOf(x.dataset.ec))); m.querySelectorAll('[data-ei]').forEach(x=>x.onclick=()=>itemDrawer(itemOf(x.dataset.ei)));
 }
 function classDrawer(c){ const b=acctSettings(); const d=c?clone(c):{id:uid(),name:'',charges:[],minimum:{amount:0,every:'month'}}; if(!d.charges.length&&!c) d.charges.push({id:uid(),itemId:'dues',amount:'',every:'month',month:1});
@@ -7488,7 +7532,7 @@ function runStatementsDrawer(){
   const b=acctSettings(), last=(ACCT.stmts||[]).slice().sort((a,b2)=>String(b2.period_end).localeCompare(String(a.period_end)))[0], defEnd=lastDayOfPrevMonth();
   openDrawer({kicker:'Member accounts',title:'Run statements',saveLabel:'Run statements',
     body:field('Period ends','rsEnd',last&&last.period_end>=defEnd?todayISO():defEnd,{type:'date',hint:last?`The last run closed ${dateTxt(last.period_end)}; this run starts the day after for everyone it covered.`:'The first run: each member’s statement starts at their first item.'})+
-      `<label class="check"><input type="checkbox" id="rsZero">Include members with no activity and a zero balance</label>${acctCloud()?`<label class="check"><input type="checkbox" id="rsMail">E-mail each statement to the member (those with an e-mail address)</label>`:''}<p class="hint">One statement per member with a balance or activity in the period, saved to their account, and one PDF with a page per member. ${n0(b.finance.pct)||n0(b.lateFee.amount)?`Past-due balances from the previous statement get ${n0(b.finance.pct)?n0(b.finance.pct)+'% finance charge':''}${n0(b.finance.pct)&&n0(b.lateFee.amount)?' and ':''}${n0(b.lateFee.amount)?'a '+fmt2(b.lateFee.amount)+' late fee':''} first. `:''}Due ${b.dueDays} days after the period ends (Billing setup → Statement rules).</p>`,
+      `<label class="check"><input type="checkbox" id="rsZero">Include members with no activity and a zero balance</label>${acctCloud()?`<label class="check"><input type="checkbox" id="rsMail">E-mail each statement to the member (those with an e-mail address)</label>`:''}${acctCloud()&&b.online.charges_enabled&&(ACCT.users||[]).some(u=>u.autopay)?`<label class="check"><input type="checkbox" id="rsAuto" checked>Charge autopay members’ cards on file for their balance due (${(ACCT.users||[]).filter(u=>u.autopay).length})</label>`:''}<p class="hint">One statement per member with a balance or activity in the period, saved to their account, and one PDF with a page per member. ${n0(b.finance.pct)||n0(b.lateFee.amount)?`Past-due balances from the previous statement get ${n0(b.finance.pct)?n0(b.finance.pct)+'% finance charge':''}${n0(b.finance.pct)&&n0(b.lateFee.amount)?' and ':''}${n0(b.lateFee.amount)?'a '+fmt2(b.lateFee.amount)+' late fee':''} first. `:''}Due ${b.dueDays} days after the period ends (Billing setup → Statement rules).</p>`,
     save:async()=>{ const end=fv('rsEnd'); if(!end){ toast('Pick the period end'); return false; }
       // 1. finance charges and late fees on what is still past due, so they land on this statement
       const B=acctBalances(), late=[]; for(const [mid] of B) late.push(...lateCharges(mid,end));
@@ -7503,37 +7547,15 @@ function runStatementsDrawer(){
       if(acctCloud()){ const {error}=await sb.from('acct_statements').insert(rows.map(trow)); if(error){ toast('Couldn’t save statements: '+error.message); return false; } }
       ACCT.stmts=(ACCT.stmts||[]).concat(rows); if(!acctCloud()) acctLocalWrite();
       toast(`${out.length} statement${out.length===1?'':'s'} run · ${fmt2(sum(out,s=>s.closing))} outstanding${late.length?' · '+late.length+' finance charge'+(late.length===1?'':'s'):''}`);
-      const mail=$('rsMail')&&$('rsMail').checked; await statementsPDF(out); if(mail) await mailStatements(rows); }});
+      const mail=$('rsMail')&&$('rsMail').checked, auto=$('rsAuto')&&$('rsAuto').checked; await statementsPDF(out); if(mail) await mailStatements(rows); if(auto) await autopayRun(); }});
 }
 async function statementsPDF(list,opt){ opt=opt||{};
   list=(list||[]).filter(Boolean); if(!list.length){ toast('No statement to print'); return null; }
   try{ await loadJsPDF(); }catch(e){ toast(e.message); return null; }
-  const crest=await crestPNG().catch(()=>null), doc=new window.jspdf.jsPDF({unit:'pt',format:'letter'});
-  [['ps400','PS-400.ttf','PublicSans','normal'],['ps700','PS-700.ttf','PublicSans','bold'],['ps800','PS-800.ttf','PublicSansXB','normal'],['cg700','CG-700.ttf','Cormorant','bold']].forEach(([k,f,fam,st])=>{ doc.addFileToVFS(f,PDF_FONTS[k]); doc.addFont(f,fam,st); });
-  const NAVY=[15,42,56],GOLD=[199,161,58],GOLDL=[216,183,95],GOLDDK=[126,95,26],IVORY=[251,250,245],INK=[20,34,43],MUTED=[86,98,106],RED=[161,64,43],GREEN=[31,107,74];
-  const L=40,R2=572,W=612,H=792, font=(f,s,z,col)=>{ doc.setFont(f,s); doc.setFontSize(z); doc.setTextColor(...col); };
+  const crest=await crestPNG().catch(()=>null), doc=new window.jspdf.jsPDF({unit:'pt',format:'letter'}); bcFonts(doc);
   const club=(CLUB&&CLUB.name)||CLUB_META.name, msg=acctSettings().message||'';
-  list.forEach((s,idx)=>{ if(idx) doc.addPage(); doc.setFillColor(...IVORY); doc.rect(0,0,W,H,'F');
-    const p=personById(s.member_id)||{}, items=s.items||liveItems().filter(i=>i.member_id===s.member_id&&(i.posted||'')>=s.period_start&&(i.posted||'')<=s.period_end).sort(byDate);
-    doc.setFillColor(...GOLD); doc.roundedRect(L,32,R2-L,82,8,8,'F'); doc.setFillColor(...NAVY); doc.roundedRect(L,32,R2-L,78,8,8,'F'); doc.rect(L,32+66,R2-L,8,'F');
-    if(crest) doc.addImage(crest,'PNG',L+16,42,54*850/1024,54);
-    font('PublicSansXB','normal',6.8,GOLDL); doc.text(String(club).toUpperCase(),L+76,56,{charSpace:1.2});
-    font('Cormorant','bold',24,[255,255,255]); doc.text('Member statement',L+76,80);
-    font('PublicSans','normal',8.4,[214,218,220]); doc.text(`${dateTxt(s.period_start)} – ${dateTxt(s.period_end)} · due ${dateTxt(s.due)}`,L+76,96);
-    let y=140; font('PublicSansXB','normal',7.4,GOLDDK); doc.text('ACCOUNT',L,y,{charSpace:1.1}); doc.text('BALANCE DUE',R2,y,{align:'right',charSpace:1.1}); y+=6; doc.setDrawColor(...GOLD); doc.setLineWidth(1); doc.line(L,y,R2,y); y+=16;
-    font('PublicSans','bold',12,INK); doc.text(memberName(p)||'Member',L,y); font('Cormorant','bold',26,s.closing>0.004?RED:INK); doc.text(fmt2(Math.max(0,s.closing)),R2,y+4,{align:'right'});
-    font('PublicSans','normal',8.6,MUTED); const lines=[p.memberNo?'Member #'+p.memberNo:'',p.address1||'',[p.city,p.state,p.zip].filter(Boolean).join(', '),p.email||''].filter(Boolean); lines.forEach((t,i)=>doc.text(t,L,y+14+i*11));
-    if(s.closing<-0.004){ font('PublicSans','normal',8.6,GREEN); doc.text(`Credit on account ${fmt2(-s.closing)} — nothing due`,R2,y+16,{align:'right'}); }
-    y+=14+Math.max(lines.length,2)*11+18;
-    font('PublicSansXB','normal',7.4,GOLDDK); doc.text('THIS PERIOD',L,y,{charSpace:1.1}); y+=6; doc.line(L,y,R2,y); y+=12;
-    const col=(txt,x,al)=>doc.text(txt,x,y,{align:al||'left'}); font('PublicSans','bold',7.6,MUTED); col('DATE',L); col('DESCRIPTION',L+64); col('CHARGES',R2-110,'right'); col('PAYMENTS',R2-36,'right'); col('BALANCE',R2,'right'); y+=10;
-    const row=(d,t,c,pm,b,bold)=>{ if(y>H-120){ doc.addPage(); doc.setFillColor(...IVORY); doc.rect(0,0,W,H,'F'); y=60; } font('PublicSans',bold?'bold':'normal',9,INK); doc.text(d,L,y); doc.text(doc.splitTextToSize(t,R2-150-(L+64))[0],L+64,y); doc.text(c,R2-110,y,{align:'right'}); doc.text(pm,R2-36,y,{align:'right'}); font('PublicSans','bold',9,INK); doc.text(b,R2,y,{align:'right'}); y+=14; };
-    let run=s.opening; row('',`Balance forward`,'','',fmt2(run),true);
-    items.forEach(i=>{ run=Math.round((run+itemSign(i))*100)/100; row(new Date(i.posted+'T12:00').toLocaleDateString('en-US',{month:'short',day:'numeric'}),`${i.descr||SOURCE_NAME[i.source]||''}${i.kind==='payment'&&i.method?' · '+(METHOD_NAME[i.method]||'')+(i.reference?' '+i.reference:''):''}`,i.kind==='charge'?fmt2(i.amount):'',i.kind!=='charge'?fmt2(i.amount):'',fmt2(run)); });
-    y+=4; doc.setDrawColor(...GOLD); doc.line(L,y,R2,y); y+=14; font('PublicSans','bold',9.5,INK); doc.text(`Charges ${fmt2(s.charges)} · Payments & credits ${fmt2(s.payments)}`,L,y); doc.text(`Closing balance ${fmt2(s.closing)}`,R2,y,{align:'right'}); y+=24;
-    if(msg){ font('PublicSans','normal',8.6,MUTED); doc.splitTextToSize(msg,R2-L).forEach(t=>{ doc.text(t,L,y); y+=11; }); }
-    font('PublicSans','normal',7,MUTED); doc.text(`${club} · statement issued ${dateTxt((s.issued_at||'').slice(0,10))} · page ${idx+1} of ${list.length}`,W/2,H-28,{align:'center'});
-  });
+  list.forEach((s,idx)=>{ if(idx) doc.addPage(); const p=personById(s.member_id)||{}, items=s.items||liveItems().filter(i=>i.member_id===s.member_id&&(i.posted||'')>=s.period_start&&(i.posted||'')<=s.period_end).sort(byDate);
+    statementPage(doc,{club,name:memberName(p)||'Member',lines:[p.memberNo?'Member #'+p.memberNo:'',p.address1||'',[p.city,p.state,p.zip].filter(Boolean).join(', '),p.email||''],s,items,msg,crest,idx,n:list.length}); });
   const name=list.length===1?`statement-${(memberName(personById(list[0].member_id)||{})||'member').replace(/\s+/g,'-').toLowerCase()}-${list[0].period_end}.pdf`:`statements-${list[0].period_end}.pdf`;
   if(opt.returnDoc) return doc;
   if(typeof deliverFile==='function'){ const blob=doc.output('blob'); await deliverFile(blob,name,'Statements'); } else doc.save(name); return doc;
@@ -7814,7 +7836,7 @@ async function resultsPDF(t,opt){
    page counts, and a reload is tried once per build — if the page that comes back is still the old one, the CDN
    hasn't caught up; wait a while before trying that build again. */
 (function(){
-  const ME='20261026215130', KEY='au_tried', RETRY=10*60*1000; let ready=false, lastCheck=0;
+  const ME='20261026221953', KEY='au_tried', RETRY=10*60*1000; let ready=false, lastCheck=0;
   const typing=()=>{ const a=document.activeElement; return a&&/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)&&a.value&&a.type!=='search'; };
   const safe=()=>!typing()&&(typeof window.__canReload!=='function'||window.__canReload());
   const tried=()=>{ try{ const [b,t]=(sessionStorage.getItem(KEY)||'').split('|'); return b?{build:b,at:+t||0}:null; }catch(_){ return null; } };

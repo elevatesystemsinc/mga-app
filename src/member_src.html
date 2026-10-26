@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0F2A38">
+<meta name="robots" content="noindex">
+<title>My account · Flagstick</title>
+<link rel="icon" href="favicon.png?v=3">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@600;700&family=Public+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script src="config.js"></script>
+<style>
+:root{--navy:#0F2A38;--gold:#C7A13A;--goldl:#D8B75F;--golddk:#7E5F1A;--paper:#F4F0E6;--ivory:#FBFAF5;--line:#E3DCC9;--muted:#56626A;--ink:#14222B;--pos:#1F6B4A;--neg:#B5443A;
+  --serif:'Cormorant Garamond',Georgia,serif;--sans:'Public Sans',system-ui,-apple-system,'Segoe UI',sans-serif}
+*{box-sizing:border-box} html,body{margin:0} [hidden]{display:none!important}
+body{font-family:var(--sans);background:var(--paper);color:var(--ink);font-size:16px;line-height:1.4;-webkit-font-smoothing:antialiased;font-variant-numeric:lining-nums}
+button,input{font:inherit;color:inherit} button{cursor:pointer}
+.top{background:radial-gradient(circle at 10% 40%,#1B3D50,var(--navy) 65%);color:#fff;padding:calc(14px + env(safe-area-inset-top,0px)) 18px 14px;display:flex;align-items:center;gap:14px;border-bottom:4px solid var(--gold)}
+.top img{width:44px;height:44px;object-fit:contain}
+.top .t{flex:1;min-width:0} .top b{display:block;font-family:var(--serif);font-size:24px;line-height:1.05;white-space:nowrap;overflow:hidden;text-overflow:ellipsis} .top small{color:#C9CFD2;font-size:12.5px;display:block}
+.top button{background:none;border:1px solid rgba(255,255,255,.35);color:#fff;border-radius:8px;height:34px;padding:0 12px;font-size:13px;font-weight:600}
+main{max-width:720px;margin:0 auto;padding:16px 14px 60px}
+.card{background:#fff;border:1px solid var(--line);border-radius:14px;padding:18px 18px 16px;margin-bottom:14px}
+h1{font-family:var(--serif);font-size:30px;line-height:1.05;margin:0 0 8px;color:var(--navy)} h2{font-family:var(--serif);font-size:24px;line-height:1.05;margin:0 0 10px;color:var(--navy)}
+p{margin:0;color:#2B3940} .muted{color:var(--muted)} .hint{font-size:13.5px;color:var(--muted);margin-top:8px}
+.lbl{display:block;font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--golddk);margin-bottom:6px}
+.inp{width:100%;height:48px;border:1.5px solid #CFC6AE;border-radius:10px;padding:0 14px;background:#fff;font-size:16px} .inp:focus{outline:none;border-color:var(--gold);box-shadow:0 0 0 3px rgba(199,161,58,.2)}
+.btn{height:48px;padding:0 20px;border-radius:12px;border:1.5px solid #CFC6AE;background:#fff;font-weight:700;font-size:15px;display:inline-flex;align-items:center;justify-content:center;gap:8px;color:var(--navy)}
+.btn.pri{background:var(--navy);border-color:var(--navy);color:#fff} .btn.sm{height:38px;padding:0 14px;font-size:13.5px;border-radius:9px} .btn:disabled{opacity:.55;cursor:default} .btn.w{width:100%}
+.bal{display:flex;justify-content:space-between;align-items:flex-end;gap:12px;flex-wrap:wrap}
+.bal .v{font-family:var(--serif);font-size:46px;line-height:1;font-weight:700;color:var(--navy)} .bal .v.neg{color:var(--neg)} .bal .v.pos{color:var(--pos)}
+.bal small{display:block;color:var(--muted);font-size:13.5px;margin-top:6px}
+.acts{display:flex;gap:10px;flex-wrap:wrap;margin-top:16px}
+.row{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:4px 14px;align-items:center;padding:11px 0;border-top:1px solid var(--line)} .row:first-of-type{border-top:none}
+.row b{font-size:15px;color:var(--navy);grid-column:1} .row small{display:block;color:var(--muted);font-size:12.5px}
+.row .a{font-weight:600;text-align:right;white-space:nowrap} .row .a.pay{color:var(--pos)} .row .r{font-weight:800;text-align:right;white-space:nowrap;min-width:84px}
+.row.s{grid-template-columns:minmax(0,1fr) auto} .row.s button{height:36px}
+.chip{display:inline-flex;align-items:center;height:26px;padding:0 10px;border-radius:999px;background:var(--ivory);border:1px solid var(--line);font-size:12.5px;font-weight:600}
+.chip.ok{background:#E3F0E8;border-color:#BFDCCB;color:var(--pos)}
+.auto{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+.pv{background:#F6ECCF;border:1px solid #E5CF8E;color:#5C4410;border-radius:10px;padding:10px 14px;font-size:13.5px;margin-bottom:14px}
+.toast{position:fixed;left:50%;bottom:30px;transform:translateX(-50%);background:var(--navy);color:#fff;padding:12px 18px;border-radius:10px;font-weight:600;z-index:60;box-shadow:0 6px 20px rgba(0,0,0,.25);max-width:92vw;text-align:center}
+.fs{display:flex;align-items:center;justify-content:center;gap:8px;margin-top:30px;color:var(--muted);font-size:11px;letter-spacing:.14em;text-transform:uppercase;font-weight:800} .fs img{width:18px;height:18px}
+.sheet{position:fixed;inset:0;background:rgba(15,42,56,.55);display:flex;align-items:flex-end;justify-content:center;z-index:50} .sheet>div{background:#fff;border-radius:16px 16px 0 0;padding:20px 18px calc(20px + env(safe-area-inset-bottom,0px));width:100%;max-width:560px}
+@media (max-width:400px){ h1{font-size:27px} .bal .v{font-size:40px} }
+</style>
+</head>
+<body>
+<header class="top"><img src="flagstick-crest-light.svg" alt="Flagstick"><div class="t"><b id="hTitle">My account</b><small id="hSub">Member account</small></div><button id="hOut" hidden>Sign out</button></header>
+<main id="main"><div class="card"><p class="muted">Loading…</p></div></main>
+<script>
+/*PDFFONTS*/
+/*BILLCORE*/
+const $=id=>document.getElementById(id);
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const CFG=window.MM_CONFIG||{}; const sb=(CFG.url&&CFG.anonKey&&window.supabase)?window.supabase.createClient(CFG.url,CFG.anonKey):null;
+const qs=new URLSearchParams(location.search); let TENANT=null, ME=null, BUSY=false;
+const fmt=bcFmt, dt=bcDate; const sign=i=>i.kind==='charge'?(parseFloat(i.amount)||0):-(parseFloat(i.amount)||0);
+function toast(m){ const d=document.createElement('div'); d.className='toast'; d.textContent=m; document.body.appendChild(d); setTimeout(()=>d.remove(),2800); }
+function msg(title,text,extra){ $('main').innerHTML=`<div class="card"><h1>${esc(title)}</h1><p class="muted">${esc(text)}</p>${extra||''}</div>`; }
+const here=()=>location.origin+location.pathname+(qs.get('tenant')?'?tenant='+encodeURIComponent(qs.get('tenant')):'');
+async function resolveTenant(){ try{ const {data,error}=await sb.rpc('tenant_lookup',{p_host:qs.get('tenant')||location.hostname}); if(!error&&data&&data.slug){ TENANT=data.slug; $('hSub').textContent=data.name+' · Member account'; document.title='My account · '+data.name; } }catch(_){} }
+async function boot(){
+  if(!sb) return msg('Not connected','The member portal is not available right now.');
+  await resolveTenant(); if(!TENANT) return msg('No club at this address','Open the member portal from your club’s own address.');
+  const {data:{session}}=await sb.auth.getSession();
+  if(qs.get('paid')) { history.replaceState(null,'',here()); toast('Thank you — your payment is in'); }
+  if(qs.get('autopay')) { history.replaceState(null,'',here()); toast('Autopay is set up'); }
+  if(!session) return signIn();
+  await load();
+}
+function signIn(sent){ $('hOut').hidden=true;
+  $('main').innerHTML=`<div class="card"><h1>Sign in</h1><p class="muted">Enter the e-mail address the club has for you. We’ll send a one-time link — no password to remember.</p>
+    <div style="margin-top:16px"><span class="lbl">E-mail</span><input class="inp" id="siE" type="email" inputmode="email" autocomplete="email" placeholder="you@example.com" ${sent?'disabled':''}></div>
+    <div class="acts"><button class="btn pri w" id="siGo" ${sent?'disabled':''}>${sent?'Link sent — check your e-mail':'Send me a sign-in link'}</button></div>
+    ${sent?'<p class="hint">Open the link on this device. It works once and expires in an hour. Nothing in your inbox? Check spam, or ask the club office which e-mail they have on file.</p>':''}</div><div class="fs"><img src="flagstick-crest.svg" alt="">Flagstick</div>`;
+  $('siGo').onclick=async()=>{ const email=$('siE').value.trim().toLowerCase(); if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)){ toast('Enter your e-mail address'); return; }
+    $('siGo').disabled=true; const {error}=await sb.auth.signInWithOtp({email,options:{emailRedirectTo:here(),shouldCreateUser:true}}); if(error){ $('siGo').disabled=false; toast(error.message||'Couldn’t send the link'); return; } signIn(true); };
+}
+async function load(){
+  const {data,error}=await sb.rpc('member_me',{p_tenant:TENANT});
+  if(error){ if(/function|schema cache/i.test(error.message||'')) return msg('Not ready','The member portal is not switched on for this club yet.'); return msg('Something went wrong',error.message||''); }
+  if(!data||!data.member){ $('hOut').hidden=false; const {data:{session}}=await sb.auth.getSession(); return msg('We couldn’t find your account',`${(session&&session.user&&session.user.email)||'This e-mail'} isn’t on ${data&&data.club?data.club+'’s':'the club’s'} directory. Ask the club office to add it, then sign in again.`,'<div class="acts"><button class="btn" id="out2">Sign out</button></div>'),($('out2').onclick=signOut); }
+  ME=data; $('hOut').hidden=false; $('hTitle').textContent=[ME.member.first,ME.member.last].filter(Boolean).join(' ')||'My account'; render();
+}
+async function signOut(){ await sb.auth.signOut(); ME=null; signIn(); }
+function render(){
+  const items=(ME.items||[]).slice(), bal=Math.round(items.reduce((t,i)=>t+sign(i),0)*100)/100, st=ME.statements||[], last=st[0];
+  let run=0; const ledger=items.map(i=>{ run=Math.round((run+sign(i))*100)/100; return Object.assign({},i,{run}); }).reverse().slice(0,40);
+  const due=last&&last.closing>0.004&&bal>0.004?`due ${dt(last.due)}`:'';
+  $('main').innerHTML=`
+    <div class="card"><div class="bal"><div><span class="lbl">${bal>0.004?'Balance due':bal<-0.004?'Credit on account':'Balance'}</span><div class="v ${bal>0.004?'neg':bal<-0.004?'pos':''}">${fmt(Math.abs(bal))}</div><small>${bal>0.004?(due||'owed to the club'):bal<-0.004?'the club owes you — it comes off your next charges':'nothing owed'}${ME.member.memberNo?' · member #'+esc(ME.member.memberNo):''}</small></div>
+      ${ME.online?`<div class="acts" style="margin:0">${bal>0.004?`<button class="btn pri" id="pay">Pay ${fmt(bal)}</button>`:''}<button class="btn" id="payOther">${bal>0.004?'Other amount':'Make a payment'}</button></div>`:''}</div>
+      ${ME.online?'':'<p class="hint">Pay the club the way you always have — the office records it here.</p>'}</div>
+    ${ME.online?`<div class="card auto"><div><b style="font-size:16px;color:var(--navy)">Autopay</b><small style="display:block;color:var(--muted);font-size:13px;margin-top:3px">${ME.autopay?`On · ${esc(ME.pm_label||'card on file')} · the balance due is charged when statements go out`:'Off · save a card or bank account and each statement is paid for you'}</small></div>${ME.autopay?'<button class="btn sm" id="autoOff">Turn off</button>':'<button class="btn sm pri" id="autoOn">Set up autopay</button>'}</div>`:''}
+    <div class="card"><h2>Statements</h2>${st.length?st.slice(0,12).map(s=>`<div class="row s"><div><b>${dt(s.period_start)} – ${dt(s.period_end)}</b><small>charges ${fmt(s.charges)} · payments ${fmt(s.payments)} · closing ${fmt(s.closing)}${s.closing>0.004?' · due '+dt(s.due):''}</small></div><button class="btn sm" data-stmt="${esc(s.id)}">PDF</button></div>`).join(''):'<p class="muted">No statements yet.</p>'}</div>
+    <div class="card"><h2>Activity</h2>${ledger.length?ledger.map(i=>`<div class="row"><b>${esc(i.descr||'')}</b><span class="a ${i.kind==='charge'?'':'pay'}">${i.kind==='charge'?'':'−'}${fmt(i.amount)}</span><span class="r">${fmt(i.run)}</span><small>${dt(i.posted)}${i.kind==='payment'&&i.method?' · '+(BC_METHOD[i.method]||i.method)+(i.reference&&!/^pi_/.test(i.reference)?' '+esc(i.reference):''):''}</small></div>`).join('')+(items.length>40?'<p class="hint">The last 40 items — statements carry the rest.</p>':''):'<p class="muted">Nothing on your account yet.</p>'}</div>
+    <div class="fs"><img src="flagstick-crest.svg" alt="">Flagstick</div>`;
+  $('hOut').onclick=signOut; const p=$('pay'); if(p) p.onclick=()=>pay(bal,false); const po=$('payOther'); if(po) po.onclick=()=>paySheet(bal);
+  const ao=$('autoOn'); if(ao) ao.onclick=setupAutopay; const af=$('autoOff'); if(af) af.onclick=autopayOff;
+  document.querySelectorAll('[data-stmt]').forEach(b=>b.onclick=()=>statementPDF(st.find(s=>String(s.id)===b.dataset.stmt)));
+}
+function paySheet(bal){ const d=document.createElement('div'); d.className='sheet'; d.innerHTML=`<div><h2>Make a payment</h2><span class="lbl">Amount $</span><input class="inp" id="payA" inputmode="decimal" value="${bal>0.004?bal.toFixed(2):''}"><label style="display:flex;gap:8px;align-items:center;margin-top:12px;font-size:14px"><input type="checkbox" id="payAuto">Save this card and turn on autopay</label><div class="acts"><button class="btn pri" id="payGo">Continue to payment</button><button class="btn" id="payX">Cancel</button></div><p class="hint">You’ll finish on the club’s secure payment page (Stripe). Card or US bank account.</p></div>`;
+  document.body.appendChild(d); d.querySelector('#payX').onclick=()=>d.remove(); d.querySelector('#payGo').onclick=()=>{ const a=parseFloat(d.querySelector('#payA').value); if(!(a>=1)){ toast('Enter an amount of at least $1.00'); return; } pay(a,d.querySelector('#payAuto').checked); d.remove(); }; }
+async function fn(body){ if(BUSY) return null; BUSY=true; try{ const {data,error}=await sb.functions.invoke('stripe',{body:Object.assign({tenant:TENANT,return:here()},body)}); if(error) throw new Error(error.message||'failed'); if(data&&data.error) throw new Error(data.error); return data; }catch(e){ toast(/not configured|does not take/i.test(e.message)?'Online payments aren’t set up for this club yet':e.message); return null; } finally{ BUSY=false; } }
+async function pay(amount,autopay){ const r=await fn({action:'pay',amount,autopay}); if(r&&r.url) location.href=r.url; }
+async function setupAutopay(){ const r=await fn({action:'setup'}); if(r&&r.url) location.href=r.url; }
+async function autopayOff(){ if(!confirm('Turn autopay off? Your saved card is removed; you pay each statement yourself.')) return; const {error}=await sb.rpc('member_autopay_off',{p_tenant:TENANT}); if(error){ toast(error.message); return; } await load(); toast('Autopay is off'); }
+function loadJsPDF(){ if(window.jspdf) return Promise.resolve(); return new Promise((res,rej)=>{ const sc=document.createElement('script'); sc.src='https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js'; sc.onload=()=>res(); sc.onerror=()=>rej(new Error('Couldn’t load the PDF maker — check the connection')); document.head.appendChild(sc); }); }
+async function crestPNG(){ try{ const r=await fetch('flagstick-crest-light.png'); const b=await r.blob(); return await new Promise(ok=>{ const fr=new FileReader(); fr.onload=()=>ok(fr.result); fr.readAsDataURL(b); }); }catch(_){ return null; } }
+async function statementPDF(s){ if(!s) return; try{ await loadJsPDF(); }catch(e){ toast(e.message); return; }
+  const doc=new window.jspdf.jsPDF({unit:'pt',format:'letter'}); bcFonts(doc); const m=ME.member, items=(ME.items||[]).filter(i=>i.posted>=s.period_start&&i.posted<=s.period_end);
+  statementPage(doc,{club:ME.club,name:[m.first,m.last].filter(Boolean).join(' '),lines:[m.memberNo?'Member #'+m.memberNo:'',m.address1||'',[m.city,m.state,m.zip].filter(Boolean).join(', '),m.email||''],s,items,msg:ME.message||'',crest:await crestPNG(),idx:0,n:1});
+  const name=`statement-${s.period_end}.pdf`, blob=doc.output('blob'), file=new File([blob],name,{type:'application/pdf'});
+  if(navigator.canShare&&navigator.canShare({files:[file]})&&navigator.share&&/iPhone|iPad|Android/i.test(navigator.userAgent)){ try{ await navigator.share({files:[file],title:'Statement'}); return; }catch(e){ if(e&&e.name==='AbortError') return; } }
+  const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download=name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(url),4000); }
+if(sb) sb.auth.onAuthStateChange((ev)=>{ if(ev==='SIGNED_IN'&&!ME&&TENANT) load(); });
+boot();
+/*AUTOUPDATE*/
+</script>
+</body>
+</html>

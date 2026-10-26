@@ -177,16 +177,29 @@ the member in the association's books, credited to the association. The club's o
 
 ## Member accounts (billing)
 
-Each club bills its own members — Flagstick only bills the club — so the club's ledger lives in the club hub under
-**Member accounts** (staff logins only; it appears once Flagstick turns the billing module on for the club). Every member
-has an account: dues put on account from Dues collection land there, the office posts charges by hand (pro shop, food &
-beverage, tee times, facilities, lessons, fees) and records payments as they come in (card, check, ACH, cash, with the check
-number or last four) and credits; a mistake is **voided with a reason**, never deleted. The list shows who owes what, who is
-in credit, and what was charged and received this month; search by name, member number or e-mail; **Export balances** gives
-a CSV. **Run statements** closes a period for everyone with a balance or activity (by default the month just ended),
-keeps each statement on the member's account and downloads one PDF with a branded page per member for the office to send:
-balance forward, the period's items with a running balance, the closing balance, the due date (Settings: days after the
-period ends) and the club's message. Members pay the club the way they always have; nothing here moves money.
+Flagstick is the club's billing system: each club bills its own members (Flagstick bills the club). It lives in the club
+hub under **Member accounts** (staff logins only, once the billing module is on).
+
+- **Billing setup**: membership classes (Full, Social, Junior…) with what each is charged — monthly, quarterly or yearly —
+  and a food & beverage minimum; the items the club bills with their revenue account and whether sales tax and the service
+  charge apply; the rates; statement rules (due days, finance charge, late fee, the message on statements). Give each
+  member a class and a billing status (active, leave of absence, suspended, resigned) in the Directory.
+- **Run monthly billing** posts every class charge due that month to every billable member, prorated by the day for a
+  mid-month join or resignation, plus unspent minimums for the period that just closed. Running a month twice posts nothing
+  twice.
+- **Accounts**: dues put on account from Dues collection land here; the office posts charges by hand (the item picker adds
+  tax and service charge), records payments (card, check, ACH, cash) and credits; a mistake is **voided with a reason**,
+  never deleted. The list shows who owes, who is **past due** (31–60, 61–90, 90+ by oldest-first settlement), credits, this
+  month's charges and receipts; search by name, member number or e-mail; **Export balances** with aging.
+- **Run statements** first posts the finance charge and late fee on what stayed past due, then closes the period for
+  everyone with a balance or activity, keeps each statement on the member's account, downloads one PDF with a branded page
+  per member, and can **e-mail** each statement and **charge autopay** cards on file.
+- **GL export**: a month's journal (receivables, revenue by item, service charge, sales tax, cash, credits) as CSV for the
+  bookkeeper.
+- **The member portal** (`member.html` on the club's address): a member signs in with a one-time e-mail link — the e-mail
+  the club has on file — and sees their balance, activity and statements (PDF). With **Connect with Stripe** done in
+  Billing setup, members **pay online** by card or bank account straight into the club's own Stripe account, and can turn
+  on **autopay** so each statement is paid for them. Flagstick never holds the money.
 
 ## The club calendar
 

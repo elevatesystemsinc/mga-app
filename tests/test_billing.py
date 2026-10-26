@@ -128,6 +128,32 @@ async def main():
     # the Directory editor carries the billing membership
     r=await p1.evaluate("""async()=>{ go('members'); await new Promise(r=>setTimeout(r,200)); editMember(personById('p3')); const has=!!document.getElementById('bmC'); document.getElementById('bmS').value='active'; document.getElementById('dSave').click(); await new Promise(r=>setTimeout(r,200)); return {has, st:personById('p3').billing.status, cls:personById('p3').billing.class===acctSettings().classes[0].id}; }""")
     bad+=check('Directory editor: class and billing status saved on the person',r['has'] and r['st']=='active' and r['cls'],r)
+    # ---- 5c. statements by e-mail (the mail function, in miniature) and the member portal
+    r=await p1.evaluate("""async()=>{ go('account',{acctId:'p1'}); await new Promise(r=>setTimeout(r,200)); const n=await mailStatements([stmtsOf('p1')[0]]); return {n, sent:!!stmtsOf('p1')[0].sent_at, chip:[...document.querySelectorAll('#main .kpi .muted')][2].textContent}; }""")
+    bad+=check('a statement e-mailed through the mail function; marked sent',r['n']==1 and r['sent'] and len(fdb.mails)==1 and fdb.mails[0]['to']=='ann@x.org' and fdb.mails[0]['attachments'][0]['filename'].startswith('statement-') and len(fdb.mails[0]['attachments'][0]['content'])>1000,r)
+    st=[x for x in fdb._rows('acct_statements') if x['member_id']=='p1']
+    bad+=check('sent_at written on the statement row',all(x.get('sent_at') for x in st),[x.get('sent_at') for x in st])
+    # the portal: Ann signs in (her e-mail is on the directory) → her balance, statements, activity; no Pay without Stripe; a PDF
+    fdb.seed_login('ann@x.org',name='Ann'); fdb.me='u-ann@x.org'
+    c5=await b.new_context(accept_downloads=True); await cloud(c5,fdb)
+    p5=await c5.new_page(); e5=[]; p5.on('pageerror',lambda e:e5.append(str(e)))
+    await p5.goto(page('member.html')+'?tenant=app.wcccmga.org'); await p5.wait_for_function("()=>!!ME",timeout=10000); await p5.wait_for_timeout(300)
+    r=await p5.evaluate("()=>({title:document.getElementById('hTitle').textContent, sub:document.getElementById('hSub').textContent, bal:document.querySelector('.bal .v').textContent, lbl:document.querySelector('.bal .lbl').textContent, pay:!!document.getElementById('pay'), auto:!!document.getElementById('autoOn'), stmts:document.querySelectorAll('[data-stmt]').length, rows:document.querySelectorAll('.row:not(.s)').length, online:ME.online, mine:ME.items.every(i=>i.member_id==='p1')})")
+    bad+=check('member portal: Ann sees her own account, no Pay button without Stripe',r['title']=='Ann Able' and 'Walnut Creek Country Club' in r['sub'] and r['stmts']>=1 and r['rows']>=3 and not r['pay'] and not r['auto'] and not r['online'] and r['mine'] and not e5,r,e5)
+    if os.path.exists(JSPDF):
+      async with p5.expect_download() as dl: await p5.click('[data-stmt]')
+      d=await dl.value; pdf=open(await d.path(),'rb').read()
+      bad+=check('the member downloads a statement PDF from the portal',d.suggested_filename.startswith('statement-') and pdf[:4]==b'%PDF',d.suggested_filename)
+    # someone whose e-mail is not on the directory
+    fdb.seed_login('stranger@x.org'); fdb.me='u-stranger@x.org'
+    c6=await b.new_context(); await cloud(c6,fdb); p6=await c6.new_page(); e6=[]; p6.on('pageerror',lambda e:e6.append(str(e)))
+    await p6.goto(page('member.html')+'?tenant=app.wcccmga.org'); await p6.wait_for_timeout(1200)
+    r=await p6.evaluate("()=>({h1:document.querySelector('#main h1')?.textContent, txt:document.querySelector('#main p')?.textContent, me:ME})")
+    bad+=check('an e-mail not on the directory is told so, sees nothing',r['h1']=='We couldn’t find your account' and 'Walnut Creek Country Club' in (r['txt'] or '') and r['me'] is None and not e6,r,e6)
+    # the hub: Billing setup names the portal link and offers Connect with Stripe; the stripe function is not configured
+    fdb.me='u-pro@wccc.org'
+    r=await p1.evaluate("""async()=>{ go('billsetup'); await new Promise(r=>setTimeout(r,200)); const link=document.querySelector('#main .cardhead .muted b')?.textContent; const con=document.getElementById('bsCon')?.textContent; document.getElementById('bsSt').click(); await new Promise(r=>setTimeout(r,400)); return {link, con, toast:document.getElementById('toast').textContent, online:acctSettings().online}; }""")
+    bad+=check('Billing setup: the portal link, Connect with Stripe, a clear message while the function has no key',r['link'].endswith('member.html') and r['con']=='Connect with Stripe' and 'aren’t switched on' in r['toast'] and not r['online']['connected'],r)
     # ---- 6. a board login: no nav item, the page redirects; a club without the module: locked page, no nav item
     fdb.me='u-mgaboard@x.org'
     c3=await b.new_context(); await cloud(c3,fdb)
