@@ -22,7 +22,7 @@ def ledger(fdb): return [r for r in fdb._rows('acct_items')]
 async def main():
   bad=0
   fdb=FakeDB()
-  fdb.seed_tenant('wccc','Walnut Creek Country Club',{'golf':True,'billing':True},hosts=['app.wcccmga.org'],login_email='pro@wccc.org',plan='club')
+  fdb.seed_tenant('wccc','Walnut Creek Country Club',{'golf':True,'billing':True,'pos':True},hosts=['app.wcccmga.org'],login_email='pro@wccc.org',plan='club')
   fdb.seed_tenant('pines','The Pines Golf Club',{'golf':True},login_email='gm@pines.org',plan='golf')
   club=club_doc('Walnut Creek Country Club',[{'id':'mga','kind':'association','name':'Men’s Golf Association','short':'MGA'}])
   club['members']+=[{'id':'p2','first':'Bo','last':'Baker','memberNo':'1042','status':'Active'},{'id':'p3','first':'Cy','last':'Cole','status':'Active'}]
@@ -52,7 +52,7 @@ async def main():
     rows=ledger(fdb)
     bad+=check('rows in acct_items carry the tenant, the kind, the method and who posted',len(rows)==3 and all(x['tenant']=='wccc' and x['member_id']=='p2' and x['created_by']=='board@test' for x in rows) and sorted(x['kind'] for x in rows)==['charge','charge','payment'] and next(x for x in rows if x['kind']=='payment')['method']=='check' and next(x for x in rows if x['kind']=='payment')['reference']=='#4471',[(x['kind'],x['source'],x['amount']) for x in rows])
     # ---- 2. void needs a reason and stays on the record; the balance moves
-    p1.on('dialog',lambda d:asyncio.ensure_future(d.accept('Charged twice')))
+    ANS={'v':'Charged twice'}; p1.on('dialog',lambda d:asyncio.ensure_future(d.accept(ANS['v'])))
     r=await p1.evaluate("""async()=>{ const b=[...document.querySelectorAll('[data-void]')].find(x=>document.querySelectorAll('[data-void]').length&&x); const grill=[...document.querySelectorAll('#main .lr')].find(r=>r.textContent.includes('Grill')); grill.querySelector('[data-void]').click(); await new Promise(r=>setTimeout(r,400));
       const v=[...document.querySelectorAll('#main .lr.void')].map(r=>r.querySelector('.ls').textContent); return {v, bal:document.querySelector('#main .kpi .v').textContent, left:document.querySelectorAll('[data-void]').length}; }""")
     row=next(x for x in ledger(fdb) if 'Grill' in x['descr'])
@@ -154,6 +154,25 @@ async def main():
     fdb.me='u-pro@wccc.org'
     r=await p1.evaluate("""async()=>{ go('billsetup'); await new Promise(r=>setTimeout(r,200)); const link=document.querySelector('#main .cardhead .muted b')?.textContent; const con=document.getElementById('bsCon')?.textContent; document.getElementById('bsSt').click(); await new Promise(r=>setTimeout(r,400)); return {link, con, toast:document.getElementById('toast').textContent, online:acctSettings().online}; }""")
     bad+=check('Billing setup: the portal link, Connect with Stripe, a clear message while the function has no key',r['link'].endswith('member.html') and r['con']=='Connect with Stripe' and 'aren’t switched on' in r['toast'] and not r['online']['connected'],r)
+    # ---- 5d. point of sale: products, a grill ticket to Bo's account (service charge + tax), a cash ticket, a void, the day's tickets, stock
+    r=await p1.evaluate("""async()=>{ go('possetup'); await new Promise(r=>setTimeout(r,200)); const nav=navItems().map(x=>x[0]);
+      document.getElementById('pxNewP').click(); document.getElementById('pN').value='Club sandwich'; document.getElementById('pO').value='grill'; document.getElementById('pC').value='Food'; document.getElementById('pP').value='14'; document.getElementById('dSave').click(); await new Promise(r=>setTimeout(r,150));
+      document.getElementById('pxNewP').click(); document.getElementById('pN').value='Sleeve Pro V1'; document.getElementById('pO').value='proshop'; document.getElementById('pC').value='Balls'; document.getElementById('pP').value='18'; document.getElementById('pTr').checked=true; document.getElementById('pQ').value='10'; document.getElementById('dSave').click(); await new Promise(r=>setTimeout(r,150));
+      go('pos'); await new Promise(r=>setTimeout(r,300)); const prods=[...document.querySelectorAll('[data-pp]')].map(b=>b.querySelector('b').textContent);
+      document.querySelector('[data-pp]').click(); document.querySelector('[data-pp]').click(); await new Promise(r=>setTimeout(r,50)); const qty=document.querySelector('.tk .qty b').textContent;
+      const pm=document.getElementById('psM'); pm.value='1042'; pm.dispatchEvent(new Event('input')); document.querySelector('[data-pk]').click(); await new Promise(r=>setTimeout(r,100));
+      document.getElementById('psTip').value='5'; document.getElementById('psTip').dispatchEvent(new Event('change')); await new Promise(r=>setTimeout(r,100));
+      const tot=[...document.querySelectorAll('.tk .tot b')].map(x=>x.textContent); const before=balanceOf('p2'); document.getElementById('psAcct').click(); await new Promise(r=>setTimeout(r,500));
+      const it=ACCT.items.find(i=>i.ref&&i.ref.startsWith('pos:')); return {nav, prods, qty, tot, delta:Math.round((balanceOf('p2')-before)*100)/100, it:it&&[it.item,it.source,it.amount,it.svc,it.tax,it.descr], cleared:document.querySelectorAll('.tk .ln').length}; }""")
+    bad+=check('POS: products made, a 2× sandwich ticket with 20% service, 8% tax on both and a $5 tip charged to Bo',r['nav'].index('pos')==r['nav'].index('accounts')+1 and r['prods']==['Club sandwich'] and r['qty']=='2' and r['tot']==['$28.00','$5.60','$2.69','$41.29'] and r['delta']==41.29 and r['it']==['fnb','fnb',41.29,5.6,2.69,'Grill · 2× Club sandwich'] and r['cleared']==0,r)
+    tk=[t for t in fdb._rows('pos_tickets')]
+    bad+=check('the ticket row: lines, money, paid on account, the account item',len(tk)==1 and tk[0]['paid']=='account' and tk[0]['status']=='closed' and tk[0]['total']==41.29 and tk[0]['acct_item'] and tk[0]['tenant']=='wccc',tk and {k:tk[0][k] for k in ('paid','status','total')})
+    r=await p1.evaluate("""async()=>{ document.querySelector('[data-po="proshop"]').click(); await new Promise(r=>setTimeout(r,100)); document.querySelector('[data-pp]').click(); await new Promise(r=>setTimeout(r,50)); const tot=[...document.querySelectorAll('.tk .tot b')].map(x=>x.textContent); document.getElementById('psCash').click(); await new Promise(r=>setTimeout(r,400));
+      const stock=productOf(posSettings().products.find(x=>x.name==='Sleeve Pro V1').id).stock; go('postickets'); await new Promise(r=>setTimeout(r,200)); const rows=[...document.querySelectorAll('#main .lg .lr .ln')].map(x=>x.textContent.trim()); const kp=[...document.querySelectorAll('#main .kpi .v')].map(x=>x.textContent); return {tot, stock, rows, kp}; }""")
+    bad+=check('a pro shop sleeve for cash: 8% tax, no service charge; stock 10 → 9; the day lists both tickets',r['tot']==['$18.00','$1.44','$19.44'] and r['stock']==9 and len(r['rows'])==2 and r['kp'][0]=='$60.73' and r['kp'][1]=='$41.29',r)
+    ANS['v']='Rang up twice'
+    r=await p1.evaluate("""async()=>{ const b=[...document.querySelectorAll('[data-tv]')].find(x=>x.closest('.lr').textContent.includes('Bo Baker')); b.click(); await new Promise(r=>setTimeout(r,500)); const t=POS.tickets.find(x=>x.member_id==='p2'); const it=ACCT.items.find(i=>i.id===t.acct_item); return {st:t.status, reason:t.void_reason, itVoid:!!it.void_at, bal:balanceOf('p2'), voidRows:document.querySelectorAll('#main .lr.void').length}; }""")
+    bad+=check('voiding the ticket voids the account charge with the reason',r['st']=='void' and r['reason']=='Rang up twice' and r['itVoid'] and r['voidRows']==1,r)
     # ---- 6. a board login: no nav item, the page redirects; a club without the module: locked page, no nav item
     fdb.me='u-mgaboard@x.org'
     c3=await b.new_context(); await cloud(c3,fdb)

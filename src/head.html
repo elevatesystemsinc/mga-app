@@ -404,6 +404,12 @@ textarea.inp{height:auto;min-height:84px;padding:10px 12px;resize:vertical}
 .lg .lm{font-size:13px;color:var(--muted);display:flex;gap:12px;flex-wrap:wrap;font-variant-numeric:tabular-nums} .lg .lm b{color:var(--ink);font-weight:600}
 .lg .lnet{font-weight:800;font-size:19px;text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}
 .lg .lr.click{cursor:pointer} .lg .lr.click:hover{background:#fff} .lg .lr.void .ln,.lg .lr.void .lm{text-decoration:line-through;color:var(--muted)} .lg .lr.void .lnet{color:var(--muted);font-weight:500}
+.pos{display:grid;grid-template-columns:minmax(0,1.4fr) 400px;gap:16px;align-items:start} .pos .pg{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
+.pos .pb{min-height:76px;border:1px solid var(--line);border-radius:12px;background:#fff;padding:10px 12px;text-align:left;display:flex;flex-direction:column;justify-content:space-between;gap:6px} .pos .pb:active{background:var(--ivory)} .pos .pb b{font-size:14.5px;color:var(--navy);line-height:1.2} .pos .pb span{font-weight:700;font-variant-numeric:tabular-nums} .pos .pb[data-out]{opacity:.55} .pos .pb.open{border-style:dashed}
+.tk .who{display:flex;align-items:center;gap:10px;padding:8px 10px;border:1px solid var(--line);border-radius:10px;background:var(--ivory)} .tk .who .cell2{flex:1} .tk .who small{font-size:12px;color:var(--muted)}
+.tk .ln{display:grid;grid-template-columns:minmax(0,1fr) auto 70px 28px;gap:8px;align-items:center;padding:8px 0;border-top:1px solid var(--line)} .tk .ln:first-child{border-top:none} .tk .ln small{font-size:11.5px;color:var(--muted)} .tk .qty{display:flex;align-items:center;gap:2px} .tk .qty b{min-width:22px;text-align:center}
+.tk .tot{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:4px 12px;align-items:center;border-top:2px solid var(--line);padding-top:10px;margin-top:6px;font-size:14px} .tk .tot .big{font-size:19px;font-weight:800;color:var(--navy)}
+@media (max-width:900px){ .pos{grid-template-columns:minmax(0,1fr)} .pos .pg{grid-template-columns:repeat(auto-fill,minmax(130px,1fr))} }
 .lg .lact:empty{display:none} .lg .la{grid-template-areas:"who net" "who act"} .lg .la .lact{align-self:start}
 @media (min-width:1180px){
   .lg .lr{grid-template-columns:minmax(0,1.3fr) minmax(0,1.5fr) 120px 84px;grid-template-areas:"who money net act";gap:12px 18px;padding:10px 22px}

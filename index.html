@@ -404,6 +404,12 @@ textarea.inp{height:auto;min-height:84px;padding:10px 12px;resize:vertical}
 .lg .lm{font-size:13px;color:var(--muted);display:flex;gap:12px;flex-wrap:wrap;font-variant-numeric:tabular-nums} .lg .lm b{color:var(--ink);font-weight:600}
 .lg .lnet{font-weight:800;font-size:19px;text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}
 .lg .lr.click{cursor:pointer} .lg .lr.click:hover{background:#fff} .lg .lr.void .ln,.lg .lr.void .lm{text-decoration:line-through;color:var(--muted)} .lg .lr.void .lnet{color:var(--muted);font-weight:500}
+.pos{display:grid;grid-template-columns:minmax(0,1.4fr) 400px;gap:16px;align-items:start} .pos .pg{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
+.pos .pb{min-height:76px;border:1px solid var(--line);border-radius:12px;background:#fff;padding:10px 12px;text-align:left;display:flex;flex-direction:column;justify-content:space-between;gap:6px} .pos .pb:active{background:var(--ivory)} .pos .pb b{font-size:14.5px;color:var(--navy);line-height:1.2} .pos .pb span{font-weight:700;font-variant-numeric:tabular-nums} .pos .pb[data-out]{opacity:.55} .pos .pb.open{border-style:dashed}
+.tk .who{display:flex;align-items:center;gap:10px;padding:8px 10px;border:1px solid var(--line);border-radius:10px;background:var(--ivory)} .tk .who .cell2{flex:1} .tk .who small{font-size:12px;color:var(--muted)}
+.tk .ln{display:grid;grid-template-columns:minmax(0,1fr) auto 70px 28px;gap:8px;align-items:center;padding:8px 0;border-top:1px solid var(--line)} .tk .ln:first-child{border-top:none} .tk .ln small{font-size:11.5px;color:var(--muted)} .tk .qty{display:flex;align-items:center;gap:2px} .tk .qty b{min-width:22px;text-align:center}
+.tk .tot{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:4px 12px;align-items:center;border-top:2px solid var(--line);padding-top:10px;margin-top:6px;font-size:14px} .tk .tot .big{font-size:19px;font-weight:800;color:var(--navy)}
+@media (max-width:900px){ .pos{grid-template-columns:minmax(0,1fr)} .pos .pg{grid-template-columns:repeat(auto-fill,minmax(130px,1fr))} }
 .lg .lact:empty{display:none} .lg .la{grid-template-areas:"who net" "who act"} .lg .la .lact{align-self:start}
 @media (min-width:1180px){
   .lg .lr{grid-template-columns:minmax(0,1.3fr) minmax(0,1.5fr) 120px 84px;grid-template-areas:"who money net act";gap:12px 18px;padding:10px 22px}
@@ -728,9 +734,9 @@ let TENANCY=false, TENANT=null, TENANT_INFO=null, ACCESS=null;   // ACCESS = my_
    the whole club through Flagstick, with its own toggles (member billing, point of sale). */
 const MODULE_CATALOG=[
   {id:'golf',    name:'Golf management', base:true, desc:'The package: the club directory, tournaments, rounds and results, live scoring and formats, the game library, associations (MGA, LGA, SMGA…), small groups, dues collection, the club’s treasury and budget'},
-  {id:'club',    name:'Club management', soon:true, desc:'Run the whole club through Flagstick: membership, member numbers, statements and the club’s operations — with the toggles below'},
+  {id:'club',    name:'Bookings & tee sheet', desc:'Tee times, courts, pools and lessons — booked by staff on the sheet and by members in the portal'},
   {id:'billing', name:'Member billing',  desc:'Member accounts: charges from dues, the shop and bookings, payments recorded by the club, statements'},
-  {id:'pos',     name:'Point of sale',   soon:true, desc:'Food & beverage and pro shop charges to member accounts'},
+  {id:'pos',     name:'Point of sale',   desc:'Food & beverage and pro shop tickets at the register, charged to member accounts or taken as cash / card; products and stock'},
 ];
 const PLAN_PRESETS={golf:{golf:true},club:{golf:true,club:true,billing:true,pos:true}};
 function hasModule(k){ if(k==='golf'||k==='associations'||k==='groups') return true; if(!TENANCY||!TENANT_INFO) return true; return !!(TENANT_INFO.modules||{})[k]; }
@@ -1078,17 +1084,17 @@ const I={
   ledger:svg('<rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/>'),
   plus:svg('<path d="M12 5v14M5 12h14"/>'), edit:svg('<path d="M4 20h4L19 9l-4-4L4 16z"/>'), x:svg('<path d="M6 6l12 12M18 6L6 18"/>'),
   search:svg('<circle cx="11" cy="11" r="6.5"/><path d="M20 20l-4-4"/>'), chev:svg('<path d="M9 6l6 6-6 6"/>'),
-  down:svg('<path d="M12 4v12M6 11l6 6 6-6M5 20h14"/>'), menu:svg('<path d="M4 7h16M4 12h16M4 17h16"/>'),
+  down:svg('<path d="M12 4v12M6 11l6 6 6-6M5 20h14"/>'), cart:svg('<path d="M3 4h2l2.4 11h11L21 7H6"/><circle cx="9" cy="19" r="1.5"/><circle cx="17" cy="19" r="1.5"/>'), cal:svg('<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/>'), menu:svg('<path d="M4 7h16M4 12h16M4 17h16"/>'),
   trash:svg('<path d="M4 7h16M10 7V4h4v3M6 7l1 13h10l1-13"/>'), check:svg('<path d="M5 12l5 5 9-10"/>'), refresh:svg('<path d="M20 11a8 8 0 10-2.3 5.7"/><path d="M20 4v7h-7"/>'),
 };
 I.org=svg('<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18M9 20v-6h6v6"/>');
 I.survey=svg('<rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4V3h6v2M9 11h6M9 15h4"/>');
 I.lib=svg('<path d="M4 5h5a3 3 0 013 3v12a2 2 0 00-2-2H4z"/><path d="M20 5h-5a3 3 0 00-3 3v12a2 2 0 012-2h6z"/>');
 I.coins=svg('<ellipse cx="12" cy="6" rx="7" ry="3"/><path d="M5 6v12c0 1.7 3.1 3 7 3s7-1.3 7-3V6"/><path d="M5 12c0 1.7 3.1 3 7 3s7-1.3 7-3"/>');
-const NAV=[['dash','Dashboard',I.home],['tournaments','Tournaments',I.flag],['members','Members',I.users],['collections','Dues collection',I.coins],['accounts','Member accounts',I.ledger],['board','Board',I.shield],['budget','Season budget',I.ledger],['orgs','Organizations',I.org],['library','Game library',I.lib],['logins','Logins',I.shield],['surveys','Surveys',I.survey]];
+const NAV=[['dash','Dashboard',I.home],['tournaments','Tournaments',I.flag],['members','Members',I.users],['collections','Dues collection',I.coins],['accounts','Member accounts',I.ledger],['pos','Point of sale',I.cart],['board','Board',I.shield],['budget','Season budget',I.ledger],['orgs','Organizations',I.org],['library','Game library',I.lib],['logins','Logins',I.shield],['surveys','Surveys',I.survey]];
 /* which pages each kind of organization gets (associations get everything) */
-const ORG_NAV={club:['dash','tournaments','golf','members','collections','accounts','orgs','library','budget','treasury','surveys','logins'],association:['dash','tournaments','golf','members','board','treasury','budget','surveys'],group:['dash','tournaments','golf','members','surveys']};
-function navItems(){ const allow=ORG_NAV[db.kind]; return NAV.filter(([k])=>(!allow||allow.includes(k))&&(k!=='logins'||canManageLogins())&&(k!=='accounts'||(typeof acctOn==='function'&&acctOn()))).map(([k,l,ic])=>[k,k==='members'&&isClub()?'Directory':l,ic]); }
+const ORG_NAV={club:['dash','tournaments','golf','members','collections','accounts','pos','orgs','library','budget','treasury','surveys','logins'],association:['dash','tournaments','golf','members','board','treasury','budget','surveys'],group:['dash','tournaments','golf','members','surveys']};
+function navItems(){ const allow=ORG_NAV[db.kind]; return NAV.filter(([k])=>(!allow||allow.includes(k))&&(k!=='logins'||canManageLogins())&&(k!=='accounts'||(typeof acctOn==='function'&&acctOn()))&&(k!=='pos'||(typeof posOn==='function'&&posOn()))).map(([k,l,ic])=>[k,k==='members'&&isClub()?'Directory':l,ic]); }
 /* the organization on screen: the club's record from CLUB.orgs wins over what the document says */
 const curOrg=()=>!db?null:isClub()?Object.assign({},CLUB_META,{name:CLUB.name||CLUB_META.name,crest:CLUB.crest||CLUB_META.crest}):(orgMeta()||{id:db.id,kind:db.kind,name:db.name,short:db.short});
 const orgShort=()=>{ const o=curOrg(); return o?(o.short||o.name||'club'):'club'; };
@@ -1185,12 +1191,12 @@ function renderInner(){
   const ys=Object.keys(db.seasons).sort((a,b)=>b-a);
   $('seasonSel').innerHTML=ys.map(y=>`<option value="${y}"${y===Y()?' selected':''}>${y} season</option>`).join('')+'<option value="__new">+ New season…</option>';
   const live=typeof liveEvents==='function'?liveEvents():[];
-  const items=navItems(); if(view.page!=='pick'&&!items.some(([k])=>k===view.page||(k==='tournaments'&&view.page==='tournament')||(k==='accounts'&&/^(account|billsetup)$/.test(view.page)))) view.page='dash';
-  $('nav').innerHTML=items.map(([k,l,ic])=>`<button class="nav${(view.page===k||(k==='tournaments'&&view.page==='tournament')||(k==='accounts'&&/^(account|billsetup)$/.test(view.page)))?' on':''}" data-go="${k}">${ic}<span>${l}</span>${k==='golf'&&live.length?'<span class="livedot" aria-label="Live scoring"></span>':''}</button>`).join('')+
+  const items=navItems(); if(view.page!=='pick'&&!items.some(([k])=>k===view.page||(k==='tournaments'&&view.page==='tournament')||(k==='accounts'&&/^(account|billsetup)$/.test(view.page))||(k==='pos'&&/^(postickets|possetup)$/.test(view.page)))) view.page='dash';
+  $('nav').innerHTML=items.map(([k,l,ic])=>`<button class="nav${(view.page===k||(k==='tournaments'&&view.page==='tournament')||(k==='accounts'&&/^(account|billsetup)$/.test(view.page))||(k==='pos'&&/^(postickets|possetup)$/.test(view.page)))?' on':''}" data-go="${k}">${ic}<span>${l}</span>${k==='golf'&&live.length?'<span class="livedot" aria-label="Live scoring"></span>':''}</button>`).join('')+
     live.map(e=>`<button class="nav livelink" data-golfev="${e.id}"><span class="livedot"></span><span class="trunc">Leaderboard · ${esc(e.name)}</span></button>`).join('');
   $('nav').querySelectorAll('[data-go]').forEach(b=>b.onclick=()=>{ if(b.dataset.go==='golf') view.geid=null; go(b.dataset.go); });
   const m=$('main');
-  ({dash:vDash,tournaments:vTournaments,tournament:vTournament,members:vMembers,board:vBoard,budget:vBudget,treasury:vTreasury,golf:vGolf,orgs:vOrgs,pick:vPicker,collections:vCollections,games:vGames,ledger:vLedger,library:vLibrary,logins:vLogins,surveys:vSurveys,accounts:vAccounts,account:vAccount,billsetup:vBillSetup}[view.page]||vDash)(m);
+  ({dash:vDash,tournaments:vTournaments,tournament:vTournament,members:vMembers,board:vBoard,budget:vBudget,treasury:vTreasury,golf:vGolf,orgs:vOrgs,pick:vPicker,collections:vCollections,games:vGames,ledger:vLedger,library:vLibrary,logins:vLogins,surveys:vSurveys,accounts:vAccounts,account:vAccount,billsetup:vBillSetup,pos:vPos,postickets:vPosTickets,possetup:vPosSetup}[view.page]||vDash)(m);
   if(view.page==='board'&&!isClub()&&typeof loginsCard==='function') loginsCard(m,ORG_ID);
   if(!isClub()&&((db.kind==='group'&&view.page==='members')||(db.kind!=='group'&&view.page==='board'))) adminLinksCard(m,curOrg());
 }
@@ -7560,6 +7566,127 @@ async function statementsPDF(list,opt){ opt=opt||{};
   if(opt.returnDoc) return doc;
   if(typeof deliverFile==='function'){ const blob=doc.output('blob'); await deliverFile(blob,name,'Statements'); } else doc.save(name); return doc;
 }
+/* ============ Point of sale (module 'pos' — the club hub, staff only) ============
+   Food & beverage and the pro shop ring up tickets here, on a tablet or a phone at the register: pick the outlet, the
+   member (or a walk-in), tap the products, close the ticket to the member's account (one acct_items charge with tax and
+   service charge broken out — statements, minimums and the GL all see it) or as cash / card taken at the register.
+   Outlets, products and stock counts live in CLUB.pos; tickets are rows in pos_tickets (pos-setup.sql). */
+const POS={tickets:null,loading:false,at:0,cur:null,outlet:'',cat:'',q:'',day:''};
+const posOn=()=>!!CLUB&&isClub()&&hasModule('pos')&&!KEYMODE&&!SCOPED;
+const posKey=()=>'fs_pos_'+((typeof TENANT!=='undefined'&&TENANT)||'local');
+function posSettings(){ CLUB.pos=CLUB.pos||{}; const p=CLUB.pos;
+  if(!Array.isArray(p.outlets)||!p.outlets.length) p.outlets=[{id:'grill',name:'Grill',kind:'fnb',item:'fnb'},{id:'proshop',name:'Pro shop',kind:'proshop',item:'proshop'}];
+  p.products=p.products||[]; p.products.forEach(x=>{ if(x.active==null) x.active=true; if(x.cat==null) x.cat=''; });
+  return p; }
+const outletOf=id=>posSettings().outlets.find(o=>o.id===id);
+const productOf=id=>posSettings().products.find(x=>x.id===id);
+async function posLoad(force){ if(POS.loading||(POS.tickets&&!force)) return; POS.loading=true;
+  try{ if(!acctCloud()){ try{ POS.tickets=JSON.parse(localStorage.getItem(posKey())||'[]'); }catch(_){ POS.tickets=[]; } }
+    else { const r=await tq(sb.from('pos_tickets').select('*')); POS.tickets=r.error?[]:(r.data||[]); } POS.at=Date.now(); }
+  finally{ POS.loading=false; } }
+function posLocalWrite(){ if(!acctCloud()){ try{ localStorage.setItem(posKey(),JSON.stringify(POS.tickets||[])); }catch(_){} } }
+/* the money on a ticket: service charge on lines marked for it, tax on taxable lines (and their service charge), the tip on top */
+function ticketTotals(t){ const b=acctSettings(); let sub=0, svcBase=0, taxBase=0;
+  for(const l of t.lines){ const v=Math.round(n0(l.qty)*n0(l.price)*100)/100; sub+=v; if(l.svc) svcBase+=v; if(l.taxable) taxBase+=v+(l.svc?v*n0(b.svc.rate)/100:0); }
+  const svc=Math.round(svcBase*n0(b.svc.rate))/100, tax=Math.round(taxBase*n0(b.tax.rate))/100, tip=Math.round(n0(t.tip)*100)/100;
+  return {subtotal:Math.round(sub*100)/100,svc,tax,tip,total:Math.round((sub+svc+tax+tip)*100)/100}; }
+function newTicket(outletId){ const o=outletOf(outletId)||posSettings().outlets[0]; return {id:uid(),outlet:o.id,member_id:null,guest:'',lines:[],tip:0,note:'',status:'open',paid:null,created_at:new Date().toISOString(),created_by:whoAmI()}; }
+function addLine(t,prod,custom){ const o=outletOf(t.outlet), bi=itemOf(o&&o.item)||{}; const l=prod?{id:uid(),pid:prod.id,name:prod.name,qty:1,price:n0(prod.price),taxable:prod.taxable!=null?!!prod.taxable:!!bi.taxable,svc:prod.svc!=null?!!prod.svc:!!bi.svc}:{id:uid(),pid:null,name:custom.name||'Open item',qty:1,price:n0(custom.price),taxable:custom.taxable!=null?custom.taxable:!!bi.taxable,svc:custom.svc!=null?custom.svc:!!bi.svc};
+  const same=prod&&t.lines.find(x=>x.pid===prod.id&&x.price===l.price); if(same) same.qty++; else t.lines.push(l); }
+const ticketText=t=>t.lines.map(l=>(l.qty>1?l.qty+'× ':'')+l.name).join(', ');
+async function closeTicket(t,paid){
+  const o=outletOf(t.outlet), m=ticketTotals(t); if(!t.lines.length){ toast('Nothing on the ticket'); return false; }
+  Object.assign(t,m,{paid,status:'closed',closed_at:new Date().toISOString()});
+  if(paid==='account'){ if(!t.member_id){ toast('Pick the member'); return false; } if(!acctOn()){ toast('Member billing is off — take cash or card'); return false; } const p=personById(t.member_id); if(p&&pBilling(p).status==='suspended'){ toast(`${memberName(p)} is suspended — no charges to the account`); return false; }
+    const bi=itemOf(o.item)||{id:o.item,source:o.kind==='fnb'?'fnb':'proshop',gl:''};
+    const it=await acctPost({member_id:t.member_id,kind:'charge',source:bi.source,item:bi.id,gl:bi.gl,ref:'pos:'+t.id,descr:`${o.name} · ${ticketText(t)}`.slice(0,180),amount:m.total,tax:m.tax,svc:m.svc,posted:todayISO()}); if(!it){ t.status='open'; return false; } t.acct_item=it.id; }
+  for(const l of t.lines){ const pr=productOf(l.pid); if(pr&&pr.track) pr.stock=n0(pr.stock)-n0(l.qty); }
+  const row=Object.assign({},t); if(acctCloud()){ const {error}=await sb.from('pos_tickets').insert(trow(row)); if(error){ toast('Couldn’t save the ticket: '+error.message); } }
+  POS.tickets=(POS.tickets||[]).filter(x=>x.id!==t.id).concat([row]); posLocalWrite(); persist(); return true; }
+async function voidTicket(t,reason){ const patch={status:'void',void_at:new Date().toISOString(),void_reason:reason};
+  if(t.acct_item){ await acctLoad(); const it=(ACCT.items||[]).find(i=>i.id===t.acct_item); if(it&&!it.void_at) await acctVoid(it,'Ticket voided: '+reason); }
+  for(const l of t.lines){ const pr=productOf(l.pid); if(pr&&pr.track) pr.stock=n0(pr.stock)+n0(l.qty); }
+  if(acctCloud()){ const {error}=await sb.from('pos_tickets').update(patch).eq('id',t.id); if(error){ toast('Couldn’t void: '+error.message); return false; } }
+  Object.assign(t,patch); posLocalWrite(); persist(); return true; }
+/* ---------- the register ---------- */
+function vPos(m){
+  if(!posOn()){ go('dash'); return; } const P=posSettings(), b=acctSettings();
+  if(POS.tickets==null){ posLoad().then(()=>render()); m.innerHTML=head('Point of sale','Loading…'); return; }
+  if(!POS.outlet||!outletOf(POS.outlet)) POS.outlet=P.outlets[0].id; const o=outletOf(POS.outlet);
+  if(!POS.cur||POS.cur.outlet!==o.id) POS.cur=newTicket(o.id); const t=POS.cur, tot=ticketTotals(t);
+  const prods=P.products.filter(x=>x.outlet===o.id&&x.active!==false), cats=[...new Set(prods.map(x=>x.cat||''))].sort((a,c)=>a.localeCompare(c)); if(POS.cat&&!cats.includes(POS.cat)) POS.cat='';
+  const show=prods.filter(x=>(!POS.cat||x.cat===POS.cat)&&(!POS.q||x.name.toLowerCase().includes(POS.q.toLowerCase()))).sort((a,c)=>(a.cat||'').localeCompare(c.cat||'')||a.name.localeCompare(c.name));
+  const mem=t.member_id?personById(t.member_id):null, held=(POS.tickets||[]).filter(x=>x.status==='open'&&x.id!==t.id);
+  const chip=(k,l,on)=>`<button class="${on?'on':''}" data-pc="${esc(k)}">${esc(l)}</button>`;
+  m.innerHTML=head('Point of sale',`${esc(o.name)} register — tap the products, close the ticket to the member’s account or take cash / card.`,btn('Setup','psSet','')+btn('Tickets','psTk',''))+`
+    <div class="toolbar"><div class="seg">${P.outlets.map(x=>`<button class="${x.id===o.id?'on':''}" data-po="${x.id}">${esc(x.name)}</button>`).join('')}</div><input class="inp" id="psQ" placeholder="Find a product…" value="${esc(POS.q)}" style="margin-left:auto;height:38px;width:220px;max-width:100%" autocomplete="off"></div>
+    <div class="pos"><div>
+      ${cats.length>1||(cats.length===1&&cats[0])?`<div class="seg" style="margin-bottom:10px;flex-wrap:wrap">${chip('','All',!POS.cat)}${cats.map(c=>chip(c,c||'Uncategorised',POS.cat===c)).join('')}</div>`:''}
+      <div class="pg">${show.map(x=>`<button class="pb" data-pp="${x.id}"${x.track&&n0(x.stock)<=0?' data-out="1"':''}><b>${esc(x.name)}</b><span>${fmt2(x.price)}${x.track?` <small class="muted">· ${n0(x.stock)} left</small>`:''}</span></button>`).join('')}<button class="pb open" id="psOpen"><b>Open item</b><span class="muted">any amount</span></button></div>
+      ${prods.length?'':`<div class="empty" style="margin-top:12px"><b>No products for ${esc(o.name)} yet</b><span>Add them in Setup (or import a CSV). Open item works meanwhile.</span></div>`}</div>
+    <div class="card tk" style="align-self:start"><div class="cardhead"><div><h2 class="h2">Ticket</h2><span class="muted">${esc(o.name)}${held.length?` · ${held.length} on hold`:''}</span></div>${t.lines.length?`<button class="ib" id="psClear" aria-label="Clear">${I.x}</button>`:''}</div>
+      <div class="fld" style="margin-bottom:10px">${mem?`<div class="who"><span class="av">${initials(mem)}</span><div class="cell2"><b>${esc(memberName(mem))}</b><small>${mem.memberNo?'#'+esc(mem.memberNo)+' · ':''}${acctOn()?balTxt(balanceOf(mem.id)):''}${pBilling(mem).status==='suspended'?' · <span class="neg">suspended</span>':''}</small></div><button class="ib" id="psWho" aria-label="Change">${I.x}</button></div>`
+        :t.guest?`<div class="who"><span class="av">G</span><div class="cell2"><b>${esc(t.guest)}</b><small>walk-in · cash or card</small></div><button class="ib" id="psWho" aria-label="Change">${I.x}</button></div>`
+        :`<input class="inp" id="psM" placeholder="Member name or number… (or leave blank for a walk-in)" autocomplete="off"><div class="pick" id="psML" style="display:none;max-height:220px"></div>`}</div>
+      <div class="lines">${t.lines.length?t.lines.map(l=>`<div class="ln"><div class="cell2"><b>${esc(l.name)}</b><small>${fmt2(l.price)}${l.svc?' · svc':''}${l.taxable?' · tax':''}</small></div><div class="qty"><button class="ib" data-lq="${l.id}" data-d="-1">−</button><b>${n0(l.qty)}</b><button class="ib" data-lq="${l.id}" data-d="1">+</button></div><b class="r">${fmt2(l.qty*l.price)}</b><button class="ib" data-lx="${l.id}" aria-label="Remove">${I.x}</button></div>`).join(''):'<p class="muted" style="margin:6px 0 10px">Tap products to add them.</p>'}</div>
+      <div class="tot"><span>Subtotal</span><b>${fmt2(tot.subtotal)}</b>${tot.svc?`<span>Service charge ${n0(b.svc.rate)}%</span><b>${fmt2(tot.svc)}</b>`:''}${tot.tax?`<span>Tax ${n0(b.tax.rate)}%</span><b>${fmt2(tot.tax)}</b>`:''}${o.kind==='fnb'?`<span>Tip</span><span class="r"><input class="inp r" id="psTip" inputmode="decimal" value="${t.tip?t.tip:''}" placeholder="0" style="height:32px;width:90px;display:inline-block"></span>`:''}<span class="big">Total</span><b class="big">${fmt2(tot.total)}</b></div>
+      <div class="acts" style="margin-top:12px;display:grid;grid-template-columns:1fr 1fr;gap:8px"><button class="btn pri" id="psAcct" style="grid-column:1/-1"${mem&&acctOn()&&t.lines.length?'':' disabled'}>Charge to account</button><button class="btn" id="psCash"${t.lines.length?'':' disabled'}>Cash</button><button class="btn" id="psCard"${t.lines.length?'':' disabled'}>Card</button><button class="btn" id="psHold"${t.lines.length?'':' disabled'}>Hold</button>${held.length?`<button class="btn" id="psHeld">On hold · ${held.length}</button>`:'<span></span>'}</div>
+      <p class="hint">${acctOn()?'Charge to account posts one line on the member’s statement with tax and service charge broken out.':'Member billing is off: tickets are cash or card at the register.'}</p></div></div>`;
+  m.querySelectorAll('[data-po]').forEach(x=>x.onclick=()=>{ if(POS.cur.lines.length&&!confirm('Switch outlets? The ticket on screen is cleared (Hold keeps it).')) return; POS.outlet=x.dataset.po; POS.cur=null; POS.cat=''; render(); });
+  m.querySelectorAll('[data-pc]').forEach(x=>x.onclick=()=>{ POS.cat=x.dataset.pc; render(); });
+  const q=$('psQ'); q.oninput=()=>{ POS.q=q.value; render(); };
+  m.querySelectorAll('[data-pp]').forEach(x=>x.onclick=()=>{ const pr=productOf(x.dataset.pp); if(x.dataset.out&&!confirm(`${pr.name} shows no stock. Sell it anyway?`)) return; addLine(t,pr); render(); });
+  $('psOpen').onclick=()=>openDrawer({kicker:o.name,title:'Open item',body:pair(field('What','poN','',{ph:'e.g. Range balls'}),field('Amount $','poA','',{type:'number'}))+`<label class="check"><input type="checkbox" id="poT"${(itemOf(o.item)||{}).taxable?' checked':''}>Taxable</label>${o.kind==='fnb'?`<label class="check"><input type="checkbox" id="poS" checked>Service charge</label>`:''}`,saveLabel:'Add',save:()=>{ const a=fnum('poA'); if(!(a>0)){ toast('Enter the amount'); return false; } addLine(t,null,{name:fv('poN')||'Open item',price:a,taxable:$('poT').checked,svc:!!($('poS')&&$('poS').checked)}); }});
+  const pc=$('psClear'); if(pc) pc.onclick=()=>{ if(confirm('Clear this ticket?')){ POS.cur=newTicket(o.id); render(); } };
+  const pw=$('psWho'); if(pw) pw.onclick=()=>{ t.member_id=null; t.guest=''; render(); };
+  const pm=$('psM'); if(pm){ const L=$('psML'); const list=()=>{ const s=pm.value.toLowerCase().trim(); if(!s){ L.style.display='none'; return; } const hits=persons().filter(p=>p.status!=='Inactive'&&[memberName(p),p.memberNo||'',p.email||''].join(' ').toLowerCase().includes(s)).slice(0,8);
+      L.innerHTML=hits.map(p=>`<button type="button" data-pk="${p.id}"><span class="av">${initials(p)}</span><b>${esc(memberName(p))}</b><span class="muted" style="margin-left:auto;font-size:12.5px">${p.memberNo?'#'+esc(p.memberNo):''}</span></button>`).join('')+`<button type="button" data-pg="1"><span class="av">G</span><b>Walk-in: “${esc(pm.value.trim())}”</b></button>`; L.style.display='';
+      L.querySelectorAll('[data-pk]').forEach(x=>x.onclick=()=>{ t.member_id=x.dataset.pk; t.guest=''; render(); }); L.querySelector('[data-pg]').onclick=()=>{ t.guest=pm.value.trim(); t.member_id=null; render(); }; }; pm.oninput=list; }
+  m.querySelectorAll('[data-lq]').forEach(x=>x.onclick=()=>{ const l=t.lines.find(y=>y.id===x.dataset.lq); l.qty=Math.max(0,n0(l.qty)+(+x.dataset.d)); if(!l.qty) t.lines=t.lines.filter(y=>y!==l); render(); });
+  m.querySelectorAll('[data-lx]').forEach(x=>x.onclick=()=>{ t.lines=t.lines.filter(y=>y.id!==x.dataset.lx); render(); });
+  const tip=$('psTip'); if(tip) tip.onchange=()=>{ t.tip=n0(tip.value); render(); };
+  const done=async paid=>{ if(await closeTicket(t,paid)){ toast(paid==='account'?`${fmt2(t.total)} charged to ${memberName(personById(t.member_id))}`:`${fmt2(t.total)} ${paid} — ticket closed`); POS.cur=newTicket(o.id); render(); } };
+  $('psAcct').onclick=()=>done('account'); $('psCash').onclick=()=>done('cash'); $('psCard').onclick=()=>done('card');
+  $('psHold').onclick=()=>{ POS.tickets=(POS.tickets||[]).filter(x=>x.id!==t.id).concat([Object.assign({},t)]); posLocalWrite(); if(acctCloud()) sb.from('pos_tickets').upsert(trow(Object.assign({},t))).then(()=>{}); POS.cur=newTicket(o.id); toast('Ticket on hold'); render(); };
+  const ph=$('psHeld'); if(ph) ph.onclick=()=>openDrawer({kicker:o.name,title:'Tickets on hold',body:held.map(x=>`<button class="btn" data-hh="${x.id}" style="width:100%;justify-content:space-between;margin-bottom:8px"><span>${esc(x.member_id?memberName(personById(x.member_id)||{}):x.guest||'Walk-in')} · ${esc(ticketText(x))}</span><b>${fmt2(ticketTotals(x).total)}</b></button>`).join(''),wire:r=>{ r.querySelectorAll('[data-hh]').forEach(x=>x.onclick=()=>{ const h=held.find(y=>y.id===x.dataset.hh); POS.tickets=POS.tickets.filter(y=>y.id!==h.id); if(acctCloud()) sb.from('pos_tickets').delete().eq('id',h.id).then(()=>{}); posLocalWrite(); POS.cur=h; POS.outlet=h.outlet; closeDrawer(); render(); }); }});
+  $('psSet').onclick=()=>go('possetup'); $('psTk').onclick=()=>go('postickets');
+}
+/* ---------- tickets of a day ---------- */
+function vPosTickets(m){ if(!posOn()){ go('dash'); return; } if(POS.tickets==null){ posLoad().then(()=>render()); m.innerHTML=head('Tickets','Loading…'); return; }
+  const day=POS.day||todayISO(), P=posSettings(), all=(POS.tickets||[]).filter(t=>t.status!=='open'&&String(t.closed_at||t.created_at).slice(0,10)===day).sort((a,b)=>String(b.closed_at||'').localeCompare(String(a.closed_at||'')));
+  const live=all.filter(t=>t.status==='closed'), by=k=>sum(live.filter(t=>t.paid===k),t=>t.total);
+  m.innerHTML=`<div class="crumb"><button id="ptBack">Point of sale</button><span class="muted">/</span><span class="muted">Tickets</span></div>`+head('Tickets',`Everything closed on ${dateTxt(day)}.`,btn('CSV','ptCsv','',I.down))+`
+    <div class="toolbar"><input class="inp" type="date" id="ptDay" value="${day}" style="height:38px;width:170px"></div>
+    <div class="grid g4">${kpi('Sales',fmt2(sum(live,t=>t.total)),`${live.length} ticket${live.length===1?'':'s'}`)}${kpi('To accounts',fmt2(by('account')),`${live.filter(t=>t.paid==='account').length} tickets`)}${kpi('Cash & card',fmt2(by('cash')+by('card')),`cash ${fmt2(by('cash'))} · card ${fmt2(by('card'))}`)}${kpi('Tax · service · tips',fmt2(sum(live,t=>t.tax)),`service ${fmt2(sum(live,t=>t.svc))} · tips ${fmt2(sum(live,t=>t.tip))}`)}</div>
+    <div class="card lg" style="overflow:hidden">${all.length?all.map(t=>{ const o=outletOf(t.outlet)||{name:t.outlet}; const who=t.member_id?memberName(personById(t.member_id)||{})||'Member':t.guest||'Walk-in'; return `<div class="lr${t.status==='void'?' void':''}"><div class="cell2"><span class="ln">${esc(who)} <span class="chip" style="height:20px;font-size:11px">${esc(o.name)}</span>${t.status==='void'?' <span class="chip warn">void</span>':''}</span><span class="ls">${new Date(t.closed_at||t.created_at).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'})} · ${esc(ticketText(t))}${t.status==='void'?' · '+esc(t.void_reason||''):''}</span></div><div class="lm"><span>${t.paid==='account'?'on account':esc(t.paid||'')}</span></div><b class="lnet">${fmt2(t.total)}</b><span class="lact">${t.status==='void'?'':`<button class="ib" data-tv="${t.id}" aria-label="Void">${I.x}</button>`}</span></div>`; }).join(''):`<div class="empty"><b>No tickets</b><span>Nothing was closed on this day.</span></div>`}</div>`;
+  $('ptBack').onclick=()=>go('pos'); $('ptDay').onchange=()=>{ POS.day=$('ptDay').value; render(); };
+  m.querySelectorAll('[data-tv]').forEach(x=>x.onclick=async()=>{ const t=all.find(y=>y.id===x.dataset.tv); const reason=prompt(`Void the ${fmt2(t.total)} ticket? Say why; it stays on the record${t.acct_item?' and the account charge is voided too':''}.`); if(reason==null) return; if(!reason.trim()){ toast('A reason is needed'); return; } if(await voidTicket(t,reason.trim())) render(); });
+  $('ptCsv').onclick=()=>{ const qq=v=>'"'+String(v??'').replace(/"/g,'""')+'"'; dl([['Time','Outlet','Who','Lines','Subtotal','Service','Tax','Tip','Total','Paid','Status'].map(qq).join(',')].concat(all.map(t=>[new Date(t.closed_at||t.created_at).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'}),(outletOf(t.outlet)||{}).name||t.outlet,t.member_id?memberName(personById(t.member_id)||{}):t.guest||'Walk-in',ticketText(t),n0(t.subtotal).toFixed(2),n0(t.svc).toFixed(2),n0(t.tax).toFixed(2),n0(t.tip).toFixed(2),n0(t.total).toFixed(2),t.paid,t.status].map(qq).join(','))).join('\n'),'text/csv',`tickets-${day}.csv`); };
+}
+/* ---------- setup: outlets, products, stock ---------- */
+function vPosSetup(m){ if(!posOn()){ go('dash'); return; } const P=posSettings();
+  m.innerHTML=`<div class="crumb"><button id="pxBack">Point of sale</button><span class="muted">/</span><span class="muted">Setup</span></div>`+head('Point of sale setup','Outlets and what each one sells. Prices are before tax; tax and the service charge follow the billing item of the outlet unless a product says otherwise.',btn('Import products (CSV)','pxCsv','',I.down)+btn('New outlet','pxNewO','')+btn('New product','pxNewP','pri',I.plus))+`
+    <div class="grid g3">${P.outlets.map(o=>`<div class="card pad"><div style="display:flex;justify-content:space-between;gap:10px;align-items:flex-start"><div><b style="font-size:17px;color:var(--navy)">${esc(o.name)}</b><div class="muted" style="font-size:12.5px">${o.kind==='fnb'?'Food & beverage':'Pro shop'} · bills as ${esc((itemOf(o.item)||{}).name||o.item)} · ${P.products.filter(x=>x.outlet===o.id).length} products</div></div><button class="btn sm" data-eo="${o.id}">Edit</button></div></div>`).join('')}</div>
+    <div class="card" style="overflow:hidden"><div class="cardhead"><div><h2 class="h2">Products</h2></div></div>${P.products.length?`<div class="t"><div class="tr th" style="grid-template-columns:minmax(150px,1.5fr) 110px 120px 90px 60px 60px 80px 44px"><span>Product</span><span>Outlet</span><span>Category</span><span class="r">Price</span><span>Tax</span><span>Svc</span><span class="r">Stock</span><span></span></div>
+      ${P.products.slice().sort((a,b)=>a.outlet.localeCompare(b.outlet)||(a.cat||'').localeCompare(b.cat||'')||a.name.localeCompare(b.name)).map(x=>`<div class="tr${x.active===false?' void':''}" style="grid-template-columns:minmax(150px,1.5fr) 110px 120px 90px 60px 60px 80px 44px"><div class="cell2"><b>${esc(x.name)}</b>${x.sku?`<small>${esc(x.sku)}</small>`:''}</div><span class="muted">${esc((outletOf(x.outlet)||{}).name||'')}</span><span class="muted">${esc(x.cat||'')}</span><b class="r num">${fmt2(x.price)}</b><span>${x.taxable==null?'—':x.taxable?'yes':'no'}</span><span>${x.svc==null?'—':x.svc?'yes':'no'}</span><span class="r num">${x.track?n0(x.stock):'—'}</span><span class="actions"><button class="ib" data-ep="${x.id}" aria-label="Edit">${I.edit}</button></span></div>`).join('')}</div>`:'<div class="empty"><b>No products yet</b><span>Add them one by one or import a CSV with name, category, price, sku, stock.</span></div>'}</div>`;
+  $('pxBack').onclick=()=>go('pos'); $('pxNewO').onclick=()=>outletDrawer(null); $('pxNewP').onclick=()=>productDrawer(null); $('pxCsv').onclick=importProducts;
+  m.querySelectorAll('[data-eo]').forEach(x=>x.onclick=()=>outletDrawer(outletOf(x.dataset.eo))); m.querySelectorAll('[data-ep]').forEach(x=>x.onclick=()=>productDrawer(productOf(x.dataset.ep)));
+}
+function outletDrawer(o){ const P=posSettings(), b=acctSettings();
+  openDrawer({kicker:'Point of sale',title:o?o.name:'New outlet',body:field('Name','oN',o?o.name:'',{ph:'Grill · Halfway house · Pro shop'})+pair(field('Kind','oK',o?o.kind:'fnb',{type:'select',options:[['fnb','Food & beverage (service charge, tip)'],['proshop','Pro shop / retail']]}),field('Bills to the account as','oI',o?o.item:'fnb',{type:'select',options:b.items.filter(x=>!['finance','late','min'].includes(x.id)).map(x=>[x.id,x.name])})),
+    save:()=>{ const name=fv('oN'); if(!name){ toast('Name the outlet'); return false; } const d={name,kind:fv('oK'),item:fv('oI')}; if(o) Object.assign(o,d); else P.outlets.push(Object.assign({id:uid()},d)); persist(); },
+    del:o&&P.outlets.length>1?()=>{ if(!confirm(`Remove ${o.name}? Its products go with it.`)) return false; P.products=P.products.filter(x=>x.outlet!==o.id); P.outlets=P.outlets.filter(x=>x!==o); if(POS.outlet===o.id) POS.outlet=''; persist(); }:null}); }
+function productDrawer(x){ const P=posSettings();
+  openDrawer({kicker:'Point of sale',title:x?x.name:'New product',body:field('Name','pN',x?x.name:'')+pair(field('Outlet','pO',x?x.outlet:(POS.outlet||P.outlets[0].id),{type:'select',options:P.outlets.map(o=>[o.id,o.name])}),field('Category','pC',x?x.cat:'',{ph:'Drinks · Sandwiches · Balls'}))+pair(field('Price $ (before tax)','pP',x?x.price:'',{type:'number'}),field('SKU','pS',x?x.sku||'':''))+
+      pair(field('Sales tax','pT',x&&x.taxable!=null?(x.taxable?'yes':'no'):'',{type:'select',options:[['','As the outlet'],['yes','Yes'],['no','No']]}),field('Service charge','pV',x&&x.svc!=null?(x.svc?'yes':'no'):'',{type:'select',options:[['','As the outlet'],['yes','Yes'],['no','No']]}))+`<label class="check"><input type="checkbox" id="pTr"${x&&x.track?' checked':''}>Track stock</label>`+field('Stock on hand','pQ',x?x.stock??'':'',{type:'number'})+`<label class="check"><input type="checkbox" id="pA"${!x||x.active!==false?' checked':''}>On the register</label>`,
+    save:()=>{ const name=fv('pN'), price=fnum('pP'); if(!name){ toast('Name the product'); return false; } const tv=fv('pT'), sv=fv('pV'); const d={name,outlet:fv('pO'),cat:fv('pC'),price,sku:fv('pS'),taxable:tv===''?null:tv==='yes',svc:sv===''?null:sv==='yes',track:$('pTr').checked,stock:fnum('pQ'),active:$('pA').checked}; if(x) Object.assign(x,d); else P.products.push(Object.assign({id:uid()},d)); persist(); },
+    del:x?()=>{ P.products=P.products.filter(y=>y!==x); persist(); }:null}); }
+function importProducts(){ const P=posSettings();
+  openDrawer({kicker:'Point of sale',title:'Import products',body:field('Outlet','ipO',POS.outlet||P.outlets[0].id,{type:'select',options:P.outlets.map(o=>[o.id,o.name])})+`<div class="fld"><label class="lbl">CSV file</label><input type="file" id="ipF" accept=".csv,text/csv"></div><p class="hint">Columns: <b>name, price</b> and optionally category, sku, stock. A header row is expected. Existing products with the same name in the outlet are updated.</p>`,saveLabel:'Import',
+    save:()=>{ const f=$('ipF').files[0]; if(!f){ toast('Choose a file'); return false; } const oid=fv('ipO'); f.text().then(txt=>{ const rows=txt.split(/\r?\n/).filter(l=>l.trim()).map(l=>{ const out=[]; let cur='', q=false; for(const ch of l){ if(ch==='"'){ q=!q; continue; } if(ch===','&&!q){ out.push(cur); cur=''; continue; } cur+=ch; } out.push(cur); return out.map(s=>s.trim()); });
+        const H=rows.shift().map(h=>h.toLowerCase()); const ix=k=>H.findIndex(h=>h===k||h.startsWith(k)); const iN=ix('name'), iP=ix('price'), iC=ix('cat'), iS=ix('sku'), iQ=ix('stock'); if(iN<0||iP<0){ toast('Need name and price columns'); return; } let n=0;
+        for(const r of rows){ const name=r[iN]; if(!name) continue; const d={name,outlet:oid,cat:iC>=0?r[iC]||'':'',price:n0(String(r[iP]).replace(/[$,]/g,'')),sku:iS>=0?r[iS]||'':'',track:iQ>=0&&r[iQ]!=='',stock:iQ>=0?n0(r[iQ]):0,taxable:null,svc:null,active:true}; const ex=P.products.find(x=>x.outlet===oid&&x.name.toLowerCase()===name.toLowerCase()); if(ex) Object.assign(ex,d); else P.products.push(Object.assign({id:uid()},d)); n++; }
+        persist(); toast(`${n} product${n===1?'':'s'} imported`); render(); }); }}); }
 /* =====================================================================
    Club Hub — Tournament rounds & results. A tournament declares its rounds (one or more per day, each with a
    format: e.g. Saturday scramble/shamble split, Sunday best ball); one button builds the scoring events from the
@@ -7836,7 +7963,7 @@ async function resultsPDF(t,opt){
    page counts, and a reload is tried once per build — if the page that comes back is still the old one, the CDN
    hasn't caught up; wait a while before trying that build again. */
 (function(){
-  const ME='20261026221953', KEY='au_tried', RETRY=10*60*1000; let ready=false, lastCheck=0;
+  const ME='20261026222433', KEY='au_tried', RETRY=10*60*1000; let ready=false, lastCheck=0;
   const typing=()=>{ const a=document.activeElement; return a&&/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)&&a.value&&a.type!=='search'; };
   const safe=()=>!typing()&&(typeof window.__canReload!=='function'||window.__canReload());
   const tried=()=>{ try{ const [b,t]=(sessionStorage.getItem(KEY)||'').split('|'); return b?{build:b,at:+t||0}:null; }catch(_){ return null; } };
