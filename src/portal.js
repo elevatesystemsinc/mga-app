@@ -17,7 +17,10 @@ const tStatusChip=s=>`<span class="chip ${STATUS_CHIP[s]||''}">${esc(STATUS_LABE
 const planLabel=p=>({club:'Club management',golf:'Golf management'}[p]||p||'—');
 const tenantURL=slug=>'https://'+slug+'.'+BASE_DOMAIN+'/';
 const modulesOf=t=>Object.assign({},(t&&t.modules)||{},{golf:true});
-const modChips=t=>{ const m=modulesOf(t); return MODULE_CATALOG.filter(x=>m[x.id]).map(x=>`<span class="chip${x.id==='golf'?'':' gold'}">${esc(x.name)}</span>`).join(' '); };
+const modChips=t=>{ const m=modulesOf(t); return MODULE_CATALOG.filter(x=>m[x.id]&&!(m.club&&x.addon)).map(x=>`<span class="chip${x.id==='golf'?'':' gold'}">${esc(x.name)}</span>`).join(' '); };
+/* the checkbox rows: Golf management always on; an add-on that Club management includes is ticked and locked while club is on */
+const modRow=(x,m,attr)=>{ const inc=x.addon&&m.club; return `<label class="mr" style="grid-template-columns:28px minmax(0,1fr);cursor:pointer"><input type="checkbox" ${attr}="${x.id}"${m[x.id]||x.base||inc?' checked':''}${x.base||inc?' disabled':''}><span><b>${esc(x.name)}</b>${inc?' <span class="chip gold">included in Club management</span>':x.addon?' <span class="chip">add-on</span>':''}<br><span class="muted" style="font-size:12.5px">${esc(x.desc)}</span></span></label>`; };
+function wireModRows(root,attr){ const club=root.querySelector(`[${attr}=club]`); if(!club) return; club.onchange=()=>{ root.querySelectorAll(`[${attr}]`).forEach(c=>{ const x=MODULE_CATALOG.find(y=>y.id===c.getAttribute(attr)); if(x&&x.addon){ if(club.checked){ c.checked=true; c.disabled=true; } else c.disabled=false; } }); }; }
 const addrLine=a=>{ a=a||{}; return [a.line1,a.line2,[a.city,a.state].filter(Boolean).join(', ')+(a.zip?' '+a.zip:''),a.country].map(x=>String(x||'').trim()).filter(Boolean); };
 const tenantOf=slug=>(PS.tenants||[]).find(t=>t.slug===slug)||null;
 const usersOf=slug=>PS.users.filter(u=>u.tenant===slug);
@@ -120,7 +123,7 @@ function vClient(m,slug){
     <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px;align-items:start" class="g2">
       ${card('Subscription',`<div style="padding:0 22px 18px">${kv('Plan',esc(planLabel(t.plan)))}${kv('Status',tStatusChip(t.status)+(t.ended_on?' <span class="muted" style="font-size:13px">since '+fdate(t.ended_on)+'</span>':''))}${kv('Client since',fdate(t.started_on))}${kv('Renews',fdate(t.renews_on))}${kv('Billing e-mail',t.billing_email?`<a href="mailto:${esc(t.billing_email)}">${esc(t.billing_email)}</a>`:'')}
         <div style="border-top:1px solid var(--line);padding-top:10px;margin-top:4px"><span class="muted" style="font-size:13px">Modules</span>
-        <div class="mini" style="margin-top:8px" id="ptMods">${MODULE_CATALOG.map(x=>`<label class="mr" style="grid-template-columns:28px minmax(0,1fr);cursor:pointer"><input type="checkbox" data-mod="${x.id}"${mods[x.id]||x.base?' checked':''}${x.base?' disabled':''}><span><b>${esc(x.name)}</b>${x.soon?' <span class="chip inact">coming</span>':''}<br><span class="muted" style="font-size:12.5px">${esc(x.desc)}</span></span></label>`).join('')}</div>
+        <div class="mini" style="margin-top:8px" id="ptMods">${MODULE_CATALOG.map(x=>modRow(x,mods,'data-mod')).join('')}</div>
         <div class="actions" style="margin-top:10px"><button class="btn" id="ptModSave">Save modules</button><span class="hint" style="margin-left:8px">The club’s hub picks changes up on its next load.</span></div></div></div>`)}
       ${card('Club details',`<div style="padding:0 22px 18px">${kv('Address',addr.length?addr.map(esc).join('<br>'):'')}${kv('Phone',esc(t.phone||''))}${kv('Website',t.website?`<a href="${esc(/^https?:/.test(t.website)?t.website:'https://'+t.website)}" target="_blank" rel="noopener">${esc(t.website)}</a>`:'')}${kv('Time zone',esc(t.timezone||''))}${kv('Short name',esc(t.short||''))}${kv('Other hosts',(t.hosts||[]).map(esc).join('<br>'))}${kv('Organizations',orgs.length?orgs.map(o=>esc(o.short||o.name)).join(', '):'')}${kv('Notes',esc(t.notes||'').replace(/\n/g,'<br>'))}</div>`,btn('Edit','ptEdit2','',I.edit))}
     </div>
@@ -133,7 +136,8 @@ function vClient(m,slug){
   $('ptBack').onclick=e=>{ e.preventDefault(); PS.view='clients'; PS.slug=null; portalNav(); vPortal(m); };
   $('ptOpen').onclick=()=>openHub(t); $('ptStatus').onclick=()=>statusDrawer(t); $('ptEdit').onclick=()=>editClient(t); $('ptEdit2').onclick=()=>editClient(t);
   $('ptAddC').onclick=()=>editContact(t,null); $('ptAddU').onclick=()=>staffDrawer(t,null); $('ptLink').onclick=()=>linkDrawer(t);
-  $('ptModSave').onclick=async()=>{ const nm={golf:true}; m.querySelectorAll('[data-mod]').forEach(c=>{ if(c.checked) nm[c.dataset.mod]=true; }); const b=$('ptModSave'); b.disabled=true;
+  wireModRows(m,'data-mod');
+  $('ptModSave').onclick=async()=>{ const nm={golf:true}; m.querySelectorAll('[data-mod]').forEach(c=>{ if(c.checked) nm[c.dataset.mod]=true; }); if(nm.club) (MODULE_CATALOG.find(x=>x.id==='club').includes||[]).forEach(k=>nm[k]=true); const b=$('ptModSave'); b.disabled=true;
     const {error}=await sb.from('tenants').update({modules:nm,updated_at:new Date().toISOString()}).eq('slug',t.slug); b.disabled=false;
     if(error){ toast(error.message); return; } t.modules=nm; toast('Modules saved');
     const on=MODULE_CATALOG.filter(x=>nm[x.id]&&!x.base).map(x=>x.name).join(', ')||'Golf management only'; logEvent(t.slug,'modules','Modules: '+on); vClient(m,slug); };
@@ -141,14 +145,14 @@ function vClient(m,slug){
   m.querySelectorAll('[data-u]').forEach(r=>r.onclick=()=>staffDrawer(t,users.find(u=>u.user_id===r.dataset.u)));
 }
 /* ---------- drawers ---------- */
-function moduleBoxes(m){ return `<div class="fld"><span class="lbl">Modules</span><div class="mini" id="ptModsD">${MODULE_CATALOG.map(x=>`<label class="mr" style="grid-template-columns:28px minmax(0,1fr);cursor:pointer"><input type="checkbox" data-modd="${x.id}"${m[x.id]||x.base?' checked':''}${x.base?' disabled':''}><span><b>${esc(x.name)}</b>${x.soon?' <span class="chip inact">coming</span>':''}<br><span class="muted" style="font-size:12.5px">${esc(x.desc)}</span></span></label>`).join('')}</div></div>`; }
-function readModulesD(root){ const m={golf:true}; root.querySelectorAll('[data-modd]').forEach(c=>{ if(c.checked) m[c.dataset.modd]=true; }); return m; }
+function moduleBoxes(m){ return `<div class="fld"><span class="lbl">Modules</span><div class="mini" id="ptModsD">${MODULE_CATALOG.map(x=>modRow(x,m,'data-modd')).join('')}</div></div>`; }
+function readModulesD(root){ const m={golf:true}; root.querySelectorAll('[data-modd]').forEach(c=>{ if(c.checked) m[c.dataset.modd]=true; }); if(m.club) (MODULE_CATALOG.find(x=>x.id==='club').includes||[]).forEach(k=>m[k]=true); return m; }
 function editClient(t){
   const a=(t&&t.address)||{};
   openDrawer({kicker:t?'Client':'New client',title:t?t.name:'New client',wide:true,saveLabel:t?'Save':'Create client',
     body:pair(field('Club name','ptN',t?.name||'',{ph:'e.g. Walnut Creek Country Club'}),field('Short name','ptS',t?.short||'',{ph:'e.g. WCCC'}))+
       (t?'':field('Address (subdomain)','ptSlug','',{ph:'e.g. wccc  →  wccc.'+BASE_DOMAIN})+'<p class="hint">Lower-case letters, digits and dashes. It becomes the club’s address and can’t change later.</p>')+
-      `<div class="fld"><span class="lbl">Plan</span>${seg('ptPlan',[['golf','Golf management'],['club','Club management']],t?.plan||'golf')}<p class="hint">Golf management is the package (everything built today). Club management adds running the whole club, with its toggles below.</p></div>`+moduleBoxes(modulesOf(t))+
+      `<div class="fld"><span class="lbl">Plan</span>${seg('ptPlan',[['golf','Golf management'],['club','Club management']],t?.plan||'golf')}<p class="hint">Golf management is the package; Point of sale is its add-on for a golf-only client. Club management is the full club — billing, point of sale, bookings and the member portal.</p></div>`+moduleBoxes(modulesOf(t))+
       (t?'':`<div class="fld"><span class="lbl">Status</span>${seg('ptSt0',[['prospect','Prospect'],['trial','Trial'],['active','Active']],'active')}</div>`)+
       pair(field('Client since','ptFrom',t?.started_on||'',{type:'date'}),field('Renews on','ptRen',t?.renews_on||'',{type:'date'}))+
       '<div class="fld"><span class="lbl">Address</span></div>'+field('','ptA1',a.line1||'',{ph:'Street'})+field('','ptA2',a.line2||'',{ph:'Suite, building (optional)'})+
@@ -158,7 +162,7 @@ function editClient(t){
       field('Other host names','ptH',(t?.hosts||[]).join(', '),{ph:'e.g. app.wcccmga.org, hub.wcccmga.org'})+'<p class="hint">Other addresses that open this club (their own domain). Each needs a CNAME to the site and a custom domain on Render.</p>'+
       field('Notes','ptNo',t?.notes||'',{type:'textarea'})+
       (t?'':`<div class="fld" style="margin-top:6px"><span class="lbl">First staff login (optional)</span>${pair(field('','ptLE','',{type:'email',ph:'head.pro@club.org'}),field('','ptLN','',{ph:'Name'}))}${seg('ptLMode',[['set','Set a password now'],['invite','E-mail an invite']],'set')}<p class="hint">A staff login for the whole club. With “set a password” the password is generated and shown once; an invite e-mails them a link to choose their own.</p></div>`),
-    wire:r=>{ wireSeg(r,'ptPlan',v=>{ const p=PLAN_PRESETS[v]||{}; r.querySelectorAll('[data-modd]').forEach(c=>{ if(!c.disabled) c.checked=!!p[c.dataset.modd]; }); }); wireSeg(r,'ptSt0'); wireSeg(r,'ptLMode'); },
+    wire:r=>{ wireModRows(r,'data-modd'); wireSeg(r,'ptPlan',v=>{ const p=PLAN_PRESETS[v]||{}; const club=r.querySelector('[data-modd=club]'); r.querySelectorAll('[data-modd]').forEach(c=>{ if(!c.disabled||c.dataset.modd!=='golf') { if(c.dataset.modd!=='golf'){ c.disabled=false; c.checked=!!p[c.dataset.modd]; } } }); if(club) club.onchange(); }); wireSeg(r,'ptSt0'); wireSeg(r,'ptLMode'); },
     save:()=>{ const name=fv('ptN'); if(!name){ toast('Give the club a name'); return false; }
       const slug=(t?t.slug:fv('ptSlug')).toLowerCase(); if(!/^[a-z0-9][a-z0-9-]{1,30}$/.test(slug)||['app','portal','www','api','admin','mail'].includes(slug)){ toast('Choose a different address: letters, digits and dashes'); return false; }
       const body=$('dBody');

@@ -275,13 +275,13 @@ let TENANCY=false, TENANT=null, TENANT_INFO=null, ACCESS=null;   // ACCESS = my_
    associations and small groups, dues collection, the club's treasury. Club management is the coming tier for running
    the whole club through Flagstick, with its own toggles (member billing, point of sale). */
 const MODULE_CATALOG=[
-  {id:'golf',    name:'Golf management', base:true, desc:'The package: the club directory, tournaments, rounds and results, live scoring and formats, the game library, associations (MGA, LGA, SMGA…), small groups, dues collection, the club’s treasury and budget'},
-  {id:'club',    name:'Bookings & tee sheet', desc:'Tee times, courts, pools and lessons — booked by staff on the sheet and by members in the portal'},
-  {id:'billing', name:'Member billing',  desc:'Member accounts: charges from dues, the shop and bookings, payments recorded by the club, statements'},
-  {id:'pos',     name:'Point of sale',   desc:'Food & beverage and pro shop tickets at the register, charged to member accounts or taken as cash / card; products and stock'},
+  {id:'golf', name:'Golf management', base:true, desc:'The package: the club directory, tournaments, rounds and results, live scoring and formats, the game library, associations (MGA, LGA, SMGA…), small groups, dues collection, the club’s treasury and budget'},
+  {id:'pos',  name:'Point of sale', addon:true, desc:'An add-on for a golf-only client (a municipal course, a pro shop): the register for the shop and the grill — products, stock, tickets as cash / card, and to member accounts where billing is on'},
+  {id:'club', name:'Club management', includes:['pos','billing'], desc:'The full club: member accounts & billing (classes, monthly billing, statements, finance charges, the GL), point of sale, bookings (tee sheet, courts, pools, lessons), the member portal with online payment and autopay'},
 ];
-const PLAN_PRESETS={golf:{golf:true},club:{golf:true,club:true,billing:true,pos:true}};
-function hasModule(k){ if(k==='golf'||k==='associations'||k==='groups') return true; if(!TENANCY||!TENANT_INFO) return true; return !!(TENANT_INFO.modules||{})[k]; }
+const PLAN_PRESETS={golf:{golf:true},club:{golf:true,club:true}};
+/* the switches on the tenant row: golf (always), pos, club. Club management includes billing and point of sale. */
+function hasModule(k){ if(k==='golf'||k==='associations'||k==='groups') return true; if(!TENANCY||!TENANT_INFO) return true; const m=TENANT_INFO.modules||{}; if(k==='billing'||k==='pos') return !!(m[k]||m.club); return !!m[k]; }
 /* a login's scope inside the tenant (portal-setup.sql): staff see the whole club; an 'org' login only its organizations */
 let SCOPED=false, SCOPE_ORGS=[], GRANT=null;
 const scopedDB=()=>!!(ACCESS&&ACCESS.grants);          // portal-setup.sql has run

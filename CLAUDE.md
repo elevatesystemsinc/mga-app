@@ -111,8 +111,12 @@ compare-and-swap, 250 ms polling "realtime"). If you change `core.js` saving/mer
 `tests/test_tenants.py`): a client is a row in `tenants` (`slug` = subdomain, `plan` preset, **`modules`** switchboard,
 `status` prospect/trial/active/suspended/inactive, extra `hosts`, address/contact fields, `login_email`); every row in
 `mga_hub` / `golf_events` / `golf_scores` / `calcutta_share` / `hub_keys` carries `tenant`, `mga_hub`'s key is
-`(tenant, id)`. **Modules:** Golf management (`golf`) is the package = everything built today (associations and small
-groups included); `club`, `billing`, `pos` are the coming Club-management tier (`MODULE_CATALOG`, `hasModule()`).
+`(tenant, id)`. **Modules — three offerings** (`MODULE_CATALOG`, the owner, Oct 2026): **Golf management** (`golf`, the base = everything
+built for associations and small groups), **Point of sale** (`pos`, an add-on for a golf-only client such as a municipal
+course) and **Club management** (`club`: the full club — member accounts & billing, point of sale, bookings, the member
+portal). The tenant row's `modules` switches are `golf` / `pos` / `club`; `hasModule('billing')` and `hasModule('pos')` are on
+whenever `club` is (the portal also writes `billing` and `pos` explicitly when it saves a club-managed client). Code checks
+`hasModule('billing')` for accounts, `'pos'` for the register, `'club'` for bookings.
 **Logins** (`tenant_users`): role `staff` = the whole club, created by Flagstick in the portal; role `org` = only the
 organizations in `orgs` (a board login), `manage` = a board administrator who invites its own board; staff invite boards
 from the club hub's Logins page. RLS does the isolation: `can_org(tenant, org)` on every data table, `can_manage_login()`
