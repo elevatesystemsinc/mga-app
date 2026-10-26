@@ -25,10 +25,33 @@ I.org=svg('<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18M9 
 I.survey=svg('<rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4V3h6v2M9 11h6M9 15h4"/>');
 I.lib=svg('<path d="M4 5h5a3 3 0 013 3v12a2 2 0 00-2-2H4z"/><path d="M20 5h-5a3 3 0 00-3 3v12a2 2 0 012-2h6z"/>');
 I.coins=svg('<ellipse cx="12" cy="6" rx="7" ry="3"/><path d="M5 6v12c0 1.7 3.1 3 7 3s7-1.3 7-3V6"/><path d="M5 12c0 1.7 3.1 3 7 3s7-1.3 7-3"/>');
-const NAV=[['dash','Dashboard',I.home],['tournaments','Tournaments',I.flag],['members','Members',I.users],['collections','Dues collection',I.coins],['accounts','Member accounts',I.ledger],['pos','Point of sale',I.cart],['bookings','Bookings',I.cal],['board','Board',I.shield],['budget','Season budget',I.ledger],['orgs','Organizations',I.org],['library','Game library',I.lib],['logins','Logins',I.shield],['surveys','Surveys',I.survey]];
+const NAV=[['dash','Dashboard',I.home],['tournaments','Tournaments',I.flag],['members','Members',I.users],['collections','Dues collection',I.coins],['accounts','Member accounts',I.ledger],['billsetup','Billing setup',I.shield],['pos','Register',I.cart],['postickets','Tickets',I.ledger],['posmenu','Menus & products',I.lib],['proshop','Pro shop',I.cart],['teesheet','Tee sheet',I.flag],['bookings','Bookings',I.cal],['board','Board',I.shield],['budget','Season budget',I.ledger],['orgs','Organizations',I.org],['library','Game library',I.lib],['logins','Logins',I.shield],['surveys','Surveys',I.survey]];
 /* which pages each kind of organization gets (associations get everything) */
-const ORG_NAV={club:['dash','tournaments','golf','members','collections','accounts','pos','bookings','orgs','library','budget','treasury','surveys','logins'],association:['dash','tournaments','golf','members','board','treasury','budget','surveys'],group:['dash','tournaments','golf','members','surveys']};
-function navItems(){ const allow=ORG_NAV[db.kind]; return NAV.filter(([k])=>(!allow||allow.includes(k))&&(k!=='logins'||canManageLogins())&&(k!=='accounts'||(typeof acctOn==='function'&&acctOn()))&&(k!=='pos'||(typeof posOn==='function'&&posOn()))&&(k!=='bookings'||(typeof bookOn==='function'&&bookOn()))).map(([k,l,ic])=>[k,k==='members'&&isClub()?'Directory':l,ic]); }
+const ORG_NAV={club:['dash','tournaments','golf','teesheet','library','proshop','pos','postickets','posmenu','members','accounts','collections','billsetup','logins','bookings','orgs','library','budget','treasury','surveys','logins'],association:['dash','tournaments','golf','members','board','treasury','budget','surveys'],group:['dash','tournaments','golf','members','surveys']};
+/* the rail: which entries show for this organization, gated by module and role. Keys that are views of another page
+   (teesheet → bookings, proshop → pos, posmenu → possetup) are listed in NAV_PAGE; NAV_OWNS says which pages light an entry up. */
+const NAV_PAGE={teesheet:'bookings',proshop:'pos',posmenu:'possetup'};
+const NAV_OWNS={tournaments:['tournaments','tournament'],accounts:['accounts','account'],bookings:['bookings','booksetup'],teesheet:['bookings'],pos:['pos'],proshop:['pos'],posmenu:['possetup']};
+const NAV_SECTIONS={club:[['',['dash']],['Golf',['tournaments','golf','teesheet','library','proshop']],['Food & beverage',['pos','postickets','posmenu']],['Membership',['members','accounts','collections','billsetup','logins']],['Club',['bookings','orgs','treasury','budget','surveys']]],
+  association:[['',['dash']],['Golf',['tournaments','golf']],['Membership',['members','board']],['Money',['treasury','budget']],['',['surveys']]],
+  group:[['',['dash']],['Golf',['games','ledger','tournaments','golf']],['',['members','surveys']]]};
+const NAV_GATE={logins:()=>canManageLogins(),accounts:()=>typeof acctOn==='function'&&acctOn(),billsetup:()=>typeof acctOn==='function'&&acctOn(),pos:()=>typeof posOn==='function'&&posOn(),postickets:()=>typeof posOn==='function'&&posOn(),posmenu:()=>typeof posOn==='function'&&posOn(),
+  proshop:()=>typeof posOn==='function'&&posOn()&&posSettings().outlets.some(o=>o.kind==='proshop'),bookings:()=>typeof bookOn==='function'&&bookOn(),teesheet:()=>typeof bookOn==='function'&&bookOn()&&bookSettings().facilities.some(f=>f.kind==='tee')};
+function navItems(){ const allow=ORG_NAV[db.kind]; return NAV.filter(([k])=>(!allow||allow.includes(k))&&(!NAV_GATE[k]||NAV_GATE[k]())).map(([k,l,ic])=>[k,k==='members'&&isClub()?'Directory':k==='golf'&&isClub()?'Events & live scoring':k==='bookings'&&isClub()?'Courts, pool & lessons':l,ic]); }
+/* is this rail entry the one lit for the page on screen? a view of a shared page looks at that page's state */
+function navActive(k){ const pg=view.page; const owns=NAV_OWNS[k]||[k]; if(!owns.includes(pg)) return false;
+  if(k==='teesheet') return typeof BK!=='undefined'&&(facOf(BK.fac)||{}).kind==='tee'; if(k==='bookings'&&pg==='bookings') return !(typeof BK!=='undefined'&&(facOf(BK.fac)||{}).kind==='tee');
+  if(k==='proshop') return typeof POS!=='undefined'&&(outletOf(POS.outlet)||{}).kind==='proshop'; if(k==='pos') return !(typeof POS!=='undefined'&&(outletOf(POS.outlet)||{}).kind==='proshop'); return true; }
+function navGo(k){ if(k==='golf') view.geid=null;
+  if(k==='teesheet'){ const f=bookSettings().facilities.find(x=>x.kind==='tee'); BK.fac=f?f.id:''; }
+  if(k==='bookings'&&typeof BK!=='undefined'&&(facOf(BK.fac)||{}).kind==='tee'){ const f=bookSettings().facilities.find(x=>x.kind!=='tee'); BK.fac=f?f.id:''; }
+  if(k==='proshop'||k==='pos'){ const want=k==='proshop'?'proshop':'fnb'; if((outletOf(POS.outlet)||{}).kind!==want){ const o=posSettings().outlets.find(x=>x.kind===want); if(o){ POS.outlet=o.id; POS.cur=null; } } }
+  go(NAV_PAGE[k]||k); }
+function navHTML(items,live){ const secs=NAV_SECTIONS[db.kind]||[['',items.map(x=>x[0])]], placed=new Set(), out=[];
+  const btn=([k,l,ic])=>`<button class="nav${navActive(k)?' on':''}" data-go="${k}">${ic}<span>${l}</span>${k==='golf'&&live.length?'<span class="livedot" aria-label="Live scoring"></span>':''}</button>`;
+  for(const [title,keys] of secs){ const its=keys.map(k=>items.find(x=>x[0]===k)).filter(Boolean); if(!its.length) continue; its.forEach(x=>placed.add(x[0])); out.push((title?`<div class="navsec">${esc(title)}</div>`:'')+its.map(btn).join('')); }
+  const rest=items.filter(x=>!placed.has(x[0])); if(rest.length) out.push(rest.map(btn).join(''));
+  return out.join('')+live.map(e=>`<button class="nav livelink" data-golfev="${e.id}"><span class="livedot"></span><span class="trunc">Leaderboard · ${esc(e.name)}</span></button>`).join(''); }
 /* the organization on screen: the club's record from CLUB.orgs wins over what the document says */
 const curOrg=()=>!db?null:isClub()?Object.assign({},CLUB_META,{name:CLUB.name||CLUB_META.name,crest:CLUB.crest||CLUB_META.crest}):(orgMeta()||{id:db.id,kind:db.kind,name:db.name,short:db.short});
 const orgShort=()=>{ const o=curOrg(); return o?(o.short||o.name||'club'):'club'; };
@@ -125,10 +148,9 @@ function renderInner(){
   const ys=Object.keys(db.seasons).sort((a,b)=>b-a);
   $('seasonSel').innerHTML=ys.map(y=>`<option value="${y}"${y===Y()?' selected':''}>${y} season</option>`).join('')+'<option value="__new">+ New season…</option>';
   const live=typeof liveEvents==='function'?liveEvents():[];
-  const items=navItems(); if(view.page!=='pick'&&!items.some(([k])=>k===view.page||(k==='tournaments'&&view.page==='tournament')||(k==='accounts'&&/^(account|billsetup)$/.test(view.page))||(k==='pos'&&/^(postickets|possetup)$/.test(view.page))||(k==='bookings'&&view.page==='booksetup'))) view.page='dash';
-  $('nav').innerHTML=items.map(([k,l,ic])=>`<button class="nav${(view.page===k||(k==='tournaments'&&view.page==='tournament')||(k==='accounts'&&/^(account|billsetup)$/.test(view.page))||(k==='pos'&&/^(postickets|possetup)$/.test(view.page))||(k==='bookings'&&view.page==='booksetup'))?' on':''}" data-go="${k}">${ic}<span>${l}</span>${k==='golf'&&live.length?'<span class="livedot" aria-label="Live scoring"></span>':''}</button>`).join('')+
-    live.map(e=>`<button class="nav livelink" data-golfev="${e.id}"><span class="livedot"></span><span class="trunc">Leaderboard · ${esc(e.name)}</span></button>`).join('');
-  $('nav').querySelectorAll('[data-go]').forEach(b=>b.onclick=()=>{ if(b.dataset.go==='golf') view.geid=null; go(b.dataset.go); });
+  const items=navItems(); if(view.page!=='pick'&&!items.some(([k])=>(NAV_OWNS[k]||[k]).includes(view.page))) view.page='dash';
+  $('nav').innerHTML=navHTML(items,live);
+  $('nav').querySelectorAll('[data-go]').forEach(b=>b.onclick=()=>navGo(b.dataset.go));
   const m=$('main');
   ({dash:vDash,tournaments:vTournaments,tournament:vTournament,members:vMembers,board:vBoard,budget:vBudget,treasury:vTreasury,golf:vGolf,orgs:vOrgs,pick:vPicker,collections:vCollections,games:vGames,ledger:vLedger,library:vLibrary,logins:vLogins,surveys:vSurveys,accounts:vAccounts,account:vAccount,billsetup:vBillSetup,pos:vPos,postickets:vPosTickets,possetup:vPosSetup,bookings:vBookings,booksetup:vBookSetup}[view.page]||vDash)(m);
   if(view.page==='board'&&!isClub()&&typeof loginsCard==='function') loginsCard(m,ORG_ID);

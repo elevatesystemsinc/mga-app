@@ -31,7 +31,8 @@ body{font-variant-numeric:lining-nums}
 
 /* layout */
 .app{display:flex;min-height:100vh}
-.side{width:248px;flex-shrink:0;background:var(--navy);color:#E9E4D6;display:flex;flex-direction:column;padding:24px 16px;position:sticky;top:0;height:100vh}
+.side{width:248px;flex-shrink:0;background:var(--navy);color:#E9E4D6;display:flex;flex-direction:column;padding:24px 16px;position:sticky;top:0;height:100vh;overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin}
+.navsec{font-size:10.5px;font-weight:800;letter-spacing:.16em;text-transform:uppercase;color:var(--goldl);opacity:.85;padding:0 12px;margin:14px 0 2px} .navsec:first-child{margin-top:4px}
 .brand{display:block;padding:0 8px 16px;border-bottom:1px solid rgba(216,183,95,.3)}
 /* Flagstick: the product mark. The crest file carries the two-tone trim; the word is live text in Public Sans */
 .fs{display:flex;align-items:center;gap:12px;min-width:0}
@@ -56,12 +57,12 @@ body{font-variant-numeric:lining-nums}
 .season{padding:18px 8px 10px}
 .season label{font-size:12px;font-weight:600;color:#A9A595}
 .season select{margin-top:6px;width:100%;height:38px;border-radius:8px;border:1px solid rgba(216,183,95,.4);background:var(--deep);color:#fff;padding:0 10px;font-weight:600}
-.navlist{display:flex;flex-direction:column;gap:4px;margin-top:8px}
-.nav{display:flex;align-items:center;gap:12px;padding:10px 12px;border-radius:8px;color:#C9C5B8;text-decoration:none;font-weight:500;border:none;background:none;text-align:left;width:100%}
+.navlist{display:flex;flex-direction:column;gap:3px;margin-top:8px;flex:none}
+.nav{display:flex;align-items:center;gap:12px;padding:9px 12px;border-radius:8px;color:#C9C5B8;text-decoration:none;font-weight:500;border:none;background:none;text-align:left;width:100%;font-size:14.5px}
 .nav:hover{color:#fff;background:rgba(255,255,255,.05)}
 .nav.on{background:rgba(216,183,95,.14);color:#fff;box-shadow:inset 0 0 0 1px rgba(216,183,95,.35)}
 .nav svg{width:18px;height:18px;flex-shrink:0}
-.sidefoot{margin-top:auto;padding:14px 12px 0;border-top:1px solid rgba(216,183,95,.3);display:flex;flex-direction:column;gap:10px;font-size:12.5px;color:#C9C5B8}
+.sidefoot{margin-top:auto;padding:14px 12px calc(8px + env(safe-area-inset-bottom,0px));flex:none;border-top:1px solid rgba(216,183,95,.3);display:flex;flex-direction:column;gap:10px;font-size:12.5px;color:#C9C5B8}
 .sync{display:flex;align-items:center;gap:8px}
 .dot{width:8px;height:8px;border-radius:50%;background:#6FBF8E;flex-shrink:0}
 .dot.saving{background:var(--goldl)} .dot.offline{background:#E07B62} .dot.local{background:#9AA3A8}
@@ -210,7 +211,9 @@ textarea.inp{height:auto;min-height:84px;padding:10px 12px;resize:vertical}
 .banner{background:#F6ECCF;border:1px solid #E5CF8E;color:#5C4410;border-radius:10px;padding:12px 16px;font-size:13.5px;display:flex;gap:12px;align-items:center;flex-wrap:wrap}
 
 /* responsive: web first, still usable on a phone */
-@media (max-width:1100px){ .g4{grid-template-columns:repeat(2,minmax(0,1fr))} .split{grid-template-columns:minmax(0,1fr)} }
+@media (max-width:1100px){ .g4{grid-template-columns:repeat(2,minmax(0,1fr))} .split{grid-template-columns:minmax(0,1fr)} .main{padding:28px 28px 48px} .side{width:220px;padding:20px 12px} .nav{font-size:14px;gap:10px} }
+.grid:has(> .kpi){grid-template-columns:repeat(auto-fit,minmax(170px,1fr))}
+.sheetwrap{overflow-x:auto;-webkit-overflow-scrolling:touch} .sheetwrap .sheet{min-width:max(100%, calc(84px + var(--units,1) * 160px))}
 @media (max-width:900px){
   .side{position:fixed;left:0;top:0;z-index:60;transform:translateX(-100%);transition:transform .2s;padding-top:calc(24px + env(safe-area-inset-top,0px))}
   .side.open{transform:none;box-shadow:0 0 60px rgba(0,0,0,.4)}
@@ -240,7 +243,8 @@ textarea.inp{height:auto;min-height:84px;padding:10px 12px;resize:vertical}
   .grid.g4{grid-template-columns:repeat(2,minmax(0,1fr))} .grid{gap:10px} .card.pad{padding:14px}
   .phead{gap:12px} .phead .actions{width:100%} .phead .actions .btn{flex:1 1 auto;justify-content:center;min-width:0}
   .btn{height:38px;font-size:13px;padding:0 12px} .btn.sm{height:32px;font-size:12.5px}
-  .toolbar .search{flex:1 1 100%} .toolbar .seg{max-width:100%;overflow-x:auto;-webkit-overflow-scrolling:touch} .toolbar>.muted{flex:1 1 100%}
+  .toolbar .search{flex:1 1 100%} .toolbar .seg{max-width:100%;overflow-x:auto;-webkit-overflow-scrolling:touch;flex-wrap:nowrap} .toolbar>.muted{flex:1 1 100%} .toolbar>.inp{flex:1 1 100%;margin-left:0!important;width:100%!important}
+  .grid:has(> .kpi){grid-template-columns:repeat(auto-fit,minmax(150px,1fr))} .grid:has(> .kpi) .kpi .v{font-size:24px}
   .topbar b{font-size:20px} .cardhead{flex-wrap:wrap;gap:10px} .cardhead .actions{flex-wrap:wrap}
   .tabs button,.tab{flex:none}
   .tw{overflow:visible} .t:not(.keep):not(.bt){min-width:0!important}
@@ -1095,10 +1099,33 @@ I.org=svg('<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18M9 
 I.survey=svg('<rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4V3h6v2M9 11h6M9 15h4"/>');
 I.lib=svg('<path d="M4 5h5a3 3 0 013 3v12a2 2 0 00-2-2H4z"/><path d="M20 5h-5a3 3 0 00-3 3v12a2 2 0 012-2h6z"/>');
 I.coins=svg('<ellipse cx="12" cy="6" rx="7" ry="3"/><path d="M5 6v12c0 1.7 3.1 3 7 3s7-1.3 7-3V6"/><path d="M5 12c0 1.7 3.1 3 7 3s7-1.3 7-3"/>');
-const NAV=[['dash','Dashboard',I.home],['tournaments','Tournaments',I.flag],['members','Members',I.users],['collections','Dues collection',I.coins],['accounts','Member accounts',I.ledger],['pos','Point of sale',I.cart],['bookings','Bookings',I.cal],['board','Board',I.shield],['budget','Season budget',I.ledger],['orgs','Organizations',I.org],['library','Game library',I.lib],['logins','Logins',I.shield],['surveys','Surveys',I.survey]];
+const NAV=[['dash','Dashboard',I.home],['tournaments','Tournaments',I.flag],['members','Members',I.users],['collections','Dues collection',I.coins],['accounts','Member accounts',I.ledger],['billsetup','Billing setup',I.shield],['pos','Register',I.cart],['postickets','Tickets',I.ledger],['posmenu','Menus & products',I.lib],['proshop','Pro shop',I.cart],['teesheet','Tee sheet',I.flag],['bookings','Bookings',I.cal],['board','Board',I.shield],['budget','Season budget',I.ledger],['orgs','Organizations',I.org],['library','Game library',I.lib],['logins','Logins',I.shield],['surveys','Surveys',I.survey]];
 /* which pages each kind of organization gets (associations get everything) */
-const ORG_NAV={club:['dash','tournaments','golf','members','collections','accounts','pos','bookings','orgs','library','budget','treasury','surveys','logins'],association:['dash','tournaments','golf','members','board','treasury','budget','surveys'],group:['dash','tournaments','golf','members','surveys']};
-function navItems(){ const allow=ORG_NAV[db.kind]; return NAV.filter(([k])=>(!allow||allow.includes(k))&&(k!=='logins'||canManageLogins())&&(k!=='accounts'||(typeof acctOn==='function'&&acctOn()))&&(k!=='pos'||(typeof posOn==='function'&&posOn()))&&(k!=='bookings'||(typeof bookOn==='function'&&bookOn()))).map(([k,l,ic])=>[k,k==='members'&&isClub()?'Directory':l,ic]); }
+const ORG_NAV={club:['dash','tournaments','golf','teesheet','library','proshop','pos','postickets','posmenu','members','accounts','collections','billsetup','logins','bookings','orgs','library','budget','treasury','surveys','logins'],association:['dash','tournaments','golf','members','board','treasury','budget','surveys'],group:['dash','tournaments','golf','members','surveys']};
+/* the rail: which entries show for this organization, gated by module and role. Keys that are views of another page
+   (teesheet → bookings, proshop → pos, posmenu → possetup) are listed in NAV_PAGE; NAV_OWNS says which pages light an entry up. */
+const NAV_PAGE={teesheet:'bookings',proshop:'pos',posmenu:'possetup'};
+const NAV_OWNS={tournaments:['tournaments','tournament'],accounts:['accounts','account'],bookings:['bookings','booksetup'],teesheet:['bookings'],pos:['pos'],proshop:['pos'],posmenu:['possetup']};
+const NAV_SECTIONS={club:[['',['dash']],['Golf',['tournaments','golf','teesheet','library','proshop']],['Food & beverage',['pos','postickets','posmenu']],['Membership',['members','accounts','collections','billsetup','logins']],['Club',['bookings','orgs','treasury','budget','surveys']]],
+  association:[['',['dash']],['Golf',['tournaments','golf']],['Membership',['members','board']],['Money',['treasury','budget']],['',['surveys']]],
+  group:[['',['dash']],['Golf',['games','ledger','tournaments','golf']],['',['members','surveys']]]};
+const NAV_GATE={logins:()=>canManageLogins(),accounts:()=>typeof acctOn==='function'&&acctOn(),billsetup:()=>typeof acctOn==='function'&&acctOn(),pos:()=>typeof posOn==='function'&&posOn(),postickets:()=>typeof posOn==='function'&&posOn(),posmenu:()=>typeof posOn==='function'&&posOn(),
+  proshop:()=>typeof posOn==='function'&&posOn()&&posSettings().outlets.some(o=>o.kind==='proshop'),bookings:()=>typeof bookOn==='function'&&bookOn(),teesheet:()=>typeof bookOn==='function'&&bookOn()&&bookSettings().facilities.some(f=>f.kind==='tee')};
+function navItems(){ const allow=ORG_NAV[db.kind]; return NAV.filter(([k])=>(!allow||allow.includes(k))&&(!NAV_GATE[k]||NAV_GATE[k]())).map(([k,l,ic])=>[k,k==='members'&&isClub()?'Directory':k==='golf'&&isClub()?'Events & live scoring':k==='bookings'&&isClub()?'Courts, pool & lessons':l,ic]); }
+/* is this rail entry the one lit for the page on screen? a view of a shared page looks at that page's state */
+function navActive(k){ const pg=view.page; const owns=NAV_OWNS[k]||[k]; if(!owns.includes(pg)) return false;
+  if(k==='teesheet') return typeof BK!=='undefined'&&(facOf(BK.fac)||{}).kind==='tee'; if(k==='bookings'&&pg==='bookings') return !(typeof BK!=='undefined'&&(facOf(BK.fac)||{}).kind==='tee');
+  if(k==='proshop') return typeof POS!=='undefined'&&(outletOf(POS.outlet)||{}).kind==='proshop'; if(k==='pos') return !(typeof POS!=='undefined'&&(outletOf(POS.outlet)||{}).kind==='proshop'); return true; }
+function navGo(k){ if(k==='golf') view.geid=null;
+  if(k==='teesheet'){ const f=bookSettings().facilities.find(x=>x.kind==='tee'); BK.fac=f?f.id:''; }
+  if(k==='bookings'&&typeof BK!=='undefined'&&(facOf(BK.fac)||{}).kind==='tee'){ const f=bookSettings().facilities.find(x=>x.kind!=='tee'); BK.fac=f?f.id:''; }
+  if(k==='proshop'||k==='pos'){ const want=k==='proshop'?'proshop':'fnb'; if((outletOf(POS.outlet)||{}).kind!==want){ const o=posSettings().outlets.find(x=>x.kind===want); if(o){ POS.outlet=o.id; POS.cur=null; } } }
+  go(NAV_PAGE[k]||k); }
+function navHTML(items,live){ const secs=NAV_SECTIONS[db.kind]||[['',items.map(x=>x[0])]], placed=new Set(), out=[];
+  const btn=([k,l,ic])=>`<button class="nav${navActive(k)?' on':''}" data-go="${k}">${ic}<span>${l}</span>${k==='golf'&&live.length?'<span class="livedot" aria-label="Live scoring"></span>':''}</button>`;
+  for(const [title,keys] of secs){ const its=keys.map(k=>items.find(x=>x[0]===k)).filter(Boolean); if(!its.length) continue; its.forEach(x=>placed.add(x[0])); out.push((title?`<div class="navsec">${esc(title)}</div>`:'')+its.map(btn).join('')); }
+  const rest=items.filter(x=>!placed.has(x[0])); if(rest.length) out.push(rest.map(btn).join(''));
+  return out.join('')+live.map(e=>`<button class="nav livelink" data-golfev="${e.id}"><span class="livedot"></span><span class="trunc">Leaderboard · ${esc(e.name)}</span></button>`).join(''); }
 /* the organization on screen: the club's record from CLUB.orgs wins over what the document says */
 const curOrg=()=>!db?null:isClub()?Object.assign({},CLUB_META,{name:CLUB.name||CLUB_META.name,crest:CLUB.crest||CLUB_META.crest}):(orgMeta()||{id:db.id,kind:db.kind,name:db.name,short:db.short});
 const orgShort=()=>{ const o=curOrg(); return o?(o.short||o.name||'club'):'club'; };
@@ -1195,10 +1222,9 @@ function renderInner(){
   const ys=Object.keys(db.seasons).sort((a,b)=>b-a);
   $('seasonSel').innerHTML=ys.map(y=>`<option value="${y}"${y===Y()?' selected':''}>${y} season</option>`).join('')+'<option value="__new">+ New season…</option>';
   const live=typeof liveEvents==='function'?liveEvents():[];
-  const items=navItems(); if(view.page!=='pick'&&!items.some(([k])=>k===view.page||(k==='tournaments'&&view.page==='tournament')||(k==='accounts'&&/^(account|billsetup)$/.test(view.page))||(k==='pos'&&/^(postickets|possetup)$/.test(view.page))||(k==='bookings'&&view.page==='booksetup'))) view.page='dash';
-  $('nav').innerHTML=items.map(([k,l,ic])=>`<button class="nav${(view.page===k||(k==='tournaments'&&view.page==='tournament')||(k==='accounts'&&/^(account|billsetup)$/.test(view.page))||(k==='pos'&&/^(postickets|possetup)$/.test(view.page))||(k==='bookings'&&view.page==='booksetup'))?' on':''}" data-go="${k}">${ic}<span>${l}</span>${k==='golf'&&live.length?'<span class="livedot" aria-label="Live scoring"></span>':''}</button>`).join('')+
-    live.map(e=>`<button class="nav livelink" data-golfev="${e.id}"><span class="livedot"></span><span class="trunc">Leaderboard · ${esc(e.name)}</span></button>`).join('');
-  $('nav').querySelectorAll('[data-go]').forEach(b=>b.onclick=()=>{ if(b.dataset.go==='golf') view.geid=null; go(b.dataset.go); });
+  const items=navItems(); if(view.page!=='pick'&&!items.some(([k])=>(NAV_OWNS[k]||[k]).includes(view.page))) view.page='dash';
+  $('nav').innerHTML=navHTML(items,live);
+  $('nav').querySelectorAll('[data-go]').forEach(b=>b.onclick=()=>navGo(b.dataset.go));
   const m=$('main');
   ({dash:vDash,tournaments:vTournaments,tournament:vTournament,members:vMembers,board:vBoard,budget:vBudget,treasury:vTreasury,golf:vGolf,orgs:vOrgs,pick:vPicker,collections:vCollections,games:vGames,ledger:vLedger,library:vLibrary,logins:vLogins,surveys:vSurveys,accounts:vAccounts,account:vAccount,billsetup:vBillSetup,pos:vPos,postickets:vPosTickets,possetup:vPosSetup,bookings:vBookings,booksetup:vBookSetup}[view.page]||vDash)(m);
   if(view.page==='board'&&!isClub()&&typeof loginsCard==='function') loginsCard(m,ORG_ID);
@@ -2321,7 +2347,7 @@ const tStatusChip=s=>`<span class="chip ${STATUS_CHIP[s]||''}">${esc(STATUS_LABE
 const planLabel=p=>({club:'Club management',golf:'Golf management'}[p]||p||'—');
 const tenantURL=slug=>'https://'+slug+'.'+BASE_DOMAIN+'/';
 const modulesOf=t=>Object.assign({},(t&&t.modules)||{},{golf:true});
-const modChips=t=>{ const m=modulesOf(t); return MODULE_CATALOG.filter(x=>m[x.id]&&!(m.club&&x.addon)).map(x=>`<span class="chip${x.id==='golf'?'':' gold'}">${esc(x.name)}</span>`).join(' '); };
+const modChips=t=>{ const m=modulesOf(t), preset=PLAN_PRESETS[t&&t.plan]||PLAN_PRESETS.golf; return MODULE_CATALOG.filter(x=>m[x.id]&&!x.base&&!preset[x.id]&&!(m.club&&x.addon)).map(x=>`<span class="chip gold">${esc(x.name)}${x.addon?' add-on':''}</span>`).join(' '); };
 /* the checkbox rows: Golf management always on; an add-on that Club management includes is ticked and locked while club is on */
 const modRow=(x,m,attr)=>{ const inc=x.addon&&m.club; return `<label class="mr" style="grid-template-columns:28px minmax(0,1fr);cursor:pointer"><input type="checkbox" ${attr}="${x.id}"${m[x.id]||x.base||inc?' checked':''}${x.base||inc?' disabled':''}><span><b>${esc(x.name)}</b>${inc?' <span class="chip gold">included in Club management</span>':x.addon?' <span class="chip">add-on</span>':''}<br><span class="muted" style="font-size:12.5px">${esc(x.desc)}</span></span></label>`; };
 function wireModRows(root,attr){ const club=root.querySelector(`[${attr}=club]`); if(!club) return; club.onchange=()=>{ root.querySelectorAll(`[${attr}]`).forEach(c=>{ const x=MODULE_CATALOG.find(y=>y.id===c.getAttribute(attr)); if(x&&x.addon){ if(club.checked){ c.checked=true; c.disabled=true; } else c.disabled=false; } }); }; }
@@ -2385,11 +2411,11 @@ function vClients(m){
   const q=PS.q.trim().toLowerCase();
   const list=(T||[]).filter(t=>PS.filter==='all'||t.status===PS.filter).filter(t=>!q||[t.name,t.short,t.slug,(t.hosts||[]).join(' '),...contactsOf(t.slug).map(c=>c.name+' '+c.email)].join(' ').toLowerCase().includes(q));
   const tabs=[['active','Active'],['trial','Trial'],['prospect','Prospect'],['suspended','Suspended'],['inactive','Inactive'],['all','All']];
-  const cols='grid-template-columns:minmax(0,1.7fr) 140px minmax(0,1.2fr) minmax(0,1.3fr) 70px 110px 32px';
+  const cols='grid-template-columns:minmax(200px,1.8fr) minmax(190px,1.3fr) minmax(170px,1.2fr) 56px 100px 32px';
   const row=t=>{ const pc=contactsOf(t.slug)[0], n=usersOf(t.slug).filter(u=>u.role==='staff').length;
     return `<div class="tr click" data-t="${esc(t.slug)}" style="${cols}">
       <div class="cell2"><b>${esc(t.name)}</b><small>${esc(t.slug)}.${esc(BASE_DOMAIN)}${addrLine(t.address)[2]?' · '+esc(addrLine(t.address)[2]):''}</small></div>
-      <span>${esc(planLabel(t.plan))}</span><span style="display:flex;flex-wrap:wrap;gap:4px">${modChips(t)}</span>
+      <div class="cell2"><b style="font-weight:600">${esc(planLabel(t.plan))}</b>${modChips(t)?`<span style="display:flex;flex-wrap:wrap;gap:4px;margin-top:4px">${modChips(t)}</span>`:''}</div>
       <div class="cell2">${pc?`<span>${esc(pc.name)}</span><small>${esc(pc.email||pc.phone||'')}</small>`:'<span class="muted">No contact yet</span>'}</div>
       <span class="num">${n}</span><span>${tStatusChip(t.status)}</span><span class="ib">${I.chev}</span></div>`; };
   m.innerHTML=head('Clients','Every club on Flagstick. A client is a tenant: its own address, its own staff logins, and the modules its subscription turns on.',btn('New client','ptNew','pri',I.plus))+
@@ -2397,9 +2423,9 @@ function vClients(m){
     `<div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:14px">
       <div class="seg" id="ptFilter">${tabs.map(([k,l])=>`<button type="button" data-v="${k}" class="${PS.filter===k?'on':''}">${l}${counts[k]?' · '+counts[k]:''}</button>`).join('')}</div>
       <div class="search">${I.search}<input class="inp" id="ptQ" placeholder="Search clients, contacts, hosts" value="${esc(PS.q)}" aria-label="Search clients"></div></div>
-    <div class="card" style="overflow:hidden"><div class="t">
-      <div class="tr th" style="${cols}"><span>Client</span><span>Plan</span><span>Modules</span><span>Primary contact</span><span>Staff</span><span>Status</span><span></span></div>
-      ${T?(list.map(row).join('')||`<div class="tr"><span class="muted">${q?'Nothing matches.':'No '+(STATUS_LABEL[PS.filter]||'').toLowerCase()+' clients.'}</span></div>`):'<div class="tr"><span class="muted">Loading…</span></div>'}</div></div>`;
+    <div class="card" style="overflow:hidden"><div class="tw"><div class="t" style="min-width:860px">
+      <div class="tr th" style="${cols}"><span>Client</span><span>Plan &amp; modules</span><span>Primary contact</span><span>Staff</span><span>Status</span><span></span></div>
+      ${T?(list.map(row).join('')||`<div class="tr"><span class="muted">${q?'Nothing matches.':'No '+(STATUS_LABEL[PS.filter]||'').toLowerCase()+' clients.'}</span></div>`):'<div class="tr"><span class="muted">Loading…</span></div>'}</div></div></div>`;
   $('ptNew').onclick=()=>editClient(null);
   m.querySelectorAll('#ptFilter button').forEach(b=>b.onclick=()=>{ PS.filter=b.dataset.v; vClients(m); });
   const qi=$('ptQ'); qi.oninput=()=>{ PS.q=qi.value; const pos=qi.selectionStart; vClients(m); const n=$('ptQ'); n.focus(); n.setSelectionRange(pos,pos); };
@@ -7746,7 +7772,7 @@ function vBookings(m){
   m.innerHTML=head('Bookings',`${esc(f.name)} · ${new Date(day+'T12:00').toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'})} — tap a time to book, a name to check in or change it.`,btn('Facilities','bkSet','')+btn('Print the sheet','bkPdf','',I.down)+btn('New booking','bkNew','pri',I.plus))+`
     <div class="toolbar"><div class="seg">${S.facilities.map(x=>`<button class="${x.id===f.id?'on':''}" data-bf="${x.id}">${esc(x.name)}</button>`).join('')}</div><div class="seg" style="margin-left:auto"><button id="bkPrev">‹</button><button id="bkToday">Today</button><button id="bkNext">›</button></div><input class="inp" type="date" id="bkDate" value="${day}" style="height:38px;width:160px"></div>
     <div class="grid g3">${kpi('Booked',dayRows,`${people} ${f.kind==='tee'?'players':'people'}`)}${kpi('Checked in',ins,`${dayRows-ins} to come`)}${kpi('Open',slots.length*f.units-(f.kind==='tee'?0:rows.length),`${f.kind==='tee'?`${slots.length*f.units*f.cap-people} spots`:`of ${slots.length*f.units} ${f.kind==='lesson'?'lesson':'slot'}s`} · ${t12(f.open)}–${t12(f.close)}`)}</div>
-    <div class="card" style="overflow:hidden"><div class="sheet" style="grid-template-columns:84px repeat(${f.units},minmax(150px,1fr))"><div class="sh"></div>${units.map(u=>`<div class="sh">${esc(unitName(f,u))}</div>`).join('')}${slots.map(t=>`<div class="st">${t12(t)}</div>${units.map(u=>cell(t,u)).join('')}`).join('')}</div></div>`;
+    <div class="card sheetwrap" style="--units:${f.units}"><div class="sheet" style="grid-template-columns:84px repeat(${f.units},minmax(150px,1fr))"><div class="sh"></div>${units.map(u=>`<div class="sh">${esc(unitName(f,u))}</div>`).join('')}${slots.map(t=>`<div class="st">${t12(t)}</div>${units.map(u=>cell(t,u)).join('')}`).join('')}</div></div>`;
   m.querySelectorAll('[data-bf]').forEach(x=>x.onclick=()=>{ BK.fac=x.dataset.bf; render(); });
   const shift=n=>{ BK.date=isoPlus(day,n); render(); }; $('bkPrev').onclick=()=>shift(-1); $('bkNext').onclick=()=>shift(1); $('bkToday').onclick=()=>{ BK.date=todayISO(); render(); }; $('bkDate').onchange=()=>{ BK.date=$('bkDate').value||todayISO(); render(); };
   m.querySelectorAll('[data-add]').forEach(x=>x.onclick=()=>{ const [t,u]=x.dataset.add.split('|'); bookingDrawer(null,f,day,t,+u); });
@@ -8078,7 +8104,7 @@ async function resultsPDF(t,opt){
    page counts, and a reload is tried once per build — if the page that comes back is still the old one, the CDN
    hasn't caught up; wait a while before trying that build again. */
 (function(){
-  const ME='20261026223925', KEY='au_tried', RETRY=10*60*1000; let ready=false, lastCheck=0;
+  const ME='20261026231952', KEY='au_tried', RETRY=10*60*1000; let ready=false, lastCheck=0;
   const typing=()=>{ const a=document.activeElement; return a&&/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)&&a.value&&a.type!=='search'; };
   const safe=()=>!typing()&&(typeof window.__canReload!=='function'||window.__canReload());
   const tried=()=>{ try{ const [b,t]=(sessionStorage.getItem(KEY)||'').split('|'); return b?{build:b,at:+t||0}:null; }catch(_){ return null; } };

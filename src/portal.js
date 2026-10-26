@@ -17,7 +17,7 @@ const tStatusChip=s=>`<span class="chip ${STATUS_CHIP[s]||''}">${esc(STATUS_LABE
 const planLabel=p=>({club:'Club management',golf:'Golf management'}[p]||p||'—');
 const tenantURL=slug=>'https://'+slug+'.'+BASE_DOMAIN+'/';
 const modulesOf=t=>Object.assign({},(t&&t.modules)||{},{golf:true});
-const modChips=t=>{ const m=modulesOf(t); return MODULE_CATALOG.filter(x=>m[x.id]&&!(m.club&&x.addon)).map(x=>`<span class="chip${x.id==='golf'?'':' gold'}">${esc(x.name)}</span>`).join(' '); };
+const modChips=t=>{ const m=modulesOf(t), preset=PLAN_PRESETS[t&&t.plan]||PLAN_PRESETS.golf; return MODULE_CATALOG.filter(x=>m[x.id]&&!x.base&&!preset[x.id]&&!(m.club&&x.addon)).map(x=>`<span class="chip gold">${esc(x.name)}${x.addon?' add-on':''}</span>`).join(' '); };
 /* the checkbox rows: Golf management always on; an add-on that Club management includes is ticked and locked while club is on */
 const modRow=(x,m,attr)=>{ const inc=x.addon&&m.club; return `<label class="mr" style="grid-template-columns:28px minmax(0,1fr);cursor:pointer"><input type="checkbox" ${attr}="${x.id}"${m[x.id]||x.base||inc?' checked':''}${x.base||inc?' disabled':''}><span><b>${esc(x.name)}</b>${inc?' <span class="chip gold">included in Club management</span>':x.addon?' <span class="chip">add-on</span>':''}<br><span class="muted" style="font-size:12.5px">${esc(x.desc)}</span></span></label>`; };
 function wireModRows(root,attr){ const club=root.querySelector(`[${attr}=club]`); if(!club) return; club.onchange=()=>{ root.querySelectorAll(`[${attr}]`).forEach(c=>{ const x=MODULE_CATALOG.find(y=>y.id===c.getAttribute(attr)); if(x&&x.addon){ if(club.checked){ c.checked=true; c.disabled=true; } else c.disabled=false; } }); }; }
@@ -81,11 +81,11 @@ function vClients(m){
   const q=PS.q.trim().toLowerCase();
   const list=(T||[]).filter(t=>PS.filter==='all'||t.status===PS.filter).filter(t=>!q||[t.name,t.short,t.slug,(t.hosts||[]).join(' '),...contactsOf(t.slug).map(c=>c.name+' '+c.email)].join(' ').toLowerCase().includes(q));
   const tabs=[['active','Active'],['trial','Trial'],['prospect','Prospect'],['suspended','Suspended'],['inactive','Inactive'],['all','All']];
-  const cols='grid-template-columns:minmax(0,1.7fr) 140px minmax(0,1.2fr) minmax(0,1.3fr) 70px 110px 32px';
+  const cols='grid-template-columns:minmax(200px,1.8fr) minmax(190px,1.3fr) minmax(170px,1.2fr) 56px 100px 32px';
   const row=t=>{ const pc=contactsOf(t.slug)[0], n=usersOf(t.slug).filter(u=>u.role==='staff').length;
     return `<div class="tr click" data-t="${esc(t.slug)}" style="${cols}">
       <div class="cell2"><b>${esc(t.name)}</b><small>${esc(t.slug)}.${esc(BASE_DOMAIN)}${addrLine(t.address)[2]?' · '+esc(addrLine(t.address)[2]):''}</small></div>
-      <span>${esc(planLabel(t.plan))}</span><span style="display:flex;flex-wrap:wrap;gap:4px">${modChips(t)}</span>
+      <div class="cell2"><b style="font-weight:600">${esc(planLabel(t.plan))}</b>${modChips(t)?`<span style="display:flex;flex-wrap:wrap;gap:4px;margin-top:4px">${modChips(t)}</span>`:''}</div>
       <div class="cell2">${pc?`<span>${esc(pc.name)}</span><small>${esc(pc.email||pc.phone||'')}</small>`:'<span class="muted">No contact yet</span>'}</div>
       <span class="num">${n}</span><span>${tStatusChip(t.status)}</span><span class="ib">${I.chev}</span></div>`; };
   m.innerHTML=head('Clients','Every club on Flagstick. A client is a tenant: its own address, its own staff logins, and the modules its subscription turns on.',btn('New client','ptNew','pri',I.plus))+
@@ -93,9 +93,9 @@ function vClients(m){
     `<div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:14px">
       <div class="seg" id="ptFilter">${tabs.map(([k,l])=>`<button type="button" data-v="${k}" class="${PS.filter===k?'on':''}">${l}${counts[k]?' · '+counts[k]:''}</button>`).join('')}</div>
       <div class="search">${I.search}<input class="inp" id="ptQ" placeholder="Search clients, contacts, hosts" value="${esc(PS.q)}" aria-label="Search clients"></div></div>
-    <div class="card" style="overflow:hidden"><div class="t">
-      <div class="tr th" style="${cols}"><span>Client</span><span>Plan</span><span>Modules</span><span>Primary contact</span><span>Staff</span><span>Status</span><span></span></div>
-      ${T?(list.map(row).join('')||`<div class="tr"><span class="muted">${q?'Nothing matches.':'No '+(STATUS_LABEL[PS.filter]||'').toLowerCase()+' clients.'}</span></div>`):'<div class="tr"><span class="muted">Loading…</span></div>'}</div></div>`;
+    <div class="card" style="overflow:hidden"><div class="tw"><div class="t" style="min-width:860px">
+      <div class="tr th" style="${cols}"><span>Client</span><span>Plan &amp; modules</span><span>Primary contact</span><span>Staff</span><span>Status</span><span></span></div>
+      ${T?(list.map(row).join('')||`<div class="tr"><span class="muted">${q?'Nothing matches.':'No '+(STATUS_LABEL[PS.filter]||'').toLowerCase()+' clients.'}</span></div>`):'<div class="tr"><span class="muted">Loading…</span></div>'}</div></div></div>`;
   $('ptNew').onclick=()=>editClient(null);
   m.querySelectorAll('#ptFilter button').forEach(b=>b.onclick=()=>{ PS.filter=b.dataset.v; vClients(m); });
   const qi=$('ptQ'); qi.oninput=()=>{ PS.q=qi.value; const pos=qi.selectionStart; vClients(m); const n=$('ptQ'); n.focus(); n.setSelectionRange(pos,pos); };

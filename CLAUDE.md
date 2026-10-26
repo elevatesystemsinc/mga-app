@@ -151,9 +151,16 @@ Tournament = { id, name, season, days, startDate, field:[{id,memberId,team,paid,
   `persons()`/`personById(id)` (directory), and write through `upsertMember(id|null, data)` / `removeMember(id)`
   (which keep both documents right) — `memberSnapshot()`/`memberRestore()` for undo. A person is one record
   club-wide; removing someone from an association only ends the membership.
-- Organization kinds gate the nav (`ORG_NAV` in ui.js): club = directory, dues collection, organizations, game
-  library, tournaments, golf, budget, treasury; association = everything the MGA has; group = dashboard, games,
-  ledger, tournaments, golf, members.
+- **The rail is sectioned** (ui.js `NAV_SECTIONS` per organization kind, the owner, Oct 2026: "Golf needs a subsection…
+  Food & beverage… Membership"): club = Dashboard · **Golf** (Tournaments, Events & live scoring, Tee sheet, Game library,
+  Pro shop) · **Food & beverage** (Register, Tickets, Menus & products) · **Membership** (Directory, Member accounts, Dues
+  collection, Billing setup, Logins) · **Club** (Courts, pool & lessons, Organizations, Treasury, Season budget, Surveys);
+  association = Dashboard · Golf · Membership (Members, Board) · Money (Treasury, Budget) · Surveys; group = Dashboard ·
+  Golf (Games, Ledger, Tournaments, Golf) · Members · Surveys. `ORG_NAV` still says which keys an organization kind may
+  show and `NAV_GATE` adds the module / role checks; entries that are views of another page (`NAV_PAGE`: teesheet →
+  bookings with the tee facility, proshop → pos with the pro-shop outlet, posmenu → possetup) light up through
+  `navActive()` / `NAV_OWNS` and open through `navGo()`. The rail scrolls (`.side{overflow-y:auto}`); section headers are
+  `.navsec`. Tablet widths 900–1100 keep a 220 px rail; below 900 the rail is the drawer behind the top bar.
 - **The club hub keeps every organization's document open** (`openOrgDocs()` in startCloud / `openLocal`, read with
   `orgDocs()` → [{meta, db}]). It reads them for the club calendar (`clubCalendar(y)`: the Tournaments page's second
   card and the dashboard's "Across the club") and for **Dues collection**; it writes to them only to mark a dues
