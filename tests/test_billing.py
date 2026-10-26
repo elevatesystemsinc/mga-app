@@ -41,9 +41,9 @@ async def main():
     p1,e1=await open_page(c1,'?org=club&tenant=app.wcccmga.org')
     r=await p1.evaluate("""async()=>{ const nav=[...document.querySelectorAll('#nav [data-go]')].map(b=>b.dataset.go); go('accounts'); await new Promise(r=>setTimeout(r,600));
       const empty=document.querySelector('#main .empty b')?.textContent; const kpis=[...document.querySelectorAll('#main .kpi .v')].map(x=>x.textContent);
-      document.getElementById('acCharge').click(); document.getElementById('apM').value='p2'; document.getElementById('apA').value='48.50'; document.getElementById('apS').value='proshop'; document.getElementById('apN').value='Dozen Pro V1'; document.getElementById('dSave').click(); await new Promise(r=>setTimeout(r,400));
+      document.getElementById('acCharge').click(); document.getElementById('apM').value='p2'; document.getElementById('apA').value='48.50'; document.getElementById('apI').value='proshop'; document.getElementById('apN').value='Dozen Pro V1'; document.getElementById('dSave').click(); await new Promise(r=>setTimeout(r,400));
       const onAccount=view.page==='account'&&view.acctId==='p2'; const bal1=document.querySelector('#main .kpi .v').textContent;
-      document.getElementById('acCharge2').click(); document.getElementById('apA').value='30'; document.getElementById('apS').value='fnb'; document.getElementById('apN').value='Grill · Oct 12'; document.getElementById('dSave').click(); await new Promise(r=>setTimeout(r,400));
+      document.getElementById('acCharge2').click(); document.getElementById('apA').value='30'; document.getElementById('apI').value='fnb'; document.getElementById('apN').value='Grill · Oct 12'; document.getElementById('dSave').click(); await new Promise(r=>setTimeout(r,400));
       document.getElementById('acPay2').click(); document.getElementById('apA').value='50'; document.getElementById('apS').value='check'; document.getElementById('apR').value='#4471'; document.getElementById('dSave').click(); await new Promise(r=>setTimeout(r,400));
       const rows=[...document.querySelectorAll('#main .lg .lr')].map(r=>[r.querySelector('.ln').textContent.trim(), r.querySelector('.lnet').textContent]);
       return {nav, empty, kpis, onAccount, bal1, rows, bal:document.querySelector('#main .kpi .v').textContent}; }""")
@@ -73,7 +73,7 @@ async def main():
     bad+=check('second staff device: the same balances, search by member number',r['kpi'][0]=='$118.50' and r['found']==['Bo Baker'] and r['filter'][0]=='Owing · 1' and not e2,r,e2)
     async with p2.expect_download() as dl: await p2.evaluate("()=>{ view.aq=''; render(); document.getElementById('acCsv').click(); }")
     d=await dl.value; csv=open(await d.path()).read()
-    bad+=check('balances CSV',d.suggested_filename.startswith('member-balances-') and '"1042","Baker","Bo","","118.50"' in csv and '"Able","Ann","ann@x.org","0.00"' in csv,csv.splitlines()[:3])
+    bad+=check('balances CSV',d.suggested_filename.startswith('member-balances-') and '"1042","Baker","Bo","","","Active","118.50","118.50"' in csv and '"Able","Ann","ann@x.org","","Active","0.00"' in csv,csv.splitlines()[:3])
     # ---- 5. statements: one per member with a balance, saved, the PDF with a page per member; the second run starts the day after
     if os.path.exists(JSPDF):
       async with p2.expect_download() as dl:
@@ -87,6 +87,47 @@ async def main():
       s2=[s for s in fdb._rows('acct_statements') if s['member_id']=='p2']
       bad+=check('account page shows the statement; the next run starts the day after and carries the opening balance',r['k'][2].startswith('$118.50 | Oct 31, 2026') and len(s2)==2 and r['stmts'][1][0]=='2026-11-01' and r['stmts'][1][1]=='2026-11-30' and r['stmts'][1][2]==118.5 and r['stmts'][1][3]==0,r)
     else: print('skip statements PDF (no jspdf in tests/node_modules)')
+    # ---- 5b. the engine on the first staff device: a class with monthly dues + cart, a quarterly locker, a yearly assessment, an F&B minimum; rates; two members
+    r=await p1.evaluate("""async()=>{ go('billsetup'); await new Promise(r=>setTimeout(r,200)); const b=acctSettings();
+      document.getElementById('bsRates').click(); document.getElementById('brT').value='8'; document.getElementById('brS').value='20'; document.getElementById('dSave').click(); await new Promise(r=>setTimeout(r,200));
+      document.getElementById('bsNewC').click(); document.getElementById('bcN').value='Full'; const amt=(i,v)=>{ const e=document.querySelector('[data-ci="'+i+'"][data-k="amount"]'); e.value=v; e.dispatchEvent(new Event('input')); }; amt(0,'500');
+      document.getElementById('bcAdd').click(); const r1=document.querySelector('[data-ci="1"][data-k="itemId"]'); r1.value='cart'; r1.dispatchEvent(new Event('change')); amt(1,'120');
+      document.getElementById('bcAdd').click(); let e2=document.querySelector('[data-ci="2"][data-k="itemId"]'); e2.value='locker'; e2.dispatchEvent(new Event('change')); amt(2,'90'); let ev=document.querySelector('[data-ci="2"][data-k="every"]'); ev.value='quarter'; ev.dispatchEvent(new Event('change'));
+      ev=document.querySelector('[data-ci="2"][data-k="every"]'); ev.value='m1'; ev.dispatchEvent(new Event('change'));
+      document.getElementById('bcAdd').click(); let e3=document.querySelector('[data-ci="3"][data-k="itemId"]'); e3.value='capital'; e3.dispatchEvent(new Event('change')); amt(3,'1200'); ev=document.querySelector('[data-ci="3"][data-k="every"]'); ev.value='year'; ev.dispatchEvent(new Event('change')); ev=document.querySelector('[data-ci="3"][data-k="every"]'); ev.value='m10'; ev.dispatchEvent(new Event('change'));
+      document.getElementById('bcMin').value='150'; document.getElementById('bcMinE').value='month'; document.getElementById('dSave').click(); await new Promise(r=>setTimeout(r,200));
+      const c=b.classes[0]; const bm=personById('p1').billing={class:c.id,status:'active',since:'',until:''}; personById('p2').billing={class:c.id,status:'active',since:'2026-10-16',until:''}; personById('p3').billing={class:c.id,status:'loa',since:'',until:''}; persist();
+      return {rates:[b.tax.rate,b.svc.rate], cls:[c.name,c.charges.map(x=>[x.itemId,x.amount,x.every,x.month]),c.minimum], cards:[...document.querySelectorAll('[data-ec]')].length}; }""")
+    bad+=check('billing setup: rates, a class with four charges on three schedules and a minimum',r['rates']==[8,20] and r['cls'][0]=='Full' and r['cls'][1]==[['dues',500,'month',None],['cart',120,'month',None],['locker',90,'quarter',1],['capital',1200,'year',10]] and r['cls'][2]=={'amount':150,'every':'month'} and r['cards']==1,r)
+    # a taxed F&B charge with the service charge; the plan for October: Ann full (dues, cart, locker (Oct = quarter from Jan), capital (Oct)), Bo prorated 16/31, Cy on leave nothing; then the run; running twice posts nothing
+    r=await p1.evaluate("""async()=>{ go('account',{acctId:'p1'}); await new Promise(r=>setTimeout(r,200)); document.getElementById('acCharge2').click(); document.getElementById('apA').value='100'; document.getElementById('apI').value='fnb'; document.getElementById('apI').dispatchEvent(new Event('change')); document.getElementById('apD').value='2026-09-20'; const hint=document.getElementById('apTot').textContent; document.getElementById('dSave').click(); await new Promise(r=>setTimeout(r,400));
+      const fnb=ACCT.items.find(i=>i.item==='fnb'&&i.member_id==='p1'); const plan=billingPlan('2026-10').map(x=>[x.member_id,x.item,x.amount,x.tax,x.descr]).sort();
+      const n1=await runBilling('2026-10'); const n2=await runBilling('2026-10'); go('accounts'); await new Promise(r=>setTimeout(r,200));
+      return {hint, fnb:[fnb.amount,fnb.svc,fnb.tax,netOf(fnb)], plan, n1, n2, runs:acctSettings().runs.map(x=>[x.month,x.n,x.total]), kpi:document.querySelectorAll('#main .kpi')[2].textContent.includes('billing run through October 2026')}; }""")
+    bad+=check('F&B charge: 20% service charge, 8% tax on both, net kept',r['hint']=='$100.00 + $20.00 service charge (20%) + $9.60 tax (8%) = $129.60 on the account' and r['fnb']==[129.6,20,9.6,100],r['fnb'])
+    bad+=check('the October plan: four charges for Ann, Bo prorated 16/31 days, nothing for a leave of absence; unspent September minimum $50 for Ann',r['plan']==[['p1','capital',1200,0,'Capital assessment · October 2026'],['p1','cart',120,0,'Cart plan · October 2026'],['p1','dues',500,0,'Dues · October 2026'],['p1','locker',90,0,'Locker · October 2026'],['p1','min',50,0,'Unspent minimum · September 2026 (spent $100.00 of $150.00)'],['p2','capital',619.35,0,'Capital assessment · October 2026 (prorated)'],['p2','cart',61.94,0,'Cart plan · October 2026 (prorated)'],['p2','dues',258.06,0,'Dues · October 2026 (prorated)'],['p2','locker',46.45,0,'Locker · October 2026 (prorated)']],r['plan'])
+    bad+=check('the run posts once; a second run posts nothing; the KPI names the month',r['n1']==9 and r['n2']==0 and r['runs']==[['2026-10',9,2945.8]] and r['kpi'],r)
+    rows=[x for x in ledger(fdb) if str(x.get('ref','')).startswith('run:')]
+    bad+=check('run rows in the database carry item, GL account and the idempotent ref',len(rows)==8 and all(x['gl'] and x['item'] and x['ref'].startswith('run:2026-10:') for x in rows),[(x['item'],x['gl']) for x in rows][:3])
+    # November: monthly only (locker is quarterly from January, capital yearly in October); Bo now a full month; the October minimum for Bo is short (spent nothing) and Ann's too
+    r=await p1.evaluate("()=>billingPlan('2026-11').map(x=>[x.member_id,x.item,x.amount]).sort()")
+    bad+=check('November: monthly charges only, full months, unspent October minimums',r==[['p1','cart',120],['p1','dues',500],['p1','min',150],['p2','cart',120],['p2','dues',500],['p2','min',77.42]],r)
+    # resigned mid-month: billed through the last day, then nothing
+    r=await p1.evaluate("()=>{ personById('p2').billing={class:acctSettings().classes[0].id,status:'resigned',since:'2026-10-16',until:'2026-11-10'}; const nov=billingPlan('2026-11').filter(x=>x.member_id==='p2').map(x=>[x.item,x.amount]).sort(); const dec=billingPlan('2026-12').filter(x=>x.member_id==='p2').length; personById('p2').billing.status='active'; personById('p2').billing.until=''; return {nov,dec}; }")
+    bad+=check('resigned Nov 10: November prorated 10/30, December nothing',r['nov']==[['cart',40],['dues',166.67],['min',77.42]] and r['dec']==0,r)
+    # finance charges: Ann's October statement (closing 120 → paid off) carries none; set 1.5% + $10 late fee, run statements for November 30: Ann's Oct 31 statement was paid; Bo's $118.50 from Oct 31 is still owed past Nov 25 → finance charge + late fee on the November statement
+    r=await p1.evaluate("""async()=>{ const b=acctSettings(); b.finance={pct:1.5,min:1}; b.lateFee={amount:10}; persist(); await acctLoad(true); const bo=ACCT.items.filter(i=>i.member_id==='p2'&&i.kind==='payment'&&i.descr==='Statement payment'); for(const i of bo) await acctVoid(i,'test: unpaid');
+      const late=lateCharges('p2','2026-11-30').map(x=>[x.item,x.amount,x.descr]); const ag=agingOf('p2','2026-12-01'); return {late, ag, bal:balanceOf('p2')}; }""")
+    bad+=check('finance charge 1.5% on the $118.50 still past due and a $10 late fee; aging buckets it',r['late']==[['finance',1.78,'Finance charge · 1.5% on $118.50 past due'],['late',10,'Late fee · statement of Oct 31, 2026 unpaid']] and r['ag']['cur']==0 and r['ag']['d60']>1000 and abs(r['ag']['total']-r['bal'])<0.01,r)
+    # the GL journal for October balances: debits = credits, tax and service charge on their own accounts
+    r=await p1.evaluate("()=>{ const L=glJournal('2026-10'), S=glJournal('2026-09'); const d=Math.round(sum(L,l=>l[3])*100)/100, c=Math.round(sum(L,l=>l[4])*100)/100; const accts=[...new Set(L.concat(S).map(l=>l[1]))].sort(); return {d,c,accts,n:L.length,sep:S.filter(l=>l[1]==='2300'||l[1]==='4150').map(l=>[l[1],l[4]])}; }")
+    bad+=check('GL journal for October balances across receivables, revenue, tax, service charge and cash',r['d']==r['c'] and r['d']>0 and '1200' in r['accts'] and '4000' in r['accts'] and r['sep']==[['4150',20],['2300',9.6]],r)
+    async with p1.expect_download() as dl: await p1.evaluate("()=>glExportCSV('2026-10')")
+    d=await dl.value; csv=open(await d.path()).read()
+    bad+=check('GL export CSV with a summary by account',d.suggested_filename=='gl-journal-2026-10.csv' and '"Summary"' in csv and '"1200","Accounts receivable"' in csv,csv.splitlines()[:2])
+    # the Directory editor carries the billing membership
+    r=await p1.evaluate("""async()=>{ go('members'); await new Promise(r=>setTimeout(r,200)); editMember(personById('p3')); const has=!!document.getElementById('bmC'); document.getElementById('bmS').value='active'; document.getElementById('dSave').click(); await new Promise(r=>setTimeout(r,200)); return {has, st:personById('p3').billing.status, cls:personById('p3').billing.class===acctSettings().classes[0].id}; }""")
+    bad+=check('Directory editor: class and billing status saved on the person',r['has'] and r['st']=='active' and r['cls'],r)
     # ---- 6. a board login: no nav item, the page redirects; a club without the module: locked page, no nav item
     fdb.me='u-mgaboard@x.org'
     c3=await b.new_context(); await cloud(c3,fdb)

@@ -64,3 +64,11 @@ create policy "staff manage accounts" on public.acct_items for all to authentica
 drop policy if exists "staff manage statements" on public.acct_statements;
 create policy "staff manage statements" on public.acct_statements for all to authenticated using (can_staff(tenant)) with check (can_staff(tenant));
 grant select, insert, update, delete on public.acct_items, public.acct_statements to authenticated;
+
+-- ---- the billing engine (Oct 2026): tax and service charge on an item, the item and ledger account it posts to,
+-- statements that were e-mailed. Idempotent.
+alter table public.acct_items add column if not exists tax numeric(12,2) not null default 0;
+alter table public.acct_items add column if not exists svc numeric(12,2) not null default 0;
+alter table public.acct_items add column if not exists item text;
+alter table public.acct_items add column if not exists gl text;
+alter table public.acct_statements add column if not exists sent_at timestamptz;

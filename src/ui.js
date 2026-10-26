@@ -125,12 +125,12 @@ function renderInner(){
   const ys=Object.keys(db.seasons).sort((a,b)=>b-a);
   $('seasonSel').innerHTML=ys.map(y=>`<option value="${y}"${y===Y()?' selected':''}>${y} season</option>`).join('')+'<option value="__new">+ New season…</option>';
   const live=typeof liveEvents==='function'?liveEvents():[];
-  const items=navItems(); if(view.page!=='pick'&&!items.some(([k])=>k===view.page||(k==='tournaments'&&view.page==='tournament')||(k==='accounts'&&view.page==='account'))) view.page='dash';
-  $('nav').innerHTML=items.map(([k,l,ic])=>`<button class="nav${(view.page===k||(k==='tournaments'&&view.page==='tournament')||(k==='accounts'&&view.page==='account'))?' on':''}" data-go="${k}">${ic}<span>${l}</span>${k==='golf'&&live.length?'<span class="livedot" aria-label="Live scoring"></span>':''}</button>`).join('')+
+  const items=navItems(); if(view.page!=='pick'&&!items.some(([k])=>k===view.page||(k==='tournaments'&&view.page==='tournament')||(k==='accounts'&&/^(account|billsetup)$/.test(view.page)))) view.page='dash';
+  $('nav').innerHTML=items.map(([k,l,ic])=>`<button class="nav${(view.page===k||(k==='tournaments'&&view.page==='tournament')||(k==='accounts'&&/^(account|billsetup)$/.test(view.page)))?' on':''}" data-go="${k}">${ic}<span>${l}</span>${k==='golf'&&live.length?'<span class="livedot" aria-label="Live scoring"></span>':''}</button>`).join('')+
     live.map(e=>`<button class="nav livelink" data-golfev="${e.id}"><span class="livedot"></span><span class="trunc">Leaderboard · ${esc(e.name)}</span></button>`).join('');
   $('nav').querySelectorAll('[data-go]').forEach(b=>b.onclick=()=>{ if(b.dataset.go==='golf') view.geid=null; go(b.dataset.go); });
   const m=$('main');
-  ({dash:vDash,tournaments:vTournaments,tournament:vTournament,members:vMembers,board:vBoard,budget:vBudget,treasury:vTreasury,golf:vGolf,orgs:vOrgs,pick:vPicker,collections:vCollections,games:vGames,ledger:vLedger,library:vLibrary,logins:vLogins,surveys:vSurveys,accounts:vAccounts,account:vAccount}[view.page]||vDash)(m);
+  ({dash:vDash,tournaments:vTournaments,tournament:vTournament,members:vMembers,board:vBoard,budget:vBudget,treasury:vTreasury,golf:vGolf,orgs:vOrgs,pick:vPicker,collections:vCollections,games:vGames,ledger:vLedger,library:vLibrary,logins:vLogins,surveys:vSurveys,accounts:vAccounts,account:vAccount,billsetup:vBillSetup}[view.page]||vDash)(m);
   if(view.page==='board'&&!isClub()&&typeof loginsCard==='function') loginsCard(m,ORG_ID);
   if(!isClub()&&((db.kind==='group'&&view.page==='members')||(db.kind!=='group'&&view.page==='board'))) adminLinksCard(m,curOrg());
 }
@@ -699,6 +699,7 @@ function editMember(mm){
       pair(field('First name','mfF',mm?.first||'',L),field('Last name','mfL',mm?.last||'',L))+pair(field('Email','mfE',mm?.email||'',L),field('Phone','mfP',mm?.phone||'',L))+
       pair(field('Handicap index','mfH',mm?.hcp??'',L),field('GHIN','mfG',mm?.ghin||'',L))+pair(field('Member #','mfNo',mm?.memberNo||'',L),field('Address','mfA',mm?.address1||'',L))+`<div style="display:grid;grid-template-columns:minmax(0,2fr) 70px minmax(0,1fr);gap:12px">${field('City','mfC',mm?.city||'',L)}${field('State','mfSt',mm?.state||'',L)}${field('Zip','mfZ',mm?.zip||'',L)}</div>`+
       pair(field(club?'Club status':short+' status','mfS',mm?.status||'Active',{type:'select',options:['Active','Inactive']}),field('Joined','mfJ',mm?.joined||'',{type:'date'}))+
+      (club&&typeof acctOn==='function'&&acctOn()&&!locked?`<p class="lbl" style="margin-top:4px">Billing</p>`+membershipFields(mm||{}):'')+
       (simple?'':`<div class="fld"><div style="display:flex;justify-content:space-between;align-items:center"><span class="lbl">${y} dues · ${fmt(s.dues.amount)}, not prorated</span><button class="btn sm" id="dAdd" type="button">${I.plus}Record payment</button></div><div class="mini"><div id="dRows">${payHTML()}</div></div></div>`)+
       (mm&&mm.ggId?`<p class="hint">Golf Genius ID ${esc(mm.ggId)}${mm.memberType?' · member type '+esc(mm.memberType):''}</p>`:'')+(inT.length?`<div class="fld"><span class="lbl">Tournaments</span><span>${inT.map(t=>esc(t.name)+' ('+t.season+')').join(', ')}</span></div>`:'')+field('Notes','mfNt',mm?.notes||'',{type:'textarea'}),
     wire:r=>{ const bind=()=>{ r.querySelectorAll('[data-di]').forEach(e=>e.oninput=()=>pays[+e.dataset.di][e.dataset.k]=e.value); r.querySelectorAll('[data-ddel]').forEach(b=>b.onclick=()=>{pays.splice(+b.dataset.ddel,1);r.querySelector('#dRows').innerHTML=payHTML();bind();}); };
@@ -709,7 +710,7 @@ function editMember(mm){
           who.innerHTML=`Adding <b>${esc(memberName(p))}</b> from the directory to the ${esc(short)}.`; L.style.display='none'; pk.value=''; }); }; } },
     save:()=>{ const first=fv('mfF'), last=fv('mfL'); if(!first&&!last){ toast('Enter a name'); return false; }
       const data=locked?{status:fv('mfS'),joined:fv('mfJ'),notes:fv('mfNt')}:{first,last,email:fv('mfE'),phone:fv('mfP'),hcp:fv('mfH'),ghin:fv('mfG'),memberNo:fv('mfNo'),address1:fv('mfA'),city:fv('mfC'),state:fv('mfSt'),zip:fv('mfZ'),status:fv('mfS'),joined:fv('mfJ'),notes:fv('mfNt')};
-      const p=upsertMember(pickedId||null,data);
+      const p=upsertMember(pickedId||null,data); if(club&&typeof acctOn==='function'&&acctOn()&&!locked&&$('bmC')) readMembership(p);
       if(!club) s.duesPayments=s.duesPayments.filter(x=>x.memberId!==p.id).concat(pays.filter(x=>n0(x.amount)).map(x=>({id:x.id||uid(),memberId:p.id,amount:n0(x.amount),date:x.date||''}))); },
     del:mm?()=>{ if(inT.length&&!confirm(`${memberName(mm)} is in ${inT.length} tournament field(s). Remove anyway?`)) return false;
       removeMember(mm.id); toast(club?'Removed from the directory':`Removed from the ${short} — still in the club directory`); }:null,delLabel:club?'Remove from directory':'Remove from '+short});
