@@ -105,7 +105,7 @@ function vClient(m,slug){
   const t=tenantOf(slug); if(!t){ PS.view='clients'; return vClients(m); }
   const mods=modulesOf(t), users=usersOf(slug), staff=users.filter(u=>u.role==='staff'), board=users.filter(u=>u.role!=='staff'), contacts=contactsOf(slug), events=eventsOf(slug).slice(0,30), orgs=orgsOf(slug);
   const card=(title,body,actions='')=>`<div class="card" style="overflow:hidden"><div class="cardhead"><h2 class="h2">${title}</h2><div class="actions">${actions}</div></div>${body}</div>`;
-  const kv=(k,v)=>`<div style="display:flex;gap:12px;padding:6px 0;border-top:1px solid var(--line)"><span class="muted" style="min-width:130px;font-size:13px">${k}</span><span style="min-width:0">${v||'<span class="muted">—</span>'}</span></div>`;
+  const kv=(k,v)=>`<div class="kv"><span class="muted">${k}</span><span>${v||'<span class="muted">—</span>'}</span></div>`;
   const urow=u=>{ const a=PS.auth[u.user_id]||{}; return `<div class="tr click" data-u="${esc(u.user_id)}" style="grid-template-columns:minmax(0,1.6fr) minmax(0,1.2fr) 130px 32px">
       <div class="cell2"><b>${esc(u.name||a.name||u.email||'')}</b><small>${esc(u.email||a.email||'')}</small></div>
       <span class="muted" style="font-size:13px">${a.last_sign_in_at?'Signed in '+fwhen(a.last_sign_in_at):u.invited_at?'Invited '+fdate(u.invited_at):'Never signed in'}</span>
@@ -120,7 +120,7 @@ function vClient(m,slug){
       <p class="sub"><a href="${esc(tenantURL(t.slug))}" target="_blank" rel="noopener">${esc(t.slug)}.${esc(BASE_DOMAIN)}</a>${(t.hosts||[]).length?' · '+(t.hosts||[]).map(esc).join(', '):''} · ${tStatusChip(t.status)}${t.started_on?' · client since '+fdate(t.started_on):''}</p></div>
       <div class="actions">${btn('Open hub','ptOpen','',I.chev)}${btn('Status','ptStatus','')}${btn('Edit client','ptEdit','pri',I.edit)}</div></div><div class="rule"></div>
     ${PS.err?`<div class="banner">${esc(PS.err)}</div>`:''}
-    <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px;align-items:start" class="g2">
+    <div class="grid g2" style="align-items:start">
       ${card('Subscription',`<div style="padding:0 22px 18px">${kv('Plan',esc(planLabel(t.plan)))}${kv('Status',tStatusChip(t.status)+(t.ended_on?' <span class="muted" style="font-size:13px">since '+fdate(t.ended_on)+'</span>':''))}${kv('Client since',fdate(t.started_on))}${kv('Renews',fdate(t.renews_on))}${kv('Billing e-mail',t.billing_email?`<a href="mailto:${esc(t.billing_email)}">${esc(t.billing_email)}</a>`:'')}
         <div style="border-top:1px solid var(--line);padding-top:10px;margin-top:4px"><span class="muted" style="font-size:13px">Modules</span>
         <div class="mini" style="margin-top:8px" id="ptMods">${MODULE_CATALOG.map(x=>modRow(x,mods,'data-mod')).join('')}</div>

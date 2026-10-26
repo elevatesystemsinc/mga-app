@@ -100,7 +100,7 @@ body{font-variant-numeric:lining-nums}
 .ib{width:32px;height:32px;display:inline-flex;align-items:center;justify-content:center;border-radius:6px;border:1px solid transparent;background:none;color:var(--muted);flex-shrink:0}
 .ib:hover{border-color:var(--line);color:var(--navy);background:#fff}
 .ib svg{width:16px;height:16px}
-.chip{display:inline-flex;align-items:center;height:24px;padding:0 10px;border-radius:999px;font-size:12px;font-weight:600;background:var(--paper);color:var(--navy);border:1px solid var(--line);white-space:nowrap}
+.chip{display:inline-flex;align-items:center;min-height:24px;height:auto;padding-top:2px;padding-bottom:2px;padding:0 10px;border-radius:999px;font-size:12px;font-weight:600;background:var(--paper);color:var(--navy);border:1px solid var(--line);white-space:normal;text-align:left;line-height:1.2}
 .chip.gold{background:#F6ECCF;border-color:#E5CF8E;color:#6B4F12}
 .chip.navy{background:var(--navy);border-color:var(--navy);color:#fff}
 .chip.ok{background:#E3F0E8;border-color:#BCD9C7;color:var(--pos)}
@@ -418,6 +418,8 @@ textarea.inp{height:auto;min-height:84px;padding:10px 12px;resize:vertical}
 .sheet .bc{display:flex;flex-wrap:wrap;gap:4px;padding:4px;align-content:flex-start;background:#fff} .sheet .bc.full{background:var(--ivory)} .sheet .bb{border:1px solid var(--line);border-radius:8px;background:#fff;padding:4px 8px;text-align:left;line-height:1.15;max-width:100%} .sheet .bb b{font-size:12.5px;color:var(--navy);display:block} .sheet .bb small{font-size:11px;color:var(--muted);display:block} .sheet .bb.in{border-color:var(--pos);background:#E3F0E8} .sheet .bb.mem{border-left:3px solid var(--gold)}
 .sheet .ba{flex:1;min-width:28px;min-height:34px;border:1px dashed transparent;border-radius:8px;background:none;color:var(--muted);font-weight:700} .sheet .bc:hover .ba{border-color:var(--line)}
 @media (max-width:640px){ .sheet{font-size:12px} .sheet .st{padding:8px 6px;font-size:12px} }
+.kv{display:flex;gap:12px;padding:6px 0;border-top:1px solid var(--line);align-items:flex-start} .kv>.muted:first-child{flex:0 0 120px;font-size:13px;padding-top:2px} .kv>span:last-child{flex:1 1 0;min-width:0;overflow-wrap:anywhere}
+@media (max-width:640px){ .kv>.muted:first-child{flex-basis:96px} }
 .lg .lact:empty{display:none} .lg .la{grid-template-areas:"who net" "who act"} .lg .la .lact{align-self:start}
 @media (min-width:1180px){
   .lg .lr{grid-template-columns:minmax(0,1.3fr) minmax(0,1.5fr) 120px 84px;grid-template-areas:"who money net act";gap:12px 18px;padding:10px 22px}
@@ -2435,7 +2437,7 @@ function vClient(m,slug){
   const t=tenantOf(slug); if(!t){ PS.view='clients'; return vClients(m); }
   const mods=modulesOf(t), users=usersOf(slug), staff=users.filter(u=>u.role==='staff'), board=users.filter(u=>u.role!=='staff'), contacts=contactsOf(slug), events=eventsOf(slug).slice(0,30), orgs=orgsOf(slug);
   const card=(title,body,actions='')=>`<div class="card" style="overflow:hidden"><div class="cardhead"><h2 class="h2">${title}</h2><div class="actions">${actions}</div></div>${body}</div>`;
-  const kv=(k,v)=>`<div style="display:flex;gap:12px;padding:6px 0;border-top:1px solid var(--line)"><span class="muted" style="min-width:130px;font-size:13px">${k}</span><span style="min-width:0">${v||'<span class="muted">—</span>'}</span></div>`;
+  const kv=(k,v)=>`<div class="kv"><span class="muted">${k}</span><span>${v||'<span class="muted">—</span>'}</span></div>`;
   const urow=u=>{ const a=PS.auth[u.user_id]||{}; return `<div class="tr click" data-u="${esc(u.user_id)}" style="grid-template-columns:minmax(0,1.6fr) minmax(0,1.2fr) 130px 32px">
       <div class="cell2"><b>${esc(u.name||a.name||u.email||'')}</b><small>${esc(u.email||a.email||'')}</small></div>
       <span class="muted" style="font-size:13px">${a.last_sign_in_at?'Signed in '+fwhen(a.last_sign_in_at):u.invited_at?'Invited '+fdate(u.invited_at):'Never signed in'}</span>
@@ -2450,7 +2452,7 @@ function vClient(m,slug){
       <p class="sub"><a href="${esc(tenantURL(t.slug))}" target="_blank" rel="noopener">${esc(t.slug)}.${esc(BASE_DOMAIN)}</a>${(t.hosts||[]).length?' · '+(t.hosts||[]).map(esc).join(', '):''} · ${tStatusChip(t.status)}${t.started_on?' · client since '+fdate(t.started_on):''}</p></div>
       <div class="actions">${btn('Open hub','ptOpen','',I.chev)}${btn('Status','ptStatus','')}${btn('Edit client','ptEdit','pri',I.edit)}</div></div><div class="rule"></div>
     ${PS.err?`<div class="banner">${esc(PS.err)}</div>`:''}
-    <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px;align-items:start" class="g2">
+    <div class="grid g2" style="align-items:start">
       ${card('Subscription',`<div style="padding:0 22px 18px">${kv('Plan',esc(planLabel(t.plan)))}${kv('Status',tStatusChip(t.status)+(t.ended_on?' <span class="muted" style="font-size:13px">since '+fdate(t.ended_on)+'</span>':''))}${kv('Client since',fdate(t.started_on))}${kv('Renews',fdate(t.renews_on))}${kv('Billing e-mail',t.billing_email?`<a href="mailto:${esc(t.billing_email)}">${esc(t.billing_email)}</a>`:'')}
         <div style="border-top:1px solid var(--line);padding-top:10px;margin-top:4px"><span class="muted" style="font-size:13px">Modules</span>
         <div class="mini" style="margin-top:8px" id="ptMods">${MODULE_CATALOG.map(x=>modRow(x,mods,'data-mod')).join('')}</div>
@@ -8104,7 +8106,7 @@ async function resultsPDF(t,opt){
    page counts, and a reload is tried once per build — if the page that comes back is still the old one, the CDN
    hasn't caught up; wait a while before trying that build again. */
 (function(){
-  const ME='20261026231952', KEY='au_tried', RETRY=10*60*1000; let ready=false, lastCheck=0;
+  const ME='20261026232208', KEY='au_tried', RETRY=10*60*1000; let ready=false, lastCheck=0;
   const typing=()=>{ const a=document.activeElement; return a&&/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)&&a.value&&a.type!=='search'; };
   const safe=()=>!typing()&&(typeof window.__canReload!=='function'||window.__canReload());
   const tried=()=>{ try{ const [b,t]=(sessionStorage.getItem(KEY)||'').split('|'); return b?{build:b,at:+t||0}:null; }catch(_){ return null; } };
