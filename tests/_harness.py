@@ -80,7 +80,49 @@ class FakeDB:
             items=sorted([i for i in self._rows('acct_items') if i.get('tenant','wccc')==a['p_tenant'] and i['member_id']==m['id'] and not i.get('void_at')],key=lambda i:(i.get('posted',''),i.get('created_at','')))
             st=sorted([x for x in self._rows('acct_statements') if x.get('tenant','wccc')==a['p_tenant'] and x['member_id']==m['id']],key=lambda x:x['period_end'],reverse=True)
             t=next((t for t in self._rows('tenants') if t['slug']==a['p_tenant']),{})
-            return json.dumps({'data':{'member':{k:m.get(k) for k in ('id','first','last','memberNo','email','address1','city','state','zip','status')},'club':club.get('name'),'message':(club.get('billing') or {}).get('message'),'items':items,'statements':st,'autopay':u['autopay'],'pm_label':u['pm_label'],'online':bool(t.get('stripe_account')) and bool((t.get('stripe_status') or {}).get('charges_enabled'))},'error':None})
+            facs=[f for f in ((club.get('booking') or {}).get('facilities') or []) if f.get('members',True)]
+            bks=sorted([b for b in self._rows('bookings') if b.get('tenant','wccc')==a['p_tenant'] and b['member_id']==m['id'] and b['status'] in ('booked','checked_in') and b['date']>=datetime.date.today().isoformat()],key=lambda b:(b['date'],b['time']))
+            return json.dumps({'data':{'member':{k:m.get(k) for k in ('id','first','last','memberNo','email','address1','city','state','zip','status')},'club':club.get('name'),'message':(club.get('billing') or {}).get('message'),'items':items,'statements':st,'facilities':facs,'bookings':bks,'autopay':u['autopay'],'pm_label':u['pm_label'],'online':bool(t.get('stripe_account')) and bool((t.get('stripe_status') or {}).get('charges_enabled'))},'error':None})
+        if fn in ('member_slots','member_book','member_cancel'):   # booking-setup.sql, in miniature
+            me=next((u for u in self.auth_users if u['id']==self.me),None); em=(me or {}).get('email','').lower()
+            club=self.get('mga_hub','club',a['p_tenant']) or {}; m=next((x for x in club.get('members',[]) if str(x.get('email','')).lower()==em),None)
+            mid=m and m['id']; rows=self._rows('bookings'); live=lambda b:b.get('tenant','wccc')==a['p_tenant'] and b['status'] in ('booked','checked_in')
+            if fn=='member_slots':
+                day=str(a['p_date']); taken=[{'time':b['time'],'unit':b['unit'],'n':max(1,len(b.get('players') or [])),'mine':b['member_id']==mid} for b in rows if live(b) and b['facility']==a['p_facility'] and b['date']==day]
+                mine=sorted([b for b in rows if live(b) and b['member_id']==mid and b['date']>=datetime.date.today().isoformat()],key=lambda b:(b['date'],b['time']))
+                return json.dumps({'data':{'taken':taken,'mine':mine},'error':None})
+            if fn=='member_book':
+                if not mid: return err('Your e-mail is not on the club directory')
+                f=next((f for f in ((club.get('booking') or {}).get('facilities') or []) if f['id']==a['p_facility']),None)
+                if not f: return err('Unknown facility')
+                if not f.get('members',True): return err('This facility is booked by the club office')
+                if (m.get('billing') or {}).get('status')=='suspended': return err('Your account is suspended — please see the club office')
+                day=str(a['p_date']); today=datetime.date.today()
+                if day<today.isoformat(): return err('That day has passed')
+                if day>(today+datetime.timedelta(days=int(f.get('lead',7)))).isoformat(): return err('Members may book up to %s days ahead'%f.get('lead',7))
+                t=a['p_time']; mins=lambda x:int(x[:2])*60+int(x[3:5])
+                if t<f.get('open','00:00') or t>=f.get('close','24:00') or (mins(t)-mins(f.get('open','00:00')))%max(1,int(f.get('slot',60))): return err('Not a bookable time')
+                players=a.get('p_players') or []; n=max(1,len(players)); cap=max(1,int(f.get('cap',1)))
+                if n>cap: return err('At most %s per booking'%cap)
+                same=[b for b in rows if live(b) and b['facility']==f['id'] and b['date']==day and b['time']==t and b['unit']==a['p_unit']]; used=sum(max(1,len(b.get('players') or [])) for b in same)
+                if f.get('kind')=='tee':
+                    if used+n>cap: return err('That tee time is full')
+                elif same: return err('That time is taken')
+                if f.get('onePerDay',True) and any(b for b in rows if live(b) and b['facility']==f['id'] and b['date']==day and b['member_id']==mid): return err('You already have a booking here that day')
+                bid=str(uuid.uuid4()); aid=None; fee=float((f.get('fee') or {}).get('amount') or 0)
+                if fee>0:
+                    per=(f.get('fee') or {}).get('per','booking'); it=next((x for x in ((club.get('billing') or {}).get('items') or []) if x['id']==(f.get('fee') or {}).get('item','facility')),{'id':'facility','source':'facility','gl':''})
+                    aid=str(uuid.uuid4()); self._rows('acct_items').append({'id':aid,'tenant':a['p_tenant'],'member_id':mid,'kind':'charge','source':it.get('source','facility'),'item':it['id'],'gl':it.get('gl',''),'ref':'bk:'+bid,'descr':f['name']+' · '+day+' '+t,'amount':round(fee*n if per=='player' else fee,2),'tax':0,'svc':0,'method':None,'reference':None,'posted':today.isoformat(),'void_at':None,'void_reason':None,'created_at':datetime.datetime.utcnow().isoformat()+'Z','created_by':'member'})
+                rows.append({'id':bid,'tenant':a['p_tenant'],'facility':f['id'],'date':day,'time':t,'unit':a['p_unit'],'member_id':mid,'name':(m.get('first','')+' '+m.get('last','')).strip(),'players':players,'note':a.get('p_note') or '','status':'booked','source':'member','acct_item':aid,'created_by':'member','created_at':datetime.datetime.utcnow().isoformat()+'Z','cancelled_at':None})
+                return json.dumps({'data':{'ok':True,'id':bid},'error':None})
+            b=next((b for b in rows if b['id']==a['p_id'] and b.get('tenant','wccc')==a['p_tenant'] and b['member_id']==mid),None)
+            if not b: return err('Not your booking')
+            if b['status']!='booked': return err('This booking can no longer be cancelled')
+            b['status']='cancelled'; b['cancelled_at']=datetime.datetime.utcnow().isoformat()+'Z'
+            if b.get('acct_item'):
+                for i in self._rows('acct_items'):
+                    if i['id']==b['acct_item'] and not i.get('void_at'): i['void_at']=b['cancelled_at']; i['void_reason']='Booking cancelled by the member'
+            return json.dumps({'data':True,'error':None})
         if fn=='member_autopay_off':
             for r in self._rows('member_users'):
                 if r['tenant']==a['p_tenant'] and r.get('user_id')==self.me: r['autopay']=False; r['stripe_pm']=None; r['pm_label']=None

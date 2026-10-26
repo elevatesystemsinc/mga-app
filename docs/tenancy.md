@@ -147,8 +147,8 @@ and RLS enforces the same on the tables.
    one-time password (or let the invite e-mail do it). Their staff then invite their boards from the hub. Their hub is live immediately at `<slug>.flagstickhub.com` (with option b, add that host name
    on Render and a CNAME first).
 
-8. **Billing, the member portal and online payments** (module `billing`): run `billing-setup.sql` then `member-setup.sql`
-   (both applied to the project, Oct 2026) and switch the module on for the client in the portal. Edge Functions (deployed
+8. **Billing, the member portal and online payments** (module `billing`), **Point of sale** (`pos`) and **Bookings** (`club`): run
+   `billing-setup.sql`, `member-setup.sql`, `pos-setup.sql`, `booking-setup.sql` (all applied to the project, Oct 2026) and switch the module on for the client in the portal. Edge Functions (deployed
    from the Supabase MCP / dashboard): `mail`, `stripe`, `stripe-webhook` (the webhook with **verify JWT off**). Secrets
    (Edge Functions → Secrets): `RESEND_API_KEY` (+ `MAIL_FROM`, a verified sending domain in Resend) for statements by
    e-mail; `STRIPE_SECRET_KEY` (Flagstick's platform key — the Connect platform must be enabled in the Stripe dashboard,

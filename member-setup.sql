@@ -32,7 +32,7 @@ grant select, insert, update, delete on public.member_users to authenticated;
 alter table public.tenants add column if not exists stripe_account text;
 alter table public.tenants add column if not exists stripe_status jsonb;
 
--- the signed-in member's own account, by the e-mail on the club directory
+-- the signed-in member's own account, by the e-mail on the club directory (re-run after booking-setup.sql: it reads bookings)
 create or replace function public.member_me(p_tenant text) returns jsonb
 language plpgsql security definer set search_path = public as $$
 declare em text; m jsonb; mid text; u member_users%rowtype; club jsonb;
@@ -54,6 +54,8 @@ begin
     'message', club -> 'billing' ->> 'message',
     'items', coalesce((select jsonb_agg(to_jsonb(i) order by i.posted, i.created_at) from acct_items i where i.tenant = p_tenant and i.member_id = mid and i.void_at is null), '[]'::jsonb),
     'statements', coalesce((select jsonb_agg(to_jsonb(s) order by s.period_end desc) from acct_statements s where s.tenant = p_tenant and s.member_id = mid), '[]'::jsonb),
+    'facilities', coalesce((select jsonb_agg(x) from jsonb_array_elements(club -> 'booking' -> 'facilities') x where coalesce((x ->> 'members')::boolean, true)), '[]'::jsonb),
+    'bookings', coalesce((select jsonb_agg(to_jsonb(b) order by b.date, b.time) from bookings b where b.tenant = p_tenant and b.member_id = mid and b.status in ('booked','checked_in') and b.date >= current_date), '[]'::jsonb),
     'autopay', coalesce(u.autopay, false), 'pm_label', u.pm_label,
     'online', coalesce((select t.stripe_account is not null and coalesce((t.stripe_status ->> 'charges_enabled')::boolean, false) from tenants t where t.slug = p_tenant), false));
 end $$;

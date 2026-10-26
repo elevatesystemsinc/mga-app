@@ -22,7 +22,7 @@ def ledger(fdb): return [r for r in fdb._rows('acct_items')]
 async def main():
   bad=0
   fdb=FakeDB()
-  fdb.seed_tenant('wccc','Walnut Creek Country Club',{'golf':True,'billing':True,'pos':True},hosts=['app.wcccmga.org'],login_email='pro@wccc.org',plan='club')
+  fdb.seed_tenant('wccc','Walnut Creek Country Club',{'golf':True,'billing':True,'pos':True,'club':True},hosts=['app.wcccmga.org'],login_email='pro@wccc.org',plan='club')
   fdb.seed_tenant('pines','The Pines Golf Club',{'golf':True},login_email='gm@pines.org',plan='golf')
   club=club_doc('Walnut Creek Country Club',[{'id':'mga','kind':'association','name':'Men’s Golf Association','short':'MGA'}])
   club['members']+=[{'id':'p2','first':'Bo','last':'Baker','memberNo':'1042','status':'Active'},{'id':'p3','first':'Cy','last':'Cole','status':'Active'}]
@@ -173,6 +173,34 @@ async def main():
     ANS['v']='Rang up twice'
     r=await p1.evaluate("""async()=>{ const b=[...document.querySelectorAll('[data-tv]')].find(x=>x.closest('.lr').textContent.includes('Bo Baker')); b.click(); await new Promise(r=>setTimeout(r,500)); const t=POS.tickets.find(x=>x.member_id==='p2'); const it=ACCT.items.find(i=>i.id===t.acct_item); return {st:t.status, reason:t.void_reason, itVoid:!!it.void_at, bal:balanceOf('p2'), voidRows:document.querySelectorAll('#main .lr.void').length}; }""")
     bad+=check('voiding the ticket voids the account charge with the reason',r['st']=='void' and r['reason']=='Rang up twice' and r['itVoid'] and r['voidRows']==1,r)
+    # ---- 5e. bookings: the tee sheet on the hub (book, check in), a court booked by a member in the portal with a fee, the member cancels
+    r=await p1.evaluate("""async()=>{ go('bookings'); await new Promise(r=>setTimeout(r,300)); const nav=navItems().map(x=>x[0]); const f=facOf('tee'); const day=todayISO(); const slots=slotsOf(f).length;
+      const tennis=facOf('tennis'); tennis.fee={item:'facility',amount:10,per:'player'}; persist();
+      document.querySelector('[data-add="07:10|1"]').click(); await new Promise(r=>setTimeout(r,150)); document.getElementById('bdM').value='p1'; document.getElementById('bdM').dispatchEvent(new Event('change')); const a=document.getElementById('bdAdd'); a.value='Bo'; a.dispatchEvent(new Event('input')); document.querySelector('#bdAddL [data-pk]').click(); a.value='Walt Guest'; a.dispatchEvent(new Event('input')); document.querySelector('#bdAddL [data-pg]').click(); document.getElementById('dSave').click(); await new Promise(r=>setTimeout(r,400));
+      const cell=document.querySelector('[data-bt="07:10"][data-bu="1"]'); const names=[...cell.querySelectorAll('.bb b')].map(x=>x.textContent); const sub=cell.querySelector('.bb small').textContent; const kp=[...document.querySelectorAll('#main .kpi .v')].map(x=>x.textContent);
+      cell.querySelector('[data-bk]').click(); await new Promise(r=>setTimeout(r,150)); const btn=[...document.querySelectorAll('#dFoot button')].find(b=>b.textContent==='Check in'); btn.click(); await new Promise(r=>setTimeout(r,400));
+      const row=BK.rows.find(b=>b.facility==='tee'); return {nav, slots, names, sub, kp, st:row.status, players:row.players.map(p=>[p.member_id||null,p.name]), inCell:!!document.querySelector('.bb.in')}; }""")
+    bad+=check('tee sheet: Oak and Pecan every 10 minutes, a threesome booked for Ann, checked in',r['nav'].index('bookings')==r['nav'].index('pos')+1 and r['slots']==60 and r['names']==['Ann Able'] and r['sub'].startswith('3 · Bo, Walt') and r['kp'][0]=='1' and r['st']=='checked_in' and r['players']==[['p1','Ann Able'],['p2','Bo Baker'],[None,'Walt Guest']] and r['inCell'],r)
+    # the portal (Ann): facilities offered, tennis court 2 at 10:00 tomorrow with a guest → $20 fee on her account; the tee time she has shows as hers on the sheet
+    fdb.me='u-ann@x.org'
+    await p5.reload(); await p5.wait_for_function("()=>!!ME&&BKV.slots!==null",timeout=10000); await p5.wait_for_timeout(200)
+    r=await p5.evaluate("""async()=>{ const bal0=ME.items.reduce((t,i)=>t+sign(i),0); const facs=ME.facilities.map(f=>f.id); const mineTee=!!document.querySelector('.sl.mine'); const dbg=[BKV.fac,BKV.date,JSON.stringify(BKV.slots)]; document.querySelector('[data-bf="tennis"]').click(); await new Promise(r=>setTimeout(r,500)); const days=document.querySelectorAll('[data-bd]').length; document.querySelectorAll('[data-bd]')[1].click(); await new Promise(r=>setTimeout(r,500));
+      document.querySelector('[data-bs="10:00|2"]').click(); await new Promise(r=>setTimeout(r,100)); document.querySelector('[data-pn="1"]').value='Pat Partner'; document.getElementById('bkN').value='doubles'; document.getElementById('bkGo').click(); await new Promise(r=>setTimeout(r,900));
+      const mine=ME.bookings.map(b=>[b.facility,b.time,b.unit,b.players.length,b.source]); const bal=Math.round((ME.items.reduce((t,i)=>t+sign(i),0)-bal0)*100)/100; const own=!!document.querySelector('[data-bs="10:00|2"].mine'); window.BAL0=bal0;
+      return {facs, mineTee, dbg, days, mine, bal, own, fee:ME.items.filter(i=>i.ref&&i.ref.startsWith('bk:')).map(i=>[i.item,i.amount,i.descr.split(' · ')[0]])}; }""")
+    bad+=check('portal: tennis court 2 tomorrow for Ann and a partner, $10 per player on her account, the tee time shows as hers',r['facs']==['tee','tennis','pickle','pool'] and r['mineTee'] and r['days']==8 and r['mine'][-1][:5]==['tennis','10:00',2,2,'member'] and r['own'] and r['fee']==[['facility',20,'Tennis']] and r['bal']==20,r)
+    # rules: the same court again that day is refused; the hub sees the booking; the member cancels → the fee is voided
+    r=await p5.evaluate("""async()=>{ const {error}=await sb.rpc('member_book',{p_tenant:TENANT,p_facility:'tennis',p_date:BKV.date,p_time:'11:00',p_unit:1,p_players:[{member_id:ME.member.id,name:'Ann'}],p_note:''}); const e1=error&&error.message;
+      const {error:e2}=await sb.rpc('member_book',{p_tenant:TENANT,p_facility:'lessons',p_date:BKV.date,p_time:'09:00',p_unit:1,p_players:[],p_note:''}); return {e1, e2:e2&&e2.message}; }""")
+    bad+=check('rules from the database: one a day per facility; lessons are booked by the office',r['e1'] and 'already have' in r['e1'] and r['e2'] and 'club office' in r['e2'],r)
+    fdb.me='u-pro@wccc.org'
+    r=await p1.evaluate("""async()=>{ BK.fac='tennis'; BK.date=isoPlus(todayISO(),1); await bkLoad(true); render(); await new Promise(r=>setTimeout(r,200)); const cell=document.querySelector('[data-bt="10:00"][data-bu="2"]'); return {name:cell.querySelector('.bb b')?.textContent, mem:!!cell.querySelector('.bb.mem'), note:cell.querySelector('.bb small')?.textContent}; }""")
+    bad+=check('the hub sheet shows the member’s booking, marked as made in the portal',r['name']=='Ann Able' and r['mem'],r)
+    fdb.me='u-ann@x.org'
+    p5.on('dialog',lambda d:asyncio.ensure_future(d.accept()))
+    r=await p5.evaluate("""async()=>{ const b=[...document.querySelectorAll('[data-bx]')].pop(); b.click(); await new Promise(r=>setTimeout(r,900)); return {left:ME.bookings.filter(b=>b.facility==='tennis').length, bal:Math.round((ME.items.reduce((t,i)=>t+sign(i),0)-window.BAL0)*100)/100, fee:ME.items.filter(i=>i.ref&&i.ref.startsWith('bk:')).length}; }""")
+    bad+=check('the member cancels: the booking goes, the fee is voided, the balance is back to zero',r['left']==0 and r['bal']==0 and r['fee']==0,r)
+    fdb.me='u-pro@wccc.org'
     # ---- 6. a board login: no nav item, the page redirects; a club without the module: locked page, no nav item
     fdb.me='u-mgaboard@x.org'
     c3=await b.new_context(); await cloud(c3,fdb)

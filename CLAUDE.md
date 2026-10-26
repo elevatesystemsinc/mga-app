@@ -63,6 +63,8 @@ src/
   billcore.js          the member statement PDF page (statementPage), shared by the hub and the member portal            [shared]
   billing.js           Member accounts & billing (module 'billing', club hub, staff only): classes, the monthly run, tax/service,
                        minimums, finance charges, aging, statements, GL export, Stripe Connect, the mail function
+  pos.js               Point of sale (module 'pos'): outlets, products & stock, the register, tickets to accounts or cash / card
+  bookings.js          Bookings (module 'club'): the tee sheet, courts, pool, lessons — the sheet, check-in, fees, the printed sheet
   autoupdate.js        version.json polling + safe reload (__BUILD__ placeholder)                     [shared]
   cashier_src.html     cashier page   (markers /*CALCCORE*/ /*AUTOUPDATE*/)
   checkin_src.html     check-in page  (markers /*CKCORE*/  /*AUTOUPDATE*/)
@@ -93,7 +95,7 @@ python3 tests/test_score.py   # the public scoring page against the fake: mid-ro
 python3 tests/test_tenants.py # tenants, the portal, staff / board logins and scope, invite links — against the fake
 python3 tests/test_survey.py  # a survey from the template → public link → anonymous answers → results, against the fake
 python3 tests/test_finish.py  # a game wrapped up from the phones (close → skins → draw → payouts) and taken into the hub, against the fake
-python3 tests/test_billing.py # member accounts: staff post / pay / void / statements, dues → the account, board logins kept out, against the fake
+python3 tests/test_billing.py # the Club-management tier against the fake: accounts, the billing engine, statements + e-mail, the member portal, POS, bookings
 git add -A && git commit && git push origin main  # Render deploys main to app.wcccmga.org
 ```
 Tests need `pip install playwright && playwright install chromium` and `cd tests && npm i xlsx@0.18.5`.
@@ -339,6 +341,8 @@ Tournament = { id, name, season, days, startDate, field:[{id,memberId,team,paid,
 | `survey_share` (sid, tenant, org, token, status, doc), `survey_responses` (id, tenant, org, sid, answers, day) + RPC `survey_get(p_token)`, `survey_submit(p_token,p_answers)`, `hub_key_survey`, `hub_key_survey_results` | surveys (`survey-setup.sql`): the share row is what the public page shows; a response is answers + the **day** only — no user, e-mail, IP or device, ever. |
 | `acct_items`, `acct_statements` + `can_staff(p_tenant)` | member accounts & billing (`billing-setup.sql`): the club's ledger, staff only. |
 | `member_users`, `tenants.stripe_account/stripe_status` + RPC `member_me(p_tenant)`, `member_autopay_off(p_tenant)` | the member portal and online payments (`member-setup.sql`); Edge Functions `mail`, `stripe`, `stripe-webhook`. |
+| `pos_tickets` | point of sale tickets (`pos-setup.sql`), staff only. |
+| `bookings` + RPC `member_id_of`, `member_slots`, `member_book`, `member_cancel` | bookings (`booking-setup.sql`): staff on the sheet, members through the security-definer functions that enforce the facility's rules. |
 | `hub_keys` (org_id, key_hash, label, revoked_at) + RPC `hub_key_org/read/write/people/golf_event/golf_delete/score/share` | admin links (`admin-links-setup.sql`): security-definer functions that act for exactly one organization. |
 | `mm_tournament` | the retired Member-Member app's row (`supabase-setup.sql`). Archive only — no hub code reads or writes it. |
 
@@ -546,8 +550,31 @@ localStorage. `acctPost(o)` is the one way anything lands on an account.
   `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `RESEND_API_KEY`, `MAIL_FROM` (docs/tenancy.md §6). Without the keys the
   functions answer "not configured" and the hub / portal say so; the fake (`_harness.py`) emulates `member_me`,
   `member_autopay_off`, a `mail` that records what it sent and a `stripe` that is never configured.
-- Coming next in this tier: POS (F&B + pro shop posting to these accounts, minimums from real spend) and bookings (tee
-  sheet, courts, pools, lessons) on the member sign-in built here.
+
+### Point of sale (`pos.js`, `pos-setup.sql`, module `pos`) and Bookings (`bookings.js`, `booking-setup.sql`, module `club`)
+- **POS** (`posOn()`, staff only): `CLUB.pos = {outlets:[{id,name,kind fnb|proshop,item (the billing item it charges as)}],
+  products:[{id,outlet,cat,name,price (before tax),sku,taxable|null,svc|null (null = as the outlet's item),track,stock,active}]}`
+  (`posSettings()`, defaults Grill + Pro shop); tickets are rows in `pos_tickets` (`POS.tickets`, local mode in localStorage).
+  The register (`vPos`): outlet seg, product grid by category with search and **Open item**, the ticket (member picker or a
+  walk-in, qty ±, tip for F&B), `ticketTotals` (service charge on lines marked for it, tax on taxable lines + their service
+  charge, tip on top), **Charge to account** (`closeTicket('account')` → one `acctPost` charge with `tax`/`svc`, `ref pos:<id>`,
+  `descr` "Grill · 2× Club sandwich"; refused for a suspended member or when billing is off), Cash / Card (recorded, no
+  account), Hold / On hold; stock moves on close. Tickets (`vPosTickets`: a day's tickets, KPIs, void with a reason →
+  `voidTicket` voids the account charge and restores stock, CSV); Setup (`vPosSetup`: outlets, products, CSV import
+  `importProducts`). F&B minimums read the net F&B charges these post.
+- **Bookings** (`bookOn()`, staff on the hub; members in the portal): `CLUB.booking.facilities = [{id,name,kind
+  tee|court|pool|lesson|room, units, unitNames, open, close, slot (min), cap (per slot; players per tee time), lead (days
+  members may book ahead), members (bookable in the portal), onePerDay, fee:{item,amount,per booking|player}|null}]`
+  (`bookSettings()`, defaults: Tee sheet Oak/Pecan every 10 min ×4, Tennis ×4 courts, Pickleball ×4, Pool, Lessons
+  office-only); rows in `bookings` (`BK.rows`). The sheet (`vBookings`): facility seg, day nav, a time × unit grid
+  (`.sheet`: names, player count, checked-in green, portal bookings with a gold edge), tap a slot → `bookingDrawer`
+  (booked by, players / guests up to cap, note; Check in, Cancel booking; a facility fee → `acctPost` ref `bk:<id>`,
+  voided on cancel), **Print the sheet** (`sheetPDF`, branded, a page set per day), Facilities (`vBookSetup` /
+  `facilityDrawer`). Members: `member_me` returns `facilities` (members:true) and upcoming `bookings`; the portal's Book
+  card (`bookCard` / `loadSlots` / `bookSheet` in member_src.html) shows the next `lead` days, taken / open / yours per slot,
+  books through `member_book(tenant, facility, date, time, unit, players, note)` — the database enforces the rules
+  (hours, slot grid, lead days, capacity, one a day, office-only, suspended members, the fee posted to acct_items) — and
+  cancels through `member_cancel` (voids the fee). `member_slots` gives a day's taken slots without names.
 
 ### Other
 Checklist (95-task 2026 template, assignees from members/board, notes, print). Golf (courses, WHS, flights,

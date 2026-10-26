@@ -201,6 +201,22 @@ hub under **Member accounts** (staff logins only, once the billing module is on)
   Billing setup, members **pay online** by card or bank account straight into the club's own Stripe account, and can turn
   on **autopay** so each statement is paid for them. Flagstick never holds the money.
 
+## Point of sale
+
+**Point of sale** (staff, with the module on) is the register for the grill, the halfway house and the pro shop: pick
+the outlet, tap the products (or an open item), pick the member or a walk-in, add a tip, and close the ticket **to the
+member's account** — one line on their statement with tax and service charge broken out — or as cash or card. Tickets can
+be held and picked up again, voided with a reason (the account charge goes with it), and the day's tickets export to CSV.
+Setup holds the outlets and products with prices, categories, tax and service flags and stock counts (CSV import).
+
+## Bookings
+
+**Bookings** (staff, with the module on) is the tee sheet and every other sheet: tennis and pickleball courts, the pool,
+lessons by instructor, rooms. Each facility has its hours, slot length, how many per slot (players per tee time), how far
+ahead members may book, whether members may book it at all, and a fee that goes on the member's account. Staff book on
+the sheet, check people in, cancel, and print the day's sheet. Members book from the **member portal** inside the same
+rules — the next days, open and taken slots, their own bookings with Cancel.
+
 ## The club calendar
 
 The club's Tournaments page and dashboard also list every association's and small group's tournaments — name, dates,
