@@ -178,7 +178,7 @@ class FakeDB:
                         t=max(0,tips.get(p['id'],0)); p['amount']=round(float(p['amount'])-float(p.get('tip') or 0)+t,2); p['tip']=t
                         if p['method']=='account' and t>0 and p.get('acct_item'):
                             for i in self._rows('acct_items'):
-                                if i['id']==p['acct_item'] and not i.get('void_at'): i['amount']=round(float(i['amount'])+t,2); i['descr']=(i['descr']+' · tip %s'%t)[:180]
+                                if i['id']==p['acct_item'] and not i.get('void_at'): i['amount']=round(float(i['amount'])+t,2); i['tip']=round(float(i.get('tip') or 0)+t,2); i['descr']=(i['descr']+' · tip %s'%t)[:180]
                     tot+=float(p.get('tip') or 0)
                 r.update({'tip':round(tot,2),'total':round(r['subtotal']+r['svc']+r['tax']+tot,2),'status':'closed','updated_at':now})
                 return json.dumps({'data':r,'error':None})

@@ -776,7 +776,9 @@ groups, printed scorecards — the printed cards include a live-scoring QR that 
   printed slip carries Additional tip / Total / Signature per such payment (`receipt` on the station, `receiptPDF` in the hub),
   the floor lists it under **Slips out**, and the server closes it out with the written tip (`settleSheet` → `pos_settle`; the hub's
   Tickets page: Close out → `settleDrawer` / `settleTicket`): the tip goes on the payment (`payments[].tip`, null while pending), an
-  account tip onto the member's `acct_items` charge (amount + "· tip"), and the ticket closes. `shiftStats` counts a slip as a sale.
+  account tip onto the member's `acct_items` charge (amount + **`tip`** column + "· tip" in descr — `netOf()` leaves it out, so it is
+  never F&B spend toward a minimum and the GL export credits it to `gl.tips` Tips payable, not revenue), and the ticket closes. A tip
+  over $20 that is more than the payment itself asks "is that what is written on the slip?" before it posts. `shiftStats` counts a slip as a sale.
   Tips by server (`payments[].tip` × `server_id`) are what a payroll feature will read — the owner: "we can build that later".
 - No payout or handicap-allowance details on player handouts.
 

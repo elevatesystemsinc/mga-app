@@ -11,6 +11,9 @@
 --                                  acct_items charge (amount + descr), the ticket closes
 --   pos_checks                     now returns open and slip checks (the floor shows "Slips out")
 
+-- a tip charged to the account is its own figure on the acct_items row: never revenue, never F&B spend toward a minimum
+alter table public.acct_items add column if not exists tip numeric(12,2) not null default 0;
+
 create or replace function public.pos_checks(p_key text) returns jsonb
 language sql stable security definer set search_path = public as $$
   select coalesce(jsonb_agg(to_jsonb(t) order by t.created_at), '[]'::jsonb) from pos_station(p_key) s, pos_tickets t
@@ -72,7 +75,7 @@ begin
       t := greatest(0, round(coalesce((e ->> 'tip')::numeric, 0), 2));
       p := p || jsonb_build_object('tip', t, 'amount', round((p ->> 'amount')::numeric - coalesce((p ->> 'tip')::numeric, 0) + t, 2));
       if p ->> 'method' = 'account' and t > 0 and (p ->> 'acct_item') is not null then
-        update acct_items set amount = amount + t, descr = left(descr || ' · tip ' || t::text, 180) where id = (p ->> 'acct_item')::uuid and tenant = s.tenant and void_at is null;
+        update acct_items set amount = amount + t, tip = coalesce(tip, 0) + t, descr = left(descr || ' · tip ' || t::text, 180) where id = (p ->> 'acct_item')::uuid and tenant = s.tenant and void_at is null;
       end if;
     end if;
     tips := tips + coalesce((p ->> 'tip')::numeric, 0); pays := pays || jsonb_build_array(p);
