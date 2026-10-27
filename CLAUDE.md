@@ -218,8 +218,14 @@ Tournament = { id, name, season, days, startDate, field:[{id,memberId,team,paid,
   `shiftDrawer`), filtered by department (Everything · Golf · Racket sports · Aquatics · Food & beverage · Club). **Events**
   (`vEvents`, `CLUB.events = [{id, name, dept ('club' | a department), date, end, start, finish, where, descr, public}]`,
   `eventDrawer`): the Boo Bash, movie night at the pool; public ones reach the member portal (`member_me` → `events`, the
-  "What's on" card). Loads never re-trigger while running (`calLoad` checks the loading flags — a `.then(render)` on an
-  early-returned load was a microtask loop that froze the page).
+  "What's on" card).
+- **Table caches and the session** (STN stations, BK bookings, BLK blocks, ST clock, POS tickets, ACCT ledger, MAILS): every
+  loader reads localStorage until `acctCloud()` is true, and `boot()` renders the remembered page **before** the session is
+  established — so a hub restored onto Settings → Food & beverage used to cache an empty local list and never list the
+  stations. Two rules in core.js: each module registers a reset in `CACHE_RESETS` and `startCloud` runs them once the cloud
+  is up (the page then loads the real rows); and a loader called while its load is in flight returns `PENDING` (a promise
+  that never settles) — a second `.then(render)` on an immediately-resolved early return re-rendered, called the loader
+  again and spun a microtask loop that starved the fetch and froze the page. Keep both for any new loader.
 - **The club runs on calendar years, not seasons** (the owner, Oct 2026: "turn the season functionality off on the club
   side… annual revenue, annual profits, as well as quarterly reports"; associations and groups keep their seasons).
   `Y()` for the club = `view.year` or the current year (a `db.seasons[y]` the club has not seen yet is created on the

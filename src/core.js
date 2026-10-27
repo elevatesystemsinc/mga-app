@@ -453,6 +453,13 @@ function applyRemote(D,remote){
   if(hadLocal) persist();                                            // our unsaved edits still need to go up
 }
 let sessionOK=false, cloudReady=false, setupNeeded=false;
+/* table caches (stations, bookings, the ledger…) filled before the session was established read this device's local copy;
+   each module registers a reset here and startCloud runs them once the cloud is up, so the page loads the real rows */
+const CACHE_RESETS=[];
+/* a loader called while its load is in flight hands back a promise that never settles: the first call's .then(render)
+   will fire; a second .then(render) on an immediately-resolved promise would re-render, call the loader again, and so on
+   in a microtask loop that starves the fetch */
+const PENDING=new Promise(()=>{});
 /* open one row: server copy wins over the device's; the row is created when `create` is set */
 async function loadDoc(id,meta,opt){
   const D=docState(id,meta);
@@ -484,7 +491,7 @@ async function startCloud(){
     if(KEYMODE&&ORG_ID!==HUBKEY.org){ chooseOrg(HUBKEY.org); return; }       // the link is for one organization only
     if(SCOPED&&ORG_ID==='club'&&SCOPE_ORGS.length){ chooseOrg(SCOPE_ORGS[0]); return; }   // a board login lands on its own hub
     const club=await loadDoc('club',CLUB_META);
-    cloudReady=true;
+    cloudReady=true; CACHE_RESETS.forEach(f=>{ try{ f(); }catch(_){} });
     if(!club){ setupNeeded=true; CLUB=null; db=null; render(); return; }          // first run: the club hasn't been set up yet
     setupNeeded=false; CLUB=club;
     if(ORG_ID==='club'&&!SCOPED){ db=CLUB; await openOrgDocs(); }

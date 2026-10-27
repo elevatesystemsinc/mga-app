@@ -5,14 +5,14 @@
    club), sent by Flagstick's mailer or through the organization's Microsoft 365 (an Azure app with Mail.Send); the
    settings live in mail_settings (mail-setup.sql), the secret is write-only here. The club's Settings also gathers
    the setup of each module: restaurants and the golf shop (POS outlets), billing, facilities, the game library. */
-const MAILS={row:null,loaded:false};
+const MAILS={row:null,loaded:false}; CACHE_RESETS.push(()=>{ MAILS.loaded=false; MAILS.row=null; });
 const mailKey=()=>'fs_mail_'+((typeof TENANT!=='undefined'&&TENANT)||'local')+'_'+ORG_ID;
 function brandOf(){ if(db&&db.brand&&db.brand.logo) return db.brand; if(CLUB&&CLUB.brand&&CLUB.brand.logo) return CLUB.brand; return null; }
 const brandLogo=()=>{ const b=brandOf(); return b?b.logo:null; };
 const brandName=()=>(db&&db.name)||(CLUB&&CLUB.name)||CLUB_META.name;
-async function mailLoad(force){ if(MAILS.loaded&&!force) return MAILS.row; MAILS.loaded=true;
-  if(!acctCloud()){ try{ MAILS.row=JSON.parse(localStorage.getItem(mailKey())||'null'); }catch(_){ MAILS.row=null; } return MAILS.row; }
-  const r=await tq(sb.from('mail_settings').select('*').eq('org',ORG_ID)).maybeSingle(); MAILS.row=r.error?null:(r.data||null); return MAILS.row; }
+async function mailLoad(force){ if(MAILS.loading) return PENDING; if(MAILS.loaded&&!force) return MAILS.row; MAILS.loaded=true; MAILS.loading=true;
+  try{ if(!acctCloud()){ try{ MAILS.row=JSON.parse(localStorage.getItem(mailKey())||'null'); }catch(_){ MAILS.row=null; } return MAILS.row; }
+    const r=await tq(sb.from('mail_settings').select('*').eq('org',ORG_ID)).maybeSingle(); MAILS.row=r.error?null:(r.data||null); return MAILS.row; } finally{ MAILS.loading=false; } }
 async function mailSave(row){ row=Object.assign({org:ORG_ID,updated_at:new Date().toISOString(),updated_by:whoAmI()},row);
   if(!acctCloud()){ MAILS.row=Object.assign({},MAILS.row||{},row); try{ localStorage.setItem(mailKey(),JSON.stringify(MAILS.row)); }catch(_){} return true; }
   const {error}=await sb.from('mail_settings').upsert(trow(row),{onConflict:'tenant,org'}); if(error){ toast('Couldn’t save: '+error.message); return false; } MAILS.row=Object.assign({},MAILS.row||{},row); return true; }

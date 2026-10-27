@@ -6,7 +6,7 @@
    copied forward, printed. The time clock: rows in staff_clock (staff-setup.sql), written from a clock kiosk
    (clock.html?k=TOKEN — a pos_stations row of kind 'clock' bound to a department) or a register's lock screen through
    staff_clock(key, pin, action); the hub reads them for who is on now and the hours of the week. */
-const ST={dept:'',week:'',clock:null,loading:false,at:0};
+const ST={dept:'',week:'',clock:null,loading:false,at:0}; CACHE_RESETS.push(()=>{ if(!ST.loading) ST.clock=null; });
 const STAFF_ROLES=[['server','Server'],['bartender','Bartender'],['manager','Manager — can leave a station and void checks'],['pro','Pro / instructor'],['attendant','Attendant'],['lifeguard','Lifeguard'],['staff','Staff']];
 const ROLE_NAME=Object.fromEntries(STAFF_ROLES.map(([k,l])=>[k,l.split(' — ')[0]]));
 const staffOn=()=>!!CLUB&&isClub()&&(hasModule('club')||hasModule('pos'))&&!KEYMODE&&!SCOPED;
@@ -27,7 +27,7 @@ const hoursTxt=h=>(Math.round(h*100)/100).toFixed(2).replace(/\.?0+$/,'')+' h';
 const clockHours=r=>Math.max(0,(new Date(r.out_at||Date.now())-new Date(r.in_at))/36e5);
 /* ---- the time clock rows ---- */
 const clkKey=()=>'fs_clock_'+((typeof TENANT!=='undefined'&&TENANT)||'local');
-async function clockLoad(force){ if(ST.loading||(ST.clock&&!force)) return; ST.loading=true;
+async function clockLoad(force){ if(ST.loading) return PENDING; if(ST.clock&&!force) return; ST.loading=true;
   try{ if(!acctCloud()){ try{ ST.clock=JSON.parse(localStorage.getItem(clkKey())||'[]'); }catch(_){ ST.clock=[]; } } else { const r=await tq(sb.from('staff_clock').select('*').gte('in_at',new Date(Date.now()-45*864e5).toISOString())); ST.clock=r.error?[]:(r.data||[]); } ST.at=Date.now(); } finally{ ST.loading=false; } }
 async function clockFix(row,patch){ if(acctCloud()){ const {error}=await sb.from('staff_clock').update(patch).eq('id',row.id); if(error){ toast(error.message); return false; } } Object.assign(row,patch); if(!acctCloud()){ try{ localStorage.setItem(clkKey(),JSON.stringify(ST.clock)); }catch(_){} } return true; }
 /* ---- the page: a department's people, their week, who is on the clock ---- */

@@ -3,7 +3,7 @@
    member (or a walk-in), tap the products, close the ticket to the member's account (one acct_items charge with tax and
    service charge broken out — statements, minimums and the GL all see it) or as cash / card taken at the register.
    Outlets, products and stock counts live in CLUB.pos; tickets are rows in pos_tickets (pos-setup.sql). */
-const POS={tickets:null,loading:false,at:0,cur:null,outlet:'',cat:'',q:'',day:'',last:null,dept:''};
+const POS={tickets:null,loading:false,at:0,cur:null,outlet:'',cat:'',q:'',day:'',last:null,dept:''}; CACHE_RESETS.push(()=>{ if(!POS.loading) POS.tickets=null; });
 const outletDept=o=>o.kind==='fnb'?'fnb':(o.dept==='tennis'?'racket':o.dept||'golf');
 const posOn=()=>!!CLUB&&isClub()&&hasModule('pos')&&!KEYMODE&&!SCOPED;
 const posKey=()=>'fs_pos_'+((typeof TENANT!=='undefined'&&TENANT)||'local');
@@ -13,7 +13,7 @@ function posSettings(){ CLUB.pos=CLUB.pos||{}; const p=CLUB.pos;
   return p; }
 const outletOf=id=>posSettings().outlets.find(o=>o.id===id);
 const productOf=id=>posSettings().products.find(x=>x.id===id);
-async function posLoad(force){ if(POS.loading||(POS.tickets&&!force)) return; POS.loading=true;
+async function posLoad(force){ if(POS.loading) return PENDING; if(POS.tickets&&!force) return; POS.loading=true;
   try{ if(!acctCloud()){ try{ POS.tickets=JSON.parse(localStorage.getItem(posKey())||'[]'); }catch(_){ POS.tickets=[]; } }
     else { const r=await tq(sb.from('pos_tickets').select('*')); POS.tickets=r.error?[]:(r.data||[]); } POS.at=Date.now(); }
   finally{ POS.loading=false; } }
@@ -168,10 +168,10 @@ function importProducts(){ const P=posSettings();
    (pos.html?s=TOKEN, the hash in pos_stations); an expo station is a kitchen screen (expo.html?k=TOKEN) bound to one of
    the outlet's prep stations (outlet.expos). Servers unlock a station with a PIN (CLUB.pos.staff[].pin = sha256 of
    tenant:pin, checked by pos_pin); a manager's PIN lets someone leave the station. */
-const STN={rows:null,loading:false};
+const STN={rows:null,loading:false}; CACHE_RESETS.push(()=>{ if(!STN.loading) STN.rows=null; });
 const stnKey=()=>'fs_stn_'+((typeof TENANT!=='undefined'&&TENANT)||'local');
 function outletSetup(o){ o.tables=o.tables||[]; o.expos=o.expos||[]; o.menus=o.menus||[]; return o; }
-async function stnLoad(force){ if(STN.loading||(STN.rows&&!force)) return; STN.loading=true;
+async function stnLoad(force){ if(STN.loading) return PENDING; if(STN.rows&&!force) return; STN.loading=true;
   try{ if(!acctCloud()){ try{ STN.rows=JSON.parse(localStorage.getItem(stnKey())||'[]'); }catch(_){ STN.rows=[]; } } else { const r=await tq(sb.from('pos_stations').select('*')); STN.rows=r.error?[]:(r.data||[]); } } finally{ STN.loading=false; } }
 function stnLocalWrite(){ if(!acctCloud()){ try{ localStorage.setItem(stnKey(),JSON.stringify(STN.rows||[])); }catch(_){} } }
 const pinHash=pin=>sha256hex(((typeof TENANT!=='undefined'&&TENANT)||'local')+':'+String(pin).trim());

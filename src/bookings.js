@@ -4,7 +4,7 @@
    members may book, a fee); bookings are rows in `bookings` (booking-setup.sql). Staff book on the sheet, check people
    in, cancel; a facility fee lands on the member's account (ref bk:<booking>). The portal's Book card and the
    member_* functions let members do it themselves inside the same rules. */
-const BK={rows:null,loading:false,at:0,fac:'',date:'',dept:'',selMode:false,sel:new Set()};
+const BK={rows:null,loading:false,at:0,fac:'',date:'',dept:'',selMode:false,sel:new Set()}; CACHE_RESETS.push(()=>{ if(!BK.loading) BK.rows=null; });
 /* departments: each runs its own sheets, shop, staff and schedule; the club sees everything */
 const DEPTS=[['golf','Golf'],['racket','Racket sports'],['aquatics','Aquatics'],['fnb','Food & beverage'],['club','Club']];
 const DEPT_FIX={tennis:'racket',pool:'aquatics'};   // names from before the rename
@@ -32,7 +32,7 @@ const mins=t=>{ const [h,m]=String(t||'00:00').split(':').map(Number); return h*
 const hhmm=n=>String(Math.floor(n/60)).padStart(2,'0')+':'+String(n%60).padStart(2,'0');
 const t12=t=>{ const n=mins(t), h=Math.floor(n/60), m=n%60; return `${((h+11)%12)+1}:${String(m).padStart(2,'0')} ${h<12?'am':'pm'}`; };
 function slotsOf(f){ const out=[]; for(let n=mins(f.open); n<mins(f.close); n+=f.slot) out.push(hhmm(n)); return out; }
-async function bkLoad(force){ if(BK.loading||(BK.rows&&!force)) return; BK.loading=true;
+async function bkLoad(force){ if(BK.loading) return PENDING; if(BK.rows&&!force) return; BK.loading=true;
   try{ if(!acctCloud()){ try{ BK.rows=JSON.parse(localStorage.getItem(bkKey())||'[]'); }catch(_){ BK.rows=[]; } } else { const r=await tq(sb.from('bookings').select('*')); BK.rows=r.error?[]:(r.data||[]); } BK.at=Date.now(); } finally{ BK.loading=false; } }
 function bkLocalWrite(){ if(!acctCloud()){ try{ localStorage.setItem(bkKey(),JSON.stringify(BK.rows||[])); }catch(_){} } }
 const bkLive=(fid,date)=>(BK.rows||[]).filter(b=>b.facility===fid&&b.date===date&&b.status!=='cancelled');
@@ -104,9 +104,9 @@ function bookingDrawer(b,f,day,time,unit){
   if(b&&b.status!=='checked_in'){ const foot=$('dFoot').querySelector('.actions'); const ci=document.createElement('button'); ci.className='btn'; ci.textContent='Check in'; ci.onclick=async()=>{ b.status='checked_in'; if(await bkSave(b,false)){ closeDrawer(); render(); toast('Checked in'); } }; foot.prepend(ci); }
 }
 /* ---------- closed times: a tee time, a stretch of the morning, the whole course for a day or a week ---------- */
-const BLK={rows:null,loading:false};
+const BLK={rows:null,loading:false}; CACHE_RESETS.push(()=>{ if(!BLK.loading) BLK.rows=null; });
 const blkKey=()=>'fs_blocks_'+((typeof TENANT!=='undefined'&&TENANT)||'local');
-async function blocksLoad(force){ if(BLK.loading||(BLK.rows&&!force)) return; BLK.loading=true;
+async function blocksLoad(force){ if(BLK.loading) return PENDING; if(BLK.rows&&!force) return; BLK.loading=true;
   try{ if(!acctCloud()){ try{ BLK.rows=JSON.parse(localStorage.getItem(blkKey())||'[]'); }catch(_){ BLK.rows=[]; } } else { const r=await tq(sb.from('booking_blocks').select('*').gte('date',isoPlus(todayISO(),-60))); BLK.rows=r.error?[]:(r.data||[]); } } finally{ BLK.loading=false; } }
 function blkLocalWrite(){ if(!acctCloud()){ try{ localStorage.setItem(blkKey(),JSON.stringify(BLK.rows||[])); }catch(_){} } }
 const blocksAt=(fid,date)=>(BLK.rows||[]).filter(k=>k.facility===fid&&k.date===date).sort((a,b)=>a.from_t.localeCompare(b.from_t));

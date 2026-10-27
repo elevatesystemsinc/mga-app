@@ -245,6 +245,12 @@ async def main():
     bad+=check('F&B setup: prep stations, tables, a menu, two staff with PINs, a register link and an expo screen link',r['tabs']==['General','Food & beverage','Shops'] and r['expos']==['Kitchen','Bar'] and r['tables']==['1','2','3','4','Patio 1','Patio 2','Bar'] and r['menus']==['Lunch'] and r['staff']==[['Sam','server',True],['Mia','manager',True]] and 'pos.html?s=' in r['reg'] and 'expo.html?k=' in r['ex'] and r['cards']==2,r)
     REG=r['reg'].split('s=')[1]; EXP=r['ex'].split('k=')[1]
     stn=fdb._rows('pos_stations'); bad+=check('station rows carry hashes, never the token',len(stn)==2 and all(len(x['key_hash'])==64 and REG not in json.dumps(x) for x in stn),[(x['kind'],x['name']) for x in stn])
+    # a hub that boots straight onto Settings → Food & beverage (the view remembered on the device) must list the stations from the database, not an empty local copy
+    c11=await b.new_context(); await cloud(c11,fdb); p11=await c11.new_page(); await p11.add_init_script("localStorage.setItem('hub_view_club',JSON.stringify({page:'settings',stab:'fnb',_at:Date.now()}))")
+    await p11.goto(page('index.html')+'?org=club&tenant=app.wcccmga.org'); await p11.wait_for_function('()=>cloudReady',timeout=15000); await p11.wait_for_timeout(900)
+    r=await p11.evaluate("()=>({page:view.page, stab:view.stab, rows:STN.rows&&STN.rows.filter(s=>!s.revoked_at).map(s=>s.name), cards:[...document.querySelectorAll('.stn')].length})")
+    bad+=check('a reload that lands on the F&B settings still lists the stations (caches reset once the cloud is up)',r['page']=='settings' and r['stab']=='fnb' and r['rows'] and set(r['rows'])=={'Bar 1','Kitchen screen'} and r['cards']==2,r)
+    await c11.close()
     # the register: lock screen → PIN → floor → table 2 → two sandwiches and a beer → send (the sandwiches fire to the kitchen, the beer fires nowhere) → charge Bo's account
     c7=await b.new_context(viewport={'width':1024,'height':768}); await cloud(c7,fdb); p7=await c7.new_page(); e7=[]; p7.on('pageerror',lambda e:e7.append(str(e))); p7.on('dialog',lambda d:asyncio.ensure_future(d.dismiss()))
     await p7.goto(page('pos.html')+'?s='+REG); await p7.wait_for_function("()=>!!B",timeout=10000); await p7.wait_for_timeout(200)

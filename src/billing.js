@@ -5,7 +5,7 @@
    Run statements closes a period for everyone. Rows live in acct_items / acct_statements (billing-setup.sql), not in
    the organization documents — many staff, many rows. Local mode (tests, file://) keeps the same shapes in
    localStorage. Board logins and admin links never see any of it. */
-const ACCT={items:null,stmts:null,users:[],loading:false,err:'',at:0};
+const ACCT={items:null,stmts:null,users:[],loading:false,err:'',at:0}; CACHE_RESETS.push(()=>{ if(!ACCT.loading){ ACCT.items=null; ACCT.stmts=null; } });
 const SOURCES=[['dues','Dues'],['fnb','Food & beverage'],['proshop','Pro shop'],['tee','Tee time'],['facility','Facility'],['lesson','Lesson'],['fee','Fee'],['manual','Other']];
 const SOURCE_NAME=Object.fromEntries(SOURCES);
 const METHODS=[['card','Card'],['check','Check'],['ach','ACH / bank'],['cash','Cash'],['other','Other']];
@@ -18,7 +18,7 @@ function acctLocalRead(){ try{ return JSON.parse(localStorage.getItem(acctKey())
 function acctLocalWrite(){ try{ localStorage.setItem(acctKey(),JSON.stringify({items:ACCT.items||[],stmts:ACCT.stmts||[]})); }catch(_){} }
 /* the whole ledger once per visit; the pages read ACCT.items / ACCT.stmts */
 async function acctLoad(force){
-  if(ACCT.loading) return; if(ACCT.items&&!force) return; ACCT.loading=true; ACCT.err='';
+  if(ACCT.loading) return PENDING; if(ACCT.items&&!force) return; ACCT.loading=true; ACCT.err='';
   try{
     if(!acctCloud()){ const L=acctLocalRead(); ACCT.items=L.items; ACCT.stmts=L.stmts; }
     else { const a=await tq(sb.from('acct_items').select('*')); const b=await tq(sb.from('acct_statements').select('*'));
