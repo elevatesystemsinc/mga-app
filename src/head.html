@@ -32,7 +32,8 @@ body{font-variant-numeric:lining-nums}
 /* layout */
 .app{display:flex;min-height:100vh}
 .side{width:248px;flex-shrink:0;background:var(--navy);color:#E9E4D6;display:flex;flex-direction:column;padding:24px 16px;position:sticky;top:0;height:100vh;overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin}
-.navsec{font-size:10.5px;font-weight:800;letter-spacing:.16em;text-transform:uppercase;color:var(--goldl);opacity:.85;padding:0 12px;margin:14px 0 2px} .navsec:first-child{margin-top:4px}
+.navsec{font-size:10.5px;font-weight:800;letter-spacing:.16em;text-transform:uppercase;color:var(--goldl);opacity:.85;padding:0 12px;margin:14px 0 2px;display:flex;align-items:center;justify-content:space-between;width:100%;background:none;border:none;text-align:left;cursor:pointer} .navsec:first-child{margin-top:4px} .navsec svg{width:12px;height:12px;transform:rotate(90deg);transition:transform .15s;opacity:.7} .navsec.closed svg{transform:rotate(0)} .navsec:hover{opacity:1}
+.ybar{display:inline-flex;margin-right:8px} .ybar button{height:34px;padding:0 12px} .ybar button.on{background:var(--navy);color:#fff}
 .brand{display:block;padding:0 8px 16px;border-bottom:1px solid rgba(216,183,95,.3)}
 /* Flagstick: the product mark. The crest file carries the two-tone trim; the word is live text in Public Sans */
 .fs{display:flex;align-items:center;gap:12px;min-width:0}
@@ -149,7 +150,7 @@ table.scard.sheet{min-width:0} table.scard.sheet .inp{height:34px;padding:0 6px;
 
 /* tables */
 .tw{overflow-x:auto}
-.t{min-width:720px}
+.t{min-width:720px} .t.fit{min-width:0}
 .tr{display:grid;align-items:center;gap:12px;padding:0 22px;min-height:50px;border-top:1px solid var(--line)}
 .tr.th{min-height:40px;border-top:none;font-size:12px;font-weight:600;color:var(--muted);background:var(--ivory);border-bottom:1px solid var(--line)}
 .tr.th + .tr{border-top:none}

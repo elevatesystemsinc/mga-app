@@ -25,31 +25,37 @@ I.org=svg('<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18M9 
 I.survey=svg('<rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4V3h6v2M9 11h6M9 15h4"/>');
 I.lib=svg('<path d="M4 5h5a3 3 0 013 3v12a2 2 0 00-2-2H4z"/><path d="M20 5h-5a3 3 0 00-3 3v12a2 2 0 012-2h6z"/>');
 I.coins=svg('<ellipse cx="12" cy="6" rx="7" ry="3"/><path d="M5 6v12c0 1.7 3.1 3 7 3s7-1.3 7-3V6"/><path d="M5 12c0 1.7 3.1 3 7 3s7-1.3 7-3"/>');
-const NAV=[['dash','Dashboard',I.home],['tournaments','Tournaments',I.flag],['members','Members',I.users],['collections','Dues collection',I.coins],['accounts','Member accounts',I.ledger],['billsetup','Billing setup',I.shield],['pos','Register',I.cart],['postickets','Tickets',I.ledger],['posmenu','Menus & products',I.lib],['proshop','Pro shop',I.cart],['teesheet','Tee sheet',I.flag],['bookings','Bookings',I.cal],['settings','Settings',I.gear],['board','Board',I.shield],['budget','Season budget',I.ledger],['orgs','Organizations',I.org],['library','Game library',I.lib],['logins','Logins',I.shield],['surveys','Surveys',I.survey]];
+const NAV=[['dash','Dashboard',I.home],['tournaments','Tournaments',I.flag],['members','Members',I.users],['collections','Dues collection',I.coins],['accounts','Member accounts',I.ledger],['billsetup','Billing setup',I.shield],['pos','Register',I.cart],['postickets','Tickets',I.ledger],['posmenu','Menus & products',I.lib],['proshop','Pro shop',I.cart],['teesheet','Tee sheet',I.flag],['courts','Court sheet',I.cal],['tennisshop','Tennis shop',I.cart],['poolsheet','Pool',I.cal],['bookings','Bookings',I.cal],['reports','Reports',I.ledger],['settings','Settings',I.gear],['board','Board',I.shield],['budget','Season budget',I.ledger],['orgs','Organizations',I.org],['library','Game library',I.lib],['logins','Logins',I.shield],['surveys','Surveys',I.survey]];
 /* which pages each kind of organization gets (associations get everything) */
-const ORG_NAV={club:['dash','tournaments','golf','teesheet','library','proshop','pos','postickets','posmenu','members','accounts','collections','billsetup','logins','bookings','orgs','library','budget','treasury','surveys','logins','settings'],association:['dash','tournaments','golf','members','board','treasury','budget','surveys','settings'],group:['dash','tournaments','golf','members','surveys','settings']};
+const ORG_NAV={club:['dash','tournaments','golf','teesheet','library','proshop','courts','tennisshop','poolsheet','pos','postickets','posmenu','members','accounts','collections','billsetup','logins','bookings','reports','orgs','library','budget','treasury','surveys','logins','settings'],association:['dash','tournaments','golf','members','board','treasury','budget','surveys','settings'],group:['dash','tournaments','golf','members','surveys','settings']};
 /* the rail: which entries show for this organization, gated by module and role. Keys that are views of another page
    (teesheet → bookings, proshop → pos, posmenu → possetup) are listed in NAV_PAGE; NAV_OWNS says which pages light an entry up. */
-const NAV_PAGE={teesheet:'bookings',proshop:'pos',posmenu:'possetup'};
-const NAV_OWNS={tournaments:['tournaments','tournament'],accounts:['accounts','account'],bookings:['bookings','booksetup'],teesheet:['bookings'],pos:['pos'],proshop:['pos'],posmenu:['possetup']};
-const NAV_SECTIONS={club:[['',['dash']],['Golf',['tournaments','golf','teesheet','library','proshop']],['Food & beverage',['pos','postickets','posmenu']],['Membership',['members','accounts','collections','billsetup','logins']],['Club',['bookings','orgs','treasury','budget','surveys']],['',['settings']]],
+const NAV_PAGE={teesheet:'bookings',courts:'bookings',poolsheet:'bookings',proshop:'pos',tennisshop:'pos',posmenu:'possetup'};
+/* which department a rail entry drives (bookings by facility department, registers by outlet department) */
+const NAV_DEPT={teesheet:'golf',courts:'tennis',poolsheet:'pool',bookings:'',proshop:'golf',tennisshop:'tennis',pos:'fnb'};
+const NAV_OWNS={tournaments:['tournaments','tournament'],accounts:['accounts','account'],bookings:['bookings','booksetup'],teesheet:['bookings'],courts:['bookings'],poolsheet:['bookings'],pos:['pos'],proshop:['pos'],tennisshop:['pos'],posmenu:['possetup']};
+const NAV_SECTIONS={club:[['',['dash']],['Golf',['tournaments','golf','teesheet','library','proshop']],['Tennis & pickleball',['courts','tennisshop']],['Pool',['poolsheet']],['Food & beverage',['pos','postickets','posmenu']],['Membership',['members','accounts','collections','billsetup','logins']],['Club',['bookings','reports','orgs','treasury','budget','surveys']],['',['settings']]],
   association:[['',['dash']],['Golf',['tournaments','golf']],['Membership',['members','board']],['Money',['treasury','budget']],['',['surveys','settings']]],
   group:[['',['dash']],['Golf',['games','ledger','tournaments','golf']],['',['members','surveys','settings']]]};
 const NAV_GATE={settings:()=>!KEYMODE,logins:()=>canManageLogins(),accounts:()=>typeof acctOn==='function'&&acctOn(),billsetup:()=>typeof acctOn==='function'&&acctOn(),pos:()=>typeof posOn==='function'&&posOn(),postickets:()=>typeof posOn==='function'&&posOn(),posmenu:()=>typeof posOn==='function'&&posOn(),
-  proshop:()=>typeof posOn==='function'&&posOn()&&posSettings().outlets.some(o=>o.kind==='proshop'),bookings:()=>typeof bookOn==='function'&&bookOn(),teesheet:()=>typeof bookOn==='function'&&bookOn()&&bookSettings().facilities.some(f=>f.kind==='tee')};
-function navItems(){ const allow=ORG_NAV[db.kind]; return NAV.filter(([k])=>(!allow||allow.includes(k))&&(!NAV_GATE[k]||NAV_GATE[k]())).map(([k,l,ic])=>[k,k==='members'&&isClub()?'Directory':k==='golf'&&isClub()?'Events & live scoring':k==='bookings'&&isClub()?'Courts, pool & lessons':l,ic]); }
+  proshop:()=>typeof posOn==='function'&&posOn()&&posSettings().outlets.some(o=>o.kind==='proshop'&&outletDept(o)==='golf'),tennisshop:()=>typeof posOn==='function'&&posOn()&&posSettings().outlets.some(o=>o.kind==='proshop'&&outletDept(o)==='tennis'),
+  bookings:()=>typeof bookOn==='function'&&bookOn(),teesheet:()=>typeof bookOn==='function'&&bookOn()&&bookSettings().facilities.some(f=>facDept(f)==='golf'),courts:()=>typeof bookOn==='function'&&bookOn()&&bookSettings().facilities.some(f=>facDept(f)==='tennis'),poolsheet:()=>typeof bookOn==='function'&&bookOn()&&bookSettings().facilities.some(f=>facDept(f)==='pool'),reports:()=>typeof acctOn==='function'&&acctOn()};
+function navItems(){ const allow=ORG_NAV[db.kind]; return NAV.filter(([k])=>(!allow||allow.includes(k))&&(!NAV_GATE[k]||NAV_GATE[k]())).map(([k,l,ic])=>[k,k==='members'&&isClub()?'Directory':k==='golf'&&isClub()?'Events & live scoring':k==='bookings'&&isClub()?'All bookings':k==='budget'&&isClub()?'Budget':l,ic]); }
 /* is this rail entry the one lit for the page on screen? a view of a shared page looks at that page's state */
 function navActive(k){ const pg=view.page; const owns=NAV_OWNS[k]||[k]; if(!owns.includes(pg)) return false;
-  if(k==='teesheet') return typeof BK!=='undefined'&&(facOf(BK.fac)||{}).kind==='tee'; if(k==='bookings'&&pg==='bookings') return !(typeof BK!=='undefined'&&(facOf(BK.fac)||{}).kind==='tee');
-  if(k==='proshop') return typeof POS!=='undefined'&&(outletOf(POS.outlet)||{}).kind==='proshop'; if(k==='pos') return !(typeof POS!=='undefined'&&(outletOf(POS.outlet)||{}).kind==='proshop'); return true; }
+  if(k in NAV_DEPT){ if(NAV_PAGE[k]==='bookings'||k==='bookings') return typeof BK!=='undefined'&&(BK.dept||'')===NAV_DEPT[k]; if(NAV_PAGE[k]==='pos'||k==='pos') return typeof POS!=='undefined'&&(POS.dept||'fnb')===NAV_DEPT[k]; } return true; }
 function navGo(k){ if(k==='golf') view.geid=null;
-  if(k==='teesheet'){ const f=bookSettings().facilities.find(x=>x.kind==='tee'); BK.fac=f?f.id:''; }
-  if(k==='bookings'&&typeof BK!=='undefined'&&(facOf(BK.fac)||{}).kind==='tee'){ const f=bookSettings().facilities.find(x=>x.kind!=='tee'); BK.fac=f?f.id:''; }
-  if(k==='proshop'||k==='pos'){ const want=k==='proshop'?'proshop':'fnb'; if((outletOf(POS.outlet)||{}).kind!==want){ const o=posSettings().outlets.find(x=>x.kind===want); if(o){ POS.outlet=o.id; POS.cur=null; } } }
+  if(NAV_PAGE[k]==='bookings'||k==='bookings'){ BK.dept=NAV_DEPT[k]||''; const fs=bookSettings().facilities.filter(f=>!BK.dept||facDept(f)===BK.dept); if(!fs.some(f=>f.id===BK.fac)) BK.fac=fs[0]?fs[0].id:''; }
+  if(NAV_PAGE[k]==='pos'||k==='pos'){ POS.dept=NAV_DEPT[k]||'fnb'; const os=posSettings().outlets.filter(o=>outletDept(o)===POS.dept); if(!os.some(o=>o.id===POS.outlet)){ POS.outlet=os[0]?os[0].id:''; POS.cur=null; } }
   go(NAV_PAGE[k]||k); }
+/* collapsed sections are remembered per hub on this device; the section holding the page on screen never hides it */
+const navColKey=()=>'fs_navcol_'+ORG_ID; const navCollapsed=()=>{ try{ return new Set(JSON.parse(localStorage.getItem(navColKey())||'[]')); }catch(_){ return new Set(); } };
+function toggleNavSec(t){ const c=navCollapsed(); if(c.has(t)) c.delete(t); else c.add(t); try{ localStorage.setItem(navColKey(),JSON.stringify([...c])); }catch(_){} render(); }
 function navHTML(items,live){ const secs=NAV_SECTIONS[db.kind]||[['',items.map(x=>x[0])]], placed=new Set(), out=[];
   const btn=([k,l,ic])=>`<button class="nav${navActive(k)?' on':''}" data-go="${k}">${ic}<span>${l}</span>${k==='golf'&&live.length?'<span class="livedot" aria-label="Live scoring"></span>':''}</button>`;
-  for(const [title,keys] of secs){ const its=keys.map(k=>items.find(x=>x[0]===k)).filter(Boolean); if(!its.length) continue; its.forEach(x=>placed.add(x[0])); out.push((title?`<div class="navsec">${esc(title)}</div>`:'')+its.map(btn).join('')); }
+  const col=navCollapsed();
+  for(const [title,keys] of secs){ const its=keys.map(k=>items.find(x=>x[0]===k)).filter(Boolean); if(!its.length) continue; its.forEach(x=>placed.add(x[0])); const open=!title||!col.has(title)||its.some(x=>navActive(x[0]));
+    out.push((title?`<button class="navsec${open?'':' closed'}" data-sec="${esc(title)}"><span>${esc(title)}</span>${I.chev}</button>`:'')+(open?its.map(btn).join(''):'')); }
   const rest=items.filter(x=>!placed.has(x[0])); if(rest.length) out.push(rest.map(btn).join(''));
   return out.join('')+live.map(e=>`<button class="nav livelink" data-golfev="${e.id}"><span class="livedot"></span><span class="trunc">Leaderboard · ${esc(e.name)}</span></button>`).join(''); }
 /* the organization on screen: the club's record from CLUB.orgs wins over what the document says */
@@ -60,7 +66,12 @@ const orgName=()=>{ const o=curOrg(); return o?(o.name||o.short||''):''; };
    a club or association logo. `o.crest` in stored documents is ignored. */
 function crestHTML(o,cls=''){ return `<img class="crest ${cls}" src="flagstick-crest.svg" alt="">`; }
 let view={page:'dash',tid:null,ttab:'budget',mfilter:'All',mq:'',tfilter:'All'};
-const Y=()=>db?db.activeSeason:String(new Date().getFullYear());
+/* the year on screen: an association or group has an active season it chooses; the club runs on the calendar year
+   (annual revenue, quarterly reports) — view.year moves it, and a year the club has not seen yet is set up on the fly */
+const Y=()=>{ if(!db) return String(new Date().getFullYear()); if(!isClub()) return db.activeSeason; const y=view.year||String(new Date().getFullYear()); if(!db.seasons[y]) db.seasons[y]=newSeason(); return y; };
+/* the club's year bar: ‹ 2026 › and, where a page reports by quarter, Q1–Q4 / Year */
+function yearBar(quarters){ const y=+Y(); return `<div class="seg ybar"><button data-yb="${y-1}">‹</button><button class="on">${y}</button><button data-yb="${y+1}">›</button></div>${quarters?`<div class="seg ybar">${[['','Year'],['1','Q1'],['2','Q2'],['3','Q3'],['4','Q4']].map(([k,l])=>`<button class="${(view.q||'')===k?'on':''}" data-yq="${k}">${l}</button>`).join('')}</div>`:''}`; }
+function wireYearBar(m){ m.querySelectorAll('[data-yb]').forEach(b=>b.onclick=()=>{ view.year=b.dataset.yb; render(); }); m.querySelectorAll('[data-yq]').forEach(b=>b.onclick=()=>{ view.q=b.dataset.yq; render(); }); }
 const T=()=>db.tournaments.find(t=>t.id===view.tid);
 function go(page,extra){ view=Object.assign(view,{page},extra||{}); $('side').classList.remove('open'); render(); window.scrollTo(0,0); }
 
@@ -144,15 +155,16 @@ function renderInner(){
   $('btnSwitch').hidden=!CLUB||(!db&&!setupNeeded)||KEYMODE||(SCOPED&&SCOPE_ORGS.length<2); if(typeof paintHubSync==='function') paintHubSync();
   if(!db){ $('nav').innerHTML=''; $('seasonBox').hidden=true; (setupNeeded?vSetup:SCOPED&&cloudReady&&(ORG_ID==='club'||!allowedOrg(ORG_ID))?vNotYours:vPicker)($('main')); return; }
   if(!isClub()&&!hasModule(db.kind==='group'?'groups':'associations')){ $('nav').innerHTML=''; $('seasonBox').hidden=true; vLocked($('main'),db.kind); return; }
-  $('seasonBox').hidden=false;
+  $('seasonBox').hidden=isClub();   // the club has no seasons: it reports by year and quarter
   const ys=Object.keys(db.seasons).sort((a,b)=>b-a);
   $('seasonSel').innerHTML=ys.map(y=>`<option value="${y}"${y===Y()?' selected':''}>${y} season</option>`).join('')+'<option value="__new">+ New season…</option>';
   const live=typeof liveEvents==='function'?liveEvents():[];
   const items=navItems(); if(view.page!=='pick'&&!items.some(([k])=>(NAV_OWNS[k]||[k]).includes(view.page))) view.page='dash';
   $('nav').innerHTML=navHTML(items,live);
-  $('nav').querySelectorAll('[data-go]').forEach(b=>b.onclick=()=>navGo(b.dataset.go));
+  $('nav').querySelectorAll('[data-go]').forEach(b=>b.onclick=()=>navGo(b.dataset.go)); $('nav').querySelectorAll('[data-sec]').forEach(b=>b.onclick=()=>toggleNavSec(b.dataset.sec));
   const m=$('main');
-  ({dash:vDash,tournaments:vTournaments,tournament:vTournament,members:vMembers,board:vBoard,budget:vBudget,treasury:vTreasury,golf:vGolf,orgs:vOrgs,pick:vPicker,collections:vCollections,games:vGames,ledger:vLedger,library:vLibrary,logins:vLogins,surveys:vSurveys,accounts:vAccounts,account:vAccount,billsetup:vBillSetup,pos:vPos,postickets:vPosTickets,possetup:vPosSetup,bookings:vBookings,booksetup:vBookSetup,settings:vSettings}[view.page]||vDash)(m);
+  ({dash:vDash,tournaments:vTournaments,tournament:vTournament,members:vMembers,board:vBoard,budget:vBudget,treasury:vTreasury,golf:vGolf,orgs:vOrgs,pick:vPicker,collections:vCollections,games:vGames,ledger:vLedger,library:vLibrary,logins:vLogins,surveys:vSurveys,accounts:vAccounts,account:vAccount,billsetup:vBillSetup,pos:vPos,postickets:vPosTickets,possetup:vPosSetup,bookings:vBookings,booksetup:vBookSetup,settings:vSettings,reports:vReports}[view.page]||vDash)(m);
+  if(isClub()) wireYearBar(m);
   if(view.page==='board'&&!isClub()&&typeof loginsCard==='function') loginsCard(m,ORG_ID);
   if(!isClub()&&((db.kind==='group'&&view.page==='members')||(db.kind!=='group'&&view.page==='board'))) adminLinksCard(m,curOrg());
 }
@@ -277,11 +289,11 @@ function vDash(m){
   }
   const ms=members(), unpaid=isClub()?0:ms.filter(x=>x.status!=='Inactive'&&memberDues(Y(),x.id)<n0(sc.s.dues.amount)).length;
   if(ms.length&&unpaid&&sc.s.duesPayments.length) attention.push([String(unpaid),`member${unpaid>1?'s have':' has'} not paid full ${Y()} dues`,'warn',null]);
-  m.innerHTML=head(`${Y()} Season`,esc(CLUB.name||CLUB_META.name)+(isClub()?'':' · '+esc(orgName())),btn('New tournament','dNew','pri',I.plus))+`
+  m.innerHTML=head(isClub()?`${Y()}`:`${Y()} Season`,esc(CLUB.name||CLUB_META.name)+(isClub()?'':' · '+esc(orgName())),(isClub()?yearBar(false):'')+btn('New tournament','dNew','pri',I.plus))+`
   <div class="grid g4">
-    ${kpi('Season net (projected)',fmtS(sc.projected),`Actuals for ${sc.past.length} completed · budget for ${sc.upcoming.length} upcoming`,netCls(sc.projected))}
+    ${kpi(isClub()?'Net (projected)':'Season net (projected)',fmtS(sc.projected),`Actuals for ${sc.past.length} completed · budget for ${sc.upcoming.length} upcoming`,netCls(sc.projected))}
     ${kpi('Next up',next?dayShort(next,0)||'TBD':'—',next?`${esc(next.name)} · ${daysOut(next)===0?'today':daysOut(next)+' days out'}`:'No upcoming tournaments')}
-    ${kpi('Sponsor money received',fmt(sc.received),`of ${fmt(sc.pledged)} pledged this season`)}
+    ${kpi('Sponsor money received',fmt(sc.received),`of ${fmt(sc.pledged)} pledged this ${isClub()?'year':'season'}`)}
     ${kpi('Members',String(sc.active),isClub()?'active in the club directory':`active · ${db.board.filter(b=>b.memberId).length} on the board`)}
   </div>
   <div class="split">
@@ -291,7 +303,7 @@ function vDash(m){
       <div class="tr th" style="${cols}"><span>Tournament</span><span>Dates</span><span class="r">Revenue</span><span class="r">Expenses</span><span class="r">Net</span></div>
       ${sc.ts.map(({t,c})=>`<div class="tr num click" data-open="${t.id}" style="${cols}"><div class="cell2"><b class="trunc" style="color:var(--navy)">${esc(t.name)}</b><small>${t.days} day${t.days>1?'s':''} · ${esc(t.status||'Planning')}</small></div><span>${dateRange(t).replace(/, \d{4}$/,'')}</span><span class="r">${fmt(c.revenue)}</span><span class="r">${fmt(c.expenses)}</span><b class="r ${netCls(c.net)}">${fmtS(c.net)}</b></div>`).join('')}
       <div class="tr tot num" style="${cols}"><span>Tournaments total</span><span></span><span class="r">${fmt(sc.tRev)}</span><span class="r">${fmt(sc.tExp)}</span><span class="r ${netCls(sc.tRev-sc.tExp)}">${fmtS(sc.tRev-sc.tExp)}</span></div>
-      </div></div>`:`<div class="empty"><b>No tournaments yet</b><span>Add the season’s first event.</span><div class="actions"><button class="btn pri" id="dNew2">${I.plus}New tournament</button></div></div>`}
+      </div></div>`:`<div class="empty"><b>No tournaments yet</b><span>Add the ${isClub()?'year':'season'}’s first event.</span><div class="actions"><button class="btn pri" id="dNew2">${I.plus}New tournament</button></div></div>`}
     </div>
     <div style="display:flex;flex-direction:column;gap:20px">
       ${typeof liveBoardCard==='function'?liveBoardCard():''}
@@ -1022,7 +1034,7 @@ function vBudget(m){
   const cols='grid-template-columns:minmax(160px,2fr) 140px 130px 130px 120px 120px';
   const r=(n,d,rv,ex,nt,act,cls='',attr='')=>`<div class="tr num ${cls}" ${attr} style="${cols}"><span style="font-weight:600;color:var(--navy)">${n}</span><span class="muted">${d}</span><span class="r">${rv}</span><span class="r">${ex}</span><b class="r ${typeof nt==='number'?netCls(nt):''}">${typeof nt==='number'?fmtS(nt):nt}</b><span class="r muted">${act}</span></div>`;
   const club=isClub();
-  m.innerHTML=head('Season budget',club?'Club tournaments and club-level lines. Dues and the 50/50 belong to the associations; the club only collects dues on their behalf (Dues collection).':`Tournaments are self-sustaining; dues are the ${esc(orgShort())}’s own income. Everything rolls up here.`,btn('Add '+orgShort()+' line','sbAdd','',I.plus))+`
+  m.innerHTML=head(club?'Annual budget':'Season budget',club?'Club tournaments and club-level lines. Dues and the 50/50 belong to the associations; the club only collects dues on their behalf (Dues collection).':`Tournaments are self-sustaining; dues are the ${esc(orgShort())}’s own income. Everything rolls up here.`,(club?yearBar(false):'')+btn('Add '+orgShort()+' line','sbAdd','',I.plus))+`
   <div class="grid g3">${kpi('Budgeted revenue',fmt(sc.revenue),club?'tournaments + club lines':'tournaments + dues + '+orgShort()+' lines')}${kpi('Budgeted expenses',fmt(sc.expenses),'tournaments + MGA lines')}${kpi('Season net (projected)',fmtS(sc.projected),`Actuals for ${sc.past.length} completed, budget for ${sc.upcoming.length} upcoming · all-budget net ${fmtS(sc.net)}`,netCls(sc.projected))}</div>
   <div class="card" style="overflow:hidden"><div class="cardhead"><h2 class="h2">Tournaments</h2></div><div class="tw"><div class="t" style="min-width:820px">
     <div class="tr th" style="${cols}"><span>Tournament</span><span>Dates</span><span class="r">Revenue</span><span class="r">Expenses</span><span class="r">Net</span><span class="r">Actual net</span></div>

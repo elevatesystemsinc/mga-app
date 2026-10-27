@@ -335,3 +335,60 @@ async function statementsPDF(list,opt){ opt=opt||{};
   if(opt.returnDoc) return doc;
   if(typeof deliverFile==='function'){ const blob=doc.output('blob'); await deliverFile(blob,name,'Statements'); } else doc.save(name); return doc;
 }
+
+/* ============ Reports — the club's year and quarters (the club runs on the calendar year, not seasons) ============
+   Revenue by billing item from the accounts, receipts by method, outstanding receivables at the period end, the registers
+   by outlet from the tickets, and the club's own budget lines — for the year on the bar or one quarter of it. */
+function reportRange(y,q){ y=+y; const q1=q?+q:0; const from=q1?`${y}-${String((q1-1)*3+1).padStart(2,'0')}-01`:`${y}-01-01`; const to=q1?new Date(Date.UTC(y,q1*3,0)).toISOString().slice(0,10):`${y}-12-31`; return {from,to,label:q1?`Q${q1} ${y}`:String(y)}; }
+function clubReport(y,q){ const R=reportRange(y,q), inR=d=>d>=R.from&&d<=R.to, L=liveItems(); const rep={range:R,items:{},sources:{},methods:{},charges:0,net:0,tax:0,svc:0,payments:0,credits:0,ar:0,arOpen:0,outlets:{},pos:null,byMonth:{}};
+  for(const i of L){ if(i.posted<=R.to&&i.kind==='charge') rep.ar+=n0(i.amount); if(i.posted<=R.to&&i.kind!=='charge') rep.ar-=n0(i.amount); if(!inR(i.posted)) continue; const mo=i.posted.slice(0,7); const M=rep.byMonth[mo]=rep.byMonth[mo]||{charges:0,payments:0};
+    if(i.kind==='charge'){ const it=itemOf(i.item)||{}, k=i.item||i.source||'other', name=it.name||SOURCE_NAME[i.source]||'Other'; const r=rep.items[k]=rep.items[k]||{name,source:it.source||i.source,n:0,net:0,tax:0,svc:0,amount:0}; r.n++; r.net+=netOf(i); r.tax+=n0(i.tax); r.svc+=n0(i.svc); r.amount+=n0(i.amount);
+      const sk=it.source||i.source||'manual'; rep.sources[sk]=(rep.sources[sk]||0)+netOf(i); rep.charges+=n0(i.amount); rep.net+=netOf(i); rep.tax+=n0(i.tax); rep.svc+=n0(i.svc); M.charges+=n0(i.amount); }
+    else if(i.kind==='payment'){ rep.payments+=n0(i.amount); rep.methods[i.method||'other']=(rep.methods[i.method||'other']||0)+n0(i.amount); M.payments+=n0(i.amount); }
+    else rep.credits+=n0(i.amount); }
+  rep.ar=Math.round(rep.ar*100)/100;
+  if(typeof POS!=='undefined'&&POS.tickets){ const T=POS.tickets.filter(t=>t.status!=='open'&&inR(String(t.closed_at||t.created_at).slice(0,10))); rep.pos=shiftStats(T); for(const o of posSettings().outlets) rep.outlets[o.id]=Object.assign({name:o.name,kind:o.kind},shiftStats(T.filter(t=>t.outlet===o.id))); }
+  const r2=o=>{ for(const k in o) if(typeof o[k]==='number') o[k]=Math.round(o[k]*100)/100; }; r2(rep); Object.values(rep.items).forEach(r2); r2(rep.sources); r2(rep.methods); Object.values(rep.byMonth).forEach(r2); return rep; }
+function vReports(m){ if(!acctOn()){ go('dash'); return; } if(ACCT.items==null){ acctLoad().then(()=>render()); m.innerHTML=head('Reports','Loading…'); return; }
+  if(typeof posOn==='function'&&posOn()&&POS.tickets==null) posLoad().then(()=>render());
+  const y=Y(), q=view.q||'', rep=clubReport(y,q), R=rep.range, sc=scalc(y);
+  const items=Object.values(rep.items).sort((a,b)=>b.net-a.net), months=Object.keys(rep.byMonth).sort();
+  const row=(k,v,cls='')=>`<div class="tr num ${cls}" style="grid-template-columns:1fr 140px"><span>${k}</span><b class="r">${v}</b></div>`;
+  m.innerHTML=head('Reports',`${esc(CLUB.name||CLUB_META.name)} · ${R.label} · ${dateTxt(R.from)} – ${dateTxt(R.to)}`,yearBar(true)+btn('CSV','rpCSV','',I.down)+btn('Report (PDF)','rpPDF','pri',I.down))+`
+  <div class="grid g4">${kpi('Billed',fmt(rep.charges),'charges to member accounts, incl. tax & service')}${kpi('Revenue (net)',fmt(rep.net),'before tax and service charge')}${kpi('Received',fmt(rep.payments),'payments recorded')}${kpi('Receivable',fmt(rep.ar),'owed by members at '+dateTxt(R.to),rep.ar>0?'neg':'')}</div>
+  <div class="card" style="overflow:hidden"><div class="cardhead"><h2 class="h2">Revenue by item</h2><span class="muted">${items.length} item${items.length===1?'':'s'}</span></div><div class="t fit">
+      <div class="tr th" style="grid-template-columns:minmax(140px,1fr) 70px 120px 110px 110px"><span>Item</span><span class="r">Count</span><span class="r">Net</span><span class="r">Tax</span><span class="r">Service</span></div>
+      ${items.map(r=>`<div class="tr num" style="grid-template-columns:minmax(140px,1fr) 70px 120px 110px 110px"><span style="font-weight:600;color:var(--navy)">${esc(r.name)}<small class="muted" style="display:block">${esc(SOURCE_NAME[r.source]||r.source||'')}</small></span><span class="r">${r.n}</span><b class="r">${fmt2(r.net)}</b><span class="r muted">${fmt2(r.tax)}</span><span class="r muted">${fmt2(r.svc)}</span></div>`).join('')||'<p class="muted" style="padding:14px">Nothing billed in this period.</p>'}
+      ${items.length?`<div class="tr num" style="grid-template-columns:minmax(140px,1fr) 70px 120px 110px 110px;border-top:2px solid var(--line)"><b>Total</b><span></span><b class="r">${fmt2(rep.net)}</b><b class="r">${fmt2(rep.tax)}</b><b class="r">${fmt2(rep.svc)}</b></div>`:''}
+    </div></div>
+  <div class="grid g2">
+    <div>
+      <div class="card" style="overflow:hidden"><div class="cardhead"><h2 class="h2">Receipts by method</h2></div><div class="t fit">${METHODS.map(([k,l])=>rep.methods[k]?row(l,fmt2(rep.methods[k])):'').join('')||'<p class="muted" style="padding:14px">No payments in this period.</p>'}${rep.credits?row('Credits & adjustments',fmt2(rep.credits),'muted'):''}</div></div>
+      <div class="card" style="overflow:hidden"><div class="cardhead"><h2 class="h2">Registers</h2><span class="muted">${rep.pos?'from the tickets':'point of sale is off'}</span></div><div class="t fit">${rep.pos?Object.values(rep.outlets).filter(o=>o.n).map(o=>row(`${esc(o.name)} <small class="muted">· ${o.n} ticket${o.n===1?'':'s'}</small>`,fmt2(o.sales))).join('')+row('Service charge',fmt2(rep.pos.svc),'muted')+row('Sales tax',fmt2(rep.pos.tax),'muted')+row('Tips',fmt2(rep.pos.tips),'muted'):''}</div></div>
+    </div>
+    <div>
+    <div class="card" style="overflow:hidden"><div class="cardhead"><h2 class="h2">By month</h2></div><div class="t fit"><div class="tr th" style="grid-template-columns:1fr 130px 130px"><span>Month</span><span class="r">Billed</span><span class="r">Received</span></div>${months.map(mo=>`<div class="tr num" style="grid-template-columns:1fr 130px 130px"><span>${esc(ymTxt(mo))}</span><span class="r">${fmt2(rep.byMonth[mo].charges)}</span><span class="r">${fmt2(rep.byMonth[mo].payments)}</span></div>`).join('')||'<p class="muted" style="padding:14px">No activity yet.</p>'}</div></div>
+    <div class="card" style="overflow:hidden"><div class="cardhead"><h2 class="h2">${esc(String(y))} budget</h2><a class="lnk" data-go="budget">Open the budget</a></div><div class="t fit">${row('Budgeted revenue',fmt(sc.revenue))}${row('Budgeted expenses',fmt(sc.expenses))}${row('Projected net',fmtS(sc.projected))}${row('Actual net to date',fmtS(sc.netA))}</div></div>
+    </div>
+  </div>`;
+  m.querySelectorAll('[data-go]').forEach(a=>a.onclick=()=>go(a.dataset.go)); wireYearBar(m);
+  $('rpCSV').onclick=()=>reportCSV(rep); $('rpPDF').onclick=()=>reportPDF(rep,sc); }
+function reportCSV(rep){ const qq=v=>'"'+String(v??'').replace(/"/g,'""')+'"', L=[['Flagstick report',rep.range.label,rep.range.from,rep.range.to],[],['Revenue by item','Source','Count','Net','Tax','Service','Billed']];
+  Object.values(rep.items).sort((a,b)=>b.net-a.net).forEach(r=>L.push([r.name,SOURCE_NAME[r.source]||r.source||'',r.n,r.net.toFixed(2),r.tax.toFixed(2),r.svc.toFixed(2),r.amount.toFixed(2)])); L.push(['Total','','',rep.net.toFixed(2),rep.tax.toFixed(2),rep.svc.toFixed(2),rep.charges.toFixed(2)],[]);
+  L.push(['Receipts by method','Amount']); Object.entries(rep.methods).forEach(([k,v])=>L.push([METHOD_NAME[k]||k,v.toFixed(2)])); L.push(['Payments',rep.payments.toFixed(2)],['Credits & adjustments',rep.credits.toFixed(2)],['Receivable at '+rep.range.to,rep.ar.toFixed(2)],[]);
+  if(rep.pos){ L.push(['Registers','Tickets','Net sales','Service','Tax','Tips']); Object.values(rep.outlets).forEach(o=>L.push([o.name,o.n,o.sales.toFixed(2),o.svc.toFixed(2),o.tax.toFixed(2),o.tips.toFixed(2)])); L.push([]); }
+  L.push(['Month','Billed','Received']); Object.keys(rep.byMonth).sort().forEach(mo=>L.push([mo,rep.byMonth[mo].charges.toFixed(2),rep.byMonth[mo].payments.toFixed(2)]));
+  dl(L.map(r=>r.map(qq).join(',')).join('\n'),'text/csv',`report-${rep.range.label.replace(/\s+/g,'-').toLowerCase()}.csv`); }
+async function reportPDF(rep,sc){ try{ await loadJsPDF(); }catch(e){ toast(e.message); return; } const crest=await crestPNG().catch(()=>null), doc=new window.jspdf.jsPDF({unit:'pt',format:'letter'}); bcFonts(doc);
+  const NAVY=[15,42,56],GOLD=[199,161,58],GOLDL=[216,183,95],GOLDDK=[126,95,26],IVORY=[251,250,245],INK=[20,34,43],MUTED=[86,98,106]; const L=40,R=572,W=612,H=792, font=(f,s,z,c)=>{ doc.setFont(f,s); doc.setFontSize(z); doc.setTextColor(...c); };
+  doc.setFillColor(...IVORY); doc.rect(0,0,W,H,'F'); doc.setFillColor(...GOLD); doc.roundedRect(L,32,R-L,82,8,8,'F'); doc.setFillColor(...NAVY); doc.roundedRect(L,32,R-L,78,8,8,'F'); doc.rect(L,98,R-L,8,'F'); const lw=drawCrest(doc,crest,L+16,42,54), TX=L+16+(lw||45)+15;
+  font('PublicSansXB','normal',6.8,GOLDL); doc.text(String(brandName()).toUpperCase(),TX,56,{charSpace:1.2}); font('Cormorant','bold',24,[255,255,255]); doc.text(`${rep.range.label} — the club's numbers`,TX,80); font('PublicSans','normal',8.4,[214,218,220]); doc.text(`${dateTxt(rep.range.from)} – ${dateTxt(rep.range.to)}`,TX,94);
+  let y=136; const page=()=>{ if(y>H-70){ doc.addPage(); doc.setFillColor(...IVORY); doc.rect(0,0,W,H,'F'); y=60; } }; const sec=t=>{ page(); font('PublicSansXB','normal',7.4,GOLDDK); doc.text(t.toUpperCase(),L,y,{charSpace:1.1}); y+=6; doc.setDrawColor(...GOLD); doc.setLineWidth(1); doc.line(L,y,R,y); y+=14; }; const row=(k,v,b)=>{ page(); font('PublicSans',b?'bold':'normal',b?10.5:9.5,INK); doc.text(k,L,y); doc.text(v,R,y,{align:'right'}); y+=14; };
+  sec('The period'); row('Billed to member accounts',fmt2(rep.charges)); row('Revenue before tax & service',fmt2(rep.net),true); row('Sales tax collected',fmt2(rep.tax)); row('Service charge',fmt2(rep.svc)); row('Payments received',fmt2(rep.payments),true); row('Credits & adjustments',fmt2(rep.credits)); row(`Receivable at ${dateTxt(rep.range.to)}`,fmt2(rep.ar),true); y+=10;
+  sec('Revenue by item'); Object.values(rep.items).sort((a,b)=>b.net-a.net).forEach(r=>row(`${r.name} · ${r.n}`,fmt2(r.net))); y+=10;
+  sec('Receipts by method'); Object.entries(rep.methods).forEach(([k,v])=>row(METHOD_NAME[k]||k,fmt2(v))); y+=10;
+  if(rep.pos){ sec('Registers'); Object.values(rep.outlets).filter(o=>o.n).forEach(o=>row(`${o.name} · ${o.n} tickets`,fmt2(o.sales))); row('Tips',fmt2(rep.pos.tips)); y+=10; }
+  sec('By month'); Object.keys(rep.byMonth).sort().forEach(mo=>row(ymTxt(mo),`${fmt2(rep.byMonth[mo].charges)} billed · ${fmt2(rep.byMonth[mo].payments)} received`)); y+=10;
+  if(sc){ sec(`${rep.range.label.slice(-4)} budget`); row('Budgeted revenue',fmt(sc.revenue)); row('Budgeted expenses',fmt(sc.expenses)); row('Projected net',fmtS(sc.projected),true); }
+  font('PublicSans','normal',7,MUTED); doc.text(`${brandName()} · printed ${new Date().toLocaleString('en-US',{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'})}`,W/2,H-28,{align:'center'});
+  doc.save(`report-${rep.range.label.replace(/\s+/g,'-').toLowerCase()}.pdf`); }

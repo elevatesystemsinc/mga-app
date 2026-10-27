@@ -32,7 +32,8 @@ body{font-variant-numeric:lining-nums}
 /* layout */
 .app{display:flex;min-height:100vh}
 .side{width:248px;flex-shrink:0;background:var(--navy);color:#E9E4D6;display:flex;flex-direction:column;padding:24px 16px;position:sticky;top:0;height:100vh;overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin}
-.navsec{font-size:10.5px;font-weight:800;letter-spacing:.16em;text-transform:uppercase;color:var(--goldl);opacity:.85;padding:0 12px;margin:14px 0 2px} .navsec:first-child{margin-top:4px}
+.navsec{font-size:10.5px;font-weight:800;letter-spacing:.16em;text-transform:uppercase;color:var(--goldl);opacity:.85;padding:0 12px;margin:14px 0 2px;display:flex;align-items:center;justify-content:space-between;width:100%;background:none;border:none;text-align:left;cursor:pointer} .navsec:first-child{margin-top:4px} .navsec svg{width:12px;height:12px;transform:rotate(90deg);transition:transform .15s;opacity:.7} .navsec.closed svg{transform:rotate(0)} .navsec:hover{opacity:1}
+.ybar{display:inline-flex;margin-right:8px} .ybar button{height:34px;padding:0 12px} .ybar button.on{background:var(--navy);color:#fff}
 .brand{display:block;padding:0 8px 16px;border-bottom:1px solid rgba(216,183,95,.3)}
 /* Flagstick: the product mark. The crest file carries the two-tone trim; the word is live text in Public Sans */
 .fs{display:flex;align-items:center;gap:12px;min-width:0}
@@ -149,7 +150,7 @@ table.scard.sheet{min-width:0} table.scard.sheet .inp{height:34px;padding:0 6px;
 
 /* tables */
 .tw{overflow-x:auto}
-.t{min-width:720px}
+.t{min-width:720px} .t.fit{min-width:0}
 .tr{display:grid;align-items:center;gap:12px;padding:0 22px;min-height:50px;border-top:1px solid var(--line)}
 .tr.th{min-height:40px;border-top:none;font-size:12px;font-weight:600;color:var(--muted);background:var(--ivory);border-bottom:1px solid var(--line)}
 .tr.th + .tr{border-top:none}
@@ -1107,31 +1108,37 @@ I.org=svg('<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18M9 
 I.survey=svg('<rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4V3h6v2M9 11h6M9 15h4"/>');
 I.lib=svg('<path d="M4 5h5a3 3 0 013 3v12a2 2 0 00-2-2H4z"/><path d="M20 5h-5a3 3 0 00-3 3v12a2 2 0 012-2h6z"/>');
 I.coins=svg('<ellipse cx="12" cy="6" rx="7" ry="3"/><path d="M5 6v12c0 1.7 3.1 3 7 3s7-1.3 7-3V6"/><path d="M5 12c0 1.7 3.1 3 7 3s7-1.3 7-3"/>');
-const NAV=[['dash','Dashboard',I.home],['tournaments','Tournaments',I.flag],['members','Members',I.users],['collections','Dues collection',I.coins],['accounts','Member accounts',I.ledger],['billsetup','Billing setup',I.shield],['pos','Register',I.cart],['postickets','Tickets',I.ledger],['posmenu','Menus & products',I.lib],['proshop','Pro shop',I.cart],['teesheet','Tee sheet',I.flag],['bookings','Bookings',I.cal],['settings','Settings',I.gear],['board','Board',I.shield],['budget','Season budget',I.ledger],['orgs','Organizations',I.org],['library','Game library',I.lib],['logins','Logins',I.shield],['surveys','Surveys',I.survey]];
+const NAV=[['dash','Dashboard',I.home],['tournaments','Tournaments',I.flag],['members','Members',I.users],['collections','Dues collection',I.coins],['accounts','Member accounts',I.ledger],['billsetup','Billing setup',I.shield],['pos','Register',I.cart],['postickets','Tickets',I.ledger],['posmenu','Menus & products',I.lib],['proshop','Pro shop',I.cart],['teesheet','Tee sheet',I.flag],['courts','Court sheet',I.cal],['tennisshop','Tennis shop',I.cart],['poolsheet','Pool',I.cal],['bookings','Bookings',I.cal],['reports','Reports',I.ledger],['settings','Settings',I.gear],['board','Board',I.shield],['budget','Season budget',I.ledger],['orgs','Organizations',I.org],['library','Game library',I.lib],['logins','Logins',I.shield],['surveys','Surveys',I.survey]];
 /* which pages each kind of organization gets (associations get everything) */
-const ORG_NAV={club:['dash','tournaments','golf','teesheet','library','proshop','pos','postickets','posmenu','members','accounts','collections','billsetup','logins','bookings','orgs','library','budget','treasury','surveys','logins','settings'],association:['dash','tournaments','golf','members','board','treasury','budget','surveys','settings'],group:['dash','tournaments','golf','members','surveys','settings']};
+const ORG_NAV={club:['dash','tournaments','golf','teesheet','library','proshop','courts','tennisshop','poolsheet','pos','postickets','posmenu','members','accounts','collections','billsetup','logins','bookings','reports','orgs','library','budget','treasury','surveys','logins','settings'],association:['dash','tournaments','golf','members','board','treasury','budget','surveys','settings'],group:['dash','tournaments','golf','members','surveys','settings']};
 /* the rail: which entries show for this organization, gated by module and role. Keys that are views of another page
    (teesheet → bookings, proshop → pos, posmenu → possetup) are listed in NAV_PAGE; NAV_OWNS says which pages light an entry up. */
-const NAV_PAGE={teesheet:'bookings',proshop:'pos',posmenu:'possetup'};
-const NAV_OWNS={tournaments:['tournaments','tournament'],accounts:['accounts','account'],bookings:['bookings','booksetup'],teesheet:['bookings'],pos:['pos'],proshop:['pos'],posmenu:['possetup']};
-const NAV_SECTIONS={club:[['',['dash']],['Golf',['tournaments','golf','teesheet','library','proshop']],['Food & beverage',['pos','postickets','posmenu']],['Membership',['members','accounts','collections','billsetup','logins']],['Club',['bookings','orgs','treasury','budget','surveys']],['',['settings']]],
+const NAV_PAGE={teesheet:'bookings',courts:'bookings',poolsheet:'bookings',proshop:'pos',tennisshop:'pos',posmenu:'possetup'};
+/* which department a rail entry drives (bookings by facility department, registers by outlet department) */
+const NAV_DEPT={teesheet:'golf',courts:'tennis',poolsheet:'pool',bookings:'',proshop:'golf',tennisshop:'tennis',pos:'fnb'};
+const NAV_OWNS={tournaments:['tournaments','tournament'],accounts:['accounts','account'],bookings:['bookings','booksetup'],teesheet:['bookings'],courts:['bookings'],poolsheet:['bookings'],pos:['pos'],proshop:['pos'],tennisshop:['pos'],posmenu:['possetup']};
+const NAV_SECTIONS={club:[['',['dash']],['Golf',['tournaments','golf','teesheet','library','proshop']],['Tennis & pickleball',['courts','tennisshop']],['Pool',['poolsheet']],['Food & beverage',['pos','postickets','posmenu']],['Membership',['members','accounts','collections','billsetup','logins']],['Club',['bookings','reports','orgs','treasury','budget','surveys']],['',['settings']]],
   association:[['',['dash']],['Golf',['tournaments','golf']],['Membership',['members','board']],['Money',['treasury','budget']],['',['surveys','settings']]],
   group:[['',['dash']],['Golf',['games','ledger','tournaments','golf']],['',['members','surveys','settings']]]};
 const NAV_GATE={settings:()=>!KEYMODE,logins:()=>canManageLogins(),accounts:()=>typeof acctOn==='function'&&acctOn(),billsetup:()=>typeof acctOn==='function'&&acctOn(),pos:()=>typeof posOn==='function'&&posOn(),postickets:()=>typeof posOn==='function'&&posOn(),posmenu:()=>typeof posOn==='function'&&posOn(),
-  proshop:()=>typeof posOn==='function'&&posOn()&&posSettings().outlets.some(o=>o.kind==='proshop'),bookings:()=>typeof bookOn==='function'&&bookOn(),teesheet:()=>typeof bookOn==='function'&&bookOn()&&bookSettings().facilities.some(f=>f.kind==='tee')};
-function navItems(){ const allow=ORG_NAV[db.kind]; return NAV.filter(([k])=>(!allow||allow.includes(k))&&(!NAV_GATE[k]||NAV_GATE[k]())).map(([k,l,ic])=>[k,k==='members'&&isClub()?'Directory':k==='golf'&&isClub()?'Events & live scoring':k==='bookings'&&isClub()?'Courts, pool & lessons':l,ic]); }
+  proshop:()=>typeof posOn==='function'&&posOn()&&posSettings().outlets.some(o=>o.kind==='proshop'&&outletDept(o)==='golf'),tennisshop:()=>typeof posOn==='function'&&posOn()&&posSettings().outlets.some(o=>o.kind==='proshop'&&outletDept(o)==='tennis'),
+  bookings:()=>typeof bookOn==='function'&&bookOn(),teesheet:()=>typeof bookOn==='function'&&bookOn()&&bookSettings().facilities.some(f=>facDept(f)==='golf'),courts:()=>typeof bookOn==='function'&&bookOn()&&bookSettings().facilities.some(f=>facDept(f)==='tennis'),poolsheet:()=>typeof bookOn==='function'&&bookOn()&&bookSettings().facilities.some(f=>facDept(f)==='pool'),reports:()=>typeof acctOn==='function'&&acctOn()};
+function navItems(){ const allow=ORG_NAV[db.kind]; return NAV.filter(([k])=>(!allow||allow.includes(k))&&(!NAV_GATE[k]||NAV_GATE[k]())).map(([k,l,ic])=>[k,k==='members'&&isClub()?'Directory':k==='golf'&&isClub()?'Events & live scoring':k==='bookings'&&isClub()?'All bookings':k==='budget'&&isClub()?'Budget':l,ic]); }
 /* is this rail entry the one lit for the page on screen? a view of a shared page looks at that page's state */
 function navActive(k){ const pg=view.page; const owns=NAV_OWNS[k]||[k]; if(!owns.includes(pg)) return false;
-  if(k==='teesheet') return typeof BK!=='undefined'&&(facOf(BK.fac)||{}).kind==='tee'; if(k==='bookings'&&pg==='bookings') return !(typeof BK!=='undefined'&&(facOf(BK.fac)||{}).kind==='tee');
-  if(k==='proshop') return typeof POS!=='undefined'&&(outletOf(POS.outlet)||{}).kind==='proshop'; if(k==='pos') return !(typeof POS!=='undefined'&&(outletOf(POS.outlet)||{}).kind==='proshop'); return true; }
+  if(k in NAV_DEPT){ if(NAV_PAGE[k]==='bookings'||k==='bookings') return typeof BK!=='undefined'&&(BK.dept||'')===NAV_DEPT[k]; if(NAV_PAGE[k]==='pos'||k==='pos') return typeof POS!=='undefined'&&(POS.dept||'fnb')===NAV_DEPT[k]; } return true; }
 function navGo(k){ if(k==='golf') view.geid=null;
-  if(k==='teesheet'){ const f=bookSettings().facilities.find(x=>x.kind==='tee'); BK.fac=f?f.id:''; }
-  if(k==='bookings'&&typeof BK!=='undefined'&&(facOf(BK.fac)||{}).kind==='tee'){ const f=bookSettings().facilities.find(x=>x.kind!=='tee'); BK.fac=f?f.id:''; }
-  if(k==='proshop'||k==='pos'){ const want=k==='proshop'?'proshop':'fnb'; if((outletOf(POS.outlet)||{}).kind!==want){ const o=posSettings().outlets.find(x=>x.kind===want); if(o){ POS.outlet=o.id; POS.cur=null; } } }
+  if(NAV_PAGE[k]==='bookings'||k==='bookings'){ BK.dept=NAV_DEPT[k]||''; const fs=bookSettings().facilities.filter(f=>!BK.dept||facDept(f)===BK.dept); if(!fs.some(f=>f.id===BK.fac)) BK.fac=fs[0]?fs[0].id:''; }
+  if(NAV_PAGE[k]==='pos'||k==='pos'){ POS.dept=NAV_DEPT[k]||'fnb'; const os=posSettings().outlets.filter(o=>outletDept(o)===POS.dept); if(!os.some(o=>o.id===POS.outlet)){ POS.outlet=os[0]?os[0].id:''; POS.cur=null; } }
   go(NAV_PAGE[k]||k); }
+/* collapsed sections are remembered per hub on this device; the section holding the page on screen never hides it */
+const navColKey=()=>'fs_navcol_'+ORG_ID; const navCollapsed=()=>{ try{ return new Set(JSON.parse(localStorage.getItem(navColKey())||'[]')); }catch(_){ return new Set(); } };
+function toggleNavSec(t){ const c=navCollapsed(); if(c.has(t)) c.delete(t); else c.add(t); try{ localStorage.setItem(navColKey(),JSON.stringify([...c])); }catch(_){} render(); }
 function navHTML(items,live){ const secs=NAV_SECTIONS[db.kind]||[['',items.map(x=>x[0])]], placed=new Set(), out=[];
   const btn=([k,l,ic])=>`<button class="nav${navActive(k)?' on':''}" data-go="${k}">${ic}<span>${l}</span>${k==='golf'&&live.length?'<span class="livedot" aria-label="Live scoring"></span>':''}</button>`;
-  for(const [title,keys] of secs){ const its=keys.map(k=>items.find(x=>x[0]===k)).filter(Boolean); if(!its.length) continue; its.forEach(x=>placed.add(x[0])); out.push((title?`<div class="navsec">${esc(title)}</div>`:'')+its.map(btn).join('')); }
+  const col=navCollapsed();
+  for(const [title,keys] of secs){ const its=keys.map(k=>items.find(x=>x[0]===k)).filter(Boolean); if(!its.length) continue; its.forEach(x=>placed.add(x[0])); const open=!title||!col.has(title)||its.some(x=>navActive(x[0]));
+    out.push((title?`<button class="navsec${open?'':' closed'}" data-sec="${esc(title)}"><span>${esc(title)}</span>${I.chev}</button>`:'')+(open?its.map(btn).join(''):'')); }
   const rest=items.filter(x=>!placed.has(x[0])); if(rest.length) out.push(rest.map(btn).join(''));
   return out.join('')+live.map(e=>`<button class="nav livelink" data-golfev="${e.id}"><span class="livedot"></span><span class="trunc">Leaderboard · ${esc(e.name)}</span></button>`).join(''); }
 /* the organization on screen: the club's record from CLUB.orgs wins over what the document says */
@@ -1142,7 +1149,12 @@ const orgName=()=>{ const o=curOrg(); return o?(o.name||o.short||''):''; };
    a club or association logo. `o.crest` in stored documents is ignored. */
 function crestHTML(o,cls=''){ return `<img class="crest ${cls}" src="flagstick-crest.svg" alt="">`; }
 let view={page:'dash',tid:null,ttab:'budget',mfilter:'All',mq:'',tfilter:'All'};
-const Y=()=>db?db.activeSeason:String(new Date().getFullYear());
+/* the year on screen: an association or group has an active season it chooses; the club runs on the calendar year
+   (annual revenue, quarterly reports) — view.year moves it, and a year the club has not seen yet is set up on the fly */
+const Y=()=>{ if(!db) return String(new Date().getFullYear()); if(!isClub()) return db.activeSeason; const y=view.year||String(new Date().getFullYear()); if(!db.seasons[y]) db.seasons[y]=newSeason(); return y; };
+/* the club's year bar: ‹ 2026 › and, where a page reports by quarter, Q1–Q4 / Year */
+function yearBar(quarters){ const y=+Y(); return `<div class="seg ybar"><button data-yb="${y-1}">‹</button><button class="on">${y}</button><button data-yb="${y+1}">›</button></div>${quarters?`<div class="seg ybar">${[['','Year'],['1','Q1'],['2','Q2'],['3','Q3'],['4','Q4']].map(([k,l])=>`<button class="${(view.q||'')===k?'on':''}" data-yq="${k}">${l}</button>`).join('')}</div>`:''}`; }
+function wireYearBar(m){ m.querySelectorAll('[data-yb]').forEach(b=>b.onclick=()=>{ view.year=b.dataset.yb; render(); }); m.querySelectorAll('[data-yq]').forEach(b=>b.onclick=()=>{ view.q=b.dataset.yq; render(); }); }
 const T=()=>db.tournaments.find(t=>t.id===view.tid);
 function go(page,extra){ view=Object.assign(view,{page},extra||{}); $('side').classList.remove('open'); render(); window.scrollTo(0,0); }
 
@@ -1226,15 +1238,16 @@ function renderInner(){
   $('btnSwitch').hidden=!CLUB||(!db&&!setupNeeded)||KEYMODE||(SCOPED&&SCOPE_ORGS.length<2); if(typeof paintHubSync==='function') paintHubSync();
   if(!db){ $('nav').innerHTML=''; $('seasonBox').hidden=true; (setupNeeded?vSetup:SCOPED&&cloudReady&&(ORG_ID==='club'||!allowedOrg(ORG_ID))?vNotYours:vPicker)($('main')); return; }
   if(!isClub()&&!hasModule(db.kind==='group'?'groups':'associations')){ $('nav').innerHTML=''; $('seasonBox').hidden=true; vLocked($('main'),db.kind); return; }
-  $('seasonBox').hidden=false;
+  $('seasonBox').hidden=isClub();   // the club has no seasons: it reports by year and quarter
   const ys=Object.keys(db.seasons).sort((a,b)=>b-a);
   $('seasonSel').innerHTML=ys.map(y=>`<option value="${y}"${y===Y()?' selected':''}>${y} season</option>`).join('')+'<option value="__new">+ New season…</option>';
   const live=typeof liveEvents==='function'?liveEvents():[];
   const items=navItems(); if(view.page!=='pick'&&!items.some(([k])=>(NAV_OWNS[k]||[k]).includes(view.page))) view.page='dash';
   $('nav').innerHTML=navHTML(items,live);
-  $('nav').querySelectorAll('[data-go]').forEach(b=>b.onclick=()=>navGo(b.dataset.go));
+  $('nav').querySelectorAll('[data-go]').forEach(b=>b.onclick=()=>navGo(b.dataset.go)); $('nav').querySelectorAll('[data-sec]').forEach(b=>b.onclick=()=>toggleNavSec(b.dataset.sec));
   const m=$('main');
-  ({dash:vDash,tournaments:vTournaments,tournament:vTournament,members:vMembers,board:vBoard,budget:vBudget,treasury:vTreasury,golf:vGolf,orgs:vOrgs,pick:vPicker,collections:vCollections,games:vGames,ledger:vLedger,library:vLibrary,logins:vLogins,surveys:vSurveys,accounts:vAccounts,account:vAccount,billsetup:vBillSetup,pos:vPos,postickets:vPosTickets,possetup:vPosSetup,bookings:vBookings,booksetup:vBookSetup,settings:vSettings}[view.page]||vDash)(m);
+  ({dash:vDash,tournaments:vTournaments,tournament:vTournament,members:vMembers,board:vBoard,budget:vBudget,treasury:vTreasury,golf:vGolf,orgs:vOrgs,pick:vPicker,collections:vCollections,games:vGames,ledger:vLedger,library:vLibrary,logins:vLogins,surveys:vSurveys,accounts:vAccounts,account:vAccount,billsetup:vBillSetup,pos:vPos,postickets:vPosTickets,possetup:vPosSetup,bookings:vBookings,booksetup:vBookSetup,settings:vSettings,reports:vReports}[view.page]||vDash)(m);
+  if(isClub()) wireYearBar(m);
   if(view.page==='board'&&!isClub()&&typeof loginsCard==='function') loginsCard(m,ORG_ID);
   if(!isClub()&&((db.kind==='group'&&view.page==='members')||(db.kind!=='group'&&view.page==='board'))) adminLinksCard(m,curOrg());
 }
@@ -1359,11 +1372,11 @@ function vDash(m){
   }
   const ms=members(), unpaid=isClub()?0:ms.filter(x=>x.status!=='Inactive'&&memberDues(Y(),x.id)<n0(sc.s.dues.amount)).length;
   if(ms.length&&unpaid&&sc.s.duesPayments.length) attention.push([String(unpaid),`member${unpaid>1?'s have':' has'} not paid full ${Y()} dues`,'warn',null]);
-  m.innerHTML=head(`${Y()} Season`,esc(CLUB.name||CLUB_META.name)+(isClub()?'':' · '+esc(orgName())),btn('New tournament','dNew','pri',I.plus))+`
+  m.innerHTML=head(isClub()?`${Y()}`:`${Y()} Season`,esc(CLUB.name||CLUB_META.name)+(isClub()?'':' · '+esc(orgName())),(isClub()?yearBar(false):'')+btn('New tournament','dNew','pri',I.plus))+`
   <div class="grid g4">
-    ${kpi('Season net (projected)',fmtS(sc.projected),`Actuals for ${sc.past.length} completed · budget for ${sc.upcoming.length} upcoming`,netCls(sc.projected))}
+    ${kpi(isClub()?'Net (projected)':'Season net (projected)',fmtS(sc.projected),`Actuals for ${sc.past.length} completed · budget for ${sc.upcoming.length} upcoming`,netCls(sc.projected))}
     ${kpi('Next up',next?dayShort(next,0)||'TBD':'—',next?`${esc(next.name)} · ${daysOut(next)===0?'today':daysOut(next)+' days out'}`:'No upcoming tournaments')}
-    ${kpi('Sponsor money received',fmt(sc.received),`of ${fmt(sc.pledged)} pledged this season`)}
+    ${kpi('Sponsor money received',fmt(sc.received),`of ${fmt(sc.pledged)} pledged this ${isClub()?'year':'season'}`)}
     ${kpi('Members',String(sc.active),isClub()?'active in the club directory':`active · ${db.board.filter(b=>b.memberId).length} on the board`)}
   </div>
   <div class="split">
@@ -1373,7 +1386,7 @@ function vDash(m){
       <div class="tr th" style="${cols}"><span>Tournament</span><span>Dates</span><span class="r">Revenue</span><span class="r">Expenses</span><span class="r">Net</span></div>
       ${sc.ts.map(({t,c})=>`<div class="tr num click" data-open="${t.id}" style="${cols}"><div class="cell2"><b class="trunc" style="color:var(--navy)">${esc(t.name)}</b><small>${t.days} day${t.days>1?'s':''} · ${esc(t.status||'Planning')}</small></div><span>${dateRange(t).replace(/, \d{4}$/,'')}</span><span class="r">${fmt(c.revenue)}</span><span class="r">${fmt(c.expenses)}</span><b class="r ${netCls(c.net)}">${fmtS(c.net)}</b></div>`).join('')}
       <div class="tr tot num" style="${cols}"><span>Tournaments total</span><span></span><span class="r">${fmt(sc.tRev)}</span><span class="r">${fmt(sc.tExp)}</span><span class="r ${netCls(sc.tRev-sc.tExp)}">${fmtS(sc.tRev-sc.tExp)}</span></div>
-      </div></div>`:`<div class="empty"><b>No tournaments yet</b><span>Add the season’s first event.</span><div class="actions"><button class="btn pri" id="dNew2">${I.plus}New tournament</button></div></div>`}
+      </div></div>`:`<div class="empty"><b>No tournaments yet</b><span>Add the ${isClub()?'year':'season'}’s first event.</span><div class="actions"><button class="btn pri" id="dNew2">${I.plus}New tournament</button></div></div>`}
     </div>
     <div style="display:flex;flex-direction:column;gap:20px">
       ${typeof liveBoardCard==='function'?liveBoardCard():''}
@@ -2104,7 +2117,7 @@ function vBudget(m){
   const cols='grid-template-columns:minmax(160px,2fr) 140px 130px 130px 120px 120px';
   const r=(n,d,rv,ex,nt,act,cls='',attr='')=>`<div class="tr num ${cls}" ${attr} style="${cols}"><span style="font-weight:600;color:var(--navy)">${n}</span><span class="muted">${d}</span><span class="r">${rv}</span><span class="r">${ex}</span><b class="r ${typeof nt==='number'?netCls(nt):''}">${typeof nt==='number'?fmtS(nt):nt}</b><span class="r muted">${act}</span></div>`;
   const club=isClub();
-  m.innerHTML=head('Season budget',club?'Club tournaments and club-level lines. Dues and the 50/50 belong to the associations; the club only collects dues on their behalf (Dues collection).':`Tournaments are self-sustaining; dues are the ${esc(orgShort())}’s own income. Everything rolls up here.`,btn('Add '+orgShort()+' line','sbAdd','',I.plus))+`
+  m.innerHTML=head(club?'Annual budget':'Season budget',club?'Club tournaments and club-level lines. Dues and the 50/50 belong to the associations; the club only collects dues on their behalf (Dues collection).':`Tournaments are self-sustaining; dues are the ${esc(orgShort())}’s own income. Everything rolls up here.`,(club?yearBar(false):'')+btn('Add '+orgShort()+' line','sbAdd','',I.plus))+`
   <div class="grid g3">${kpi('Budgeted revenue',fmt(sc.revenue),club?'tournaments + club lines':'tournaments + dues + '+orgShort()+' lines')}${kpi('Budgeted expenses',fmt(sc.expenses),'tournaments + MGA lines')}${kpi('Season net (projected)',fmtS(sc.projected),`Actuals for ${sc.past.length} completed, budget for ${sc.upcoming.length} upcoming · all-budget net ${fmtS(sc.net)}`,netCls(sc.projected))}</div>
   <div class="card" style="overflow:hidden"><div class="cardhead"><h2 class="h2">Tournaments</h2></div><div class="tw"><div class="t" style="min-width:820px">
     <div class="tr th" style="${cols}"><span>Tournament</span><span>Dates</span><span class="r">Revenue</span><span class="r">Expenses</span><span class="r">Net</span><span class="r">Actual net</span></div>
@@ -2720,7 +2733,7 @@ function editTxn(x,prefill,onSaved){
 /* ---------- Treasury page ---------- */
 function vTreasury(m){
   const tabs=[['ledger','Ledger'],['bva','Budget vs actual'],['rec','Reconcile']];
-  m.innerHTML=head('Treasury',`Every dollar in and out for the ${Y()} season, checked against the bank.`,btn('Record income','xIn','',I.plus)+btn('Record expense','xOut','pri',I.plus))+
+  m.innerHTML=head('Treasury',`Every dollar in and out for ${isClub()?Y():'the '+Y()+' season'}, checked against the bank.`,(isClub()?yearBar(false):'')+btn('Record income','xIn','',I.plus)+btn('Record expense','xOut','pri',I.plus))+
     `<div class="tabs">${tabs.map(([k,l])=>`<button class="tab${view.xtab===k?' on':''}" data-x="${k}">${l}</button>`).join('')}</div><div id="xbody" style="display:flex;flex-direction:column;gap:20px"></div>`;
   m.querySelectorAll('[data-x]').forEach(b=>b.onclick=()=>{ view.xtab=b.dataset.x; render(); });
   $('xIn').onclick=()=>editTxn(null,{dir:'in'}); $('xOut').onclick=()=>editTxn(null,{dir:'out'});
@@ -7647,12 +7660,70 @@ async function statementsPDF(list,opt){ opt=opt||{};
   if(opt.returnDoc) return doc;
   if(typeof deliverFile==='function'){ const blob=doc.output('blob'); await deliverFile(blob,name,'Statements'); } else doc.save(name); return doc;
 }
+
+/* ============ Reports — the club's year and quarters (the club runs on the calendar year, not seasons) ============
+   Revenue by billing item from the accounts, receipts by method, outstanding receivables at the period end, the registers
+   by outlet from the tickets, and the club's own budget lines — for the year on the bar or one quarter of it. */
+function reportRange(y,q){ y=+y; const q1=q?+q:0; const from=q1?`${y}-${String((q1-1)*3+1).padStart(2,'0')}-01`:`${y}-01-01`; const to=q1?new Date(Date.UTC(y,q1*3,0)).toISOString().slice(0,10):`${y}-12-31`; return {from,to,label:q1?`Q${q1} ${y}`:String(y)}; }
+function clubReport(y,q){ const R=reportRange(y,q), inR=d=>d>=R.from&&d<=R.to, L=liveItems(); const rep={range:R,items:{},sources:{},methods:{},charges:0,net:0,tax:0,svc:0,payments:0,credits:0,ar:0,arOpen:0,outlets:{},pos:null,byMonth:{}};
+  for(const i of L){ if(i.posted<=R.to&&i.kind==='charge') rep.ar+=n0(i.amount); if(i.posted<=R.to&&i.kind!=='charge') rep.ar-=n0(i.amount); if(!inR(i.posted)) continue; const mo=i.posted.slice(0,7); const M=rep.byMonth[mo]=rep.byMonth[mo]||{charges:0,payments:0};
+    if(i.kind==='charge'){ const it=itemOf(i.item)||{}, k=i.item||i.source||'other', name=it.name||SOURCE_NAME[i.source]||'Other'; const r=rep.items[k]=rep.items[k]||{name,source:it.source||i.source,n:0,net:0,tax:0,svc:0,amount:0}; r.n++; r.net+=netOf(i); r.tax+=n0(i.tax); r.svc+=n0(i.svc); r.amount+=n0(i.amount);
+      const sk=it.source||i.source||'manual'; rep.sources[sk]=(rep.sources[sk]||0)+netOf(i); rep.charges+=n0(i.amount); rep.net+=netOf(i); rep.tax+=n0(i.tax); rep.svc+=n0(i.svc); M.charges+=n0(i.amount); }
+    else if(i.kind==='payment'){ rep.payments+=n0(i.amount); rep.methods[i.method||'other']=(rep.methods[i.method||'other']||0)+n0(i.amount); M.payments+=n0(i.amount); }
+    else rep.credits+=n0(i.amount); }
+  rep.ar=Math.round(rep.ar*100)/100;
+  if(typeof POS!=='undefined'&&POS.tickets){ const T=POS.tickets.filter(t=>t.status!=='open'&&inR(String(t.closed_at||t.created_at).slice(0,10))); rep.pos=shiftStats(T); for(const o of posSettings().outlets) rep.outlets[o.id]=Object.assign({name:o.name,kind:o.kind},shiftStats(T.filter(t=>t.outlet===o.id))); }
+  const r2=o=>{ for(const k in o) if(typeof o[k]==='number') o[k]=Math.round(o[k]*100)/100; }; r2(rep); Object.values(rep.items).forEach(r2); r2(rep.sources); r2(rep.methods); Object.values(rep.byMonth).forEach(r2); return rep; }
+function vReports(m){ if(!acctOn()){ go('dash'); return; } if(ACCT.items==null){ acctLoad().then(()=>render()); m.innerHTML=head('Reports','Loading…'); return; }
+  if(typeof posOn==='function'&&posOn()&&POS.tickets==null) posLoad().then(()=>render());
+  const y=Y(), q=view.q||'', rep=clubReport(y,q), R=rep.range, sc=scalc(y);
+  const items=Object.values(rep.items).sort((a,b)=>b.net-a.net), months=Object.keys(rep.byMonth).sort();
+  const row=(k,v,cls='')=>`<div class="tr num ${cls}" style="grid-template-columns:1fr 140px"><span>${k}</span><b class="r">${v}</b></div>`;
+  m.innerHTML=head('Reports',`${esc(CLUB.name||CLUB_META.name)} · ${R.label} · ${dateTxt(R.from)} – ${dateTxt(R.to)}`,yearBar(true)+btn('CSV','rpCSV','',I.down)+btn('Report (PDF)','rpPDF','pri',I.down))+`
+  <div class="grid g4">${kpi('Billed',fmt(rep.charges),'charges to member accounts, incl. tax & service')}${kpi('Revenue (net)',fmt(rep.net),'before tax and service charge')}${kpi('Received',fmt(rep.payments),'payments recorded')}${kpi('Receivable',fmt(rep.ar),'owed by members at '+dateTxt(R.to),rep.ar>0?'neg':'')}</div>
+  <div class="card" style="overflow:hidden"><div class="cardhead"><h2 class="h2">Revenue by item</h2><span class="muted">${items.length} item${items.length===1?'':'s'}</span></div><div class="t fit">
+      <div class="tr th" style="grid-template-columns:minmax(140px,1fr) 70px 120px 110px 110px"><span>Item</span><span class="r">Count</span><span class="r">Net</span><span class="r">Tax</span><span class="r">Service</span></div>
+      ${items.map(r=>`<div class="tr num" style="grid-template-columns:minmax(140px,1fr) 70px 120px 110px 110px"><span style="font-weight:600;color:var(--navy)">${esc(r.name)}<small class="muted" style="display:block">${esc(SOURCE_NAME[r.source]||r.source||'')}</small></span><span class="r">${r.n}</span><b class="r">${fmt2(r.net)}</b><span class="r muted">${fmt2(r.tax)}</span><span class="r muted">${fmt2(r.svc)}</span></div>`).join('')||'<p class="muted" style="padding:14px">Nothing billed in this period.</p>'}
+      ${items.length?`<div class="tr num" style="grid-template-columns:minmax(140px,1fr) 70px 120px 110px 110px;border-top:2px solid var(--line)"><b>Total</b><span></span><b class="r">${fmt2(rep.net)}</b><b class="r">${fmt2(rep.tax)}</b><b class="r">${fmt2(rep.svc)}</b></div>`:''}
+    </div></div>
+  <div class="grid g2">
+    <div>
+      <div class="card" style="overflow:hidden"><div class="cardhead"><h2 class="h2">Receipts by method</h2></div><div class="t fit">${METHODS.map(([k,l])=>rep.methods[k]?row(l,fmt2(rep.methods[k])):'').join('')||'<p class="muted" style="padding:14px">No payments in this period.</p>'}${rep.credits?row('Credits & adjustments',fmt2(rep.credits),'muted'):''}</div></div>
+      <div class="card" style="overflow:hidden"><div class="cardhead"><h2 class="h2">Registers</h2><span class="muted">${rep.pos?'from the tickets':'point of sale is off'}</span></div><div class="t fit">${rep.pos?Object.values(rep.outlets).filter(o=>o.n).map(o=>row(`${esc(o.name)} <small class="muted">· ${o.n} ticket${o.n===1?'':'s'}</small>`,fmt2(o.sales))).join('')+row('Service charge',fmt2(rep.pos.svc),'muted')+row('Sales tax',fmt2(rep.pos.tax),'muted')+row('Tips',fmt2(rep.pos.tips),'muted'):''}</div></div>
+    </div>
+    <div>
+    <div class="card" style="overflow:hidden"><div class="cardhead"><h2 class="h2">By month</h2></div><div class="t fit"><div class="tr th" style="grid-template-columns:1fr 130px 130px"><span>Month</span><span class="r">Billed</span><span class="r">Received</span></div>${months.map(mo=>`<div class="tr num" style="grid-template-columns:1fr 130px 130px"><span>${esc(ymTxt(mo))}</span><span class="r">${fmt2(rep.byMonth[mo].charges)}</span><span class="r">${fmt2(rep.byMonth[mo].payments)}</span></div>`).join('')||'<p class="muted" style="padding:14px">No activity yet.</p>'}</div></div>
+    <div class="card" style="overflow:hidden"><div class="cardhead"><h2 class="h2">${esc(String(y))} budget</h2><a class="lnk" data-go="budget">Open the budget</a></div><div class="t fit">${row('Budgeted revenue',fmt(sc.revenue))}${row('Budgeted expenses',fmt(sc.expenses))}${row('Projected net',fmtS(sc.projected))}${row('Actual net to date',fmtS(sc.netA))}</div></div>
+    </div>
+  </div>`;
+  m.querySelectorAll('[data-go]').forEach(a=>a.onclick=()=>go(a.dataset.go)); wireYearBar(m);
+  $('rpCSV').onclick=()=>reportCSV(rep); $('rpPDF').onclick=()=>reportPDF(rep,sc); }
+function reportCSV(rep){ const qq=v=>'"'+String(v??'').replace(/"/g,'""')+'"', L=[['Flagstick report',rep.range.label,rep.range.from,rep.range.to],[],['Revenue by item','Source','Count','Net','Tax','Service','Billed']];
+  Object.values(rep.items).sort((a,b)=>b.net-a.net).forEach(r=>L.push([r.name,SOURCE_NAME[r.source]||r.source||'',r.n,r.net.toFixed(2),r.tax.toFixed(2),r.svc.toFixed(2),r.amount.toFixed(2)])); L.push(['Total','','',rep.net.toFixed(2),rep.tax.toFixed(2),rep.svc.toFixed(2),rep.charges.toFixed(2)],[]);
+  L.push(['Receipts by method','Amount']); Object.entries(rep.methods).forEach(([k,v])=>L.push([METHOD_NAME[k]||k,v.toFixed(2)])); L.push(['Payments',rep.payments.toFixed(2)],['Credits & adjustments',rep.credits.toFixed(2)],['Receivable at '+rep.range.to,rep.ar.toFixed(2)],[]);
+  if(rep.pos){ L.push(['Registers','Tickets','Net sales','Service','Tax','Tips']); Object.values(rep.outlets).forEach(o=>L.push([o.name,o.n,o.sales.toFixed(2),o.svc.toFixed(2),o.tax.toFixed(2),o.tips.toFixed(2)])); L.push([]); }
+  L.push(['Month','Billed','Received']); Object.keys(rep.byMonth).sort().forEach(mo=>L.push([mo,rep.byMonth[mo].charges.toFixed(2),rep.byMonth[mo].payments.toFixed(2)]));
+  dl(L.map(r=>r.map(qq).join(',')).join('\n'),'text/csv',`report-${rep.range.label.replace(/\s+/g,'-').toLowerCase()}.csv`); }
+async function reportPDF(rep,sc){ try{ await loadJsPDF(); }catch(e){ toast(e.message); return; } const crest=await crestPNG().catch(()=>null), doc=new window.jspdf.jsPDF({unit:'pt',format:'letter'}); bcFonts(doc);
+  const NAVY=[15,42,56],GOLD=[199,161,58],GOLDL=[216,183,95],GOLDDK=[126,95,26],IVORY=[251,250,245],INK=[20,34,43],MUTED=[86,98,106]; const L=40,R=572,W=612,H=792, font=(f,s,z,c)=>{ doc.setFont(f,s); doc.setFontSize(z); doc.setTextColor(...c); };
+  doc.setFillColor(...IVORY); doc.rect(0,0,W,H,'F'); doc.setFillColor(...GOLD); doc.roundedRect(L,32,R-L,82,8,8,'F'); doc.setFillColor(...NAVY); doc.roundedRect(L,32,R-L,78,8,8,'F'); doc.rect(L,98,R-L,8,'F'); const lw=drawCrest(doc,crest,L+16,42,54), TX=L+16+(lw||45)+15;
+  font('PublicSansXB','normal',6.8,GOLDL); doc.text(String(brandName()).toUpperCase(),TX,56,{charSpace:1.2}); font('Cormorant','bold',24,[255,255,255]); doc.text(`${rep.range.label} — the club's numbers`,TX,80); font('PublicSans','normal',8.4,[214,218,220]); doc.text(`${dateTxt(rep.range.from)} – ${dateTxt(rep.range.to)}`,TX,94);
+  let y=136; const page=()=>{ if(y>H-70){ doc.addPage(); doc.setFillColor(...IVORY); doc.rect(0,0,W,H,'F'); y=60; } }; const sec=t=>{ page(); font('PublicSansXB','normal',7.4,GOLDDK); doc.text(t.toUpperCase(),L,y,{charSpace:1.1}); y+=6; doc.setDrawColor(...GOLD); doc.setLineWidth(1); doc.line(L,y,R,y); y+=14; }; const row=(k,v,b)=>{ page(); font('PublicSans',b?'bold':'normal',b?10.5:9.5,INK); doc.text(k,L,y); doc.text(v,R,y,{align:'right'}); y+=14; };
+  sec('The period'); row('Billed to member accounts',fmt2(rep.charges)); row('Revenue before tax & service',fmt2(rep.net),true); row('Sales tax collected',fmt2(rep.tax)); row('Service charge',fmt2(rep.svc)); row('Payments received',fmt2(rep.payments),true); row('Credits & adjustments',fmt2(rep.credits)); row(`Receivable at ${dateTxt(rep.range.to)}`,fmt2(rep.ar),true); y+=10;
+  sec('Revenue by item'); Object.values(rep.items).sort((a,b)=>b.net-a.net).forEach(r=>row(`${r.name} · ${r.n}`,fmt2(r.net))); y+=10;
+  sec('Receipts by method'); Object.entries(rep.methods).forEach(([k,v])=>row(METHOD_NAME[k]||k,fmt2(v))); y+=10;
+  if(rep.pos){ sec('Registers'); Object.values(rep.outlets).filter(o=>o.n).forEach(o=>row(`${o.name} · ${o.n} tickets`,fmt2(o.sales))); row('Tips',fmt2(rep.pos.tips)); y+=10; }
+  sec('By month'); Object.keys(rep.byMonth).sort().forEach(mo=>row(ymTxt(mo),`${fmt2(rep.byMonth[mo].charges)} billed · ${fmt2(rep.byMonth[mo].payments)} received`)); y+=10;
+  if(sc){ sec(`${rep.range.label.slice(-4)} budget`); row('Budgeted revenue',fmt(sc.revenue)); row('Budgeted expenses',fmt(sc.expenses)); row('Projected net',fmtS(sc.projected),true); }
+  font('PublicSans','normal',7,MUTED); doc.text(`${brandName()} · printed ${new Date().toLocaleString('en-US',{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'})}`,W/2,H-28,{align:'center'});
+  doc.save(`report-${rep.range.label.replace(/\s+/g,'-').toLowerCase()}.pdf`); }
 /* ============ Point of sale (module 'pos' — the club hub, staff only) ============
    Food & beverage and the pro shop ring up tickets here, on a tablet or a phone at the register: pick the outlet, the
    member (or a walk-in), tap the products, close the ticket to the member's account (one acct_items charge with tax and
    service charge broken out — statements, minimums and the GL all see it) or as cash / card taken at the register.
    Outlets, products and stock counts live in CLUB.pos; tickets are rows in pos_tickets (pos-setup.sql). */
-const POS={tickets:null,loading:false,at:0,cur:null,outlet:'',cat:'',q:'',day:'',last:null};
+const POS={tickets:null,loading:false,at:0,cur:null,outlet:'',cat:'',q:'',day:'',last:null,dept:''};
+const outletDept=o=>o.kind==='fnb'?'fnb':(o.dept||'golf');
 const posOn=()=>!!CLUB&&isClub()&&hasModule('pos')&&!KEYMODE&&!SCOPED;
 const posKey=()=>'fs_pos_'+((typeof TENANT!=='undefined'&&TENANT)||'local');
 function posSettings(){ CLUB.pos=CLUB.pos||{}; const p=CLUB.pos;
@@ -7724,14 +7795,14 @@ async function voidTicket(t,reason){ const patch={status:'void',void_at:new Date
 function vPos(m){
   if(!posOn()){ go('dash'); return; } const P=posSettings(), b=acctSettings();
   if(POS.tickets==null){ posLoad().then(()=>render()); m.innerHTML=head('Point of sale','Loading…'); return; }
-  if(!POS.outlet||!outletOf(POS.outlet)) POS.outlet=P.outlets[0].id; const o=outletOf(POS.outlet);
+  const OL=P.outlets.filter(x=>!POS.dept||outletDept(x)===POS.dept); const OLS=OL.length?OL:P.outlets; if(!OLS.some(x=>x.id===POS.outlet)) POS.outlet=OLS[0].id; const o=outletOf(POS.outlet);
   if(!POS.cur||POS.cur.outlet!==o.id) POS.cur=newTicket(o.id); const t=POS.cur, tot=ticketTotals(t);
   const prods=P.products.filter(x=>x.outlet===o.id&&x.active!==false), cats=[...new Set(prods.map(x=>x.cat||''))].sort((a,c)=>a.localeCompare(c)); if(POS.cat&&!cats.includes(POS.cat)) POS.cat='';
   const show=prods.filter(x=>(!POS.cat||x.cat===POS.cat)&&(!POS.q||x.name.toLowerCase().includes(POS.q.toLowerCase()))).sort((a,c)=>(a.cat||'').localeCompare(c.cat||'')||a.name.localeCompare(c.name));
   const mem=t.member_id?personById(t.member_id):null, held=(POS.tickets||[]).filter(x=>x.status==='open'&&x.id!==t.id);
   const chip=(k,l,on)=>`<button class="${on?'on':''}" data-pc="${esc(k)}">${esc(l)}</button>`;
-  m.innerHTML=head('Point of sale',`${esc(o.name)} register — tap the products, close the ticket to the member’s account or take cash / card.`,btn('Setup','psSet','')+btn('Tickets','psTk',''))+`
-    <div class="toolbar"><div class="seg">${P.outlets.map(x=>`<button class="${x.id===o.id?'on':''}" data-po="${x.id}">${esc(x.name)}</button>`).join('')}</div><input class="inp" id="psQ" placeholder="Find a product…" value="${esc(POS.q)}" style="margin-left:auto;height:38px;width:220px;max-width:100%" autocomplete="off"></div>
+  m.innerHTML=head(POS.dept==='tennis'?'Tennis shop':POS.dept==='golf'?'Golf shop':'Point of sale',`${esc(o.name)} register — tap the products, close the ticket to the member’s account or take cash / card.`,btn('Setup','psSet','')+btn('Tickets','psTk',''))+`
+    <div class="toolbar"><div class="seg">${OLS.map(x=>`<button class="${x.id===o.id?'on':''}" data-po="${x.id}">${esc(x.name)}</button>`).join('')}</div><input class="inp" id="psQ" placeholder="Find a product…" value="${esc(POS.q)}" style="margin-left:auto;height:38px;width:220px;max-width:100%" autocomplete="off"></div>
     <div class="pos"><div>
       ${cats.length>1||(cats.length===1&&cats[0])?`<div class="seg" style="margin-bottom:10px;flex-wrap:wrap">${chip('','All',!POS.cat)}${cats.map(c=>chip(c,c||'Uncategorised',POS.cat===c)).join('')}</div>`:''}
       <div class="pg">${show.map(x=>`<button class="pb" data-pp="${x.id}"${x.track&&n0(x.stock)<=0?' data-out="1"':''}><b>${esc(x.name)}</b><span>${fmt2(x.price)}${x.track?` <small class="muted">· ${n0(x.stock)} left</small>`:''}</span></button>`).join('')}<button class="pb open" id="psOpen"><b>Open item</b><span class="muted">any amount</span></button></div>
@@ -7784,15 +7855,15 @@ function vPosTickets(m){ if(!posOn()){ go('dash'); return; } if(POS.tickets==nul
 /* ---------- setup: outlets, products, stock ---------- */
 function vPosSetup(m){ if(!posOn()){ go('dash'); return; } const P=posSettings();
   m.innerHTML=`<div class="crumb"><button id="pxBack">Point of sale</button><span class="muted">/</span><span class="muted">Setup</span></div>`+head('Point of sale setup','Outlets and what each one sells. Prices are before tax; tax and the service charge follow the billing item of the outlet unless a product says otherwise.',btn('Import products (CSV)','pxCsv','',I.down)+btn('New outlet','pxNewO','')+btn('New product','pxNewP','pri',I.plus))+`
-    <div class="grid g3">${P.outlets.map(o=>`<div class="card pad"><div style="display:flex;justify-content:space-between;gap:10px;align-items:flex-start"><div><b style="font-size:17px;color:var(--navy)">${esc(o.name)}</b><div class="muted" style="font-size:12.5px">${o.kind==='fnb'?'Food & beverage':'Pro shop'} · bills as ${esc((itemOf(o.item)||{}).name||o.item)} · ${P.products.filter(x=>x.outlet===o.id).length} products</div></div><button class="btn sm" data-eo="${o.id}">Edit</button></div></div>`).join('')}</div>
+    <div class="grid g3">${P.outlets.map(o=>`<div class="card pad"><div style="display:flex;justify-content:space-between;gap:10px;align-items:flex-start"><div><b style="font-size:17px;color:var(--navy)">${esc(o.name)}</b><div class="muted" style="font-size:12.5px">${o.kind==='fnb'?'Food & beverage':(o.dept==='tennis'?'Tennis shop':'Golf shop')} · bills as ${esc((itemOf(o.item)||{}).name||o.item)} · ${P.products.filter(x=>x.outlet===o.id).length} products</div></div><button class="btn sm" data-eo="${o.id}">Edit</button></div></div>`).join('')}</div>
     <div class="card" style="overflow:hidden"><div class="cardhead"><div><h2 class="h2">Products</h2></div></div>${P.products.length?`<div class="t"><div class="tr th" style="grid-template-columns:minmax(150px,1.5fr) 110px 120px 90px 60px 60px 80px 44px"><span>Product</span><span>Outlet</span><span>Category</span><span class="r">Price</span><span>Tax</span><span>Svc</span><span class="r">Stock</span><span></span></div>
       ${P.products.slice().sort((a,b)=>a.outlet.localeCompare(b.outlet)||(a.cat||'').localeCompare(b.cat||'')||a.name.localeCompare(b.name)).map(x=>`<div class="tr${x.active===false?' void':''}" style="grid-template-columns:minmax(150px,1.5fr) 110px 120px 90px 60px 60px 80px 44px"><div class="cell2"><b>${esc(x.name)}</b>${x.sku?`<small>${esc(x.sku)}</small>`:''}</div><span class="muted">${esc((outletOf(x.outlet)||{}).name||'')}</span><span class="muted">${esc(x.cat||'')}${x.route?' · → '+esc(((outletOf(x.outlet)||{}).expos||[]).find(e=>e.id===x.route)?.name||'expo'):''}</span><b class="r num">${fmt2(x.price)}</b><span>${x.taxable==null?'—':x.taxable?'yes':'no'}</span><span>${x.svc==null?'—':x.svc?'yes':'no'}</span><span class="r num">${x.track?n0(x.stock):'—'}</span><span class="actions"><button class="ib" data-ep="${x.id}" aria-label="Edit">${I.edit}</button></span></div>`).join('')}</div>`:'<div class="empty"><b>No products yet</b><span>Add them one by one or import a CSV with name, category, price, sku, stock.</span></div>'}</div>`;
   $('pxBack').onclick=()=>go('pos'); $('pxNewO').onclick=()=>outletDrawer(null); $('pxNewP').onclick=()=>productDrawer(null); $('pxCsv').onclick=importProducts;
   m.querySelectorAll('[data-eo]').forEach(x=>x.onclick=()=>outletDrawer(outletOf(x.dataset.eo))); m.querySelectorAll('[data-ep]').forEach(x=>x.onclick=()=>productDrawer(productOf(x.dataset.ep)));
 }
 function outletDrawer(o,kind){ const P=posSettings(), b=acctSettings();
-  openDrawer({kicker:'Point of sale',title:o?o.name:(kind==='proshop'?'New shop outlet':kind==='fnb'?'New restaurant':'New outlet'),body:field('Name','oN',o?o.name:'',{ph:kind==='proshop'?'Golf shop':'Creekside Grill · Nines Bistro · Halfway house'})+pair(field('Kind','oK',o?o.kind:(kind||'fnb'),{type:'select',options:[['fnb','Food & beverage (service charge, tip)'],['proshop','Pro shop / retail']]}),field('Bills to the account as','oI',o?o.item:'fnb',{type:'select',options:b.items.filter(x=>!['finance','late','min'].includes(x.id)).map(x=>[x.id,x.name])})),
-    save:()=>{ const name=fv('oN'); if(!name){ toast('Name the outlet'); return false; } const d={name,kind:fv('oK'),item:fv('oI')}; if(o) Object.assign(o,d); else P.outlets.push(Object.assign({id:uid()},d)); persist(); },
+  openDrawer({kicker:'Point of sale',title:o?o.name:(kind==='proshop'?'New shop outlet':kind==='fnb'?'New restaurant':'New outlet'),body:field('Name','oN',o?o.name:'',{ph:kind==='proshop'?'Golf shop · Tennis shop':'Creekside Grill · Nines Bistro · Halfway house'})+pair(field('Kind','oK',o?o.kind:(kind||'fnb'),{type:'select',options:[['fnb','Food & beverage (service charge, tip)'],['proshop','Pro shop / retail']]}),field('Bills to the account as','oI',o?o.item:'fnb',{type:'select',options:b.items.filter(x=>!['finance','late','min'].includes(x.id)).map(x=>[x.id,x.name])}))+field('Shop run by','oD',o?(o.dept||'golf'):'golf',{type:'select',options:[['golf','Golf'],['tennis','Tennis & pickleball']],hint:'For a shop: which rail section its register sits under. Restaurants ignore this.'}),
+    save:()=>{ const name=fv('oN'); if(!name){ toast('Name the outlet'); return false; } const d={name,kind:fv('oK'),item:fv('oI'),dept:fv('oD')||'golf'}; if(o) Object.assign(o,d); else P.outlets.push(Object.assign({id:uid()},d)); persist(); },
     del:o&&P.outlets.length>1?()=>{ if(!confirm(`Remove ${o.name}? Its products go with it.`)) return false; P.products=P.products.filter(x=>x.outlet!==o.id); P.outlets=P.outlets.filter(x=>x!==o); if(POS.outlet===o.id) POS.outlet=''; persist(); }:null}); }
 function productDrawer(x){ const P=posSettings();
   openDrawer({kicker:'Point of sale',title:x?x.name:'New product',body:field('Name','pN',x?x.name:'')+pair(field('Outlet','pO',x?x.outlet:(POS.outlet||P.outlets[0].id),{type:'select',options:P.outlets.map(o=>[o.id,o.name])}),field('Category','pC',x?x.cat:'',{ph:'Drinks · Sandwiches · Balls'}))+pair(field('Price $ (before tax)','pP',x?x.price:'',{type:'number'}),field('SKU','pS',x?x.sku||'':''))+
@@ -7886,7 +7957,9 @@ function wireFnbSetup(m,kind){ const P=posSettings();
    members may book, a fee); bookings are rows in `bookings` (booking-setup.sql). Staff book on the sheet, check people
    in, cancel; a facility fee lands on the member's account (ref bk:<booking>). The portal's Book card and the
    member_* functions let members do it themselves inside the same rules. */
-const BK={rows:null,loading:false,at:0,fac:'',date:''};
+const BK={rows:null,loading:false,at:0,fac:'',date:'',dept:''};
+const DEPTS=[['golf','Golf'],['tennis','Tennis & pickleball'],['pool','Pool'],['club','Club']];
+const facDept=f=>f.dept||({tee:'golf',court:'tennis',pool:'pool',lesson:'golf',room:'club'}[f.kind]||'club');
 const bookOn=()=>!!CLUB&&isClub()&&hasModule('club')&&!KEYMODE&&!SCOPED;
 const bkKey=()=>'fs_book_'+((typeof TENANT!=='undefined'&&TENANT)||'local');
 const FAC_KINDS=[['tee','Tee sheet'],['court','Courts'],['pool','Pool'],['lesson','Lessons'],['room','Rooms & dining']];
@@ -7923,13 +7996,13 @@ function vBookings(m){
   if(!bookOn()){ go('dash'); return; } const S=bookSettings();
   if(BK.rows==null){ bkLoad().then(()=>render()); m.innerHTML=head('Bookings','Loading…'); return; }
   if(acctCloud()&&Date.now()-BK.at>20000&&!BK.loading) bkLoad(true).then(()=>{ if(view.page==='bookings') render(); });
-  if(!facOf(BK.fac)) BK.fac=S.facilities[0].id; const f=facOf(BK.fac); if(!BK.date) BK.date=todayISO(); const day=BK.date, rows=bkLive(f.id,day), slots=slotsOf(f);
+  const FS=S.facilities.filter(x=>!BK.dept||facDept(x)===BK.dept); if(!FS.length){ BK.dept=''; } const FL=BK.dept?FS:S.facilities; if(!FL.some(x=>x.id===BK.fac)) BK.fac=FL[0].id; const f=facOf(BK.fac); if(!BK.date) BK.date=todayISO(); const day=BK.date, rows=bkLive(f.id,day), slots=slotsOf(f);
   const at=(t,u)=>rows.filter(b=>b.time===t&&b.unit===u), units=Array.from({length:f.units},(_,i)=>i+1);
   const cell=(t,u)=>{ const L=at(t,u); const used=sum(L,bkCount), full=f.kind==='tee'?used>=f.cap:L.length>0;
     return `<div class="bc${L.length?' has':''}${full?' full':''}" data-bt="${t}" data-bu="${u}">${L.map(b=>`<button class="bb${b.status==='checked_in'?' in':''}${b.source==='member'?' mem':''}" data-bk="${b.id}"><b>${esc(bkName(b))}</b>${f.kind==='tee'||f.cap>1?`<small>${bkCount(b)}${f.kind==='tee'?' · '+(b.players||[]).slice(1).map(p=>esc((p.name||'').split(' ')[0])).join(', '):''}</small>`:b.note?`<small>${esc(b.note)}</small>`:''}</button>`).join('')}${full?'':`<button class="ba" data-add="${t}|${u}">${L.length?'+':''}</button>`}</div>`; };
   const dayRows=rows.length, people=sum(rows,bkCount), ins=rows.filter(b=>b.status==='checked_in').length;
-  m.innerHTML=head('Bookings',`${esc(f.name)} · ${new Date(day+'T12:00').toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'})} — tap a time to book, a name to check in or change it.`,btn('Facilities','bkSet','')+btn('Print the sheet','bkPdf','',I.down)+btn('New booking','bkNew','pri',I.plus))+`
-    <div class="toolbar"><div class="seg">${S.facilities.map(x=>`<button class="${x.id===f.id?'on':''}" data-bf="${x.id}">${esc(x.name)}</button>`).join('')}</div><div class="seg" style="margin-left:auto"><button id="bkPrev">‹</button><button id="bkToday">Today</button><button id="bkNext">›</button></div><input class="inp" type="date" id="bkDate" value="${day}" style="height:38px;width:160px"></div>
+  m.innerHTML=head(BK.dept==='golf'?'Tee sheet':BK.dept==='tennis'?'Courts':BK.dept==='pool'?'Pool':'All bookings',`${esc(f.name)} · ${new Date(day+'T12:00').toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'})} — tap a time to book, a name to check in or change it.`,btn('Facilities','bkSet','')+btn('Print the sheet','bkPdf','',I.down)+btn('New booking','bkNew','pri',I.plus))+`
+    <div class="toolbar"><div class="seg">${FL.map(x=>`<button class="${x.id===f.id?'on':''}" data-bf="${x.id}">${esc(x.name)}</button>`).join('')}</div><div class="seg" style="margin-left:auto"><button id="bkPrev">‹</button><button id="bkToday">Today</button><button id="bkNext">›</button></div><input class="inp" type="date" id="bkDate" value="${day}" style="height:38px;width:160px"></div>
     <div class="grid g3">${kpi('Booked',dayRows,`${people} ${f.kind==='tee'?'players':'people'}`)}${kpi('Checked in',ins,`${dayRows-ins} to come`)}${kpi('Open',slots.length*f.units-(f.kind==='tee'?0:rows.length),`${f.kind==='tee'?`${slots.length*f.units*f.cap-people} spots`:`of ${slots.length*f.units} ${f.kind==='lesson'?'lesson':'slot'}s`} · ${t12(f.open)}–${t12(f.close)}`)}</div>
     <div class="card sheetwrap" style="--units:${f.units}"><div class="sheet" style="grid-template-columns:84px repeat(${f.units},minmax(150px,1fr))"><div class="sh"></div>${units.map(u=>`<div class="sh">${esc(unitName(f,u))}</div>`).join('')}${slots.map(t=>`<div class="st">${t12(t)}</div>${units.map(u=>cell(t,u)).join('')}`).join('')}</div></div>`;
   m.querySelectorAll('[data-bf]').forEach(x=>x.onclick=()=>{ BK.fac=x.dataset.bf; render(); });
@@ -7964,14 +8037,14 @@ function bookingDrawer(b,f,day,time,unit){
 /* ---------- facilities setup ---------- */
 function vBookSetup(m){ if(!bookOn()){ go('dash'); return; } const S=bookSettings();
   m.innerHTML=`<div class="crumb"><button id="bsBk">Bookings</button><span class="muted">/</span><span class="muted">Facilities</span></div>`+head('Facilities','What can be booked, when, by how many, how far ahead members may book, and what it costs.',btn('New facility','fxNew','pri',I.plus))+`
-    <div class="grid g2">${S.facilities.map(f=>`<div class="card pad"><div style="display:flex;justify-content:space-between;gap:10px;align-items:flex-start"><div><b style="font-size:17px;color:var(--navy)">${esc(f.name)}</b><div class="muted" style="font-size:12.5px">${esc((FAC_KINDS.find(k=>k[0]===f.kind)||[])[1]||f.kind)} · ${f.units>1?f.units+' ('+Array.from({length:f.units},(_,i)=>unitName(f,i+1)).join(', ')+') · ':''}${t12(f.open)}–${t12(f.close)} every ${f.slot} min · up to ${f.cap} per ${f.kind==='tee'?'tee time':'slot'}</div><div class="muted" style="font-size:12.5px">${f.members?`Members book up to ${f.lead} days ahead${f.onePerDay?', one a day':''}`:'Booked by the office only'}${f.fee&&n0(f.fee.amount)?` · ${fmt2(f.fee.amount)} ${f.fee.per==='player'?'per player':'per booking'}`:''}</div></div><button class="btn sm" data-ef="${f.id}">Edit</button></div></div>`).join('')}</div>`;
+    <div class="grid g2">${S.facilities.map(f=>`<div class="card pad"><div style="display:flex;justify-content:space-between;gap:10px;align-items:flex-start"><div><b style="font-size:17px;color:var(--navy)">${esc(f.name)}</b><div class="muted" style="font-size:12.5px">${esc((FAC_KINDS.find(k=>k[0]===f.kind)||[])[1]||f.kind)} · ${esc((DEPTS.find(d=>d[0]===facDept(f))||[])[1]||'')} · ${f.units>1?f.units+' ('+Array.from({length:f.units},(_,i)=>unitName(f,i+1)).join(', ')+') · ':''}${t12(f.open)}–${t12(f.close)} every ${f.slot} min · up to ${f.cap} per ${f.kind==='tee'?'tee time':'slot'}</div><div class="muted" style="font-size:12.5px">${f.members?`Members book up to ${f.lead} days ahead${f.onePerDay?', one a day':''}`:'Booked by the office only'}${f.fee&&n0(f.fee.amount)?` · ${fmt2(f.fee.amount)} ${f.fee.per==='player'?'per player':'per booking'}`:''}</div></div><button class="btn sm" data-ef="${f.id}">Edit</button></div></div>`).join('')}</div>`;
   $('bsBk').onclick=()=>go('bookings'); $('fxNew').onclick=()=>facilityDrawer(null); m.querySelectorAll('[data-ef]').forEach(x=>x.onclick=()=>facilityDrawer(facOf(x.dataset.ef)));
 }
 function facilityDrawer(f){ const S=bookSettings(), b=acctSettings();
-  openDrawer({kicker:'Bookings',title:f?f.name:'New facility',wide:true,body:pair(field('Name','fN',f?f.name:''),field('Kind','fK',f?f.kind:'court',{type:'select',options:FAC_KINDS}))+pair(field('How many (courses, courts, lanes, instructors)','fU',f?f.units:1,{type:'number'}),field('Their names, comma-separated','fUN',f?f.unitNames.join(', '):'',{ph:'Oak, Pecan'}))+
+  openDrawer({kicker:'Bookings',title:f?f.name:'New facility',wide:true,body:pair(field('Name','fN',f?f.name:''),field('Kind','fK',f?f.kind:'court',{type:'select',options:FAC_KINDS}))+pair(field('How many (courses, courts, lanes, instructors)','fU',f?f.units:1,{type:'number'}),field('Their names, comma-separated','fUN',f?f.unitNames.join(', '):'',{ph:'Oak, Pecan'}))+field('Run by','fD',f?facDept(f):'golf',{type:'select',options:DEPTS,hint:'Golf, tennis and the pool each keep their own sheets on the rail; the club sees everything under All bookings.'})+
       `<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px">${field('Opens','fO',f?f.open:'07:00',{type:'time'})}${field('Closes','fC',f?f.close:'19:00',{type:'time'})}${field('Slot, minutes','fS',f?f.slot:60,{type:'number'})}</div>`+pair(field('Up to … per slot (players per tee time)','fCap',f?f.cap:4,{type:'number'}),field('Members may book … days ahead','fL',f?f.lead:7,{type:'number'}))+
       `<label class="check"><input type="checkbox" id="fM"${!f||f.members?' checked':''}>Members can book it in the portal</label><label class="check"><input type="checkbox" id="fOne"${!f||f.onePerDay?' checked':''}>One booking per member per day</label>`+pair(field('Fee $','fF',f&&f.fee?f.fee.amount:'',{type:'number'}),field('Fee per','fFP',f&&f.fee?f.fee.per:'booking',{type:'select',options:[['booking','Booking'],['player','Player']]}))+field('Fee bills as','fFI',f&&f.fee?f.fee.item:'facility',{type:'select',options:b.items.filter(x=>!['finance','late','min'].includes(x.id)).map(x=>[x.id,x.name])}),
-    save:()=>{ const name=fv('fN'); if(!name){ toast('Name it'); return false; } const d={name,kind:fv('fK'),units:Math.max(1,Math.round(fnum('fU'))||1),unitNames:fv('fUN').split(',').map(s=>s.trim()).filter(Boolean),open:fv('fO')||'07:00',close:fv('fC')||'19:00',slot:Math.max(5,Math.round(fnum('fS'))||60),cap:Math.max(1,Math.round(fnum('fCap'))||1),lead:Math.max(0,Math.round(fnum('fL'))),members:$('fM').checked,onePerDay:$('fOne').checked,fee:fnum('fF')>0?{item:fv('fFI'),amount:fnum('fF'),per:fv('fFP')}:null};
+    save:()=>{ const name=fv('fN'); if(!name){ toast('Name it'); return false; } const d={name,kind:fv('fK'),dept:fv('fD'),units:Math.max(1,Math.round(fnum('fU'))||1),unitNames:fv('fUN').split(',').map(s=>s.trim()).filter(Boolean),open:fv('fO')||'07:00',close:fv('fC')||'19:00',slot:Math.max(5,Math.round(fnum('fS'))||60),cap:Math.max(1,Math.round(fnum('fCap'))||1),lead:Math.max(0,Math.round(fnum('fL'))),members:$('fM').checked,onePerDay:$('fOne').checked,fee:fnum('fF')>0?{item:fv('fFI'),amount:fnum('fF'),per:fv('fFP')}:null};
       if(f) Object.assign(f,d); else S.facilities.push(Object.assign({id:uid()},d)); persist(); },
     del:f&&S.facilities.length>1?()=>{ if(!confirm(`Remove ${f.name}? Its bookings stay on record.`)) return false; S.facilities=S.facilities.filter(x=>x!==f); if(BK.fac===f.id) BK.fac=''; persist(); }:null}); }
 /* ---------- the printed sheet ---------- */
@@ -8019,8 +8092,8 @@ function vSettings(m){
   if(KEYMODE){ go('dash'); return; } const club=isClub(), b=brandOf(), own=db.brand&&db.brand.logo, mine=MAILS.row;
   if(!MAILS.loaded){ mailLoad().then(()=>render()); }
   const prov=(mine&&mine.provider)||'resend';
-  const tabs=club&&posOn()?[['general','General'],['fnb','Food & beverage'],['shop','Golf shop']]:[['general','General']]; if(!tabs.some(([k])=>k===view.stab)) view.stab='general';
-  if(view.stab!=='general'){ if(STN.rows==null){ stnLoad().then(()=>render()); } m.innerHTML=head('Settings',`${esc(db.name)} — ${view.stab==='fnb'?'restaurants, their stations, tables and menus, and who works the floor':'the golf shop and its registers'}.`)+`<div class="tabs">${tabs.map(([k,l])=>`<button class="tab${view.stab===k?' on':''}" data-st="${k}">${l}</button>`).join('')}</div>`+fnbSetupHTML(view.stab==='fnb'?'fnb':'proshop');
+  const tabs=club&&posOn()?[['general','General'],['fnb','Food & beverage'],['shop','Shops']]:[['general','General']]; if(!tabs.some(([k])=>k===view.stab)) view.stab='general';
+  if(view.stab!=='general'){ if(STN.rows==null){ stnLoad().then(()=>render()); } m.innerHTML=head('Settings',`${esc(db.name)} — ${view.stab==='fnb'?'restaurants, their stations, tables and menus, and who works the floor':'the golf shop, the tennis shop and their registers'}.`)+`<div class="tabs">${tabs.map(([k,l])=>`<button class="tab${view.stab===k?' on':''}" data-st="${k}">${l}</button>`).join('')}</div>`+fnbSetupHTML(view.stab==='fnb'?'fnb':'proshop');
     m.querySelectorAll('[data-st]').forEach(x=>x.onclick=()=>{ view.stab=x.dataset.st; render(); }); wireFnbSetup(m,view.stab==='fnb'?'fnb':'proshop'); return; }
   m.innerHTML=head('Settings',`${esc(db.name)} — branding, outgoing e-mail${club?' and the setup of each module':''}.`)+(tabs.length>1?`<div class="tabs">${tabs.map(([k,l])=>`<button class="tab${view.stab===k?' on':''}" data-st="${k}">${l}</button>`).join('')}</div>`:'')+`
     <div class="grid g2" style="align-items:start">
@@ -8038,7 +8111,7 @@ function vSettings(m){
     </div>
     ${club?`<div class="card"><div class="cardhead"><div><h2 class="h2">Module setup</h2><span class="muted">Where each part of the club is set up</span></div></div><div class="grid g3" style="padding:0 22px 20px">
       ${posOn()?`<div class="setupcard"><b>Food &amp; beverage</b><span class="muted">${posSettings().outlets.filter(o=>o.kind==='fnb').map(o=>esc(o.name)).join(' · ')||'No restaurants yet'}</span><div class="actions"><button class="btn sm" data-stab="fnb">Restaurants, stations &amp; menus</button></div></div>
-      <div class="setupcard"><b>Golf shop</b><span class="muted">${posSettings().outlets.filter(o=>o.kind==='proshop').map(o=>esc(o.name)).join(' · ')||'No shop outlet yet'}</span><div class="actions"><button class="btn sm" data-stab="shop">Shop &amp; registers</button><button class="btn sm" data-go2="possetup">Products &amp; stock</button></div></div>`:''}
+      <div class="setupcard"><b>Shops</b><span class="muted">${posSettings().outlets.filter(o=>o.kind==='proshop').map(o=>esc(o.name)).join(' · ')||'No shop outlet yet'}</span><div class="actions"><button class="btn sm" data-stab="shop">Shop &amp; registers</button><button class="btn sm" data-go2="possetup">Products &amp; stock</button></div></div>`:''}
       ${acctOn()?`<div class="setupcard"><b>Member billing</b><span class="muted">${acctSettings().classes.length} membership class${acctSettings().classes.length===1?'':'es'} · tax ${n0(acctSettings().tax.rate)}% · service ${n0(acctSettings().svc.rate)}%</span><div class="actions"><button class="btn sm" data-go2="billsetup">Billing setup</button></div></div>`:''}
       ${bookOn()?`<div class="setupcard"><b>Bookings</b><span class="muted">${bookSettings().facilities.map(f=>esc(f.name)).join(' · ')}</span><div class="actions"><button class="btn sm" data-go2="booksetup">Facilities</button></div></div>`:''}
       <div class="setupcard"><b>Golf</b><span class="muted">The games the club plays, courses and tees</span><div class="actions"><button class="btn sm" data-go2="library">Game library</button><button class="btn sm" data-go2="golf">Events &amp; courses</button></div></div>
@@ -8343,7 +8416,7 @@ async function resultsPDF(t,opt){
    page counts, and a reload is tried once per build — if the page that comes back is still the old one, the CDN
    hasn't caught up; wait a while before trying that build again. */
 (function(){
-  const ME='20261027001705', KEY='au_tried', RETRY=10*60*1000; let ready=false, lastCheck=0;
+  const ME='20261027003553', KEY='au_tried', RETRY=10*60*1000; let ready=false, lastCheck=0;
   const typing=()=>{ const a=document.activeElement; return a&&/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)&&a.value&&a.type!=='search'; };
   const safe=()=>!typing()&&(typeof window.__canReload!=='function'||window.__canReload());
   const tried=()=>{ try{ const [b,t]=(sessionStorage.getItem(KEY)||'').split('|'); return b?{build:b,at:+t||0}:null; }catch(_){ return null; } };

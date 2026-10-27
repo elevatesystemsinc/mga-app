@@ -65,7 +65,7 @@ src/
                        minimums, finance charges, aging, statements, GL export, Stripe Connect, the mail function
   pos.js               Point of sale (module 'pos'): outlets, products & stock, the register, tickets to accounts or cash / card
   bookings.js          Bookings (module 'club'): the tee sheet, courts, pool, lessons — the sheet, check-in, fees, the printed sheet
-  settings.js          Settings: white-label branding (the logo on every output), outgoing e-mail per organization (Resend / Microsoft 365), module setup
+  settings.js          Settings: white-label branding (the logo on every output), outgoing e-mail per organization (Resend / Microsoft 365), module setup (General · Food & beverage · Shops)
   poscore.js           checkTotals: the money on a check (service charge, tax, tip), shared by the hub and the station page   [shared]
   autoupdate.js        version.json polling + safe reload (__BUILD__ placeholder)                     [shared]
   cashier_src.html     cashier page   (markers /*CALCCORE*/ /*AUTOUPDATE*/)
@@ -155,16 +155,33 @@ Tournament = { id, name, season, days, startDate, field:[{id,memberId,team,paid,
   `persons()`/`personById(id)` (directory), and write through `upsertMember(id|null, data)` / `removeMember(id)`
   (which keep both documents right) — `memberSnapshot()`/`memberRestore()` for undo. A person is one record
   club-wide; removing someone from an association only ends the membership.
-- **The rail is sectioned** (ui.js `NAV_SECTIONS` per organization kind, the owner, Oct 2026: "Golf needs a subsection…
-  Food & beverage… Membership"): club = Dashboard · **Golf** (Tournaments, Events & live scoring, Tee sheet, Game library,
-  Pro shop) · **Food & beverage** (Register, Tickets, Menus & products) · **Membership** (Directory, Member accounts, Dues
-  collection, Billing setup, Logins) · **Club** (Courts, pool & lessons, Organizations, Treasury, Season budget, Surveys);
+- **The rail is sectioned and the sections collapse** (ui.js `NAV_SECTIONS` per organization kind; the owner, Oct 2026:
+  "Golf needs a subsection… Food & beverage… Membership", then "tennis and golf need to be separate, and same with pool…
+  collapsible, because the pro shop doesn't need to see all the tennis stuff"): club = Dashboard · **Golf** (Tournaments,
+  Events & live scoring, Tee sheet, Game library, Pro shop) · **Tennis & pickleball** (Court sheet, Tennis shop) · **Pool**
+  (Pool) · **Food & beverage** (Register, Tickets, Menus & products) · **Membership** (Directory, Member accounts, Dues
+  collection, Billing setup, Logins) · **Club** (All bookings, Reports, Organizations, Treasury, Budget, Surveys);
   association = Dashboard · Golf · Membership (Members, Board) · Money (Treasury, Budget) · Surveys; group = Dashboard ·
   Golf (Games, Ledger, Tournaments, Golf) · Members · Surveys. `ORG_NAV` still says which keys an organization kind may
-  show and `NAV_GATE` adds the module / role checks; entries that are views of another page (`NAV_PAGE`: teesheet →
-  bookings with the tee facility, proshop → pos with the pro-shop outlet, posmenu → possetup) light up through
-  `navActive()` / `NAV_OWNS` and open through `navGo()`. The rail scrolls (`.side{overflow-y:auto}`); section headers are
-  `.navsec`. Tablet widths 900–1100 keep a 220 px rail; below 900 the rail is the drawer behind the top bar.
+  show and `NAV_GATE` adds the module / role checks (a department entry only shows when a facility / shop outlet belongs
+  to it). **Departments**: a facility carries `dept` golf | tennis | pool | club (`facDept(f)`, default by kind: tee and
+  lesson → golf, court → tennis, pool → pool, room → club; "Run by" in the facility editor) and a shop outlet carries
+  `dept` golf | tennis (`outletDept(o)`, restaurants are 'fnb'; "Shop run by" in the outlet editor). Entries that are
+  views of another page (`NAV_PAGE` + `NAV_DEPT`: teesheet / courts / poolsheet → bookings filtered to that department,
+  `BK.dept`; bookings = every facility, the club's central calendar; proshop / tennisshop → pos with `POS.dept`;
+  posmenu → possetup) light up through `navActive()` / `NAV_OWNS` and open through `navGo()`. Members book everything
+  from the one Book card in the portal; the hub keeps a sheet per department. Section headers are `.navsec` buttons:
+  a tap collapses the section (`toggleNavSec`, remembered per hub in localStorage `fs_navcol_<org>`); the section
+  holding the page on screen never hides it. The rail scrolls (`.side{overflow-y:auto}`). Tablet widths 900–1100 keep a
+  220 px rail; below 900 the rail is the drawer behind the top bar.
+- **The club runs on calendar years, not seasons** (the owner, Oct 2026: "turn the season functionality off on the club
+  side… annual revenue, annual profits, as well as quarterly reports"; associations and groups keep their seasons).
+  `Y()` for the club = `view.year` or the current year (a `db.seasons[y]` the club has not seen yet is created on the
+  fly), the season box is hidden, the dashboard / Budget / Treasury carry a year bar (`yearBar()` / `wireYearBar()`: ‹ 2026
+  ›) and read "2026", "Annual budget", "for 2026". **Reports** (billing.js `vReports`, module `billing`, staff only):
+  year or quarter (`view.q`, `reportRange`, `clubReport`) — billed / net revenue / received / receivable at the period
+  end, revenue by billing item with tax and service, receipts by method, the registers by outlet from the tickets
+  (`shiftStats`), by month, the year's budget — CSV (`reportCSV`) and a branded PDF (`reportPDF`).
 - **The club hub keeps every organization's document open** (`openOrgDocs()` in startCloud / `openLocal`, read with
   `orgDocs()` → [{meta, db}]). It reads them for the club calendar (`clubCalendar(y)`: the Tournaments page's second
   card and the dashboard's "Across the club") and for **Dues collection**; it writes to them only to mark a dues

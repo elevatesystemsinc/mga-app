@@ -90,7 +90,7 @@ function editTxn(x,prefill,onSaved){
 /* ---------- Treasury page ---------- */
 function vTreasury(m){
   const tabs=[['ledger','Ledger'],['bva','Budget vs actual'],['rec','Reconcile']];
-  m.innerHTML=head('Treasury',`Every dollar in and out for the ${Y()} season, checked against the bank.`,btn('Record income','xIn','',I.plus)+btn('Record expense','xOut','pri',I.plus))+
+  m.innerHTML=head('Treasury',`Every dollar in and out for ${isClub()?Y():'the '+Y()+' season'}, checked against the bank.`,(isClub()?yearBar(false):'')+btn('Record income','xIn','',I.plus)+btn('Record expense','xOut','pri',I.plus))+
     `<div class="tabs">${tabs.map(([k,l])=>`<button class="tab${view.xtab===k?' on':''}" data-x="${k}">${l}</button>`).join('')}</div><div id="xbody" style="display:flex;flex-direction:column;gap:20px"></div>`;
   m.querySelectorAll('[data-x]').forEach(b=>b.onclick=()=>{ view.xtab=b.dataset.x; render(); });
   $('xIn').onclick=()=>editTxn(null,{dir:'in'}); $('xOut').onclick=()=>editTxn(null,{dir:'out'});
