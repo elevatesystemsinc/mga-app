@@ -64,6 +64,7 @@ src/
   billing.js           Member accounts & billing (module 'billing', club hub, staff only): classes, the monthly run, tax/service,
                        minimums, finance charges, aging, statements, GL export, Stripe Connect, the mail function
   pos.js               Point of sale (module 'pos'): outlets, products & stock, the register, tickets to accounts or cash / card
+  poslib.js            the item libraries: the club F&B menu with modifiers (FNB_LIBRARY), the golf shop (SHOP_LIBRARY), the racket shop (RACKET_LIBRARY) → posLibraryDrawer
   bookings.js          Bookings (module 'club'): the tee sheet, courts, cabanas, pool, lessons — the sheet, check-in, fees, blocked times, the printed sheet
   staff.js             Staff across departments: the club's staff list with PINs and departments, the schedule builder, the time clock, timesheets
   calendar.js          The club calendar (every sheet, closure, event and shift, by department) and club events
@@ -702,6 +703,16 @@ Receipt, **Pay**: tip presets, member search → charge to the account, Cash / C
 (brand logo). `checkTotals(lines, tip, rates)` in poscore is the one money function (the hub's `ticketTotals` wraps it).
 The hub's Tickets page shows station checks (table, server) alongside its own. The fake emulates every `pos_*` function;
 `tests/test_billing.py` runs setup → station → kitchen → account → hub → revoke end to end.
+- **The item libraries** (`src/poslib.js`, the owner, Oct 2026: "an F&B item library with modifiers and a pro shop library"): `FNB_LIBRARY`
+  (14 categories, ~170 items: starters, salads, sandwiches & burgers, entrées, sides, kids, desserts, breakfast, the turn, beer,
+  wine, cocktails, spirits, non-alcoholic — each `[name, price, modsDSL?]` under a category that carries `route` kitchen |
+  grill | bar and `course`), `SHOP_LIBRARY` (9 categories, ~100 items: balls, gloves and apparel with sizes, shoes, accessories,
+  bags, green fees & carts and lessons as non-taxable, club repair with grip / shaft choices) and `RACKET_LIBRARY` (balls and
+  rackets, stringing with string and tension, rentals and court fees, lessons, apparel). `posLibraryFor(o)` picks by outlet
+  kind and department; **Add from the library** (Menus & products, and the Library button on each outlet in Settings) opens
+  `posLibraryDrawer(outletId)`: categories with their items (expand, untick), items already in the outlet disabled, for a
+  restaurant the route → prep-station mapping (`libRouteGuess` by station name, or "Create Kitchen, Grill and Bar" when it has
+  none; bar items fire nowhere). Everything lands as an ordinary product (category, price, `parseMods`, course, route).
 - **The next layer** (`pos-split-setup.sql`, Oct 2026): **modifiers** — a product's `mods:[{name,required,multi,options:[{name,price}]}]`
   typed as one group per line (`parseMods` / `modsText` in poscore: "Temperature*: Rare, Medium, Well", "Add-ons+: Bacon +2");
   tapping such a product opens the sheet (station `modsSheet`, hub `modsDrawer`); a line carries `mods:[{name,price}]` and

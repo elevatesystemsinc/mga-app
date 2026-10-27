@@ -222,6 +222,14 @@ manager's PIN is needed to leave the station, and to void a check. The kitchen s
 station with the table, the server and the minutes elapsed; **Bump** clears it. The golf shop works the same way from
 **Settings → Shops** (a golf shop and a racket sports shop each sit under their own rail section), without tables or kitchens.
 
+**Starting a menu.** Menus & products → **Add from the library** drops a whole club menu into a restaurant — starters, salads,
+sandwiches and burgers, entrées, kids, desserts, breakfast, the turn, beer, wine, cocktails, spirits, soft drinks — every item
+with its modifiers (temperature, sides, add-ons, pours) and its course, fired to the right kitchen station (made on the spot if
+the restaurant has none). The golf shop gets balls, gloves and apparel with sizes, shoes, accessories, bags, green fees and
+carts, lessons and fittings, club repair; the racket shop gets balls, rackets and paddles, stringing with string and tension
+choices, rentals, lessons and apparel. Untick what you don't sell; prices are a starting point and every item is an ordinary
+product afterwards. Items you already have are skipped.
+
 On the check: items with **modifiers** (temperature, add-ons with their prices — set on the product), **seats**, and
 **courses** — starters go with the order, mains and dessert hold until the server fires them. **Pay** takes the whole check,
 an even split, a seat, or picked items, each with its own tip and its own method, until the check is covered. A check can
