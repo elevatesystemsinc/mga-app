@@ -86,7 +86,7 @@ function acctSettings(){
   if(!Array.isArray(b.items)||!b.items.length) b.items=DEFAULT_ITEMS.map(x=>Object.assign({taxable:false,svc:false},x));
   b.items.forEach(x=>{ if(!x.source) x.source='manual'; if(x.gl==null) x.gl=''; });
   b.classes=b.classes||[]; b.classes.forEach(c=>{ c.charges=c.charges||[]; c.minimum=c.minimum||{amount:0,every:'month'}; });
-  b.tax=b.tax||{rate:0}; b.svc=b.svc||{rate:0}; b.finance=b.finance||{pct:0,min:0}; b.lateFee=b.lateFee||{amount:0};
+  b.tax=b.tax||{rate:0}; b.svc=b.svc||{rate:18};   /* the mandatory F&B service charge: 18% unless the club says otherwise (Settings → Food & beverage) */ b.finance=b.finance||{pct:0,min:0}; b.lateFee=b.lateFee||{amount:0};
   b.gl=Object.assign({ar:'1200',cash:'1000',tax:'2300',svc:'4150',credit:'4950'},b.gl||{}); b.runs=b.runs||[]; b.online=b.online||{connected:false,charges_enabled:false,at:''};
   return b;
 }

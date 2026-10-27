@@ -213,7 +213,10 @@ station** for every device at a register and an **expo screen** for every kitche
 once on that device, which stays signed in (the link stays behind the station's **Link** button if a device needs it
 again; revoke the station if a device is lost). Bartenders never see the hub: the station shows a PIN pad, then the floor
 (their own tables green, the rest gold, tabs by name), then the check — tap items, **Send** fires each course to the right
-kitchen screen, **Pay** charges the member's account (name or number), or cash / card, with a tip and a receipt. A
+kitchen screen, **Pay** charges the member's account (name or number), or cash / card. Every food & beverage check carries the
+club's service charge (18% unless Settings → Food & beverage says otherwise), and no tip is asked for on the screen: a check
+charged to an account or a card prints a slip with Additional tip, Total and Signature lines, sits on the floor under **Slips
+out**, and the server closes it out with the tip that was written — an account tip lands on the member's charge. A
 manager's PIN is needed to leave the station, and to void a check; a manager's **Closed today** lists the day's closed
 checks (or any earlier day) with **Reopen** — the payments are cleared, an account charge is voided, and the check goes
 back on the floor to be changed and paid again; the hub's Tickets page has the same Reopen on every ticket. The kitchen screen shows every fired course for its

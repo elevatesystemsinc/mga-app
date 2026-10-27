@@ -762,7 +762,14 @@ groups, printed scorecards — the printed cards include a live-scoring QR that 
 - **Printed/PDF output must look as polished as the rest of the brand** — the user rejected a plain browser
   print view as "lazy". PDFs are generated files the user downloads (jsPDF), not print-preview windows.
 - **Privacy on public-facing sheets:** no emails, GHIN numbers or handicap indexes on anything left on a table.
-- **Club prices are all-in** (no tax & service line on menus).
+- **Club prices are all-in** (no tax & service line on menus). **The service charge is mandatory on every F&B check** (`b.svc.rate`,
+  18% by default — Settings → Food & beverage's Service charge card, `svcCard` / `svcDrawer` in pos.js) and **no tip is asked for
+  in the app**: a check paid on account or by card becomes a **slip** (`pos_tickets.status 'slip'`, `pos-tips-setup.sql`): the
+  printed slip carries Additional tip / Total / Signature per such payment (`receipt` on the station, `receiptPDF` in the hub),
+  the floor lists it under **Slips out**, and the server closes it out with the written tip (`settleSheet` → `pos_settle`; the hub's
+  Tickets page: Close out → `settleDrawer` / `settleTicket`): the tip goes on the payment (`payments[].tip`, null while pending), an
+  account tip onto the member's `acct_items` charge (amount + "· tip"), and the ticket closes. `shiftStats` counts a slip as a sale.
+  Tips by server (`payments[].tip` × `server_id`) are what a payroll feature will read — the owner: "we can build that later".
 - No payout or handicap-allowance details on player handouts.
 
 ## 6. Status / history

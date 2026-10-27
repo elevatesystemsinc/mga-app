@@ -111,7 +111,7 @@ class FakeDB:
             if fn=='pos_members':
                 q=str(a.get('p_q') or '').lower(); L=[m for m in club.get('members',[]) if m.get('status','Active')!='Inactive' and len(q)>=2 and (q in (m.get('first','')+' '+m.get('last','')).lower() or m.get('memberNo','')==q)][:8]
                 return json.dumps({'data':[{'id':m['id'],'name':(m.get('first','')+' '+m.get('last','')).strip(),'memberNo':m.get('memberNo'),'suspended':(m.get('billing') or {}).get('status')=='suspended'} for m in L],'error':None})
-            if fn=='pos_checks': return json.dumps({'data':[t for t in tix if t.get('tenant','wccc')==tn and t['outlet']==st['outlet'] and t['status']=='open'],'error':None})
+            if fn=='pos_checks': return json.dumps({'data':[t for t in tix if t.get('tenant','wccc')==tn and t['outlet']==st['outlet'] and t['status'] in ('open','slip')],'error':None})
             if fn=='pos_check_put':
                 c=dict(a['p_check']); cid=c.get('id') or str(uuid.uuid4()); ex=next((t for t in tix if t['id']==cid),None)
                 row={'id':cid,'tenant':tn,'outlet':st['outlet'],'station':st['id'],'table_no':c.get('table_no'),'server':c.get('server'),'server_id':c.get('server_id'),'guests':c.get('guests') or 0,'member_id':c.get('member_id'),'guest':c.get('guest'),'lines':c.get('lines') or [],'note':c.get('note'),'subtotal':c.get('subtotal') or 0,'svc':c.get('svc') or 0,'tax':c.get('tax') or 0,'tip':c.get('tip') or 0,'total':c.get('total') or 0,'status':'open','paid':None,'acct_item':None,'created_at':(ex or {}).get('created_at') or now,'created_by':c.get('server') or 'station','updated_at':now,'closed_at':None,'void_at':None,'void_reason':None}
@@ -133,7 +133,9 @@ class FakeDB:
                 if not r or r['status']!='open': return err('Check not open')
                 d=a.get('p_pay') or {}
                 if d.get('totals'): r['subtotal']=d['totals']['subtotal']; r['svc']=d['totals']['svc']; r['tax']=d['totals']['tax']; r['lines']=d.get('lines') or r['lines']
-                method=d.get('method') or 'cash'; amt=round(float(d.get('amount') or 0),2); tip=round(float(d.get('tip') or 0),2); net=round(amt-tip,2); mid=d.get('member_id')
+                method=d.get('method') or 'cash'; amt=round(float(d.get('amount') or 0),2); tip=None if d.get('tip') is None else round(float(d.get('tip')),2)
+                if tip is None and method not in ('account','card'): tip=0
+                net=round(amt-(tip or 0),2); mid=d.get('member_id')
                 if net<=0: return err('Nothing to pay')
                 owed=round(r['subtotal']+r['svc']+r['tax'],2); paid=round(sum(float(p['amount'])-float(p.get('tip') or 0) for p in r.get('payments') or []),2)
                 if net>owed-paid+0.01: return err('That is more than what is owed')
@@ -147,7 +149,8 @@ class FakeDB:
                     aid=str(uuid.uuid4()); self._rows('acct_items').append({'id':aid,'tenant':tn,'member_id':mid,'kind':'charge','source':it.get('source','fnb'),'item':it['id'],'gl':it.get('gl',''),'ref':'pos:%s:%s'%(r['id'],pay['id']),'descr':(outlet.get('name') or st['outlet'])+' · '+(d.get('label') or ', '.join(l['name'] for l in r['lines']))+((' · tip %s'%tip) if tip else ''),'amount':amt,'tax':round(r['tax']*share,2),'svc':round(r['svc']*share,2),'method':None,'reference':None,'posted':datetime.date.today().isoformat(),'void_at':None,'void_reason':None,'created_at':now,'created_by':r.get('server') or 'station'}); pay['acct_item']=aid
                 r['payments']=(r.get('payments') or [])+[pay]; paid=round(paid+net,2)
                 if paid>=owed-0.005:
-                    tips=round(sum(float(p.get('tip') or 0) for p in r['payments']),2); r.update({'tip':tips,'total':round(owed+tips,2),'paid':'split' if len(r['payments'])>1 else method,'member_id':mid or r.get('member_id'),'acct_item':pay.get('acct_item') or r.get('acct_item'),'status':'closed','closed_at':now,'updated_at':now})
+                    tips=round(sum(float(p.get('tip') or 0) for p in r['payments']),2); pending=any(p['method'] in ('account','card') and p.get('tip') is None for p in r['payments'])
+                    r.update({'tip':tips,'total':round(owed+tips,2),'paid':'split' if len(r['payments'])>1 else method,'member_id':mid or r.get('member_id'),'acct_item':pay.get('acct_item') or r.get('acct_item'),'status':'slip' if pending else 'closed','closed_at':now,'updated_at':now})
                 else: r.update({'member_id':mid or r.get('member_id'),'updated_at':now})
                 return json.dumps({'data':r,'error':None})
             if fn=='pos_shift':
@@ -166,6 +169,18 @@ class FakeDB:
                     if (m.get('billing') or {}).get('status')=='suspended': return err('This member is suspended — no charges to the account')
                     items=(club.get('billing') or {}).get('items') or []; it=next((x for x in items if x['id']==outlet.get('item','fnb')),{'id':outlet.get('item','fnb'),'source':'fnb','gl':''})
                     aid=str(uuid.uuid4()); self._rows('acct_items').append({'id':aid,'tenant':tn,'member_id':r['member_id'],'kind':'charge','source':it.get('source','fnb'),'item':it['id'],'gl':it.get('gl',''),'ref':'pos:'+r['id'],'descr':(outlet.get('name') or st['outlet'])+' · '+', '.join((str(l['qty'])+'× ' if l['qty']>1 else '')+l['name'] for l in r['lines']),'amount':r['total'],'tax':r['tax'],'svc':r['svc'],'method':None,'reference':None,'posted':datetime.date.today().isoformat(),'void_at':None,'void_reason':None,'created_at':now,'created_by':r.get('server') or 'station'}); r['acct_item']=aid
+                return json.dumps({'data':r,'error':None})
+            if fn=='pos_settle':
+                if not r or r['status']!='slip': return err('Nothing to close out')
+                tips={x['id']:round(float(x.get('tip') or 0),2) for x in (a.get('p_tips') or [])}; tot=0
+                for p in r['payments']:
+                    if p.get('tip') is None or p['id'] in tips:
+                        t=max(0,tips.get(p['id'],0)); p['amount']=round(float(p['amount'])-float(p.get('tip') or 0)+t,2); p['tip']=t
+                        if p['method']=='account' and t>0 and p.get('acct_item'):
+                            for i in self._rows('acct_items'):
+                                if i['id']==p['acct_item'] and not i.get('void_at'): i['amount']=round(float(i['amount'])+t,2); i['descr']=(i['descr']+' · tip %s'%t)[:180]
+                    tot+=float(p.get('tip') or 0)
+                r.update({'tip':round(tot,2),'total':round(r['subtotal']+r['svc']+r['tax']+tot,2),'status':'closed','updated_at':now})
                 return json.dumps({'data':r,'error':None})
             if fn=='pos_reopen':
                 if not r: return err('Unknown check')
