@@ -705,7 +705,7 @@ select policy and is in the realtime publication so screens update at once). **T
 pad (wrong PIN shakes; 6 digits auto-submit; 4-minute idle lock; "Leave this station" needs a manager PIN and forgets the
 token), the floor (My checks / All open, the table grid — yours green, others gold — and tabs by name), the check (lines
 with sent ✓, qty ± / note / remove on a selected line, menus and categories, products with their expo, Open item, **Send**,
-Receipt, **Pay**: tip presets, member search → charge to the account, Cash / Card, a manager may void), the receipt slip
+Receipt, **Pay**: tip presets, member search → charge to the account, Cash / Card, a manager may void; the menu has a **search box** (`Q`, `renderGrid` redraws only the grid — name, category and modifier words; Enter rings the first hit; Clear) and the product grid **scrolls inside its own box** (`.menu .pg`, the check card sticky beside it on a tablet, 60vh on a phone) so a long menu never scrolls the check away), the receipt slip
 (brand logo). `checkTotals(lines, tip, rates)` in poscore is the one money function (the hub's `ticketTotals` wraps it).
 The hub's Tickets page shows station checks (table, server) alongside its own. The fake emulates every `pos_*` function;
 `tests/test_billing.py` runs setup → station → kitchen → account → hub → revoke end to end.
