@@ -167,6 +167,13 @@ class FakeDB:
                     items=(club.get('billing') or {}).get('items') or []; it=next((x for x in items if x['id']==outlet.get('item','fnb')),{'id':outlet.get('item','fnb'),'source':'fnb','gl':''})
                     aid=str(uuid.uuid4()); self._rows('acct_items').append({'id':aid,'tenant':tn,'member_id':r['member_id'],'kind':'charge','source':it.get('source','fnb'),'item':it['id'],'gl':it.get('gl',''),'ref':'pos:'+r['id'],'descr':(outlet.get('name') or st['outlet'])+' · '+', '.join((str(l['qty'])+'× ' if l['qty']>1 else '')+l['name'] for l in r['lines']),'amount':r['total'],'tax':r['tax'],'svc':r['svc'],'method':None,'reference':None,'posted':datetime.date.today().isoformat(),'void_at':None,'void_reason':None,'created_at':now,'created_by':r.get('server') or 'station'}); r['acct_item']=aid
                 return json.dumps({'data':r,'error':None})
+            if fn=='pos_reopen':
+                if not r: return err('Unknown check')
+                if r['status']!='open':
+                    for i in self._rows('acct_items'):
+                        if (i['id']==r.get('acct_item') or str(i.get('ref','')).startswith('pos:'+r['id'])) and not i.get('void_at'): i['void_at']=now; i['void_reason']='Check reopened at the station'
+                    r.update({'status':'open','closed_at':None,'paid':None,'payments':[],'acct_item':None,'void_at':None,'void_reason':None,'tip':0,'updated_at':now})
+                return json.dumps({'data':r,'error':None})
             if fn=='pos_void':
                 if not r: return err('Unknown check')
                 r.update({'status':'void','void_at':now,'void_reason':a.get('p_reason') or '','updated_at':now})

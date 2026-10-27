@@ -681,21 +681,28 @@ in **Settings → Food & beverage** (and **Golf shop** for the shop's registers)
 product carries `route` (the expo id it fires to, null = nowhere) and `menus` ([] = every menu); **staff** `CLUB.pos.staff =
 [{id,name,role server|bartender|manager, outlets ([] = all), pin (sha256 of `<tenant>:<pin>`, `pinHash`), active}]`. A
 **station** is a row in `pos_stations` (`kind` register | expo, `expo` = the prep station an expo screen follows, `key_hash`
-of a token shown once — `newStation` / `stationLinkModal`, QR included; `revokeStation`); the device opens
+of a token — `newStation` / `stationLinkModal`, QR included; the token itself is kept in `pos_stations.token` (staff-only
+table, `pos-reopen-setup.sql`) so the card's **Link** button (`stationLink`) shows it again — a station from before that
+gets a fresh token from Link; `revokeStation`); the device opens
 `pos.html?s=TOKEN` / `expo.html?k=TOKEN` once and keeps the token in localStorage (`fs_station` / `fs_expo`). Everything a
 station does goes through security-definer functions keyed by the token: `pos_boot` (outlet, products, staff names, rates,
 the brand, whether billing is on), `pos_pin` (→ {id,name,role} or null), `pos_members` (name, number, suspended — never
 e-mail or balance), `pos_checks` / `pos_check_put` (open checks = `pos_tickets` rows with `status open`, `table_no`, `server`,
 `server_id`, `guests`, `station`; every station of the outlet sees them), `pos_fire` (one `pos_fires` row per expo for the
 unfired routed lines, lines marked `fired`), `pos_close` (paid account | cash | card; account → the acct_items charge with
-tax / svc, suspended members refused), `pos_void`, `pos_expo` / `pos_bump` (the kitchen screen; `pos_fires` has an anon
+tax / svc, suspended members refused), `pos_void`, **`pos_reopen`** (`pos-reopen-setup.sql`: a closed or voided check back to open — its payments cleared, the
+account charges it posted voided "Check reopened at the station", lines kept), `pos_expo` / `pos_bump` (the kitchen screen; `pos_fires` has an anon
 select policy and is in the realtime publication so screens update at once). **The station page**: lock screen with a PIN
 pad (wrong PIN shakes; 6 digits auto-submit; 4-minute idle lock; "Leave this station" needs a manager PIN and forgets the
-token), the floor (My checks / All open, the table grid — yours green, others gold — and tabs by name), the check (lines
+token), the floor (My checks / All open, the table grid — yours green, others gold — and tabs by name; a check on a table that is
+not on the outlet's list shows as a tab "Table X", so the count and the tiles always agree; a manager's **Closed today**
+(`closedSheet`, `pos_shift` for any day through a date box) lists the closed checks with **Reopen**), the check (lines
 with sent ✓, qty ± / note / remove on a selected line, menus and categories, products with their expo, Open item, **Send**,
 Receipt, **Pay**: tip presets, member search → charge to the account, Cash / Card, a manager may void; the menu has a **search box** (`Q`, `renderGrid` redraws only the grid — name, category and modifier words; Enter rings the first hit; Clear) and the product grid **scrolls inside its own box** (`.menu .pg`, the check card sticky beside it on a tablet, 60vh on a phone) so a long menu never scrolls the check away), the receipt slip
 (brand logo). `checkTotals(lines, tip, rates)` in poscore is the one money function (the hub's `ticketTotals` wraps it).
-The hub's Tickets page shows station checks (table, server) alongside its own. The fake emulates every `pos_*` function;
+The hub's Tickets page shows station checks (table, server) alongside its own, and every closed or voided ticket has **Reopen**
+(`reopenTicket`: voids the account charges by id / `pos:<id>` ref, restores tracked stock, clears the payments) — the owner, Oct
+2026: closed tabs for the day from the station, older ones from the hub. The fake emulates every `pos_*` function;
 `tests/test_billing.py` runs setup → station → kitchen → account → hub → revoke end to end.
 - **The item libraries** (`src/poslib.js`, the owner, Oct 2026: "an F&B item library with modifiers and a pro shop library"): `FNB_LIBRARY`
   (14 categories, ~170 items: starters, salads, sandwiches & burgers, entrées, sides, kids, desserts, breakfast, the turn, beer,
