@@ -35,8 +35,8 @@ h1{font-family:var(--serif);font-size:30px;line-height:1.05;margin:0 0 6px;color
 .floor{display:grid;grid-template-columns:repeat(auto-fill,minmax(118px,1fr));gap:10px;margin-top:12px}
 .tbl{min-height:82px;border:1.5px solid #CFC6AE;border-radius:14px;background:#fff;padding:10px;text-align:left;display:flex;flex-direction:column;justify-content:space-between;gap:4px} .tbl b{font-size:18px;color:var(--navy)} .tbl small{font-size:11.5px;color:var(--muted);display:block} .tbl.open{background:#FBF3DC;border-color:var(--gold)} .tbl.mine{background:#E3F0E8;border-color:var(--pos)} .tbl.new{border-style:dashed;justify-content:center;align-items:center;color:var(--muted);font-weight:700}
 /* check */
-.chk{display:grid;grid-template-columns:minmax(300px,2fr) minmax(0,3fr);gap:12px;align-items:start} .chk>.card:first-child{position:sticky;top:8px} .menu{display:flex;flex-direction:column;max-height:calc(100vh - 150px);min-height:320px} .menu .pg{overflow-y:auto;-webkit-overflow-scrolling:touch;flex:1;min-height:0;align-content:start;padding:2px 2px 8px} .find{display:flex;gap:8px;margin-bottom:8px} .find .inp{flex:1;height:44px} .find .btn.sm{height:44px;padding:0 14px}
-@media (max-width:860px){ .chk{grid-template-columns:minmax(0,1fr)} .chk>.card:first-child{position:static} .menu{max-height:none} .menu .pg{max-height:60vh} }
+.chk{display:grid;grid-template-columns:minmax(300px,2fr) minmax(0,3fr);gap:12px;align-items:start} .chk>.card:first-child{position:sticky;top:8px;display:flex;flex-direction:column;max-height:calc(100vh - 150px)} .chk>.card:first-child .lines{flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain} .chk>.card:first-child .bar{position:static;background:none;backdrop-filter:none;padding-bottom:0} .menu{display:flex;flex-direction:column;max-height:calc(100vh - 150px);min-height:320px} .menu .pg{overflow-y:auto;-webkit-overflow-scrolling:touch;flex:1;min-height:0;align-content:start;padding:2px 2px 8px} .find{display:flex;gap:8px;margin-bottom:8px} .find .inp{flex:1;height:44px} .find .btn.sm{height:44px;padding:0 14px}
+@media (max-width:860px){ .chk{grid-template-columns:minmax(0,1fr)} .chk>.card:first-child{position:static;max-height:none} .chk>.card:first-child .lines{max-height:38vh} .menu{max-height:none} .menu .pg{max-height:60vh} }
 .lines .ln{display:grid;grid-template-columns:34px minmax(0,1fr) 80px;gap:8px;align-items:center;padding:9px 0;border-top:1px solid var(--line);font-size:15px} .lines .ln:first-child{border-top:none} .lines .ln .q{font-weight:800;color:var(--navy);text-align:center} .lines .ln.fired{color:var(--muted)} .lines .ln.fired .q::after{content:' ✓';color:var(--pos);font-size:11px} .lines .ln small{display:block;font-size:12px;color:var(--muted)} .lines .ln .p{text-align:right;font-weight:700}
 .lines .ln.sel{background:var(--ivory);margin:0 -8px;padding:9px 8px;border-radius:8px}
 .tot{display:grid;grid-template-columns:1fr auto;gap:4px 12px;border-top:2px solid var(--line);padding-top:10px;margin-top:8px;font-size:14px} .tot .big{font-size:20px;font-weight:800;color:var(--navy)}
@@ -277,7 +277,7 @@ boot();
    page counts, and a reload is tried once per build — if the page that comes back is still the old one, the CDN
    hasn't caught up; wait a while before trying that build again. */
 (function(){
-  const ME='20261027024544', KEY='au_tried', RETRY=10*60*1000; let ready=false, lastCheck=0;
+  const ME='20261027025802', KEY='au_tried', RETRY=10*60*1000; let ready=false, lastCheck=0;
   const typing=()=>{ const a=document.activeElement; return a&&/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)&&a.value&&a.type!=='search'; };
   const safe=()=>!typing()&&(typeof window.__canReload!=='function'||window.__canReload());
   const tried=()=>{ try{ const [b,t]=(sessionStorage.getItem(KEY)||'').split('|'); return b?{build:b,at:+t||0}:null; }catch(_){ return null; } };
