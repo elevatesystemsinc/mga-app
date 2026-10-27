@@ -604,6 +604,10 @@ localStorage. `acctPost(o)` is the one way anything lands on an account.
   the portal), optionally e-mails each (`mailStatements` → Edge Function **`mail`**, Resend; `sent_at`) and charges autopay
   cards (`autopayRun`). **GL export** (`glJournal` / `glExportCSV`): a month's journal — AR debit and item revenue / service
   charge / sales tax credits per charge, cash against AR per payment, credits as adjustments — with a summary by account.
+- **The account page's ledger** (`vAccount`): every charge has **Receipt** (`chargeReceipt` → `receiptPDF`: the register's own ticket
+  when the charge came from one, `ticketOfCharge` by the `pos:` ref — a split portion gets its own slip —, else a slip built from the
+  charge itself) and a live charge has **Adjust** (`adjustDrawer`: "it should have been" + a reason → the difference posted as a credit
+  or a further charge, ref `adj:<charge id>`, descr "Adjustment · <original> · <reason>"; the original row is never edited) besides Void.
 - **Pages**: Member accounts (`vAccounts`: outstanding, past due by bucket, charged / received this month; Owing · Past due ·
   In credit · With activity · Everyone; search; Post charge (item picker with the tax / service preview), Record payment,
   Run monthly billing, Run statements, Export balances (with aging columns), GL export, Billing setup), the account

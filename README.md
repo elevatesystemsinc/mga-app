@@ -223,6 +223,10 @@ back on the floor to be changed and paid again; the hub's Tickets page has the s
 station with the table, the server and the minutes elapsed; **Bump** clears it. The golf shop works the same way from
 **Settings → Shops** (a golf shop and a racket sports shop each sit under their own rail section), without tables or kitchens.
 
+On a member's account page every charge has a **Receipt** button (the register's own ticket when it came from one) and a live
+charge has **Adjust**: say what it should have been and why, and the difference posts as a credit or a further charge against it;
+the original line is never rewritten.
+
 **Starting a menu.** Menus & products → **Add from the library** drops a whole club menu into a restaurant — starters, salads,
 sandwiches and burgers, entrées, kids, desserts, breakfast, the turn, beer, wine, cocktails, spirits, soft drinks — every item
 with its modifiers (temperature, sides, add-ons, pours) and its course, fired to the right kitchen station (made on the spot if
