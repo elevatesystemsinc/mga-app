@@ -123,18 +123,18 @@ $$;
 -- save an open check (new or changed): lines, table, server, guests, note, who it is for
 create or replace function public.pos_check_put(p_key text, p_check jsonb) returns jsonb
 language plpgsql security definer set search_path = public as $$
-declare s pos_stations; id uuid; r pos_tickets;
+declare s pos_stations; tid uuid; r pos_tickets;   -- not `id`: a variable named id makes `on conflict (id)` ambiguous
 begin
   s := pos_station(p_key); if s.id is null then raise exception 'This station link is not valid' using errcode = '42501'; end if;
-  id := coalesce((p_check ->> 'id')::uuid, gen_random_uuid());
+  tid := coalesce((p_check ->> 'id')::uuid, gen_random_uuid());
   insert into pos_tickets (id, tenant, outlet, station, table_no, server, server_id, guests, member_id, guest, lines, note, subtotal, svc, tax, tip, total, status, created_at, created_by, updated_at)
-    values (id, s.tenant, s.outlet, s.id, p_check ->> 'table_no', p_check ->> 'server', p_check ->> 'server_id', coalesce((p_check ->> 'guests')::int, 0), p_check ->> 'member_id', p_check ->> 'guest',
+    values (tid, s.tenant, s.outlet, s.id, p_check ->> 'table_no', p_check ->> 'server', p_check ->> 'server_id', coalesce((p_check ->> 'guests')::int, 0), p_check ->> 'member_id', p_check ->> 'guest',
             coalesce(p_check -> 'lines', '[]'::jsonb), p_check ->> 'note', coalesce((p_check ->> 'subtotal')::numeric, 0), coalesce((p_check ->> 'svc')::numeric, 0), coalesce((p_check ->> 'tax')::numeric, 0), coalesce((p_check ->> 'tip')::numeric, 0), coalesce((p_check ->> 'total')::numeric, 0),
             'open', now(), coalesce(p_check ->> 'server', 'station'), now())
     on conflict (id) do update set table_no = excluded.table_no, server = excluded.server, server_id = excluded.server_id, guests = excluded.guests, member_id = excluded.member_id, guest = excluded.guest,
             lines = excluded.lines, note = excluded.note, subtotal = excluded.subtotal, svc = excluded.svc, tax = excluded.tax, tip = excluded.tip, total = excluded.total, updated_at = now()
     where pos_tickets.status = 'open' and pos_tickets.tenant = s.tenant and pos_tickets.outlet = s.outlet;
-  select * into r from pos_tickets where pos_tickets.id = id;
+  select * into r from pos_tickets where pos_tickets.id = tid;
   return to_jsonb(r);
 end $$;
 

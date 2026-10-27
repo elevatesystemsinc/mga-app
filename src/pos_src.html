@@ -76,7 +76,9 @@ async function boot(){ if(!sb) return msg('Not connected','The station is not av
 function msg(t,x){ $('main').innerHTML=`<div class="card" style="max-width:520px;margin:30px auto;text-align:center"><h1>${esc(t)}</h1><p class="muted">${esc(x)}</p></div>`; }
 function touch(){ clearTimeout(idleT); if(USER) idleT=setTimeout(()=>{ if(!busy) lock(); },4*60*1000); }
 document.addEventListener('pointerdown',touch,{passive:true});
-function lock(){ USER=null; CUR=null; VIEW='lock'; PIN=''; clearInterval(pollT); header(); render(); }
+function lock(){ USER=null; CUR=null; VIEW='lock'; PIN=''; clearInterval(pollT); header(); render(); reboot(); }
+/* the menu, staff and rates again at every lock, so products added in the hub show without a reload */
+async function reboot(){ try{ const b=await rpc('pos_boot'); if(b&&VIEW==='lock'){ B=b; header(); } }catch(_){} }
 $('hLock').onclick=lock; $('hWho').onclick=()=>{ if(confirm(`Switch server? ${USER.name} is signed out of this station.`)) lock(); };
 /* ---- screens ---- */
 function render(){ touch(); if(!B) return; if(VIEW==='lock') return renderLock(); if(VIEW==='check'&&CUR) return renderCheck(); return renderFloor(); }
