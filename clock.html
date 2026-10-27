@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1">
+<meta name="theme-color" content="#0F2A38">
+<meta name="robots" content="noindex">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>Time clock · Flagstick</title>
+<link rel="icon" href="favicon.png?v=3">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@600;700&family=Public+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script src="config.js"></script>
+<style>
+:root{--navy:#0F2A38;--gold:#C7A13A;--goldl:#D8B75F;--golddk:#7E5F1A;--paper:#F4F0E6;--ivory:#FBFAF5;--line:#E3DCC9;--muted:#56626A;--ink:#14222B;--pos:#1F6B4A;--neg:#B5443A;
+  --serif:'Cormorant Garamond',Georgia,serif;--sans:'Public Sans',system-ui,-apple-system,'Segoe UI',sans-serif}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent} html,body{margin:0;height:100%} [hidden]{display:none!important}
+body{font-family:var(--sans);background:var(--paper);color:var(--ink);font-size:16px;line-height:1.35;-webkit-font-smoothing:antialiased;font-variant-numeric:lining-nums;overscroll-behavior:none;user-select:none;display:flex;flex-direction:column;min-height:100%}
+button{font:inherit;color:inherit;cursor:pointer}
+.top{background:radial-gradient(circle at 10% 40%,#1B3D50,var(--navy) 65%);color:#fff;padding:calc(10px + env(safe-area-inset-top,0px)) 16px 10px;display:flex;align-items:center;gap:12px;border-bottom:3px solid var(--gold);min-height:60px}
+.top img{height:36px;max-width:130px;object-fit:contain} .top .t{flex:1;min-width:0} .top b{display:block;font-family:var(--serif);font-size:22px;line-height:1.05} .top small{color:#C9CFD2;font-size:12.5px}
+.top .clock{font-size:26px;font-weight:800;letter-spacing:.02em}
+main{flex:1;display:flex;align-items:center;justify-content:center;padding:16px}
+.card{background:#fff;border:1px solid var(--line);border-radius:18px;padding:22px;width:100%;max-width:420px;text-align:center}
+h1{font-family:var(--serif);font-size:30px;line-height:1.05;margin:0 0 4px;color:var(--navy)} .muted{color:var(--muted)} .hint{font-size:13px;color:var(--muted)}
+.pin{font-size:36px;letter-spacing:12px;height:56px;color:var(--navy);font-weight:800;margin-top:8px} .err .pin{color:var(--neg);animation:sh .3s} @keyframes sh{25%{transform:translateX(-6px)}75%{transform:translateX(6px)}}
+.pad{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:6px} .pad button{height:66px;border-radius:14px;border:1.5px solid #CFC6AE;background:#fff;font-size:24px;font-weight:700;color:var(--navy)} .pad button:active{background:var(--ivory)} .pad .go{background:var(--navy);color:#fff;border-color:var(--navy)}
+.btn{height:60px;width:100%;border-radius:14px;border:1.5px solid #CFC6AE;background:#fff;font-weight:800;font-size:18px;color:var(--navy);margin-top:10px} .btn.in{background:var(--pos);border-color:var(--pos);color:#fff} .btn.out{background:var(--navy);border-color:var(--navy);color:#fff} .btn.q{height:46px;font-size:14px;font-weight:600;border-color:transparent;color:var(--muted)}
+.who{font-family:var(--serif);font-size:34px;color:var(--navy);margin:6px 0 0} .since{font-size:15px;color:var(--muted);margin:4px 0 14px}
+.ok{font-size:22px;font-weight:800;color:var(--pos);margin:18px 0 6px} .fs{margin:14px 0 0;font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);display:flex;gap:6px;align-items:center;justify-content:center} .fs img{height:18px}
+</style>
+</head>
+<body>
+<header class="top"><img id="hLogo" src="flagstick-crest-light.svg" alt=""><div class="t"><b id="hTitle">Time clock</b><small id="hSub">Flagstick</small></div><div class="clock" id="hClock"></div></header>
+<main id="main"><div class="card"><p class="muted">Starting…</p></div></main>
+<script>
+const $=id=>document.getElementById(id); const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const CFG=window.MM_CONFIG||{}; const sb=(CFG.url&&CFG.anonKey&&window.supabase)?window.supabase.createClient(CFG.url,CFG.anonKey,{auth:{persistSession:false}}):null;
+const qs=new URLSearchParams(location.search); const ls={get(k){ try{ return localStorage.getItem(k); }catch(_){ return null; } },set(k,v){ try{ localStorage.setItem(k,v); }catch(_){ } },del(k){ try{ localStorage.removeItem(k); }catch(_){ } }};
+let KEY=(qs.get('k')||'').trim()||ls.get('fs_clock')||'', B=null, PIN='', WHO=null, resetT=null;
+if(qs.get('k')){ ls.set('fs_clock',KEY); history.replaceState(null,'',location.pathname); }
+const tfmt=t=>new Date(t).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'});
+setInterval(()=>{ $('hClock').textContent=new Date().toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'}); },1000); $('hClock').textContent=new Date().toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'});
+async function rpc(fn,args){ const {data,error}=await sb.rpc(fn,Object.assign({p_key:KEY},args||{})); if(error){ const msg=error.message||'failed'; if(/not valid|42501/i.test(msg)){ ls.del('fs_clock'); KEY=''; B=null; msg_('This clock link is not valid','Ask the office for a new one.'); } throw new Error(msg.replace(/^.*?: /,'')); } return data; }
+function msg_(t,x){ $('main').innerHTML=`<div class="card"><h1>${esc(t)}</h1><p class="muted">${esc(x)}</p></div>`; }
+async function boot(){ if(!sb) return msg_('Not connected','The time clock is not available right now.'); if(!KEY) return msg_('No clock link','Open this page from the time clock link the club made (Staff → Time clock link).');
+  try{ B=await rpc('pos_boot'); }catch(e){ return msg_('This clock link is not valid',e.message+' — ask the office for a new link.'); }
+  $('hTitle').textContent=B.station.name||'Time clock'; $('hSub').textContent=B.club||''; if(B.brand) $('hLogo').src=B.brand; document.title=`${B.station.name||'Time clock'} · ${B.club||''}`; renderPad(); }
+function renderPad(){ WHO=null; PIN=''; clearTimeout(resetT); $('main').innerHTML=`<div class="card" id="lock"><h1>Clock in or out</h1><p class="muted">Enter your PIN</p><div class="pin" id="pinV"></div>
+    <div class="pad">${[1,2,3,4,5,6,7,8,9].map(n=>`<button data-k="${n}">${n}</button>`).join('')}<button data-k="x">⌫</button><button data-k="0">0</button><button class="go" data-k="go">Go</button></div>
+    <div class="fs"><img src="flagstick-crest.svg" alt="">Flagstick</div></div>`;
+  document.querySelectorAll('[data-k]').forEach(b=>b.onclick=()=>{ const k=b.dataset.k; if(k==='x') PIN=PIN.slice(0,-1); else if(k==='go') return look(); else if(PIN.length<6) PIN+=k; $('pinV').textContent='•'.repeat(PIN.length); if(PIN.length===6) look(); }); }
+async function look(){ if(PIN.length<4) return; try{ const u=await rpc('staff_clock',{p_pin:PIN,p_action:'status'}); if(!u){ PIN=''; $('lock').classList.add('err'); $('pinV').textContent=''; setTimeout(()=>{ const l=$('lock'); if(l) l.classList.remove('err'); },400); return; } WHO=u; renderWho(); }catch(e){ toast(e.message); } }
+function renderWho(){ const open=WHO.open; $('main').innerHTML=`<div class="card"><p class="muted">${esc(B.station.name||'Time clock')}</p><div class="who">${esc(WHO.name)}</div><div class="since">${open?`On the clock since ${tfmt(open.in_at)}`:WHO.last?`Last out ${tfmt(WHO.last.out_at)}`:'Not clocked in'}</div>
+    <button class="btn ${open?'out':'in'}" id="go">${open?'Clock out':'Clock in'}</button><button class="btn q" id="back">Not you? Back</button></div>`;
+  $('back').onclick=renderPad; $('go').onclick=async()=>{ $('go').disabled=true; try{ const r=await rpc('staff_clock',{p_pin:PIN,p_action:open?'out':'in'}); done(r,open?'out':'in'); }catch(e){ toast(e.message); $('go').disabled=false; } };
+  resetT=setTimeout(renderPad,20000); }
+function done(r,what){ const t=what==='in'?r.open&&r.open.in_at:r.last&&r.last.out_at; const hrs=what==='out'&&r.last?((new Date(r.last.out_at)-new Date(r.last.in_at))/36e5):0;
+  $('main').innerHTML=`<div class="card"><div class="who">${esc(r.name)}</div><div class="ok">${what==='in'?'Clocked in':'Clocked out'} · ${t?tfmt(t):''}</div>${what==='out'&&hrs?`<p class="muted">${hrs.toFixed(2)} hours this shift</p>`:'<p class="muted">Have a good one.</p>'}</div>`; clearTimeout(resetT); resetT=setTimeout(renderPad,4000); }
+function toast(m){ const d=document.createElement('div'); d.textContent=m; d.style.cssText='position:fixed;left:50%;bottom:40px;transform:translateX(-50%);background:#0F2A38;color:#fff;padding:12px 18px;border-radius:10px;font-weight:600;z-index:60'; document.body.appendChild(d); setTimeout(()=>d.remove(),2600); }
+boot();
+/* Keeps every open device on the latest version: checks version.json about once a minute and, when a
+   newer build is live, reloads at a safe moment (nothing unsaved, no editor open, not mid-typing).
+   The host's CDN caches version.json and the pages separately (up to 5 min each), so right after a deploy they can
+   disagree in either direction. Two rules keep that from turning into a reload loop: only a build NEWER than this
+   page counts, and a reload is tried once per build — if the page that comes back is still the old one, the CDN
+   hasn't caught up; wait a while before trying that build again. */
+(function(){
+  const ME='20261027015337', KEY='au_tried', RETRY=10*60*1000; let ready=false, lastCheck=0;
+  const typing=()=>{ const a=document.activeElement; return a&&/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)&&a.value&&a.type!=='search'; };
+  const safe=()=>!typing()&&(typeof window.__canReload!=='function'||window.__canReload());
+  const tried=()=>{ try{ const [b,t]=(sessionStorage.getItem(KEY)||'').split('|'); return b?{build:b,at:+t||0}:null; }catch(_){ return null; } };
+  async function check(){ lastCheck=Date.now(); if(location.protocol==='file:') return;
+    try{ const r=await fetch('version.json?t='+Date.now(),{cache:'no-store'}); if(!r.ok) return; const v=await r.json(); if(!v||!v.build||!(v.build>ME)) return;
+      const t=tried(); if(t&&t.build===v.build&&Date.now()-t.at<RETRY) return;   // already reloaded for this build and still got the old page
+      ready=v.build; }catch(_){} }
+  setInterval(()=>{ if(ready){ if(safe()){ try{ sessionStorage.setItem(KEY,ready+'|'+Date.now()); }catch(_){ } location.reload(); } } else if(Date.now()-lastCheck>60000) check(); },3000);
+  document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='visible') check(); });
+  window.__build=ME;
+})();
+</script>
+</body>
+</html>

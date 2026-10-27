@@ -220,7 +220,7 @@ once on that device, which stays signed in. Bartenders never see the hub: the st
 kitchen screen, **Pay** charges the member's account (name or number), or cash / card, with a tip and a receipt. A
 manager's PIN is needed to leave the station, and to void a check. The kitchen screen shows every fired course for its
 station with the table, the server and the minutes elapsed; **Bump** clears it. The golf shop works the same way from
-**Settings → Shops** (a golf shop and a tennis shop each sit under their own rail section), without tables or kitchens.
+**Settings → Shops** (a golf shop and a racket sports shop each sit under their own rail section), without tables or kitchens.
 
 On the check: items with **modifiers** (temperature, add-ons with their prices — set on the product), **seats**, and
 **courses** — starters go with the order, mains and dessert hold until the server fires them. **Pay** takes the whole check,

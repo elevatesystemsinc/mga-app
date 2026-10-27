@@ -178,3 +178,5 @@ Optional: `config.js` → `baseDomain` if the product domain ever changes (defau
   portal's status/plan driven from it.
 - **Custom domains per client** (`golf.theirclub.com`): already supported through `hosts`; each one is a CNAME on
   their side and a custom domain on Render.
+
+11. **Staff and blocked times** (Oct 2026): run `staff-setup.sql` (the club-wide staff list behind the registers, `pos_stations.dept`, the `staff_clock` table and function) and `blocks-setup.sql` (`booking_blocks`, `member_slots` / `member_book` with closed times, `member_me` with events) in the SQL Editor. Both are idempotent.

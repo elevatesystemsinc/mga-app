@@ -82,21 +82,31 @@ class FakeDB:
             t=next((t for t in self._rows('tenants') if t['slug']==a['p_tenant']),{})
             facs=[f for f in ((club.get('booking') or {}).get('facilities') or []) if f.get('members',True)]
             bks=sorted([b for b in self._rows('bookings') if b.get('tenant','wccc')==a['p_tenant'] and b['member_id']==m['id'] and b['status'] in ('booked','checked_in') and b['date']>=datetime.date.today().isoformat()],key=lambda b:(b['date'],b['time']))
-            return json.dumps({'data':{'member':{k:m.get(k) for k in ('id','first','last','memberNo','email','address1','city','state','zip','status')},'club':club.get('name'),'message':(club.get('billing') or {}).get('message'),'items':items,'statements':st,'facilities':facs,'bookings':bks,'brand':(club.get('brand') or {}).get('logo'),'autopay':u['autopay'],'pm_label':u['pm_label'],'online':bool(t.get('stripe_account')) and bool((t.get('stripe_status') or {}).get('charges_enabled'))},'error':None})
-        if fn.startswith('pos_'):
+            return json.dumps({'data':{'member':{k:m.get(k) for k in ('id','first','last','memberNo','email','address1','city','state','zip','status')},'club':club.get('name'),'message':(club.get('billing') or {}).get('message'),'items':items,'statements':st,'facilities':facs,'bookings':bks,'events':sorted([e for e in (club.get('events') or []) if e.get('public',True) and (e.get('end') or e['date'])>=datetime.date.today().isoformat()],key=lambda e:(e['date'],e.get('start') or '')),'brand':(club.get('brand') or {}).get('logo'),'autopay':u['autopay'],'pm_label':u['pm_label'],'online':bool(t.get('stripe_account')) and bool((t.get('stripe_status') or {}).get('charges_enabled'))},'error':None})
+        if fn.startswith('pos_') or fn=='staff_clock':
             key=a.get('p_key') or ''; h=hashlib.sha256(key.encode()).hexdigest() if key else None
             st=next((r for r in self._rows('pos_stations') if r['key_hash']==h and not r.get('revoked_at')),None) if len(key)>=16 else None
             if not st: return json.dumps({'data':None,'error':{'message':'This station link is not valid','code':'42501'}})
-            tn=st.get('tenant','wccc'); club=self.get('mga_hub','club',tn) or {}; pos=club.get('pos') or {}; outlet=next((o for o in pos.get('outlets',[]) if o['id']==st['outlet']),None) or {}
+            tn=st.get('tenant','wccc'); club=self.get('mga_hub','club',tn) or {}; pos=club.get('pos') or {}; outlet=next((o for o in pos.get('outlets',[]) if o['id']==st.get('outlet')),None) or {}
             tix=self._rows('pos_tickets'); fires=self._rows('pos_fires'); now=datetime.datetime.utcnow().isoformat()+'Z'
+            STAFF=club.get('staff') or pos.get('staff') or []; DEPT=st.get('dept') or (('fnb' if outlet.get('kind')=='fnb' else (outlet.get('dept') or 'golf')) if outlet else None)
+            fits=lambda x:x.get('active',True) and (not st.get('outlet') or not x.get('outlets') or st['outlet'] in x['outlets']) and (not DEPT or not x.get('depts') or DEPT in x['depts'])
+            if fn=='staff_clock':
+                pin=str(a.get('p_pin') or ''); hh=hashlib.sha256((tn+':'+pin).encode()).hexdigest() if len(pin)>=4 else None
+                x=next((x for x in STAFF if x.get('pin')==hh and fits(x)),None)
+                if not x: return json.dumps({'data':None,'error':None})
+                CK=self._rows('staff_clock'); r=next((c for c in sorted(CK,key=lambda c:c['in_at'],reverse=True) if c['staff_id']==x['id'] and not c.get('out_at')),None)
+                if a.get('p_action')=='in' and not r: r={'id':str(uuid.uuid4()),'tenant':tn,'staff_id':x['id'],'name':x['name'],'dept':DEPT,'in_at':now,'out_at':None,'station':st['id'],'note':None}; CK.append(r)
+                elif a.get('p_action')=='out' and r: r['out_at']=now
+                return json.dumps({'data':{'id':x['id'],'name':x['name'],'role':x.get('role','staff'),'dept':DEPT,'open':({'id':r['id'],'in_at':r['in_at']} if r and not r.get('out_at') else None),'last':({'id':r['id'],'in_at':r['in_at'],'out_at':r['out_at']} if r and r.get('out_at') else None)},'error':None})
             if fn=='pos_boot':
                 st['last_seen']=now; t=next((t for t in self._rows('tenants') if t['slug']==tn),{}); mods=t.get('modules') or {}
-                staff=[{'id':x['id'],'name':x['name'],'role':x.get('role','server')} for x in pos.get('staff',[]) if x.get('active',True) and (not x.get('outlets') or st['outlet'] in x['outlets'])]
+                staff=[{'id':x['id'],'name':x['name'],'role':x.get('role','server')} for x in STAFF if fits(x)]
                 items=(club.get('billing') or {}).get('items') or []; it=next((x for x in items if x['id']==outlet.get('item')),None)
-                return json.dumps({'data':{'station':{'id':st['id'],'name':st['name'],'kind':st['kind'],'expo':st.get('expo'),'outlet':st['outlet']},'club':club.get('name'),'brand':(club.get('brand') or {}).get('logo'),'tenant':tn,'outlet':outlet,'products':[x for x in pos.get('products',[]) if x['outlet']==st['outlet'] and x.get('active',True)],'staff':staff,'rates':{'tax':((club.get('billing') or {}).get('tax') or {}).get('rate',0),'svc':((club.get('billing') or {}).get('svc') or {}).get('rate',0)},'item':it,'billing':bool(mods.get('billing') or mods.get('club'))},'error':None})
+                return json.dumps({'data':{'station':{'id':st['id'],'name':st['name'],'kind':st['kind'],'expo':st.get('expo'),'outlet':st.get('outlet'),'dept':DEPT},'club':club.get('name'),'brand':(club.get('brand') or {}).get('logo'),'tenant':tn,'outlet':outlet,'products':[x for x in pos.get('products',[]) if x['outlet']==st['outlet'] and x.get('active',True)],'staff':staff,'rates':{'tax':((club.get('billing') or {}).get('tax') or {}).get('rate',0),'svc':((club.get('billing') or {}).get('svc') or {}).get('rate',0)},'item':it,'billing':bool(mods.get('billing') or mods.get('club'))},'error':None})
             if fn=='pos_pin':
                 pin=str(a.get('p_pin') or ''); hh=hashlib.sha256((tn+':'+pin).encode()).hexdigest() if len(pin)>=4 else None
-                x=next((x for x in pos.get('staff',[]) if x.get('pin')==hh and x.get('active',True) and (not x.get('outlets') or st['outlet'] in x['outlets'])),None)
+                x=next((x for x in STAFF if x.get('pin')==hh and fits(x)),None)
                 return json.dumps({'data':{'id':x['id'],'name':x['name'],'role':x.get('role','server')} if x else None,'error':None})
             if fn=='pos_members':
                 q=str(a.get('p_q') or '').lower(); L=[m for m in club.get('members',[]) if m.get('status','Active')!='Inactive' and len(q)>=2 and (q in (m.get('first','')+' '+m.get('last','')).lower() or m.get('memberNo','')==q)][:8]
@@ -178,7 +188,8 @@ class FakeDB:
             if fn=='member_slots':
                 day=str(a['p_date']); taken=[{'time':b['time'],'unit':b['unit'],'n':max(1,len(b.get('players') or [])),'mine':b['member_id']==mid} for b in rows if live(b) and b['facility']==a['p_facility'] and b['date']==day]
                 mine=sorted([b for b in rows if live(b) and b['member_id']==mid and b['date']>=datetime.date.today().isoformat()],key=lambda b:(b['date'],b['time']))
-                return json.dumps({'data':{'taken':taken,'mine':mine},'error':None})
+                blocked=[{'from':k['from_t'],'to':k['to_t'],'units':k.get('units'),'reason':k.get('reason')} for k in self._rows('booking_blocks') if k.get('tenant','wccc')==a['p_tenant'] and k['facility']==a['p_facility'] and k['date']==day]
+                return json.dumps({'data':{'taken':taken,'mine':mine,'blocked':blocked},'error':None})
             if fn=='member_book':
                 if not mid: return err('Your e-mail is not on the club directory')
                 f=next((f for f in ((club.get('booking') or {}).get('facilities') or []) if f['id']==a['p_facility']),None)
@@ -190,6 +201,8 @@ class FakeDB:
                 if day>(today+datetime.timedelta(days=int(f.get('lead',7)))).isoformat(): return err('Members may book up to %s days ahead'%f.get('lead',7))
                 t=a['p_time']; mins=lambda x:int(x[:2])*60+int(x[3:5])
                 if t<f.get('open','00:00') or t>=f.get('close','24:00') or (mins(t)-mins(f.get('open','00:00')))%max(1,int(f.get('slot',60))): return err('Not a bookable time')
+                blk=next((k for k in self._rows('booking_blocks') if k.get('tenant','wccc')==a['p_tenant'] and k['facility']==f['id'] and k['date']==day and k['from_t']<=t<k['to_t'] and (not k.get('units') or a['p_unit'] in k['units'])),None)
+                if blk: return err('That time is not available — %s'%(blk.get('reason') or 'closed'))
                 players=a.get('p_players') or []; n=max(1,len(players)); cap=max(1,int(f.get('cap',1)))
                 if n>cap: return err('At most %s per booking'%cap)
                 same=[b for b in rows if live(b) and b['facility']==f['id'] and b['date']==day and b['time']==t and b['unit']==a['p_unit']]; used=sum(max(1,len(b.get('players') or [])) for b in same)

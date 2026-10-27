@@ -129,7 +129,7 @@ function shiftStats(tickets){ const S={sales:0,n:0,tax:0,svc:0,tips:0,by:{accoun
 const $=id=>document.getElementById(id); const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const CFG=window.MM_CONFIG||{}; const sb=(CFG.url&&CFG.anonKey&&window.supabase)?window.supabase.createClient(CFG.url,CFG.anonKey,{auth:{persistSession:false}}):null;
 const qs=new URLSearchParams(location.search); const ls={get(k){ try{ return localStorage.getItem(k); }catch(_){ return null; } },set(k,v){ try{ localStorage.setItem(k,v); }catch(_){ } },del(k){ try{ localStorage.removeItem(k); }catch(_){ } }};
-let KEY=(qs.get('s')||'').trim()||ls.get('fs_station')||'', B=null, USER=null, CHECKS=[], CUR=null, SEL=null, VIEW='lock', MINE=true, MENU='', CAT='', PIN='', pollT=null, idleT=null, busy=false;
+let KEY=(qs.get('s')||'').trim()||ls.get('fs_station')||'', B=null, USER=null, CHECKS=[], CUR=null, SEL=null, VIEW='lock', MINE=true, MENU='', CAT='', PIN='', pollT=null, idleT=null, busy=false, CLOCKMODE=false;
 if(qs.get('s')){ ls.set('fs_station',KEY); history.replaceState(null,'',location.pathname); }
 const fmt=pcFmt; const uid=()=>(crypto.randomUUID?crypto.randomUUID():Date.now().toString(36)+Math.random().toString(36).slice(2));
 function toast(m){ const d=document.createElement('div'); d.className='toast'; d.textContent=m; document.body.appendChild(d); setTimeout(()=>d.remove(),2600); }
@@ -150,12 +150,16 @@ function lock(){ USER=null; CUR=null; VIEW='lock'; PIN=''; clearInterval(pollT);
 $('hLock').onclick=lock; $('hWho').onclick=()=>{ if(confirm(`Switch server? ${USER.name} is signed out of this station.`)) lock(); };
 /* ---- screens ---- */
 function render(){ touch(); if(!B) return; if(VIEW==='lock') return renderLock(); if(VIEW==='check'&&CUR) return renderCheck(); return renderFloor(); }
-function renderLock(){ $('main').innerHTML=`<div class="lock" id="lock"><h1>${esc(B.outlet?B.outlet.name:'Register')}</h1><p class="muted">${esc(B.station.name)} · enter your PIN</p><div class="pin" id="pinV">${'•'.repeat(PIN.length)}</div>
+function renderLock(){ $('main').innerHTML=`<div class="lock" id="lock"><h1>${CLOCKMODE?'Time clock':esc(B.outlet?B.outlet.name:'Register')}</h1><p class="muted">${esc(B.station.name)} · ${CLOCKMODE?'enter your PIN to clock in or out':'enter your PIN'}</p><div class="pin" id="pinV">${'•'.repeat(PIN.length)}</div>
     <div class="pad">${[1,2,3,4,5,6,7,8,9].map(n=>`<button data-k="${n}">${n}</button>`).join('')}<button data-k="x">⌫</button><button data-k="0">0</button><button class="go" data-k="go">Go</button></div>
-    <p class="hint" style="margin-top:22px"><button class="btn sm" id="leave">Leave this station</button></p></div>`;
+    <p class="hint" style="margin-top:22px;display:flex;gap:8px;justify-content:center;flex-wrap:wrap"><button class="btn sm" id="clockBtn">${CLOCKMODE?'Back to the register':'Clock in / out'}</button><button class="btn sm" id="leave">Leave this station</button></p></div>`;
   document.querySelectorAll('[data-k]').forEach(b=>b.onclick=()=>{ const k=b.dataset.k; if(k==='x') PIN=PIN.slice(0,-1); else if(k==='go') return unlock(); else if(PIN.length<6) PIN+=k; $('pinV').textContent='•'.repeat(PIN.length); if(PIN.length>=4&&k!=='x'&&PIN.length===6) unlock(); });
-  $('leave').onclick=leaveStation; }
-async function unlock(){ if(PIN.length<4) return; try{ const u=await rpc('pos_pin',{p_pin:PIN}); if(!u){ PIN=''; $('lock').classList.add('err'); $('pinV').textContent=''; setTimeout(()=>$('lock').classList.remove('err'),400); return; } USER=u; PIN=''; VIEW='floor'; header(); await loadChecks(); render(); clearInterval(pollT); pollT=setInterval(()=>{ if(VIEW==='floor'&&!busy) loadChecks().then(()=>{ if(VIEW==='floor') render(); }); },8000); }catch(e){ toast(e.message); } }
+  $('leave').onclick=leaveStation; $('clockBtn').onclick=()=>{ CLOCKMODE=!CLOCKMODE; PIN=''; render(); }; }
+/* the time clock from the lock screen: the same PIN, status → in or out, then back to the lock */
+async function clockFlow(){ try{ const u=await rpc('staff_clock',{p_pin:PIN,p_action:'status'}); if(!u){ PIN=''; $('lock').classList.add('err'); $('pinV').textContent=''; setTimeout(()=>$('lock').classList.remove('err'),400); return; } const open=u.open; const pin=PIN; PIN='';
+    const d=document.createElement('div'); d.className='sheet'; d.innerHTML=`<div><h2>${esc(u.name)}</h2><p class="muted">${open?'On the clock since '+new Date(open.in_at).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'}):'Not clocked in'}</p><div class="bar" style="position:static;background:none;padding:0"><button class="btn pri" id="ckGo">${open?'Clock out':'Clock in'}</button><button class="btn" id="ckX">Cancel</button></div></div>`; document.body.appendChild(d);
+    d.querySelector('#ckX').onclick=()=>d.remove(); d.querySelector('#ckGo').onclick=async()=>{ try{ await rpc('staff_clock',{p_pin:pin,p_action:open?'out':'in'}); d.remove(); toast(`${u.name} clocked ${open?'out':'in'}`); CLOCKMODE=false; render(); }catch(e){ toast(e.message); } }; }catch(e){ toast(e.message); } }
+async function unlock(){ if(PIN.length<4) return; if(CLOCKMODE) return clockFlow(); try{ const u=await rpc('pos_pin',{p_pin:PIN}); if(!u){ PIN=''; $('lock').classList.add('err'); $('pinV').textContent=''; setTimeout(()=>$('lock').classList.remove('err'),400); return; } USER=u; PIN=''; VIEW='floor'; header(); await loadChecks(); render(); clearInterval(pollT); pollT=setInterval(()=>{ if(VIEW==='floor'&&!busy) loadChecks().then(()=>{ if(VIEW==='floor') render(); }); },8000); }catch(e){ toast(e.message); } }
 async function leaveStation(){ const pin=prompt('Manager PIN to leave this station'); if(!pin) return; try{ const u=await rpc('pos_pin',{p_pin:pin}); if(!u||u.role!=='manager'){ toast('A manager’s PIN is needed'); return; } ls.del('fs_station'); location.href=(CFG.siteBase||'/'); }catch(e){ toast(e.message); } }
 async function loadChecks(){ try{ CHECKS=await rpc('pos_checks'); }catch(e){ toast(e.message); } }
 function renderFloor(){ const open=CHECKS.filter(c=>c.status==='open'), mineF=c=>c.server_id===USER.id; const show=MINE?open.filter(mineF):open; const T=tables(); const byT={}; open.forEach(c=>{ if(c.table_no) byT[c.table_no]=c; }); const tabs=open.filter(c=>!c.table_no);
@@ -260,7 +264,7 @@ boot();
    page counts, and a reload is tried once per build — if the page that comes back is still the old one, the CDN
    hasn't caught up; wait a while before trying that build again. */
 (function(){
-  const ME='20261027003553', KEY='au_tried', RETRY=10*60*1000; let ready=false, lastCheck=0;
+  const ME='20261027015337', KEY='au_tried', RETRY=10*60*1000; let ready=false, lastCheck=0;
   const typing=()=>{ const a=document.activeElement; return a&&/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)&&a.value&&a.type!=='search'; };
   const safe=()=>!typing()&&(typeof window.__canReload!=='function'||window.__canReload());
   const tried=()=>{ try{ const [b,t]=(sessionStorage.getItem(KEY)||'').split('|'); return b?{build:b,at:+t||0}:null; }catch(_){ return null; } };

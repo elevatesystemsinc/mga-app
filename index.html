@@ -418,6 +418,15 @@ textarea.inp{height:auto;min-height:84px;padding:10px 12px;resize:vertical}
 .sheet{display:grid;font-size:13px} .sheet>div{border-bottom:1px solid var(--line);border-right:1px solid var(--line);min-height:44px} .sheet .sh{background:var(--ivory);font-weight:700;font-size:12px;color:var(--muted);padding:8px 10px;min-height:0;position:sticky;top:0} .sheet .st{padding:10px;font-weight:700;color:var(--navy);background:#fff;font-variant-numeric:tabular-nums}
 .sheet .bc{display:flex;flex-wrap:wrap;gap:4px;padding:4px;align-content:flex-start;background:#fff} .sheet .bc.full{background:var(--ivory)} .sheet .bb{border:1px solid var(--line);border-radius:8px;background:#fff;padding:4px 8px;text-align:left;line-height:1.15;max-width:100%} .sheet .bb b{font-size:12.5px;color:var(--navy);display:block} .sheet .bb small{font-size:11px;color:var(--muted);display:block} .sheet .bb.in{border-color:var(--pos);background:#E3F0E8} .sheet .bb.mem{border-left:3px solid var(--gold)}
 .sheet .ba{flex:1;min-width:28px;min-height:34px;border:1px dashed transparent;border-radius:8px;background:none;color:var(--muted);font-weight:700} .sheet .bc:hover .ba{border-color:var(--line)}
+.sheet .bc.blk{background:repeating-linear-gradient(135deg,#F3EEE2 0 6px,#E9E2D0 6px 12px);cursor:pointer} .sheet .bl{font-size:11.5px;font-weight:700;color:var(--golddk);padding:4px 6px;width:100%} .sheet .bc.blk .ba{display:none}
+.selmode .sheet{touch-action:none;cursor:crosshair;user-select:none} .selmode .sheet .ba,.selmode .sheet .bb{pointer-events:none} .sheet .bc.sel{background:#DCE6EC;box-shadow:inset 0 0 0 2px var(--navy)}
+.shc{min-height:44px;padding:4px;display:flex;flex-direction:column;gap:4px;cursor:pointer;border-left:1px solid var(--line)} .shc:hover{background:var(--ivory)} .shift{border:1px solid var(--line);border-radius:8px;background:#fff;padding:4px 7px;text-align:left;line-height:1.15} .shift b{font-size:12.5px;color:var(--navy);display:block} .shift small{font-size:11px;color:var(--muted)}
+.calgrid{grid-template-columns:minmax(0,2fr) minmax(280px,1fr);align-items:start} @media (max-width:900px){ .calgrid{grid-template-columns:minmax(0,1fr)} }
+.cal .cw{display:grid;grid-template-columns:repeat(7,1fr);background:var(--ivory);font-size:11px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)} .cal .cw span{padding:8px 6px;text-align:center}
+.cal .cg{display:grid;grid-template-columns:repeat(7,1fr)} .cd{min-height:86px;border-top:1px solid var(--line);border-right:1px solid var(--line);padding:6px;text-align:left;background:#fff;display:flex;flex-direction:column;gap:3px;align-items:flex-start;font-size:11.5px} .cd:nth-child(7n){border-right:none} .cd.pad{background:var(--paper)} .cd>b{font-size:13px;color:var(--navy)} .cd.today>b{background:var(--gold);color:#fff;border-radius:999px;width:22px;height:22px;display:inline-flex;align-items:center;justify-content:center} .cd.on{background:#F6F1E3;box-shadow:inset 0 0 0 2px var(--navy)}
+.cc{display:block;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;border-radius:6px;padding:1px 6px;background:var(--ivory);border:1px solid var(--line);color:var(--ink)} .cc.ev{background:var(--navy);color:#fff;border-color:var(--navy)} .cc.blk{background:#F3EEE2;color:var(--golddk)} .cc.sh{color:var(--muted);background:none;border-color:transparent}
+.chip.event{background:var(--navy);color:#fff;border-color:var(--navy)} .chip.block{background:#F3EEE2;color:var(--golddk)} .chip.shift{background:none}
+@media (max-width:640px){ .cd{min-height:56px;padding:4px} .cc{display:none} .cd .cc.ev{display:block;font-size:10px} }
 @media (max-width:640px){ .sheet{font-size:12px} .sheet .st{padding:8px 6px;font-size:12px} }
 .kv{display:flex;gap:12px;padding:6px 0;border-top:1px solid var(--line);align-items:flex-start} .kv>.muted:first-child{flex:0 0 120px;font-size:13px;padding-top:2px} .kv>span:last-child{flex:1 1 0;min-width:0;overflow-wrap:anywhere}
 @media (max-width:640px){ .kv>.muted:first-child{flex-basis:96px} }
@@ -1108,27 +1117,29 @@ I.org=svg('<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18M9 
 I.survey=svg('<rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4V3h6v2M9 11h6M9 15h4"/>');
 I.lib=svg('<path d="M4 5h5a3 3 0 013 3v12a2 2 0 00-2-2H4z"/><path d="M20 5h-5a3 3 0 00-3 3v12a2 2 0 012-2h6z"/>');
 I.coins=svg('<ellipse cx="12" cy="6" rx="7" ry="3"/><path d="M5 6v12c0 1.7 3.1 3 7 3s7-1.3 7-3V6"/><path d="M5 12c0 1.7 3.1 3 7 3s7-1.3 7-3"/>');
-const NAV=[['dash','Dashboard',I.home],['tournaments','Tournaments',I.flag],['members','Members',I.users],['collections','Dues collection',I.coins],['accounts','Member accounts',I.ledger],['billsetup','Billing setup',I.shield],['pos','Register',I.cart],['postickets','Tickets',I.ledger],['posmenu','Menus & products',I.lib],['proshop','Pro shop',I.cart],['teesheet','Tee sheet',I.flag],['courts','Court sheet',I.cal],['tennisshop','Tennis shop',I.cart],['poolsheet','Pool',I.cal],['bookings','Bookings',I.cal],['reports','Reports',I.ledger],['settings','Settings',I.gear],['board','Board',I.shield],['budget','Season budget',I.ledger],['orgs','Organizations',I.org],['library','Game library',I.lib],['logins','Logins',I.shield],['surveys','Surveys',I.survey]];
+const NAV=[['dash','Dashboard',I.home],['tournaments','Tournaments',I.flag],['members','Members',I.users],['collections','Dues collection',I.coins],['accounts','Member accounts',I.ledger],['billsetup','Billing setup',I.shield],['pos','Register',I.cart],['postickets','Tickets',I.ledger],['posmenu','Menus & products',I.lib],['proshop','Pro shop',I.cart],['teesheet','Tee sheet',I.flag],['golfstaff','Staff & schedule',I.users],['racketbook','Bookings',I.cal],['racketshop','Pro shop',I.cart],['racketstaff','Staff & schedule',I.users],['aquabook','Bookings',I.cal],['aquastaff','Staff & schedule',I.users],['fnbstaff','Staff & schedule',I.users],['calendar','Calendar',I.cal],['events','Events',I.flag],['bookings','Bookings',I.cal],['staff','Staff',I.users],['reports','Reports',I.ledger],['settings','Settings',I.gear],['board','Board',I.shield],['budget','Season budget',I.ledger],['orgs','Organizations',I.org],['library','Game library',I.lib],['logins','Logins',I.shield],['surveys','Surveys',I.survey]];
 /* which pages each kind of organization gets (associations get everything) */
-const ORG_NAV={club:['dash','tournaments','golf','teesheet','library','proshop','courts','tennisshop','poolsheet','pos','postickets','posmenu','members','accounts','collections','billsetup','logins','bookings','reports','orgs','library','budget','treasury','surveys','logins','settings'],association:['dash','tournaments','golf','members','board','treasury','budget','surveys','settings'],group:['dash','tournaments','golf','members','surveys','settings']};
+const ORG_NAV={club:['dash','tournaments','golf','teesheet','library','proshop','golfstaff','racketbook','racketshop','racketstaff','aquabook','aquastaff','pos','postickets','posmenu','fnbstaff','members','accounts','collections','billsetup','logins','calendar','events','bookings','staff','reports','orgs','library','budget','treasury','surveys','logins','settings'],association:['dash','tournaments','golf','members','board','treasury','budget','surveys','settings'],group:['dash','tournaments','golf','members','surveys','settings']};
 /* the rail: which entries show for this organization, gated by module and role. Keys that are views of another page
    (teesheet → bookings, proshop → pos, posmenu → possetup) are listed in NAV_PAGE; NAV_OWNS says which pages light an entry up. */
-const NAV_PAGE={teesheet:'bookings',courts:'bookings',poolsheet:'bookings',proshop:'pos',tennisshop:'pos',posmenu:'possetup'};
-/* which department a rail entry drives (bookings by facility department, registers by outlet department) */
-const NAV_DEPT={teesheet:'golf',courts:'tennis',poolsheet:'pool',bookings:'',proshop:'golf',tennisshop:'tennis',pos:'fnb'};
-const NAV_OWNS={tournaments:['tournaments','tournament'],accounts:['accounts','account'],bookings:['bookings','booksetup'],teesheet:['bookings'],courts:['bookings'],poolsheet:['bookings'],pos:['pos'],proshop:['pos'],tennisshop:['pos'],posmenu:['possetup']};
-const NAV_SECTIONS={club:[['',['dash']],['Golf',['tournaments','golf','teesheet','library','proshop']],['Tennis & pickleball',['courts','tennisshop']],['Pool',['poolsheet']],['Food & beverage',['pos','postickets','posmenu']],['Membership',['members','accounts','collections','billsetup','logins']],['Club',['bookings','reports','orgs','treasury','budget','surveys']],['',['settings']]],
+const NAV_PAGE={teesheet:'bookings',racketbook:'bookings',aquabook:'bookings',proshop:'pos',racketshop:'pos',posmenu:'possetup',golfstaff:'staff',racketstaff:'staff',aquastaff:'staff',fnbstaff:'staff'};
+/* which department a rail entry drives (bookings by facility department, registers by outlet department, staff by theirs) */
+const NAV_DEPT={teesheet:'golf',racketbook:'racket',aquabook:'aquatics',bookings:'',proshop:'golf',racketshop:'racket',pos:'fnb',golfstaff:'golf',racketstaff:'racket',aquastaff:'aquatics',fnbstaff:'fnb',staff:''};
+const NAV_OWNS={tournaments:['tournaments','tournament'],accounts:['accounts','account'],bookings:['bookings','booksetup'],teesheet:['bookings'],racketbook:['bookings'],aquabook:['bookings'],pos:['pos'],proshop:['pos'],racketshop:['pos'],posmenu:['possetup'],golfstaff:['staff'],racketstaff:['staff'],aquastaff:['staff'],fnbstaff:['staff'],calendar:['calendar'],events:['events']};
+const NAV_SECTIONS={club:[['',['dash']],['Golf',['tournaments','golf','teesheet','library','proshop','golfstaff']],['Racket sports',['racketbook','racketshop','racketstaff']],['Aquatics',['aquabook','aquastaff']],['Food & beverage',['pos','postickets','posmenu','fnbstaff']],['Membership',['members','accounts','collections','billsetup','logins']],['Club',['calendar','events','bookings','staff','reports','orgs','treasury','budget','surveys']],['',['settings']]],
   association:[['',['dash']],['Golf',['tournaments','golf']],['Membership',['members','board']],['Money',['treasury','budget']],['',['surveys','settings']]],
   group:[['',['dash']],['Golf',['games','ledger','tournaments','golf']],['',['members','surveys','settings']]]};
 const NAV_GATE={settings:()=>!KEYMODE,logins:()=>canManageLogins(),accounts:()=>typeof acctOn==='function'&&acctOn(),billsetup:()=>typeof acctOn==='function'&&acctOn(),pos:()=>typeof posOn==='function'&&posOn(),postickets:()=>typeof posOn==='function'&&posOn(),posmenu:()=>typeof posOn==='function'&&posOn(),
-  proshop:()=>typeof posOn==='function'&&posOn()&&posSettings().outlets.some(o=>o.kind==='proshop'&&outletDept(o)==='golf'),tennisshop:()=>typeof posOn==='function'&&posOn()&&posSettings().outlets.some(o=>o.kind==='proshop'&&outletDept(o)==='tennis'),
-  bookings:()=>typeof bookOn==='function'&&bookOn(),teesheet:()=>typeof bookOn==='function'&&bookOn()&&bookSettings().facilities.some(f=>facDept(f)==='golf'),courts:()=>typeof bookOn==='function'&&bookOn()&&bookSettings().facilities.some(f=>facDept(f)==='tennis'),poolsheet:()=>typeof bookOn==='function'&&bookOn()&&bookSettings().facilities.some(f=>facDept(f)==='pool'),reports:()=>typeof acctOn==='function'&&acctOn()};
+  proshop:()=>typeof posOn==='function'&&posOn()&&posSettings().outlets.some(o=>o.kind==='proshop'&&outletDept(o)==='golf'),racketshop:()=>typeof posOn==='function'&&posOn()&&posSettings().outlets.some(o=>o.kind==='proshop'&&outletDept(o)==='racket'),
+  bookings:()=>typeof bookOn==='function'&&bookOn(),teesheet:()=>typeof bookOn==='function'&&bookOn()&&bookSettings().facilities.some(f=>facDept(f)==='golf'),racketbook:()=>typeof bookOn==='function'&&bookOn()&&bookSettings().facilities.some(f=>facDept(f)==='racket'),aquabook:()=>typeof bookOn==='function'&&bookOn()&&bookSettings().facilities.some(f=>facDept(f)==='aquatics'),reports:()=>typeof acctOn==='function'&&acctOn(),
+  staff:()=>typeof staffOn==='function'&&staffOn(),golfstaff:()=>typeof staffOn==='function'&&staffOn(),racketstaff:()=>typeof staffOn==='function'&&staffOn(),aquastaff:()=>typeof staffOn==='function'&&staffOn(),fnbstaff:()=>typeof staffOn==='function'&&staffOn()&&posOn(),calendar:()=>typeof bookOn==='function'&&bookOn(),events:()=>typeof bookOn==='function'&&bookOn()};
 function navItems(){ const allow=ORG_NAV[db.kind]; return NAV.filter(([k])=>(!allow||allow.includes(k))&&(!NAV_GATE[k]||NAV_GATE[k]())).map(([k,l,ic])=>[k,k==='members'&&isClub()?'Directory':k==='golf'&&isClub()?'Events & live scoring':k==='bookings'&&isClub()?'All bookings':k==='budget'&&isClub()?'Budget':l,ic]); }
 /* is this rail entry the one lit for the page on screen? a view of a shared page looks at that page's state */
 function navActive(k){ const pg=view.page; const owns=NAV_OWNS[k]||[k]; if(!owns.includes(pg)) return false;
-  if(k in NAV_DEPT){ if(NAV_PAGE[k]==='bookings'||k==='bookings') return typeof BK!=='undefined'&&(BK.dept||'')===NAV_DEPT[k]; if(NAV_PAGE[k]==='pos'||k==='pos') return typeof POS!=='undefined'&&(POS.dept||'fnb')===NAV_DEPT[k]; } return true; }
+  if(k in NAV_DEPT){ if(NAV_PAGE[k]==='bookings'||k==='bookings') return typeof BK!=='undefined'&&(BK.dept||'')===NAV_DEPT[k]; if(NAV_PAGE[k]==='pos'||k==='pos') return typeof POS!=='undefined'&&(POS.dept||'fnb')===NAV_DEPT[k]; if(NAV_PAGE[k]==='staff'||k==='staff') return typeof ST!=='undefined'&&(ST.dept||'')===NAV_DEPT[k]; } return true; }
 function navGo(k){ if(k==='golf') view.geid=null;
   if(NAV_PAGE[k]==='bookings'||k==='bookings'){ BK.dept=NAV_DEPT[k]||''; const fs=bookSettings().facilities.filter(f=>!BK.dept||facDept(f)===BK.dept); if(!fs.some(f=>f.id===BK.fac)) BK.fac=fs[0]?fs[0].id:''; }
+  if(NAV_PAGE[k]==='staff'||k==='staff') ST.dept=NAV_DEPT[k]||'';
   if(NAV_PAGE[k]==='pos'||k==='pos'){ POS.dept=NAV_DEPT[k]||'fnb'; const os=posSettings().outlets.filter(o=>outletDept(o)===POS.dept); if(!os.some(o=>o.id===POS.outlet)){ POS.outlet=os[0]?os[0].id:''; POS.cur=null; } }
   go(NAV_PAGE[k]||k); }
 /* collapsed sections are remembered per hub on this device; the section holding the page on screen never hides it */
@@ -1246,7 +1257,7 @@ function renderInner(){
   $('nav').innerHTML=navHTML(items,live);
   $('nav').querySelectorAll('[data-go]').forEach(b=>b.onclick=()=>navGo(b.dataset.go)); $('nav').querySelectorAll('[data-sec]').forEach(b=>b.onclick=()=>toggleNavSec(b.dataset.sec));
   const m=$('main');
-  ({dash:vDash,tournaments:vTournaments,tournament:vTournament,members:vMembers,board:vBoard,budget:vBudget,treasury:vTreasury,golf:vGolf,orgs:vOrgs,pick:vPicker,collections:vCollections,games:vGames,ledger:vLedger,library:vLibrary,logins:vLogins,surveys:vSurveys,accounts:vAccounts,account:vAccount,billsetup:vBillSetup,pos:vPos,postickets:vPosTickets,possetup:vPosSetup,bookings:vBookings,booksetup:vBookSetup,settings:vSettings,reports:vReports}[view.page]||vDash)(m);
+  ({dash:vDash,tournaments:vTournaments,tournament:vTournament,members:vMembers,board:vBoard,budget:vBudget,treasury:vTreasury,golf:vGolf,orgs:vOrgs,pick:vPicker,collections:vCollections,games:vGames,ledger:vLedger,library:vLibrary,logins:vLogins,surveys:vSurveys,accounts:vAccounts,account:vAccount,billsetup:vBillSetup,pos:vPos,postickets:vPosTickets,possetup:vPosSetup,bookings:vBookings,booksetup:vBookSetup,settings:vSettings,reports:vReports,staff:vStaff,calendar:vCalendar,events:vEvents}[view.page]||vDash)(m);
   if(isClub()) wireYearBar(m);
   if(view.page==='board'&&!isClub()&&typeof loginsCard==='function') loginsCard(m,ORG_ID);
   if(!isClub()&&((db.kind==='group'&&view.page==='members')||(db.kind!=='group'&&view.page==='board'))) adminLinksCard(m,curOrg());
@@ -7723,7 +7734,7 @@ async function reportPDF(rep,sc){ try{ await loadJsPDF(); }catch(e){ toast(e.mes
    service charge broken out — statements, minimums and the GL all see it) or as cash / card taken at the register.
    Outlets, products and stock counts live in CLUB.pos; tickets are rows in pos_tickets (pos-setup.sql). */
 const POS={tickets:null,loading:false,at:0,cur:null,outlet:'',cat:'',q:'',day:'',last:null,dept:''};
-const outletDept=o=>o.kind==='fnb'?'fnb':(o.dept||'golf');
+const outletDept=o=>o.kind==='fnb'?'fnb':(o.dept==='tennis'?'racket':o.dept||'golf');
 const posOn=()=>!!CLUB&&isClub()&&hasModule('pos')&&!KEYMODE&&!SCOPED;
 const posKey=()=>'fs_pos_'+((typeof TENANT!=='undefined'&&TENANT)||'local');
 function posSettings(){ CLUB.pos=CLUB.pos||{}; const p=CLUB.pos;
@@ -7801,7 +7812,7 @@ function vPos(m){
   const show=prods.filter(x=>(!POS.cat||x.cat===POS.cat)&&(!POS.q||x.name.toLowerCase().includes(POS.q.toLowerCase()))).sort((a,c)=>(a.cat||'').localeCompare(c.cat||'')||a.name.localeCompare(c.name));
   const mem=t.member_id?personById(t.member_id):null, held=(POS.tickets||[]).filter(x=>x.status==='open'&&x.id!==t.id);
   const chip=(k,l,on)=>`<button class="${on?'on':''}" data-pc="${esc(k)}">${esc(l)}</button>`;
-  m.innerHTML=head(POS.dept==='tennis'?'Tennis shop':POS.dept==='golf'?'Golf shop':'Point of sale',`${esc(o.name)} register — tap the products, close the ticket to the member’s account or take cash / card.`,btn('Setup','psSet','')+btn('Tickets','psTk',''))+`
+  m.innerHTML=head(POS.dept==='racket'?'Racket sports shop':POS.dept==='golf'?'Golf shop':'Point of sale',`${esc(o.name)} register — tap the products, close the ticket to the member’s account or take cash / card.`,btn('Setup','psSet','')+btn('Tickets','psTk',''))+`
     <div class="toolbar"><div class="seg">${OLS.map(x=>`<button class="${x.id===o.id?'on':''}" data-po="${x.id}">${esc(x.name)}</button>`).join('')}</div><input class="inp" id="psQ" placeholder="Find a product…" value="${esc(POS.q)}" style="margin-left:auto;height:38px;width:220px;max-width:100%" autocomplete="off"></div>
     <div class="pos"><div>
       ${cats.length>1||(cats.length===1&&cats[0])?`<div class="seg" style="margin-bottom:10px;flex-wrap:wrap">${chip('','All',!POS.cat)}${cats.map(c=>chip(c,c||'Uncategorised',POS.cat===c)).join('')}</div>`:''}
@@ -7855,14 +7866,14 @@ function vPosTickets(m){ if(!posOn()){ go('dash'); return; } if(POS.tickets==nul
 /* ---------- setup: outlets, products, stock ---------- */
 function vPosSetup(m){ if(!posOn()){ go('dash'); return; } const P=posSettings();
   m.innerHTML=`<div class="crumb"><button id="pxBack">Point of sale</button><span class="muted">/</span><span class="muted">Setup</span></div>`+head('Point of sale setup','Outlets and what each one sells. Prices are before tax; tax and the service charge follow the billing item of the outlet unless a product says otherwise.',btn('Import products (CSV)','pxCsv','',I.down)+btn('New outlet','pxNewO','')+btn('New product','pxNewP','pri',I.plus))+`
-    <div class="grid g3">${P.outlets.map(o=>`<div class="card pad"><div style="display:flex;justify-content:space-between;gap:10px;align-items:flex-start"><div><b style="font-size:17px;color:var(--navy)">${esc(o.name)}</b><div class="muted" style="font-size:12.5px">${o.kind==='fnb'?'Food & beverage':(o.dept==='tennis'?'Tennis shop':'Golf shop')} · bills as ${esc((itemOf(o.item)||{}).name||o.item)} · ${P.products.filter(x=>x.outlet===o.id).length} products</div></div><button class="btn sm" data-eo="${o.id}">Edit</button></div></div>`).join('')}</div>
+    <div class="grid g3">${P.outlets.map(o=>`<div class="card pad"><div style="display:flex;justify-content:space-between;gap:10px;align-items:flex-start"><div><b style="font-size:17px;color:var(--navy)">${esc(o.name)}</b><div class="muted" style="font-size:12.5px">${o.kind==='fnb'?'Food & beverage':(outletDept(o)==='racket'?'Racket sports shop':'Golf shop')} · bills as ${esc((itemOf(o.item)||{}).name||o.item)} · ${P.products.filter(x=>x.outlet===o.id).length} products</div></div><button class="btn sm" data-eo="${o.id}">Edit</button></div></div>`).join('')}</div>
     <div class="card" style="overflow:hidden"><div class="cardhead"><div><h2 class="h2">Products</h2></div></div>${P.products.length?`<div class="t"><div class="tr th" style="grid-template-columns:minmax(150px,1.5fr) 110px 120px 90px 60px 60px 80px 44px"><span>Product</span><span>Outlet</span><span>Category</span><span class="r">Price</span><span>Tax</span><span>Svc</span><span class="r">Stock</span><span></span></div>
       ${P.products.slice().sort((a,b)=>a.outlet.localeCompare(b.outlet)||(a.cat||'').localeCompare(b.cat||'')||a.name.localeCompare(b.name)).map(x=>`<div class="tr${x.active===false?' void':''}" style="grid-template-columns:minmax(150px,1.5fr) 110px 120px 90px 60px 60px 80px 44px"><div class="cell2"><b>${esc(x.name)}</b>${x.sku?`<small>${esc(x.sku)}</small>`:''}</div><span class="muted">${esc((outletOf(x.outlet)||{}).name||'')}</span><span class="muted">${esc(x.cat||'')}${x.route?' · → '+esc(((outletOf(x.outlet)||{}).expos||[]).find(e=>e.id===x.route)?.name||'expo'):''}</span><b class="r num">${fmt2(x.price)}</b><span>${x.taxable==null?'—':x.taxable?'yes':'no'}</span><span>${x.svc==null?'—':x.svc?'yes':'no'}</span><span class="r num">${x.track?n0(x.stock):'—'}</span><span class="actions"><button class="ib" data-ep="${x.id}" aria-label="Edit">${I.edit}</button></span></div>`).join('')}</div>`:'<div class="empty"><b>No products yet</b><span>Add them one by one or import a CSV with name, category, price, sku, stock.</span></div>'}</div>`;
   $('pxBack').onclick=()=>go('pos'); $('pxNewO').onclick=()=>outletDrawer(null); $('pxNewP').onclick=()=>productDrawer(null); $('pxCsv').onclick=importProducts;
   m.querySelectorAll('[data-eo]').forEach(x=>x.onclick=()=>outletDrawer(outletOf(x.dataset.eo))); m.querySelectorAll('[data-ep]').forEach(x=>x.onclick=()=>productDrawer(productOf(x.dataset.ep)));
 }
 function outletDrawer(o,kind){ const P=posSettings(), b=acctSettings();
-  openDrawer({kicker:'Point of sale',title:o?o.name:(kind==='proshop'?'New shop outlet':kind==='fnb'?'New restaurant':'New outlet'),body:field('Name','oN',o?o.name:'',{ph:kind==='proshop'?'Golf shop · Tennis shop':'Creekside Grill · Nines Bistro · Halfway house'})+pair(field('Kind','oK',o?o.kind:(kind||'fnb'),{type:'select',options:[['fnb','Food & beverage (service charge, tip)'],['proshop','Pro shop / retail']]}),field('Bills to the account as','oI',o?o.item:'fnb',{type:'select',options:b.items.filter(x=>!['finance','late','min'].includes(x.id)).map(x=>[x.id,x.name])}))+field('Shop run by','oD',o?(o.dept||'golf'):'golf',{type:'select',options:[['golf','Golf'],['tennis','Tennis & pickleball']],hint:'For a shop: which rail section its register sits under. Restaurants ignore this.'}),
+  openDrawer({kicker:'Point of sale',title:o?o.name:(kind==='proshop'?'New shop outlet':kind==='fnb'?'New restaurant':'New outlet'),body:field('Name','oN',o?o.name:'',{ph:kind==='proshop'?'Golf shop · Tennis shop':'Creekside Grill · Nines Bistro · Halfway house'})+pair(field('Kind','oK',o?o.kind:(kind||'fnb'),{type:'select',options:[['fnb','Food & beverage (service charge, tip)'],['proshop','Pro shop / retail']]}),field('Bills to the account as','oI',o?o.item:'fnb',{type:'select',options:b.items.filter(x=>!['finance','late','min'].includes(x.id)).map(x=>[x.id,x.name])}))+field('Shop run by','oD',o?outletDept(o):'golf',{type:'select',options:[['golf','Golf'],['racket','Racket sports']],hint:'For a shop: which rail section its register sits under. Restaurants ignore this.'}),
     save:()=>{ const name=fv('oN'); if(!name){ toast('Name the outlet'); return false; } const d={name,kind:fv('oK'),item:fv('oI'),dept:fv('oD')||'golf'}; if(o) Object.assign(o,d); else P.outlets.push(Object.assign({id:uid()},d)); persist(); },
     del:o&&P.outlets.length>1?()=>{ if(!confirm(`Remove ${o.name}? Its products go with it.`)) return false; P.products=P.products.filter(x=>x.outlet!==o.id); P.outlets=P.outlets.filter(x=>x!==o); if(POS.outlet===o.id) POS.outlet=''; persist(); }:null}); }
 function productDrawer(x){ const P=posSettings();
@@ -7894,10 +7905,10 @@ async function stnLoad(force){ if(STN.loading||(STN.rows&&!force)) return; STN.l
   try{ if(!acctCloud()){ try{ STN.rows=JSON.parse(localStorage.getItem(stnKey())||'[]'); }catch(_){ STN.rows=[]; } } else { const r=await tq(sb.from('pos_stations').select('*')); STN.rows=r.error?[]:(r.data||[]); } } finally{ STN.loading=false; } }
 function stnLocalWrite(){ if(!acctCloud()){ try{ localStorage.setItem(stnKey(),JSON.stringify(STN.rows||[])); }catch(_){} } }
 const pinHash=pin=>sha256hex(((typeof TENANT!=='undefined'&&TENANT)||'local')+':'+String(pin).trim());
-const stationURL=(s,token)=>(typeof SITE_BASE!=='undefined'&&SITE_BASE?SITE_BASE:location.origin+'/')+(s.kind==='expo'?'expo.html?k=':'pos.html?s=')+token;
+const stationURL=(s,token)=>(typeof SITE_BASE!=='undefined'&&SITE_BASE?SITE_BASE:location.origin+'/')+(s.kind==='expo'?'expo.html?k=':s.kind==='clock'?'clock.html?k=':'pos.html?s=')+token;
 /* a new station: the token is shown once (like an admin link); the device keeps it */
-async function newStation(o,kind,name,expo){ if(!crypto.subtle) throw new Error('This browser cannot create station links (needs https)');
-  const token=newToken()+newToken().slice(0,8), hash=await sha256hex(token), row={id:uid(),outlet:o.id,kind,expo:expo||null,name,key_hash:hash,created_at:new Date().toISOString(),revoked_at:null,last_seen:null};
+async function newStation(o,kind,name,expo,dept){ if(!crypto.subtle) throw new Error('This browser cannot create station links (needs https)');
+  const token=newToken()+newToken().slice(0,8), hash=await sha256hex(token), row={id:uid(),outlet:o&&o.id||null,kind,expo:expo||null,dept:dept||null,name,key_hash:hash,created_at:new Date().toISOString(),revoked_at:null,last_seen:null};
   if(acctCloud()){ const {error}=await sb.from('pos_stations').insert(trow(row)); if(error) throw new Error(/relation|does not exist/i.test(error.message)?'Run pos-stations-setup.sql in Supabase first':error.message); }
   STN.rows=(STN.rows||[]).concat([row]); stnLocalWrite(); return {row,token,url:stationURL(row,token)}; }
 async function revokeStation(s){ const patch={revoked_at:new Date().toISOString()}; if(acctCloud()){ const {error}=await sb.from('pos_stations').update(patch).eq('id',s.id); if(error){ toast(error.message); return; } } Object.assign(s,patch); stnLocalWrite(); }
@@ -7921,17 +7932,10 @@ function menusDrawer(o){ outletSetup(o); const d=o.menus.map(m=>Object.assign({}
   openDrawer({kicker:o.name,title:'Menus',body:`<div class="fld"><div style="display:flex;justify-content:space-between;align-items:center"><span class="lbl">Menus</span><button class="btn sm" id="mnAdd" type="button">${I.plus}Menu</button></div><div class="mini"><div id="mnRows">${rows()}</div></div><p class="hint">A product can be on several menus; the register shows the menus that are on. Switch Lunch off and Dinner on at five.</p></div>`,
     wire:r=>{ const bind=()=>{ r.querySelectorAll('[data-mi]').forEach(e=>e.oninput=()=>d[+e.dataset.mi].name=e.value); r.querySelectorAll('[data-ma]').forEach(e=>e.onchange=()=>d[+e.dataset.ma].active=e.checked); r.querySelectorAll('[data-mdel]').forEach(b=>b.onclick=()=>{ d.splice(+b.dataset.mdel,1); r.querySelector('#mnRows').innerHTML=rows(); bind(); }); }; bind(); r.querySelector('#mnAdd').onclick=()=>{ d.push({id:uid(),name:'',active:true}); r.querySelector('#mnRows').innerHTML=rows(); bind(); }; },
     save:()=>{ o.menus=d.filter(m=>m.name.trim()).map(m=>({id:m.id,name:m.name.trim(),active:m.active!==false})); persist(); }}); }
-/* staff and their PINs (club-wide; scoped to outlets when needed) */
-function posStaff(){ const P=posSettings(); P.staff=P.staff||[]; return P.staff; }
-function posStaffDrawer(x){ const P=posSettings(), outs=P.outlets;
-  openDrawer({kicker:'Point of sale',title:x?x.name:'New server / bartender / manager',body:field('Name','sfN',x?x.name:'',{ph:'First name, as the kitchen sees it'})+field('Role','sfR',x?x.role:'server',{type:'select',options:[['server','Server'],['bartender','Bartender'],['manager','Manager — can leave a station and void checks']]})+
-      `<div class="fld"><span class="lbl">Works at</span>${outs.map(o=>`<label class="check"><input type="checkbox" data-so="${o.id}"${!x||!(x.outlets||[]).length||(x.outlets||[]).includes(o.id)?' checked':''}>${esc(o.name)}</label>`).join('')}</div>`+field('PIN','sfP','',{type:'password',ph:x&&x.pin?'•••• (set — enter to change)':'4 to 6 digits',hint:'Unlocks a station. Stored hashed; nobody can read it back.'})+`<label class="check"><input type="checkbox" id="sfA"${!x||x.active!==false?' checked':''}>Active</label>`,
-    save:async()=>{ const name=fv('sfN'); if(!name){ toast('Name them'); return false; } const pin=fv('sfP'); if(pin&&!/^\d{4,6}$/.test(pin)){ toast('PIN: 4 to 6 digits'); return false; } if(!x&&!pin){ toast('Set a PIN'); return false; }
-      const picked=[...$('dBody').querySelectorAll('[data-so]')].filter(c=>c.checked).map(c=>c.dataset.so); const d={name,role:fv('sfR'),outlets:picked.length===outs.length?[]:picked,active:$('sfA').checked}; if(pin){ const h=await pinHash(pin); if(posStaff().some(y=>y!==x&&y.pin===h)){ toast('That PIN is already in use — pick another'); return false; } d.pin=h; }
-      if(x) Object.assign(x,d); else posStaff().push(Object.assign({id:uid()},d)); persist(); },
-    del:x?()=>{ const S=posStaff(); S.splice(S.indexOf(x),1); persist(); }:null}); }
+/* staff and their PINs live club-wide in CLUB.staff (staff.js); the restaurants see the food & beverage people */
+const posStaff=()=>clubStaff();
 /* the Settings → Food & beverage / Golf shop tabs */
-function fnbSetupHTML(kind){ const P=posSettings(), outs=P.outlets.filter(o=>o.kind===kind), S=STN.rows||[], staff=posStaff();
+function fnbSetupHTML(kind){ const P=posSettings(), outs=P.outlets.filter(o=>o.kind===kind), S=STN.rows||[], staff=kind==='fnb'?staffOf('fnb'):clubStaff().filter(x=>!x.depts.length||x.depts.some(d=>P.outlets.some(o=>o.kind==='proshop'&&outletDept(o)===d)));
   const outletCard=o=>{ outletSetup(o); const st=S.filter(s=>s.outlet===o.id&&!s.revoked_at), regs=st.filter(s=>s.kind!=='expo'), exps=st.filter(s=>s.kind==='expo'), np=P.products.filter(p=>p.outlet===o.id).length;
     return `<div class="card"><div class="cardhead"><div><h2 class="h2">${esc(o.name)}</h2><span class="muted">${np} products · bills as ${esc((itemOf(o.item)||{}).name||o.item)}</span></div><div class="actions"><button class="btn sm" data-oe="${o.id}">${I.edit}Edit</button><button class="btn sm" data-op="${o.id}">Menu items</button></div></div>
       <div class="fnbgrid">
@@ -7942,38 +7946,45 @@ function fnbSetupHTML(kind){ const P=posSettings(), outs=P.outlets.filter(o=>o.k
       </div></div>`; };
   return `${outs.map(outletCard).join('')||`<div class="card"><div class="empty"><b>No ${kind==='fnb'?'restaurants':'shop outlets'} yet</b><span>${kind==='fnb'?'Add the Creekside Grill, the Nines Bistro, the men’s locker room — each is a restaurant with its own stations, tables and menus.':'Add the golf shop; each register in it gets a station link.'}</span></div></div>`}
     <div class="actions" style="margin:-6px 0 10px"><button class="btn pri" id="fbNewO">${I.plus}${kind==='fnb'?'Restaurant':'Shop outlet'}</button></div>
-    <div class="card" style="overflow:hidden"><div class="cardhead"><div><h2 class="h2">Staff &amp; PINs</h2><span class="muted">Servers, bartenders and managers unlock a station with their PIN; managers can leave it and void checks</span></div><div class="actions"><button class="btn sm" id="fbNewS">${I.plus}Person</button></div></div>
+    <div class="card" style="overflow:hidden"><div class="cardhead"><div><h2 class="h2">Staff &amp; PINs</h2><span class="muted">${kind==='fnb'?'Servers, bartenders and managers':'The shop staff'} unlock a station with their PIN; managers can leave it and void checks. The schedule and the time clock are on the Staff page.</span></div><div class="actions"><button class="btn sm" data-go2="staff">Staff &amp; schedule</button><button class="btn sm" id="fbNewS">${I.plus}Person</button></div></div>
       ${staff.length?`<div class="t"><div class="tr th" style="grid-template-columns:minmax(140px,1.4fr) 110px minmax(120px,1.4fr) 70px 44px"><span>Name</span><span>Role</span><span>Works at</span><span>PIN</span><span></span></div>${staff.map(x=>`<div class="tr${x.active===false?' void':''}" style="grid-template-columns:minmax(140px,1.4fr) 110px minmax(120px,1.4fr) 70px 44px"><div class="cell2"><b>${esc(x.name)}</b></div><span>${esc(x.role||'server')}</span><span class="muted">${(x.outlets||[]).length?x.outlets.map(id=>esc((outletOf(id)||{}).name||'')).join(', '):'everywhere'}</span><span>${x.pin?'set':'<span class="neg">none</span>'}</span><span class="actions"><button class="ib" data-se="${x.id}" aria-label="Edit">${I.edit}</button></span></div>`).join('')}</div>`:'<div class="empty"><b>Nobody yet</b><span>Add each server and bartender with a PIN, and at least one manager.</span></div>'}</div>`; }
 function wireFnbSetup(m,kind){ const P=posSettings();
-  $('fbNewO').onclick=()=>outletDrawer(null,kind); $('fbNewS').onclick=()=>posStaffDrawer(null);
+  $('fbNewO').onclick=()=>outletDrawer(null,kind); $('fbNewS').onclick=()=>staffMemberDrawer(null,kind==='fnb'?'fnb':'golf'); m.querySelectorAll('[data-go2]').forEach(x=>x.onclick=()=>{ ST.dept=kind==='fnb'?'fnb':''; go(x.dataset.go2); });
   m.querySelectorAll('[data-oe]').forEach(x=>x.onclick=()=>outletDrawer(outletOf(x.dataset.oe))); m.querySelectorAll('[data-op]').forEach(x=>x.onclick=()=>{ POS.outlet=x.dataset.op; go('possetup'); });
   m.querySelectorAll('[data-ns]').forEach(x=>x.onclick=()=>stationDrawer(outletOf(x.dataset.ns),'register')); m.querySelectorAll('[data-ne]').forEach(x=>x.onclick=()=>stationDrawer(outletOf(x.dataset.ne),'expo'));
   m.querySelectorAll('[data-sr]').forEach(x=>x.onclick=async()=>{ const s=(STN.rows||[]).find(y=>y.id===x.dataset.sr); if(!confirm(`Revoke ${s.name}? The device will be signed out the next time it talks to the station.`)) return; await revokeStation(s); render(); });
   m.querySelectorAll('[data-ex]').forEach(x=>x.onclick=()=>exposDrawer(outletOf(x.dataset.ex))); m.querySelectorAll('[data-tb]').forEach(x=>x.onclick=()=>tablesDrawer(outletOf(x.dataset.tb))); m.querySelectorAll('[data-mn]').forEach(x=>x.onclick=()=>menusDrawer(outletOf(x.dataset.mn)));
-  m.querySelectorAll('[data-se]').forEach(x=>x.onclick=()=>posStaffDrawer(posStaff().find(y=>y.id===x.dataset.se))); }
+  m.querySelectorAll('[data-se]').forEach(x=>x.onclick=()=>staffMemberDrawer(staffById(x.dataset.se),kind==='fnb'?'fnb':'')); }
 /* ============ Bookings (module 'club' — the club hub, staff only; members book from the portal) ============
    One sheet per facility: the tee sheet (per course), tennis and pickleball courts, the pool, lessons (per instructor),
    rooms. CLUB.booking.facilities holds each facility's rules (hours, slot length, how many per slot, how far ahead
    members may book, a fee); bookings are rows in `bookings` (booking-setup.sql). Staff book on the sheet, check people
    in, cancel; a facility fee lands on the member's account (ref bk:<booking>). The portal's Book card and the
    member_* functions let members do it themselves inside the same rules. */
-const BK={rows:null,loading:false,at:0,fac:'',date:'',dept:''};
-const DEPTS=[['golf','Golf'],['tennis','Tennis & pickleball'],['pool','Pool'],['club','Club']];
-const facDept=f=>f.dept||({tee:'golf',court:'tennis',pool:'pool',lesson:'golf',room:'club'}[f.kind]||'club');
+const BK={rows:null,loading:false,at:0,fac:'',date:'',dept:'',selMode:false,sel:new Set()};
+/* departments: each runs its own sheets, shop, staff and schedule; the club sees everything */
+const DEPTS=[['golf','Golf'],['racket','Racket sports'],['aquatics','Aquatics'],['fnb','Food & beverage'],['club','Club']];
+const DEPT_FIX={tennis:'racket',pool:'aquatics'};   // names from before the rename
+const facDept=f=>DEPT_FIX[f.dept]||f.dept||({tee:'golf',court:'racket',pool:'aquatics',cabana:'aquatics',lesson:'golf',room:'club'}[f.kind]||'club');
 const bookOn=()=>!!CLUB&&isClub()&&hasModule('club')&&!KEYMODE&&!SCOPED;
 const bkKey=()=>'fs_book_'+((typeof TENANT!=='undefined'&&TENANT)||'local');
-const FAC_KINDS=[['tee','Tee sheet'],['court','Courts'],['pool','Pool'],['lesson','Lessons'],['room','Rooms & dining']];
+const FAC_KINDS=[['tee','Tee sheet'],['court','Courts'],['pool','Pool / lanes'],['cabana','Cabanas'],['lesson','Lessons'],['room','Rooms & dining']];
 function bookSettings(){ CLUB.booking=CLUB.booking||{}; const b=CLUB.booking;
   if(!Array.isArray(b.facilities)||!b.facilities.length) b.facilities=[
     {id:'tee',name:'Tee sheet',kind:'tee',units:2,unitNames:['Oak','Pecan'],open:'07:00',close:'17:00',slot:10,cap:4,lead:7,members:true,onePerDay:true,fee:null},
     {id:'tennis',name:'Tennis',kind:'court',units:4,open:'07:00',close:'21:00',slot:60,cap:4,lead:7,members:true,onePerDay:true,fee:null},
     {id:'pickle',name:'Pickleball',kind:'court',units:4,open:'07:00',close:'21:00',slot:60,cap:4,lead:7,members:true,onePerDay:true,fee:null},
     {id:'pool',name:'Pool',kind:'pool',units:1,open:'09:00',close:'20:00',slot:60,cap:30,lead:3,members:true,onePerDay:false,fee:null},
-    {id:'lessons',name:'Lessons',kind:'lesson',units:1,unitNames:['Pro'],open:'08:00',close:'18:00',slot:30,cap:1,lead:14,members:false,onePerDay:true,fee:{item:'lesson',amount:0,per:'booking'}}];
+    {id:'lessons',name:'Golf lessons',kind:'lesson',dept:'golf',units:1,unitNames:['Pro'],open:'08:00',close:'18:00',slot:30,cap:1,lead:14,members:false,onePerDay:true,fee:{item:'lesson',amount:0,per:'booking'}}];
+  /* every department books lessons; aquatics books cabanas — added once to clubs set up before (ids fixed so a removed one stays removed) */
+  if(!b.v2){ b.v2=true; const add=f=>{ if(!b.facilities.some(x=>x.id===f.id)) b.facilities.push(f); };
+    add({id:'rlessons',name:'Tennis & pickleball lessons',kind:'lesson',dept:'racket',units:1,unitNames:['Pro'],open:'08:00',close:'19:00',slot:60,cap:1,lead:14,members:true,onePerDay:true,fee:{item:'lesson',amount:0,per:'booking'}});
+    add({id:'cabanas',name:'Cabanas',kind:'cabana',dept:'aquatics',units:6,open:'10:00',close:'18:00',slot:240,cap:8,lead:7,members:true,onePerDay:true,fee:{item:'facility',amount:0,per:'booking'}});
+    add({id:'slessons',name:'Swim lessons',kind:'lesson',dept:'aquatics',units:1,unitNames:['Instructor'],open:'09:00',close:'18:00',slot:30,cap:1,lead:14,members:true,onePerDay:true,fee:{item:'lesson',amount:0,per:'booking'}}); }
   b.facilities.forEach(f=>{ f.units=Math.max(1,n0(f.units)||1); f.slot=Math.max(5,n0(f.slot)||60); f.cap=Math.max(1,n0(f.cap)||1); if(f.lead==null) f.lead=7; if(f.members==null) f.members=true; if(f.onePerDay==null) f.onePerDay=true; f.unitNames=f.unitNames||[]; });
   return b; }
 const facOf=id=>bookSettings().facilities.find(f=>f.id===id);
-const unitName=(f,u)=>f.unitNames[u-1]||(f.kind==='court'?'Court '+u:f.kind==='lesson'?'Instructor '+u:f.units>1?f.name+' '+u:f.name);
+const unitName=(f,u)=>f.unitNames[u-1]||(f.kind==='court'?'Court '+u:f.kind==='lesson'?'Instructor '+u:f.kind==='cabana'?'Cabana '+u:f.units>1?f.name+' '+u:f.name);
 const mins=t=>{ const [h,m]=String(t||'00:00').split(':').map(Number); return h*60+(m||0); };
 const hhmm=n=>String(Math.floor(n/60)).padStart(2,'0')+':'+String(n%60).padStart(2,'0');
 const t12=t=>{ const n=mins(t), h=Math.floor(n/60), m=n%60; return `${((h+11)%12)+1}:${String(m).padStart(2,'0')} ${h<12?'am':'pm'}`; };
@@ -7998,19 +8009,34 @@ function vBookings(m){
   if(acctCloud()&&Date.now()-BK.at>20000&&!BK.loading) bkLoad(true).then(()=>{ if(view.page==='bookings') render(); });
   const FS=S.facilities.filter(x=>!BK.dept||facDept(x)===BK.dept); if(!FS.length){ BK.dept=''; } const FL=BK.dept?FS:S.facilities; if(!FL.some(x=>x.id===BK.fac)) BK.fac=FL[0].id; const f=facOf(BK.fac); if(!BK.date) BK.date=todayISO(); const day=BK.date, rows=bkLive(f.id,day), slots=slotsOf(f);
   const at=(t,u)=>rows.filter(b=>b.time===t&&b.unit===u), units=Array.from({length:f.units},(_,i)=>i+1);
-  const cell=(t,u)=>{ const L=at(t,u); const used=sum(L,bkCount), full=f.kind==='tee'?used>=f.cap:L.length>0;
-    return `<div class="bc${L.length?' has':''}${full?' full':''}" data-bt="${t}" data-bu="${u}">${L.map(b=>`<button class="bb${b.status==='checked_in'?' in':''}${b.source==='member'?' mem':''}" data-bk="${b.id}"><b>${esc(bkName(b))}</b>${f.kind==='tee'||f.cap>1?`<small>${bkCount(b)}${f.kind==='tee'?' · '+(b.players||[]).slice(1).map(p=>esc((p.name||'').split(' ')[0])).join(', '):''}</small>`:b.note?`<small>${esc(b.note)}</small>`:''}</button>`).join('')}${full?'':`<button class="ba" data-add="${t}|${u}">${L.length?'+':''}</button>`}</div>`; };
+  if(BLK.rows==null&&!BLK.loading) blocksLoad().then(()=>render());
+  const cell=(t,u)=>{ const L=at(t,u); const used=sum(L,bkCount), full=f.kind==='tee'?used>=f.cap:L.length>0, k=blockAt(f.id,day,t,u), sel=BK.sel.has(t+'|'+u);
+    if(k&&!sel) return `<div class="bc blk${L.length?' has':''}" data-bt="${t}" data-bu="${u}" data-blk="${k.id}"><span class="bl">Closed${k.reason?' · '+esc(k.reason):''}</span>${L.map(b=>`<button class="bb${b.status==='checked_in'?' in':''}" data-bk="${b.id}"><b>${esc(bkName(b))}</b></button>`).join('')}</div>`;
+    return `<div class="bc${L.length?' has':''}${full?' full':''}${sel?' sel':''}" data-bt="${t}" data-bu="${u}">${L.map(b=>`<button class="bb${b.status==='checked_in'?' in':''}${b.source==='member'?' mem':''}" data-bk="${b.id}"><b>${esc(bkName(b))}</b>${f.kind==='tee'||f.cap>1?`<small>${bkCount(b)}${f.kind==='tee'?' · '+(b.players||[]).slice(1).map(p=>esc((p.name||'').split(' ')[0])).join(', '):''}</small>`:b.note?`<small>${esc(b.note)}</small>`:''}</button>`).join('')}${full?'':`<button class="ba" data-add="${t}|${u}">${L.length?'+':''}</button>`}</div>`; };
   const dayRows=rows.length, people=sum(rows,bkCount), ins=rows.filter(b=>b.status==='checked_in').length;
-  m.innerHTML=head(BK.dept==='golf'?'Tee sheet':BK.dept==='tennis'?'Courts':BK.dept==='pool'?'Pool':'All bookings',`${esc(f.name)} · ${new Date(day+'T12:00').toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'})} — tap a time to book, a name to check in or change it.`,btn('Facilities','bkSet','')+btn('Print the sheet','bkPdf','',I.down)+btn('New booking','bkNew','pri',I.plus))+`
+  const nsel=BK.sel.size, blocksToday=blocksAt(f.id,day);
+  m.innerHTML=head(BK.dept==='golf'?'Tee sheet':BK.dept?deptName(BK.dept)+' bookings':'All bookings',`${esc(f.name)} · ${new Date(day+'T12:00').toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'})} — ${BK.selMode?'tap or drag across the times to close, then Block them.':'tap a time to book, a name to check in or change it.'}`,
+      (BK.selMode?btn(nsel?`Block ${nsel} time${nsel===1?'':'s'}`:'Pick the times','bkBlock',nsel?'pri':'',I.x)+btn('Done','bkSelOff',''):btn('Block times','bkSel','')+btn(f.kind==='tee'?'Close the course':'Close it','bkClose','')+btn('Facilities','bkSet','')+btn('Print the sheet','bkPdf','',I.down)+btn('New booking','bkNew','pri',I.plus)))+
+    (blocksToday.length?`<div class="note" style="margin-bottom:12px">${blocksToday.map(k=>`<button class="lnk" data-blk2="${k.id}">${esc(f.name)} closed ${t12(k.from_t)}–${t12(k.to_t)}${k.units?' · '+k.units.map(u=>unitName(f,u)).join(', '):''}${k.reason?' — '+esc(k.reason):''}</button>`).join('<br>')}</div>`:'')+`
     <div class="toolbar"><div class="seg">${FL.map(x=>`<button class="${x.id===f.id?'on':''}" data-bf="${x.id}">${esc(x.name)}</button>`).join('')}</div><div class="seg" style="margin-left:auto"><button id="bkPrev">‹</button><button id="bkToday">Today</button><button id="bkNext">›</button></div><input class="inp" type="date" id="bkDate" value="${day}" style="height:38px;width:160px"></div>
     <div class="grid g3">${kpi('Booked',dayRows,`${people} ${f.kind==='tee'?'players':'people'}`)}${kpi('Checked in',ins,`${dayRows-ins} to come`)}${kpi('Open',slots.length*f.units-(f.kind==='tee'?0:rows.length),`${f.kind==='tee'?`${slots.length*f.units*f.cap-people} spots`:`of ${slots.length*f.units} ${f.kind==='lesson'?'lesson':'slot'}s`} · ${t12(f.open)}–${t12(f.close)}`)}</div>
-    <div class="card sheetwrap" style="--units:${f.units}"><div class="sheet" style="grid-template-columns:84px repeat(${f.units},minmax(150px,1fr))"><div class="sh"></div>${units.map(u=>`<div class="sh">${esc(unitName(f,u))}</div>`).join('')}${slots.map(t=>`<div class="st">${t12(t)}</div>${units.map(u=>cell(t,u)).join('')}`).join('')}</div></div>`;
+    <div class="card sheetwrap${BK.selMode?' selmode':''}" style="--units:${f.units}"><div class="sheet" id="bkSheet" style="grid-template-columns:84px repeat(${f.units},minmax(150px,1fr))"><div class="sh"></div>${units.map(u=>`<div class="sh">${esc(unitName(f,u))}</div>`).join('')}${slots.map(t=>`<div class="st">${t12(t)}</div>${units.map(u=>cell(t,u)).join('')}`).join('')}</div></div>`;
   m.querySelectorAll('[data-bf]').forEach(x=>x.onclick=()=>{ BK.fac=x.dataset.bf; render(); });
   const shift=n=>{ BK.date=isoPlus(day,n); render(); }; $('bkPrev').onclick=()=>shift(-1); $('bkNext').onclick=()=>shift(1); $('bkToday').onclick=()=>{ BK.date=todayISO(); render(); }; $('bkDate').onchange=()=>{ BK.date=$('bkDate').value||todayISO(); render(); };
-  m.querySelectorAll('[data-add]').forEach(x=>x.onclick=()=>{ const [t,u]=x.dataset.add.split('|'); bookingDrawer(null,f,day,t,+u); });
-  m.querySelectorAll('[data-bk]').forEach(x=>x.onclick=e=>{ e.stopPropagation(); bookingDrawer(rows.find(b=>b.id===x.dataset.bk),f,day); });
-  $('bkNew').onclick=()=>bookingDrawer(null,f,day,slots[0],1); $('bkSet').onclick=()=>go('booksetup'); $('bkPdf').onclick=()=>sheetPDF(f,day);
+  if(BK.selMode){ wireSelect(m,f,day); $('bkSelOff').onclick=()=>{ BK.selMode=false; BK.sel.clear(); render(); }; $('bkBlock').onclick=()=>{ if(BK.sel.size) blockDrawer(f,day,[...BK.sel]); }; }
+  else { m.querySelectorAll('[data-add]').forEach(x=>x.onclick=()=>{ const [t,u]=x.dataset.add.split('|'); bookingDrawer(null,f,day,t,+u); });
+    m.querySelectorAll('[data-bk]').forEach(x=>x.onclick=e=>{ e.stopPropagation(); bookingDrawer(rows.find(b=>b.id===x.dataset.bk),f,day); });
+    m.querySelectorAll('[data-blk]').forEach(x=>x.onclick=e=>{ if(e.target.closest('[data-bk]')) return; blockInfoDrawer((BLK.rows||[]).find(k=>k.id===x.dataset.blk),f); });
+    $('bkNew').onclick=()=>bookingDrawer(null,f,day,slots[0],1); $('bkSet').onclick=()=>go('booksetup'); $('bkPdf').onclick=()=>sheetPDF(f,day); $('bkSel').onclick=()=>{ BK.selMode=true; BK.sel.clear(); render(); }; $('bkClose').onclick=()=>closeFacilityDrawer(f,day); }
+  m.querySelectorAll('[data-blk2]').forEach(x=>x.onclick=()=>blockInfoDrawer((BLK.rows||[]).find(k=>k.id===x.dataset.blk2),f));
 }
+/* tap or drag across cells to pick the times to close (pointer events, so a finger works too) */
+function wireSelect(m,f,day){ const sheet=$('bkSheet'); let down=false, mode=true; const cellAt=(x,y)=>{ const el=document.elementFromPoint(x,y); return el&&el.closest('.bc'); };
+  const apply=c=>{ if(!c) return; const k=c.dataset.bt+'|'+c.dataset.bu; if(mode) BK.sel.add(k); else BK.sel.delete(k); c.classList.toggle('sel',mode); };
+  sheet.onpointerdown=e=>{ const c=e.target.closest('.bc'); if(!c) return; down=true; mode=!BK.sel.has(c.dataset.bt+'|'+c.dataset.bu); apply(c); sheet.setPointerCapture&&sheet.setPointerCapture(e.pointerId); e.preventDefault(); };
+  sheet.onpointermove=e=>{ if(!down) return; apply(cellAt(e.clientX,e.clientY)); };
+  const up=()=>{ if(!down) return; down=false; const n=BK.sel.size; const b=$('bkBlock'); if(b){ b.innerHTML=(n?`Block ${n} time${n===1?'':'s'}`:'Pick the times'); b.className='btn'+(n?' pri':''); } };
+  sheet.onpointerup=up; sheet.onpointercancel=up; }
 function bookingDrawer(b,f,day,time,unit){
   const isNew=!b; const d=b?clone(b):{id:uid(),facility:f.id,date:day,time:time||slotsOf(f)[0],unit:unit||1,member_id:null,name:'',players:[],note:'',status:'booked',source:'staff',created_by:whoAmI(),created_at:new Date().toISOString()};
   if(!d.players.length&&d.member_id) d.players=[{member_id:d.member_id,name:bkName(d)}];
@@ -8034,6 +8060,36 @@ function bookingDrawer(b,f,day,time,unit){
     del:b?async()=>{ if(b.status==='checked_in'){ if(!confirm('Cancel a checked-in booking?')) return false; } await bkCancel(b); toast('Cancelled'); }:null,delLabel:'Cancel booking',delPlain:true});
   if(b&&b.status!=='checked_in'){ const foot=$('dFoot').querySelector('.actions'); const ci=document.createElement('button'); ci.className='btn'; ci.textContent='Check in'; ci.onclick=async()=>{ b.status='checked_in'; if(await bkSave(b,false)){ closeDrawer(); render(); toast('Checked in'); } }; foot.prepend(ci); }
 }
+/* ---------- closed times: a tee time, a stretch of the morning, the whole course for a day or a week ---------- */
+const BLK={rows:null,loading:false};
+const blkKey=()=>'fs_blocks_'+((typeof TENANT!=='undefined'&&TENANT)||'local');
+async function blocksLoad(force){ if(BLK.loading||(BLK.rows&&!force)) return; BLK.loading=true;
+  try{ if(!acctCloud()){ try{ BLK.rows=JSON.parse(localStorage.getItem(blkKey())||'[]'); }catch(_){ BLK.rows=[]; } } else { const r=await tq(sb.from('booking_blocks').select('*').gte('date',isoPlus(todayISO(),-60))); BLK.rows=r.error?[]:(r.data||[]); } } finally{ BLK.loading=false; } }
+function blkLocalWrite(){ if(!acctCloud()){ try{ localStorage.setItem(blkKey(),JSON.stringify(BLK.rows||[])); }catch(_){} } }
+const blocksAt=(fid,date)=>(BLK.rows||[]).filter(k=>k.facility===fid&&k.date===date).sort((a,b)=>a.from_t.localeCompare(b.from_t));
+const blockAt=(fid,date,t,u)=>blocksAt(fid,date).find(k=>t>=k.from_t&&t<k.to_t&&(!k.units||k.units.includes(u)))||null;
+async function blocksSave(rows){ if(acctCloud()){ const {error}=await sb.from('booking_blocks').insert(rows.map(trow)); if(error){ toast(/relation|does not exist/i.test(error.message)?'Run blocks-setup.sql in Supabase first':error.message); return false; } } BLK.rows=(BLK.rows||[]).concat(rows); blkLocalWrite(); return true; }
+async function blockRemove(k){ if(acctCloud()){ const {error}=await sb.from('booking_blocks').delete().eq('id',k.id); if(error){ toast(error.message); return false; } } BLK.rows=(BLK.rows||[]).filter(x=>x.id!==k.id); blkLocalWrite(); return true; }
+/* picked cells → the fewest rows: per unit, runs of consecutive slots; a run shared by every unit becomes one row for all */
+function blockRows(f,day,cells,reason){ const slots=slotsOf(f), byU={}; cells.forEach(c=>{ const [t,u]=c.split('|'); (byU[u]=byU[u]||[]).push(slots.indexOf(t)); });
+  const runs=[]; Object.entries(byU).forEach(([u,idx])=>{ idx.sort((a,b)=>a-b); let s=null,p=null; idx.forEach(i=>{ if(s===null){ s=i; p=i; } else if(i===p+1) p=i; else { runs.push({u:+u,s,p}); s=i; p=i; } }); if(s!==null) runs.push({u:+u,s,p}); });
+  const out=[]; runs.forEach(r=>{ const from=slots[r.s], to=hhmm(mins(slots[r.p])+f.slot); const same=runs.filter(x=>x.s===r.s&&x.p===r.p); if(same.length===f.units){ if(same[0]===r) out.push({id:uid(),facility:f.id,date:day,from_t:from,to_t:to,units:null,reason,created_by:whoAmI(),created_at:new Date().toISOString()}); return; }
+    const twin=out.find(o=>o.from_t===from&&o.to_t===to&&o.units); if(twin){ twin.units.push(r.u); return; } out.push({id:uid(),facility:f.id,date:day,from_t:from,to_t:to,units:[r.u],reason,created_by:whoAmI(),created_at:new Date().toISOString()}); }); return out; }
+function blockDrawer(f,day,cells){ const n=cells.length, inside=cells.reduce((a,c)=>{ const [t,u]=c.split('|'); return a+bkLive(f.id,day).filter(b=>b.time===t&&b.unit===+u).length; },0);
+  openDrawer({kicker:f.name,title:`Block ${n} time${n===1?'':'s'}`,saveLabel:'Block them',body:`<p>${dateTxt(day)} · ${n} ${f.kind==='tee'?'tee time':'slot'}${n===1?'':'s'} on ${esc(f.name)}. ${inside?`<b>${inside} booking${inside===1?' is':'s are'} inside</b> — they stay as they are; cancel them from the sheet if they must move.`:'Nothing is booked in them.'}</p>`+field('Reason (members see it)','blR','',{ph:'Maintenance · Outing · Frost delay · Staff training'}),
+    save:async()=>{ const rows=blockRows(f,day,cells,fv('blR')); if(!(await blocksSave(rows))) return false; BK.selMode=false; BK.sel.clear(); toast(`${n} time${n===1?'':'s'} blocked`); }}); }
+function closeFacilityDrawer(f,day){ const units=Array.from({length:f.units},(_,i)=>i+1);
+  openDrawer({kicker:f.name,title:f.kind==='tee'?'Close the course':`Close ${f.name}`,saveLabel:'Close it',wide:true,
+    body:pair(field('From day','cfD1',day,{type:'date'}),field('To day','cfD2',day,{type:'date'}))+`<label class="check"><input type="checkbox" id="cfAll" checked>All day (${t12(f.open)}–${t12(f.close)})</label><div id="cfT" hidden>${pair(field('From','cfT1',f.open,{type:'time'}),field('Until','cfT2',f.close,{type:'time'}))}</div>`+
+      (f.units>1?`<div class="fld"><span class="lbl">${f.kind==='tee'?'Courses':'Units'}</span><div class="chips">${units.map(u=>`<label class="check" style="margin:0"><input type="checkbox" data-cfu="${u}" checked>${esc(unitName(f,u))}</label>`).join('')}</div></div>`:'')+field('Reason (members see it)','cfR','',{ph:'Aerification · Member-Guest · Private event · Weather'}),
+    wire:r=>{ r.querySelector('#cfAll').onchange=()=>{ r.querySelector('#cfT').hidden=r.querySelector('#cfAll').checked; }; },
+    save:async()=>{ const d1=fv('cfD1')||day, d2=fv('cfD2')||d1; if(d2<d1){ toast('The last day is before the first'); return false; } const all=$('cfAll').checked, t1=all?f.open:(fv('cfT1')||f.open), t2=all?f.close:(fv('cfT2')||f.close); if(mins(t2)<=mins(t1)){ toast('It has to end after it starts'); return false; }
+      const picked=f.units>1?[...$('dBody').querySelectorAll('[data-cfu]')].filter(c=>c.checked).map(c=>+c.dataset.cfu):[1]; if(!picked.length){ toast('Pick at least one'); return false; } const un=picked.length===f.units?null:picked; const days=Math.round((new Date(d2+'T12:00')-new Date(d1+'T12:00'))/864e5)+1; if(days>62){ toast('At most 62 days at a time'); return false; }
+      const rows=[]; for(let i=0;i<days;i++) rows.push({id:uid(),facility:f.id,date:isoPlus(d1,i),from_t:t1,to_t:t2,units:un,reason:fv('cfR'),created_by:whoAmI(),created_at:new Date().toISOString()});
+      if(!(await blocksSave(rows))) return false; toast(days===1?`${f.name} closed ${all?'all day':t12(t1)+'–'+t12(t2)}`:`${f.name} closed for ${days} days`); }}); }
+function blockInfoDrawer(k,f){ if(!k) return; const inside=bkLive(f.id,k.date).filter(b=>b.time>=k.from_t&&b.time<k.to_t&&(!k.units||k.units.includes(b.unit)));
+  openDrawer({kicker:f.name,title:`Closed ${t12(k.from_t)}–${t12(k.to_t)}`,saveLabel:'Done',body:`<div class="kv"><span class="muted">Day</span><span>${dateTxt(k.date)}</span></div><div class="kv"><span class="muted">${f.kind==='tee'?'Courses':'Units'}</span><span>${k.units?k.units.map(u=>esc(unitName(f,u))).join(', '):'All'}</span></div><div class="kv"><span class="muted">Reason</span><span>${esc(k.reason||'—')}</span></div><div class="kv"><span class="muted">Bookings inside</span><span>${inside.length?inside.map(b=>esc(bkName(b))+' '+t12(b.time)).join(', '):'none'}</span></div><p class="hint" style="margin-top:10px">Members cannot book these times; the sheet shows them closed. Remove the block to open them again.</p>`,
+    save:()=>{},del:async()=>{ if(!(await blockRemove(k))) return false; toast('Opened again'); },delLabel:'Remove the block',delPlain:true}); }
 /* ---------- facilities setup ---------- */
 function vBookSetup(m){ if(!bookOn()){ go('dash'); return; } const S=bookSettings();
   m.innerHTML=`<div class="crumb"><button id="bsBk">Bookings</button><span class="muted">/</span><span class="muted">Facilities</span></div>`+head('Facilities','What can be booked, when, by how many, how far ahead members may book, and what it costs.',btn('New facility','fxNew','pri',I.plus))+`
@@ -8060,6 +8116,177 @@ async function sheetPDF(f,day){ try{ await loadJsPDF(); }catch(e){ toast(e.messa
     if(y+h>H-50){ y=page(); } font('PublicSans','bold',9,INK); doc.text(t12(t),L,y); font('PublicSans','normal',9,lines.some(Boolean)?INK:MUTED); lines.forEach((s,i)=>{ doc.text(doc.splitTextToSize(s||'—',cw-8),L+64+i*cw,y); }); y+=h; doc.setDrawColor(225,217,198); doc.setLineWidth(.5); doc.line(L,y-4,R,y-4); }
   font('PublicSans','normal',7,MUTED); doc.text(`${club} · ${f.name} · printed ${new Date().toLocaleString('en-US',{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'})}`,W/2,H-28,{align:'center'});
   const name=`${f.id}-${day}.pdf`; if(typeof deliverFile==='function') await deliverFile(doc.output('blob'),name,f.name); else doc.save(name); }
+/* ============ Staff across departments (module 'club' — the club hub, staff only) ============
+   One staff list for the whole club: CLUB.staff = [{id, name, role, depts:['golf','racket','aquatics','fnb','club'],
+   outlets ([] = every register of the department), pin (sha256 of tenant:pin — the same PIN unlocks a register and
+   clocks in), email (their hub login, if any), active}]. The old CLUB.pos.staff is folded in on first read.
+   The schedule builder: CLUB.shifts = [{id, staffId, dept, date, start, end, where, note}] — a week per department,
+   copied forward, printed. The time clock: rows in staff_clock (staff-setup.sql), written from a clock kiosk
+   (clock.html?k=TOKEN — a pos_stations row of kind 'clock' bound to a department) or a register's lock screen through
+   staff_clock(key, pin, action); the hub reads them for who is on now and the hours of the week. */
+const ST={dept:'',week:'',clock:null,loading:false,at:0};
+const STAFF_ROLES=[['server','Server'],['bartender','Bartender'],['manager','Manager — can leave a station and void checks'],['pro','Pro / instructor'],['attendant','Attendant'],['lifeguard','Lifeguard'],['staff','Staff']];
+const ROLE_NAME=Object.fromEntries(STAFF_ROLES.map(([k,l])=>[k,l.split(' — ')[0]]));
+const staffOn=()=>!!CLUB&&isClub()&&(hasModule('club')||hasModule('pos'))&&!KEYMODE&&!SCOPED;
+const deptName=k=>k?((DEPTS.find(d=>d[0]===k)||[])[1]||k):'Every department';
+/* the list, with the old restaurant-only list folded in once */
+function clubStaff(){ if(!CLUB) return []; CLUB.staff=Array.isArray(CLUB.staff)?CLUB.staff:[]; const P=CLUB.pos;
+  if(P&&Array.isArray(P.staff)&&P.staff.length){ P.staff.forEach(x=>{ if(!CLUB.staff.some(y=>y.id===x.id)) CLUB.staff.push(Object.assign({depts:['fnb']},x)); }); P.staff=[]; }
+  CLUB.staff.forEach(x=>{ x.depts=(x.depts||[]).map(d=>d==='tennis'?'racket':d==='pool'?'aquatics':d); x.outlets=x.outlets||[]; if(x.active==null) x.active=true; });
+  return CLUB.staff; }
+const staffOf=dept=>clubStaff().filter(x=>!dept||!x.depts.length||x.depts.includes(dept));
+const staffById=id=>clubStaff().find(x=>x.id===id);
+function clubShifts(){ CLUB.shifts=Array.isArray(CLUB.shifts)?CLUB.shifts:[]; return CLUB.shifts; }
+/* ---- weeks ---- */
+const weekStart=iso=>{ const d=new Date((iso||todayISO())+'T12:00'); const wd=(d.getDay()+6)%7; d.setDate(d.getDate()-wd); return d.toISOString().slice(0,10); };
+const weekDays=ws=>Array.from({length:7},(_,i)=>isoPlus(ws,i));
+const shiftHours=s=>Math.max(0,(mins(s.end)-mins(s.start))/60);
+const hoursTxt=h=>(Math.round(h*100)/100).toFixed(2).replace(/\.?0+$/,'')+' h';
+const clockHours=r=>Math.max(0,(new Date(r.out_at||Date.now())-new Date(r.in_at))/36e5);
+/* ---- the time clock rows ---- */
+const clkKey=()=>'fs_clock_'+((typeof TENANT!=='undefined'&&TENANT)||'local');
+async function clockLoad(force){ if(ST.loading||(ST.clock&&!force)) return; ST.loading=true;
+  try{ if(!acctCloud()){ try{ ST.clock=JSON.parse(localStorage.getItem(clkKey())||'[]'); }catch(_){ ST.clock=[]; } } else { const r=await tq(sb.from('staff_clock').select('*').gte('in_at',new Date(Date.now()-45*864e5).toISOString())); ST.clock=r.error?[]:(r.data||[]); } ST.at=Date.now(); } finally{ ST.loading=false; } }
+async function clockFix(row,patch){ if(acctCloud()){ const {error}=await sb.from('staff_clock').update(patch).eq('id',row.id); if(error){ toast(error.message); return false; } } Object.assign(row,patch); if(!acctCloud()){ try{ localStorage.setItem(clkKey(),JSON.stringify(ST.clock)); }catch(_){} } return true; }
+/* ---- the page: a department's people, their week, who is on the clock ---- */
+function vStaff(m){ if(!staffOn()){ go('dash'); return; } if(STN.rows==null){ if(!STN.loading) stnLoad().then(()=>render()); } if(ST.clock==null){ if(!ST.loading) clockLoad().then(()=>render()); } else if(acctCloud()&&Date.now()-ST.at>30000&&!ST.loading) clockLoad(true).then(()=>{ if(view.page==='staff') render(); });
+  const dept=ST.dept||'', people=staffOf(dept).sort((a,b)=>a.name.localeCompare(b.name)), ws=ST.week||weekStart(), days=weekDays(ws), SH=clubShifts().filter(s=>!dept||s.dept===dept), CL=ST.clock||[];
+  const wk=SH.filter(s=>days.includes(s.date)), onNow=CL.filter(r=>!r.out_at&&(!dept||r.dept===dept)), weekClock=CL.filter(r=>r.in_at.slice(0,10)>=ws&&r.in_at.slice(0,10)<=days[6]&&(!dept||r.dept===dept));
+  const shiftsOf=(p,d)=>wk.filter(s=>s.staffId===p.id&&s.date===d).sort((a,b)=>a.start.localeCompare(b.start));
+  const whereTxt=s=>s.where?` · ${esc(s.where)}`:'';
+  const cols=`grid-template-columns:minmax(150px,1.2fr) repeat(7,minmax(118px,1fr)) 70px`;
+  const clockStations=(STN.rows||[]).filter(s=>s.kind==='clock'&&!s.revoked_at&&(!dept||(s.dept||'')===dept));
+  m.innerHTML=head(dept?`${deptName(dept)} · staff`:'Staff',dept?'Who works here, the week’s schedule and the time clock.':'Everyone who works at the club, which departments they belong to, their PINs, the schedule and the time clock.',
+      btn('Time clock link','sfClock','',I.shield)+btn('Print the week','sfPdf','',I.down)+btn('New person','sfNew','pri',I.plus))+`
+    ${dept?'':`<div class="toolbar" style="margin-bottom:14px"><div class="seg">${[['','Everyone']].concat(DEPTS).map(([k,l])=>`<button class="${(ST.dept||'')===k?'on':''}" data-sd="${k}">${l}</button>`).join('')}</div></div>`}
+    <div class="grid g3">${kpi('On the clock now',onNow.length,onNow.map(r=>esc(r.name)).join(', ')||'nobody clocked in')}${kpi('Scheduled this week',hoursTxt(sum(wk,shiftHours)),`${wk.length} shift${wk.length===1?'':'s'} · ${new Set(wk.map(s=>s.staffId)).size} people`)}${kpi('Worked this week',hoursTxt(sum(weekClock,clockHours)),`${weekClock.length} clock-in${weekClock.length===1?'':'s'}`)}</div>
+    <div class="card" style="overflow:hidden"><div class="cardhead"><div><h2 class="h2">Schedule</h2><span class="muted">Week of ${dateTxt(ws)} — tap a day to add a shift, a shift to change it</span></div><div class="actions"><div class="seg"><button id="wkPrev">‹</button><button id="wkNow">This week</button><button id="wkNext">›</button></div><button class="btn sm" id="wkCopy">Copy last week</button></div></div>
+      <div class="tw"><div class="t keep" style="min-width:1120px"><div class="tr th" style="${cols}"><span>Person</span>${days.map(d=>`<span>${new Date(d+'T12:00').toLocaleDateString('en-US',{weekday:'short',month:'numeric',day:'numeric'})}</span>`).join('')}<span class="r">Hours</span></div>
+        ${people.map(p=>`<div class="tr" style="${cols};align-items:stretch"><div class="cell2" style="justify-content:center"><b>${esc(p.name)}</b><small>${esc(ROLE_NAME[p.role]||p.role||'')}${p.depts.length&&!dept?' · '+p.depts.map(deptName).join(', '):''}</small></div>
+          ${days.map(d=>`<div class="shc" data-sday="${p.id}|${d}">${shiftsOf(p,d).map(s=>`<button class="shift" data-sh="${s.id}"><b>${t12s(s.start)}–${t12s(s.end)}</b><small>${dept?'':esc(deptName(s.dept))}${whereTxt(s)}</small></button>`).join('')}</div>`).join('')}
+          <span class="r num" style="align-self:center"><b>${hoursTxt(sum(wk.filter(s=>s.staffId===p.id),shiftHours))}</b></span></div>`).join('')||`<div class="empty"><b>Nobody here yet</b><span>Add the people who work ${dept?'in '+deptName(dept).toLowerCase():'at the club'} and build the week.</span></div>`}
+      </div></div></div>
+    <div class="grid g2">
+      <div class="card" style="overflow:hidden"><div class="cardhead"><div><h2 class="h2">Time clock</h2><span class="muted">${clockStations.length?clockStations.map(s=>esc(s.name)).join(' · '):'No clock kiosk yet — make a link, or clock in at any register'}</span></div><div class="actions"><button class="btn sm" id="sfCsv">Timesheet CSV</button></div></div>
+        <div class="t fit"><div class="tr th" style="grid-template-columns:1fr 190px 90px"><span>Person</span><span>Now</span><span class="r">This week</span></div>
+        ${people.map(p=>{ const open=onNow.find(r=>r.staff_id===p.id), h=sum(weekClock.filter(r=>r.staff_id===p.id),clockHours); return `<div class="tr num" style="grid-template-columns:1fr 190px 90px"><span>${esc(p.name)}</span><span style="white-space:nowrap">${open?`<span class="pos">in since ${new Date(open.in_at).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'})}</span> <button class="lnk" data-cout="${open.id}">out</button>`:'<span class="muted">—</span>'}</span><b class="r">${h?hoursTxt(h):'—'}</b></div>`; }).join('')}
+        ${weekClock.filter(r=>!people.some(p=>p.id===r.staff_id)).length?`<p class="hint" style="padding:10px 22px">Also on the clock: ${[...new Set(weekClock.filter(r=>!people.some(p=>p.id===r.staff_id)).map(r=>esc(r.name)))].join(', ')}</p>`:''}</div></div>
+      <div class="card" style="overflow:hidden"><div class="cardhead"><div><h2 class="h2">People</h2><span class="muted">PINs unlock registers and the time clock</span></div></div>
+        <div class="t fit"><div class="tr th" style="grid-template-columns:minmax(120px,1.3fr) 100px minmax(100px,1.4fr) 50px"><span>Name</span><span>Role</span><span>${dept?'Also in':'Departments'}</span><span>PIN</span></div>
+        ${people.map(x=>`<button class="tr${x.active===false?' void':''}" data-se="${x.id}" style="grid-template-columns:minmax(120px,1.3fr) 100px minmax(100px,1.4fr) 50px;text-align:left;background:none;border-left:none;border-right:none;width:100%"><div class="cell2"><b>${esc(x.name)}</b>${x.email?`<small>${esc(x.email)}</small>`:''}</div><span>${esc(ROLE_NAME[x.role]||x.role||'')}</span><span class="muted" style="font-size:12.5px">${x.depts.length?x.depts.filter(d=>d!==dept).map(deptName).join(', ')||'—':'every department'}</span><span>${x.pin?'<span class="pos">set</span>':'<span class="neg">none</span>'}</span></button>`).join('')}</div></div>
+    </div>`;
+  m.querySelectorAll('[data-sd]').forEach(b=>b.onclick=()=>{ ST.dept=b.dataset.sd; render(); });
+  $('wkPrev').onclick=()=>{ ST.week=isoPlus(ws,-7); render(); }; $('wkNext').onclick=()=>{ ST.week=isoPlus(ws,7); render(); }; $('wkNow').onclick=()=>{ ST.week=''; render(); };
+  $('wkCopy').onclick=()=>copyLastWeek(ws,dept); $('sfNew').onclick=()=>staffMemberDrawer(null,dept); $('sfPdf').onclick=()=>schedulePDF(ws,dept); $('sfCsv').onclick=()=>timesheetCSV(ws,dept); $('sfClock').onclick=()=>clockLinkDrawer(dept);
+  m.querySelectorAll('[data-sday]').forEach(c=>c.onclick=e=>{ if(e.target.closest('[data-sh]')) return; const [pid,d]=c.dataset.sday.split('|'); shiftDrawer(null,{staffId:pid,date:d,dept:dept||(staffById(pid)||{depts:[]}).depts[0]||'club'}); });
+  m.querySelectorAll('[data-sh]').forEach(b=>b.onclick=()=>shiftDrawer(clubShifts().find(s=>s.id===b.dataset.sh)));
+  m.querySelectorAll('[data-se]').forEach(b=>b.onclick=()=>staffMemberDrawer(staffById(b.dataset.se),dept));
+  m.querySelectorAll('[data-cout]').forEach(b=>b.onclick=async()=>{ const r=(ST.clock||[]).find(x=>x.id===b.dataset.cout); if(!r||!confirm(`Clock ${r.name} out now?`)) return; if(await clockFix(r,{out_at:new Date().toISOString(),note:'clocked out from the hub'})){ toast('Clocked out'); render(); } });
+}
+const t12s=t=>t12(t).replace(':00','').replace(' ','');
+/* ---- a person ---- */
+function staffMemberDrawer(x,dept){ const outs=posOn()?posSettings().outlets:[]; const logins=typeof LOGINS!=='undefined'&&LOGINS&&Array.isArray(LOGINS.rows)?LOGINS.rows:[];
+  const dsel=x?x.depts:(dept?[dept]:[]);
+  openDrawer({kicker:'Staff',title:x?x.name:'New person',wide:true,
+    body:pair(field('Name','sfN',x?x.name:'',{ph:'First name, as the kitchen and the schedule see it'}),field('Role','sfR',x?x.role:(dept==='fnb'||!dept?'server':dept==='golf'||dept==='racket'?'pro':dept==='aquatics'?'lifeguard':'staff'),{type:'select',options:STAFF_ROLES}))+
+      `<div class="fld"><span class="lbl">Departments</span><div class="chips">${DEPTS.map(([k,l])=>`<label class="check" style="margin:0"><input type="checkbox" data-sdp="${k}"${dsel.includes(k)?' checked':''}>${l}</label>`).join('')}</div><p class="hint">Their schedule, time clock and registers follow these. Nothing ticked = everywhere.</p></div>`+
+      (outs.length?`<div class="fld"><span class="lbl">Registers they may unlock</span><div class="chips">${outs.map(o=>`<label class="check" style="margin:0"><input type="checkbox" data-so="${o.id}"${!x||!x.outlets.length||x.outlets.includes(o.id)?' checked':''}>${esc(o.name)}</label>`).join('')}</div></div>`:'')+
+      pair(field('PIN','sfP','',{type:'password',ph:x&&x.pin?'•••• (set — enter to change)':'4 to 6 digits',hint:'Unlocks a register and clocks in. Stored hashed; nobody can read it back.'}),field('Hub login e-mail (optional)','sfE',x?x.email||'':'',{ph:'sam@club.com',hint:logins.length?'Ties this person to their staff login.':''}))+
+      `<label class="check"><input type="checkbox" id="sfA"${!x||x.active!==false?' checked':''}>Active</label>`,
+    save:async()=>{ const name=fv('sfN'); if(!name){ toast('Name them'); return false; } const pin=fv('sfP'); if(pin&&!/^\d{4,6}$/.test(pin)){ toast('PIN: 4 to 6 digits'); return false; } if(!x&&!pin){ toast('Set a PIN'); return false; }
+      const depts=[...$('dBody').querySelectorAll('[data-sdp]')].filter(c=>c.checked).map(c=>c.dataset.sdp), picked=[...$('dBody').querySelectorAll('[data-so]')].filter(c=>c.checked).map(c=>c.dataset.so);
+      const d={name,role:fv('sfR'),depts,outlets:outs.length&&picked.length===outs.length?[]:picked,email:fv('sfE').trim().toLowerCase()||null,active:$('sfA').checked};
+      if(pin){ const h=await pinHash(pin); if(clubStaff().some(y=>y!==x&&y.pin===h)){ toast('That PIN is already in use — pick another'); return false; } d.pin=h; }
+      if(x) Object.assign(x,d); else clubStaff().push(Object.assign({id:uid()},d)); persist(); },
+    del:x?()=>{ if(!confirm(`Remove ${x.name}? Their shifts and clock-ins stay on record.`)) return false; const S=clubStaff(); S.splice(S.indexOf(x),1); persist(); }:null}); }
+/* ---- a shift ---- */
+function shiftDrawer(s,init){ const d=s?clone(s):Object.assign({id:uid(),staffId:'',dept:'club',date:todayISO(),start:'09:00',end:'17:00',where:'',note:''},init||{}); const people=clubStaff().filter(x=>x.active!==false).sort((a,b)=>a.name.localeCompare(b.name)); const p=staffById(d.staffId);
+  const places=[].concat(posOn()?posSettings().outlets.filter(o=>d.dept==='fnb'?o.kind==='fnb':o.kind==='proshop'&&outletDept(o)===d.dept).map(o=>o.name):[],bookOn()?bookSettings().facilities.filter(f=>facDept(f)===d.dept).map(f=>f.name):[]);
+  openDrawer({kicker:'Schedule',title:s?`${(p||{}).name||'Shift'} · ${dateTxt(d.date)}`:'New shift',
+    body:pair(field('Who','shP',d.staffId,{type:'select',options:people.map(x=>[x.id,x.name])}),field('Department','shD',d.dept,{type:'select',options:DEPTS}))+pair(field('Date','shDt',d.date,{type:'date'}),field('Where (optional)','shW',d.where||'',{ph:places.slice(0,3).join(' · ')||'Grill · Pro shop · Pool deck',list:places}))+
+      pair(field('Starts','shS',d.start,{type:'time'}),field('Ends','shE',d.end,{type:'time'}))+field('Note','shN',d.note||'',{ph:'Opening · closing · covering for Mia'})+
+      `<div class="fld"><span class="lbl">Repeat</span><div class="chips">${[['','Just this day'],['wk','Same day for the next 4 weeks'],['mf','Monday to Friday this week']].map(([k,l],i)=>`<label class="check" style="margin:0"><input type="radio" name="shRep" value="${k}"${i===0?' checked':''}>${l}</label>`).join('')}</div></div>`,
+    save:()=>{ d.staffId=fv('shP'); d.dept=fv('shD'); d.date=fv('shDt')||d.date; d.start=fv('shS')||'09:00'; d.end=fv('shE')||'17:00'; d.where=fv('shW'); d.note=fv('shN'); if(!d.staffId){ toast('Who is working?'); return false; } if(mins(d.end)<=mins(d.start)){ toast('It has to end after it starts'); return false; }
+      const rep=($('dBody').querySelector('[name=shRep]:checked')||{}).value||''; const L=clubShifts(); if(s) Object.assign(s,d); else L.push(d);
+      if(rep==='wk') for(let k=1;k<=4;k++) L.push(Object.assign({},d,{id:uid(),date:isoPlus(d.date,7*k)}));
+      if(rep==='mf'){ const ws=weekStart(d.date); for(let k=0;k<5;k++){ const dd=isoPlus(ws,k); if(dd!==d.date&&!L.some(x=>x.staffId===d.staffId&&x.date===dd&&x.start===d.start)) L.push(Object.assign({},d,{id:uid(),date:dd})); } }
+      persist(); },
+    del:s?()=>{ const L=clubShifts(); L.splice(L.indexOf(s),1); persist(); }:null}); }
+function copyLastWeek(ws,dept){ const L=clubShifts(), prev=weekDays(isoPlus(ws,-7)), src=L.filter(s=>prev.includes(s.date)&&(!dept||s.dept===dept)); if(!src.length){ toast('Last week is empty'); return; }
+  const cur=weekDays(ws); let n=0; src.forEach(s=>{ const date=cur[prev.indexOf(s.date)]; if(L.some(x=>x.staffId===s.staffId&&x.date===date&&x.start===s.start)) return; L.push(Object.assign({},s,{id:uid(),date})); n++; }); persist(); toast(n?`${n} shift${n===1?'':'s'} copied`:'This week already has them'); render(); }
+/* ---- the clock kiosk link: a station of kind 'clock' for a department ---- */
+function clockLinkDrawer(dept){ openDrawer({kicker:'Time clock',title:'New time clock link',saveLabel:'Create the link',
+    body:field('Name','ckN','',{ph:dept?`${deptName(dept)} time clock`:'Back door time clock'})+field('Department','ckD',dept||'',{type:'select',options:[['','Every department']].concat(DEPTS)})+'<p class="hint">Open the link once on a tablet or PC by the door; it stays on. Staff tap in their PIN and clock in or out. Anyone may also clock in from a register’s lock screen.</p>',
+    save:async()=>{ const name=fv('ckN'); if(!name){ toast('Name it'); return false; } try{ const r=await newStation({id:null},'clock',name,null,fv('ckD')||null); setTimeout(()=>stationLinkModal(r),50); }catch(e){ toast(e.message); return false; } }}); }
+/* ---- the printed week ---- */
+async function schedulePDF(ws,dept){ try{ await loadJsPDF(); }catch(e){ toast(e.message); return; } const crest=await crestPNG().catch(()=>null), doc=new window.jspdf.jsPDF({unit:'pt',format:'letter',orientation:'landscape'}); bcFonts(doc);
+  const NAVY=[15,42,56],GOLD=[199,161,58],GOLDL=[216,183,95],GOLDDK=[126,95,26],IVORY=[251,250,245],INK=[20,34,43],MUTED=[86,98,106]; const L=36,W=792,H=612,R=W-36, font=(f,s,z,c)=>{ doc.setFont(f,s); doc.setFontSize(z); doc.setTextColor(...c); };
+  const days=weekDays(ws), people=staffOf(dept).sort((a,b)=>a.name.localeCompare(b.name)), SH=clubShifts().filter(s=>days.includes(s.date)&&(!dept||s.dept===dept));
+  const page=()=>{ doc.setFillColor(...IVORY); doc.rect(0,0,W,H,'F'); doc.setFillColor(...GOLD); doc.roundedRect(L,24,R-L,70,8,8,'F'); doc.setFillColor(...NAVY); doc.roundedRect(L,24,R-L,66,8,8,'F'); doc.rect(L,80,R-L,8,'F'); const lw=drawCrest(doc,crest,L+14,32,46), TX=L+14+(lw||38)+12;
+    font('PublicSansXB','normal',6.8,GOLDL); doc.text(String(brandName()).toUpperCase(),TX,46,{charSpace:1.2}); font('Cormorant','bold',22,[255,255,255]); doc.text(`${dept?deptName(dept)+' — ':''}Schedule · week of ${dateTxt(ws)}`,TX,70); return 112; };
+  let y=page(); const nameW=120, cw=(R-L-nameW-50)/7;
+  const hdr=()=>{ font('PublicSansXB','normal',7,GOLDDK); doc.text('PERSON',L,y,{charSpace:1}); days.forEach((d,i)=>doc.text(new Date(d+'T12:00').toLocaleDateString('en-US',{weekday:'short',month:'numeric',day:'numeric'}).toUpperCase(),L+nameW+i*cw,y,{charSpace:1})); doc.text('HOURS',R,y,{align:'right',charSpace:1}); y+=5; doc.setDrawColor(...GOLD); doc.setLineWidth(1); doc.line(L,y,R,y); y+=12; };
+  hdr();
+  for(const p of people){ const cells=days.map(d=>SH.filter(s=>s.staffId===p.id&&s.date===d).sort((a,b)=>a.start.localeCompare(b.start)).map(s=>`${t12s(s.start)}–${t12s(s.end)}${s.where?' '+s.where:''}`)); const h=Math.max(1,...cells.map(c=>c.length))*11+8;
+    if(y+h>H-40){ doc.addPage(); y=page(); hdr(); } font('PublicSans','bold',9.5,INK); doc.text(p.name,L,y); font('PublicSans','normal',8.6,INK); cells.forEach((c,i)=>{ c.forEach((t,j)=>doc.text(doc.splitTextToSize(t,cw-6)[0],L+nameW+i*cw,y+j*11)); }); font('PublicSans','bold',9,INK); doc.text(hoursTxt(sum(SH.filter(s=>s.staffId===p.id),shiftHours)),R,y,{align:'right'}); y+=h; doc.setDrawColor(225,217,198); doc.setLineWidth(.5); doc.line(L,y-5,R,y-5); }
+  font('PublicSans','normal',7,MUTED); doc.text(`${brandName()} · printed ${new Date().toLocaleString('en-US',{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'})}`,W/2,H-22,{align:'center'});
+  doc.save(`schedule-${ws}${dept?'-'+dept:''}.pdf`); }
+function timesheetCSV(ws,dept){ const days=weekDays(ws), rows=(ST.clock||[]).filter(r=>r.in_at.slice(0,10)>=ws&&r.in_at.slice(0,10)<=days[6]&&(!dept||r.dept===dept)).sort((a,b)=>a.name.localeCompare(b.name)||a.in_at.localeCompare(b.in_at)); if(!rows.length){ toast('No clock-ins this week'); return; }
+  const qq=v=>'"'+String(v??'').replace(/"/g,'""')+'"'; const L=[['Name','Department','In','Out','Hours']].concat(rows.map(r=>[r.name,deptName(r.dept),r.in_at,r.out_at||'',clockHours(r).toFixed(2)]));
+  const by={}; rows.forEach(r=>{ by[r.name]=(by[r.name]||0)+clockHours(r); }); L.push([],['Totals','','','','']); Object.entries(by).forEach(([n,h])=>L.push([n,'','','',h.toFixed(2)]));
+  dl(L.map(r=>r.map(qq).join(',')).join('\n'),'text/csv',`timesheet-${ws}${dept?'-'+dept:''}.csv`); }
+/* ============ The club calendar and club events (module 'club' — the club hub, staff only) ============
+   One calendar for the staff across every department: bookings on every sheet (tee times, courts, cabanas, lessons),
+   closed stretches, club events and who is on shift — a month at a glance, a day in full, filtered by department.
+   Events are the club's own: CLUB.events = [{id, name, dept ('club' | a department), date, end, start, finish, where,
+   descr, public}]; public ones reach the member portal (member_me → events). */
+const CAL={ym:'',day:'',dept:''};
+function clubEvents(){ CLUB.events=Array.isArray(CLUB.events)?CLUB.events:[]; return CLUB.events; }
+const evDeptName=k=>k==='club'||!k?'Club-wide':deptName(k);
+const evOn=d=>e=>d>=e.date&&d<=(e.end||e.date);
+const monthName=ym=>MONTHS_LONG[+ym.slice(5,7)-1]+' '+ym.slice(0,4);
+function calLoad(){ const need=[]; let ready=true; if(bookOn()){ if(BK.rows==null){ ready=false; if(!BK.loading) need.push(bkLoad()); } if(typeof BLK!=='undefined'&&BLK.rows==null){ ready=false; if(!BLK.loading) need.push(blocksLoad()); } } if(need.length) Promise.all(need).then(()=>{ if(['calendar','events'].includes(view.page)) render(); }); return ready; }
+/* everything on one day, by department */
+function dayItems(d,dept){ const out=[]; const facs=bookOn()?bookSettings().facilities:[];
+  for(const f of facs){ if(dept&&facDept(f)!==dept) continue; const rows=bkLive(f.id,d).sort((a,b)=>a.time.localeCompare(b.time)); rows.forEach(b=>out.push({kind:'booking',dept:facDept(f),time:b.time,f,b,txt:`${bkName(b)}${bkCount(b)>1?' +'+(bkCount(b)-1):''}${f.units>1?' · '+unitName(f,b.unit):''}`}));
+    (typeof BLK!=='undefined'?blocksAt(f.id,d):[]).forEach(k=>out.push({kind:'block',dept:facDept(f),time:k.from_t,f,k,txt:`${f.name} closed ${t12(k.from_t)}–${t12(k.to_t)}${k.units?' · '+k.units.map(u=>unitName(f,u)).join(', '):''}${k.reason?' — '+k.reason:''}`})); }
+  clubEvents().filter(evOn(d)).filter(e=>!dept||e.dept===dept||e.dept==='club'||!e.dept).forEach(e=>out.push({kind:'event',dept:e.dept||'club',time:e.start||'00:00',e,txt:e.name}));
+  if(typeof clubShifts==='function') clubShifts().filter(s=>s.date===d&&(!dept||s.dept===dept)).forEach(s=>out.push({kind:'shift',dept:s.dept,time:s.start,s,txt:`${(staffById(s.staffId)||{name:'?'}).name} ${t12s(s.start)}–${t12s(s.end)}${s.where?' · '+s.where:''}`}));
+  return out.sort((a,b)=>a.time.localeCompare(b.time)); }
+function vCalendar(m){ if(!bookOn()&&!staffOn()){ go('dash'); return; } const ready=calLoad(); const ym=CAL.ym||todayISO().slice(0,7), dept=CAL.dept||'', [Y_,M_]=ym.split('-').map(Number); const first=`${ym}-01`, ndays=new Date(Date.UTC(Y_,M_,0)).getUTCDate(), lead=(new Date(first+'T12:00').getDay()+6)%7; const today=todayISO();
+  if(!CAL.day||CAL.day.slice(0,7)!==ym) CAL.day=ym===today.slice(0,7)?today:first;
+  const cellOf=d=>{ const it=ready?dayItems(d,dept):[]; const byF={}; it.filter(x=>x.kind==='booking').forEach(x=>{ byF[x.f.id]=byF[x.f.id]||{f:x.f,n:0,p:0}; byF[x.f.id].n++; byF[x.f.id].p+=bkCount(x.b); });
+    const evs=it.filter(x=>x.kind==='event'), blocks=it.filter(x=>x.kind==='block'), shifts=it.filter(x=>x.kind==='shift');
+    return `<button class="cd${d===CAL.day?' on':''}${d===today?' today':''}" data-cday="${d}"><b>${+d.slice(8)}</b>${evs.slice(0,2).map(x=>`<span class="cc ev">${esc(x.e.name)}</span>`).join('')}${Object.values(byF).slice(0,3).map(x=>`<span class="cc">${esc(x.f.name)} · ${x.n}</span>`).join('')}${blocks.length?`<span class="cc blk">${blocks.length===1?esc(blocks[0].f.name)+' closed':blocks.length+' closures'}</span>`:''}${shifts.length?`<span class="cc sh">${shifts.length} on shift</span>`:''}</button>`; };
+  const cells=[]; for(let i=0;i<lead;i++) cells.push('<span class="cd pad"></span>'); for(let d=1;d<=ndays;d++) cells.push(cellOf(`${ym}-${String(d).padStart(2,'0')}`));
+  const day=CAL.day, items=ready?dayItems(day,dept):[]; const kindTxt={booking:'Booking',block:'Closed',event:'Event',shift:'On shift'};
+  m.innerHTML=head('Calendar',`${esc(CLUB.name||CLUB_META.name)} · every sheet, closure, event and shift${dept?' — '+esc(deptName(dept)):''}.`,btn('New event','calEv','pri',I.plus))+`
+    <div class="toolbar" style="margin-bottom:14px"><div class="seg">${[['','Everything']].concat(DEPTS).map(([k,l])=>`<button class="${dept===k?'on':''}" data-cdept="${k}">${l}</button>`).join('')}</div><div class="seg" style="margin-left:auto"><button id="calPrev">‹</button><button id="calNow">${esc(monthName(ym))}</button><button id="calNext">›</button></div></div>
+    <div class="grid calgrid">
+      <div class="card" style="overflow:hidden"><div class="cal"><div class="cw">${['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].map(x=>`<span>${x}</span>`).join('')}</div><div class="cg">${cells.join('')}</div></div>${ready?'':'<p class="muted" style="padding:12px 22px">Loading the sheets…</p>'}</div>
+      <div class="card" style="overflow:hidden"><div class="cardhead"><div><h2 class="h2">${new Date(day+'T12:00').toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'})}</h2><span class="muted">${items.length?`${items.filter(x=>x.kind==='booking').length} bookings · ${items.filter(x=>x.kind==='event').length} events · ${items.filter(x=>x.kind==='shift').length} on shift`:'Nothing on'}</span></div></div>
+        <div class="t fit">${items.map(x=>`<button class="tr dayrow ${x.kind}" ${x.kind==='booking'?`data-cbk="${x.b.id}"`:x.kind==='event'?`data-cev="${x.e.id}"`:x.kind==='shift'?`data-csh="${x.s.id}"`:`data-cbl="${x.k.id}"`} style="grid-template-columns:72px minmax(0,1fr) 90px;text-align:left;width:100%;background:none;border-left:none;border-right:none"><b>${x.kind==='block'?t12(x.k.from_t):x.kind==='event'&&!x.e.start?'all day':t12(x.time)}</b><div class="cell2"><b>${esc(x.txt)}</b><small>${x.kind==='booking'?esc(x.f.name)+(x.b.status==='checked_in'?' · checked in':''):x.kind==='event'?esc(evDeptName(x.e.dept))+(x.e.where?' · '+esc(x.e.where):''):x.kind==='shift'?esc(deptName(x.dept)):''}</small></div><span class="chip ${x.kind}">${kindTxt[x.kind]}</span></button>`).join('')||'<p class="muted" style="padding:14px 22px">Tap a day on the left.</p>'}</div></div>
+    </div>`;
+  m.querySelectorAll('[data-cdept]').forEach(b=>b.onclick=()=>{ CAL.dept=b.dataset.cdept; render(); }); m.querySelectorAll('[data-cday]').forEach(b=>b.onclick=()=>{ CAL.day=b.dataset.cday; render(); });
+  const shiftM=n=>{ const d=new Date(Date.UTC(Y_,M_-1+n,1)); CAL.ym=d.toISOString().slice(0,7); CAL.day=''; render(); }; $('calPrev').onclick=()=>shiftM(-1); $('calNext').onclick=()=>shiftM(1); $('calNow').onclick=()=>{ CAL.ym=''; CAL.day=''; render(); };
+  $('calEv').onclick=()=>eventDrawer(null,{date:day,dept:dept||'club'});
+  m.querySelectorAll('[data-cbk]').forEach(b=>b.onclick=()=>{ const bk=(BK.rows||[]).find(x=>x.id===b.dataset.cbk); if(bk) bookingDrawer(bk,facOf(bk.facility),bk.date); }); m.querySelectorAll('[data-cev]').forEach(b=>b.onclick=()=>eventDrawer(clubEvents().find(e=>e.id===b.dataset.cev)));
+  m.querySelectorAll('[data-csh]').forEach(b=>b.onclick=()=>shiftDrawer(clubShifts().find(s=>s.id===b.dataset.csh))); m.querySelectorAll('[data-cbl]').forEach(b=>b.onclick=()=>{ const k=(BLK.rows||[]).find(x=>x.id===b.dataset.cbl); if(k) blockInfoDrawer(k,facOf(k.facility)); });
+}
+/* ---- events ---- */
+function vEvents(m){ if(!bookOn()&&!staffOn()){ go('dash'); return; } const E=clubEvents().slice().sort((a,b)=>a.date.localeCompare(b.date)||String(a.start||'').localeCompare(String(b.start||''))), today=todayISO(); const up=E.filter(e=>(e.end||e.date)>=today), past=E.filter(e=>(e.end||e.date)<today).reverse();
+  const row=e=>`<button class="tr" data-ev="${e.id}" style="grid-template-columns:120px minmax(0,1fr) 120px 90px;text-align:left;width:100%;background:none;border-left:none;border-right:none"><div class="cell2"><b>${dateTxt(e.date).replace(/, \d{4}$/,'')}${e.end&&e.end!==e.date?' – '+dateTxt(e.end).replace(/, \d{4}$/,''):''}</b><small>${e.start?t12(e.start)+(e.finish?'–'+t12(e.finish):''):'all day'}</small></div><div class="cell2"><b>${esc(e.name)}</b><small>${esc(e.where||'')}${e.descr?(e.where?' · ':'')+esc(e.descr.slice(0,90)):''}</small></div><span class="muted" style="font-size:12.5px">${esc(evDeptName(e.dept))}</span><span>${e.public===false?'<span class="chip">staff only</span>':'<span class="chip ev">members</span>'}</span></button>`;
+  m.innerHTML=head('Events',`${esc(CLUB.name||CLUB_META.name)} · what the club puts on — the Boo Bash, movie night at the pool, the member-guest dinner. Public ones show in the member portal.`,btn('Calendar','evCal','')+btn('New event','evNew','pri',I.plus))+`
+    <div class="card" style="overflow:hidden"><div class="cardhead"><h2 class="h2">Coming up</h2><span class="muted">${up.length} event${up.length===1?'':'s'}</span></div><div class="t fit">${up.map(row).join('')||'<div class="empty"><b>Nothing scheduled</b><span>Add the next club event; members see it in the portal.</span></div>'}</div></div>
+    ${past.length?`<div class="card" style="overflow:hidden"><div class="cardhead"><h2 class="h2">Past</h2></div><div class="t fit">${past.slice(0,30).map(row).join('')}</div></div>`:''}`;
+  $('evNew').onclick=()=>eventDrawer(null); $('evCal').onclick=()=>go('calendar'); m.querySelectorAll('[data-ev]').forEach(b=>b.onclick=()=>eventDrawer(clubEvents().find(e=>e.id===b.dataset.ev))); }
+function eventDrawer(e,init){ const d=e?clone(e):Object.assign({id:uid(),name:'',dept:'club',date:todayISO(),end:'',start:'',finish:'',where:'',descr:'',public:true},init||{});
+  openDrawer({kicker:'Events',title:e?e.name:'New event',wide:true,
+    body:field('Name','evN',d.name,{ph:'Boo Bash · Movie night at the pool · Member-guest dinner'})+pair(field('Put on by','evD',d.dept||'club',{type:'select',options:[['club','The club']].concat(DEPTS.filter(x=>x[0]!=='club'))}),field('Where','evW',d.where||'',{ph:'Pool deck · Grill · The lawn'}))+
+      pair(field('Date','evDt',d.date,{type:'date'}),field('Last day (if more than one)','evEnd',d.end||'',{type:'date'}))+pair(field('Starts','evS',d.start||'',{type:'time'}),field('Ends','evF',d.finish||'',{type:'time'}))+field('Details','evX',d.descr||'',{type:'textarea'})+
+      `<label class="check"><input type="checkbox" id="evP"${d.public!==false?' checked':''}>Show it to members in the portal</label>`,
+    save:()=>{ d.name=fv('evN'); if(!d.name){ toast('Name it'); return false; } d.dept=fv('evD'); d.where=fv('evW'); d.date=fv('evDt')||d.date; d.end=fv('evEnd')&&fv('evEnd')>d.date?fv('evEnd'):''; d.start=fv('evS'); d.finish=fv('evF'); d.descr=fv('evX'); d.public=$('evP').checked; if(e) Object.assign(e,d); else clubEvents().push(d); persist(); },
+    del:e?()=>{ const L=clubEvents(); L.splice(L.indexOf(e),1); persist(); }:null}); }
 /* ============ Settings — white label (branding, outgoing e-mail) and the module setup ============
    Every hub (the club, each association, each small group) has Settings. Branding: the organization's own logo on
    statements, receipts, sheets, PDFs, e-mails and the member portal — an association keeps its own, else the club's,
@@ -8114,6 +8341,7 @@ function vSettings(m){
       <div class="setupcard"><b>Shops</b><span class="muted">${posSettings().outlets.filter(o=>o.kind==='proshop').map(o=>esc(o.name)).join(' · ')||'No shop outlet yet'}</span><div class="actions"><button class="btn sm" data-stab="shop">Shop &amp; registers</button><button class="btn sm" data-go2="possetup">Products &amp; stock</button></div></div>`:''}
       ${acctOn()?`<div class="setupcard"><b>Member billing</b><span class="muted">${acctSettings().classes.length} membership class${acctSettings().classes.length===1?'':'es'} · tax ${n0(acctSettings().tax.rate)}% · service ${n0(acctSettings().svc.rate)}%</span><div class="actions"><button class="btn sm" data-go2="billsetup">Billing setup</button></div></div>`:''}
       ${bookOn()?`<div class="setupcard"><b>Bookings</b><span class="muted">${bookSettings().facilities.map(f=>esc(f.name)).join(' · ')}</span><div class="actions"><button class="btn sm" data-go2="booksetup">Facilities</button></div></div>`:''}
+      ${typeof staffOn==='function'&&staffOn()?`<div class="setupcard"><b>Staff</b><span class="muted">${clubStaff().length} people · PINs, departments, the schedule, the time clock</span><div class="actions"><button class="btn sm" data-go2="staff">Staff &amp; schedule</button></div></div>`:''}
       <div class="setupcard"><b>Golf</b><span class="muted">The games the club plays, courses and tees</span><div class="actions"><button class="btn sm" data-go2="library">Game library</button><button class="btn sm" data-go2="golf">Events &amp; courses</button></div></div>
       <div class="setupcard"><b>Organizations &amp; logins</b><span class="muted">${(CLUB.orgs||[]).filter(o=>!o.archived).length} organizations</span><div class="actions"><button class="btn sm" data-go2="orgs">Organizations</button>${canManageLogins()?`<button class="btn sm" data-go2="logins">Logins</button>`:''}</div></div>
     </div></div>`:''}
@@ -8416,7 +8644,7 @@ async function resultsPDF(t,opt){
    page counts, and a reload is tried once per build — if the page that comes back is still the old one, the CDN
    hasn't caught up; wait a while before trying that build again. */
 (function(){
-  const ME='20261027003553', KEY='au_tried', RETRY=10*60*1000; let ready=false, lastCheck=0;
+  const ME='20261027015337', KEY='au_tried', RETRY=10*60*1000; let ready=false, lastCheck=0;
   const typing=()=>{ const a=document.activeElement; return a&&/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)&&a.value&&a.type!=='search'; };
   const safe=()=>!typing()&&(typeof window.__canReload!=='function'||window.__canReload());
   const tried=()=>{ try{ const [b,t]=(sessionStorage.getItem(KEY)||'').split('|'); return b?{build:b,at:+t||0}:null; }catch(_){ return null; } };

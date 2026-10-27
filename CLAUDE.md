@@ -64,7 +64,9 @@ src/
   billing.js           Member accounts & billing (module 'billing', club hub, staff only): classes, the monthly run, tax/service,
                        minimums, finance charges, aging, statements, GL export, Stripe Connect, the mail function
   pos.js               Point of sale (module 'pos'): outlets, products & stock, the register, tickets to accounts or cash / card
-  bookings.js          Bookings (module 'club'): the tee sheet, courts, pool, lessons — the sheet, check-in, fees, the printed sheet
+  bookings.js          Bookings (module 'club'): the tee sheet, courts, cabanas, pool, lessons — the sheet, check-in, fees, blocked times, the printed sheet
+  staff.js             Staff across departments: the club's staff list with PINs and departments, the schedule builder, the time clock, timesheets
+  calendar.js          The club calendar (every sheet, closure, event and shift, by department) and club events
   settings.js          Settings: white-label branding (the logo on every output), outgoing e-mail per organization (Resend / Microsoft 365), module setup (General · Food & beverage · Shops)
   poscore.js           checkTotals: the money on a check (service charge, tax, tip), shared by the hub and the station page   [shared]
   autoupdate.js        version.json polling + safe reload (__BUILD__ placeholder)                     [shared]
@@ -76,7 +78,8 @@ src/
   member_src.html      the member portal: sign in by e-mail link, balance, statements, pay online, autopay (markers /*PDFFONTS*/ /*BILLCORE*/ /*AUTOUPDATE*/)
   pos_src.html         a register station on the floor: PIN lock, tables and tabs, the check, send to the kitchen, pay, receipt (markers /*PDFFONTS*/ /*BILLCORE*/ /*POSCORE*/ /*AUTOUPDATE*/)
   expo_src.html        a kitchen expo screen: the rail of fired courses for one prep station, bump / recall (marker /*AUTOUPDATE*/)
-build.sh               → index.html, cashier.html, checkin.html, score.html, gamecast.html, survey.html, member.html, pos.html, expo.html, version.json (repo root)
+  clock_src.html       a time clock kiosk: PIN pad → clock in / out for one department (marker /*AUTOUPDATE*/)
+build.sh               → index.html, cashier.html, checkin.html, score.html, gamecast.html, survey.html, member.html, pos.html, expo.html, clock.html, version.json (repo root)
 ```
 `index.html` = `head.html` + one `<script>` of the modules **in the order listed in `build.sh`** + `boot();`.
 Everything shares one global scope (no modules/imports) — later files may call earlier files' functions, and
@@ -155,25 +158,67 @@ Tournament = { id, name, season, days, startDate, field:[{id,memberId,team,paid,
   `persons()`/`personById(id)` (directory), and write through `upsertMember(id|null, data)` / `removeMember(id)`
   (which keep both documents right) — `memberSnapshot()`/`memberRestore()` for undo. A person is one record
   club-wide; removing someone from an association only ends the membership.
-- **The rail is sectioned and the sections collapse** (ui.js `NAV_SECTIONS` per organization kind; the owner, Oct 2026:
-  "Golf needs a subsection… Food & beverage… Membership", then "tennis and golf need to be separate, and same with pool…
-  collapsible, because the pro shop doesn't need to see all the tennis stuff"): club = Dashboard · **Golf** (Tournaments,
-  Events & live scoring, Tee sheet, Game library, Pro shop) · **Tennis & pickleball** (Court sheet, Tennis shop) · **Pool**
-  (Pool) · **Food & beverage** (Register, Tickets, Menus & products) · **Membership** (Directory, Member accounts, Dues
-  collection, Billing setup, Logins) · **Club** (All bookings, Reports, Organizations, Treasury, Budget, Surveys);
-  association = Dashboard · Golf · Membership (Members, Board) · Money (Treasury, Budget) · Surveys; group = Dashboard ·
-  Golf (Games, Ledger, Tournaments, Golf) · Members · Surveys. `ORG_NAV` still says which keys an organization kind may
-  show and `NAV_GATE` adds the module / role checks (a department entry only shows when a facility / shop outlet belongs
-  to it). **Departments**: a facility carries `dept` golf | tennis | pool | club (`facDept(f)`, default by kind: tee and
-  lesson → golf, court → tennis, pool → pool, room → club; "Run by" in the facility editor) and a shop outlet carries
-  `dept` golf | tennis (`outletDept(o)`, restaurants are 'fnb'; "Shop run by" in the outlet editor). Entries that are
-  views of another page (`NAV_PAGE` + `NAV_DEPT`: teesheet / courts / poolsheet → bookings filtered to that department,
-  `BK.dept`; bookings = every facility, the club's central calendar; proshop / tennisshop → pos with `POS.dept`;
-  posmenu → possetup) light up through `navActive()` / `NAV_OWNS` and open through `navGo()`. Members book everything
-  from the one Book card in the portal; the hub keeps a sheet per department. Section headers are `.navsec` buttons:
-  a tap collapses the section (`toggleNavSec`, remembered per hub in localStorage `fs_navcol_<org>`); the section
-  holding the page on screen never hides it. The rail scrolls (`.side{overflow-y:auto}`). Tablet widths 900–1100 keep a
-  220 px rail; below 900 the rail is the drawer behind the top bar.
+- **The rail is sectioned by department and the sections collapse** (ui.js `NAV_SECTIONS` per organization kind; the
+  owner, Oct 2026: "Golf needs a subsection… Food & beverage… Membership", then "tennis and golf need to be separate, and
+  same with pool… collapsible", then "rename… racket sports… aquatics"): club = Dashboard · **Golf** (Tournaments, Events &
+  live scoring, Tee sheet, Game library, Pro shop, Staff & schedule) · **Racket sports** (Bookings, Pro shop, Staff &
+  schedule) · **Aquatics** (Bookings, Staff & schedule) · **Food & beverage** (Register, Tickets, Menus & products, Staff &
+  schedule) · **Membership** (Directory, Member accounts, Dues collection, Billing setup, Logins) · **Club** (Calendar,
+  Events, All bookings, Staff, Reports, Organizations, Treasury, Budget, Surveys); association = Dashboard · Golf ·
+  Membership (Members, Board) · Money (Treasury, Budget) · Surveys; group = Dashboard · Golf (Games, Ledger, Tournaments,
+  Golf) · Members · Surveys. `ORG_NAV` still says which keys an organization kind may show and `NAV_GATE` adds the module
+  / role checks (a department's Bookings / Pro shop only show when a facility / shop outlet belongs to it).
+  **Departments** (`DEPTS` in bookings.js: golf · racket · aquatics · fnb · club; `DEPT_FIX` maps the old tennis / pool
+  names): a facility carries `dept` (`facDept(f)`, default by kind: tee and lesson → golf, court → racket, pool and cabana
+  → aquatics, room → club; "Run by" in the facility editor), a shop outlet carries `dept` golf | racket (`outletDept(o)`,
+  restaurants are 'fnb'; "Shop run by"), a staff member carries `depts`, a shift and an event carry `dept`. Entries that are
+  views of another page (`NAV_PAGE` + `NAV_DEPT`: teesheet / racketbook / aquabook → bookings filtered to that department,
+  `BK.dept`; bookings = every facility; proshop / racketshop → pos with `POS.dept`; golfstaff / racketstaff / aquastaff /
+  fnbstaff → staff with `ST.dept`; posmenu → possetup) light up through `navActive()` / `NAV_OWNS` and open through
+  `navGo()`. Members book everything from the one Book card in the portal; the hub keeps a sheet per department. Section
+  headers are `.navsec` buttons: a tap collapses the section (`toggleNavSec`, remembered per hub in localStorage
+  `fs_navcol_<org>`); the section holding the page on screen never hides it. The rail scrolls; tablet widths 900–1100
+  keep a 220 px rail; below 900 the rail is the drawer behind the top bar.
+- **Every department books lessons; aquatics books cabanas** (`bookSettings()` seeds Golf lessons, Tennis & pickleball
+  lessons, Cabanas (kind `cabana`, 4-hour slots), Swim lessons once — `b.v2`; a removed one stays removed).
+- **Closed times on a sheet** (`blocks-setup.sql`, table `booking_blocks`: facility, date, `from_t` / `to_t` (HH:MM,
+  to exclusive), `units` ([1,2] or null = all), reason; RLS `can_staff`): the sheet's **Block times** turns on select mode
+  (`BK.selMode` / `BK.sel`; `wireSelect`: tap or drag across cells with pointer events, a finger works) → **Block N times**
+  → `blockDrawer` (reason; bookings inside are counted and left alone) → `blockRows` compresses the picked cells into the
+  fewest rows (consecutive slots per unit; a run shared by every unit is one row for all). **Close the course / Close it**
+  (`closeFacilityDrawer`): a day or a range (≤ 62 days), all day or from–until, some units or all, a reason — one row per
+  day. Blocked cells render hatched with the reason (`.bc.blk`); a note above the sheet lists the day's closures; tap one →
+  `blockInfoDrawer` (what is inside; Remove the block). `BLK.rows` loads the last 60 days on; local mode in localStorage.
+  `member_slots` now returns `blocked` (the portal greys those slots with the reason) and `member_book` refuses a blocked
+  time ("not available — <reason>"). The calendar shows closures too.
+- **Staff across departments** (`src/staff.js`, `staff-setup.sql`; the owner: "the pins are associated to the staff
+  logins and as well as the departments"): one list, `CLUB.staff = [{id, name, role (STAFF_ROLES: server, bartender,
+  manager, pro, attendant, lifeguard, staff), depts:[…] ([] = everywhere), outlets ([] = every register of the department),
+  pin (sha256 of tenant:pin — the same PIN unlocks a register and clocks in), email (their hub login, optional), active}]`;
+  `clubStaff()` folds the old `CLUB.pos.staff` in on first read (`posStaff()` is now an alias). `staffMemberDrawer(x,dept)`
+  is the one editor (Settings → Food & beverage's Staff & PINs card and the Staff pages use it). SQL: `club_staff(club)`,
+  `station_dept(station, club)`, `staff_fits(x, station, dept)`; `pos_boot` / `pos_pin` read the club list and a register
+  sees the people of its outlet's department (fnb, or the shop's golf / racket). **Schedule builder**: `CLUB.shifts =
+  [{id, staffId, dept, date, start, end, where, note}]`; the Staff page (`vStaff`, `ST.dept` from the rail: a department's
+  people or everyone with a department seg) shows the week (Mon–Sun, ‹ › This week), tap a day cell → `shiftDrawer` (who,
+  department, where — the department's outlets / facilities as hints —, start / end, note, repeat: same day for 4 weeks or
+  Mon–Fri this week), **Copy last week**, hours per person, **Print the week** (`schedulePDF`, landscape, branded).
+  **Time clock**: rows in `staff_clock` (tenant, staff_id, name, dept, in_at, out_at, station; RLS `can_staff`), written
+  through `staff_clock(key, pin, action status|in|out)` from a **clock kiosk** (`clock_src.html` → `clock.html?k=TOKEN`:
+  a `pos_stations` row of kind `clock` bound to a department — `pos_stations.dept`, `outlet` now nullable —, made from the
+  Staff page's **Time clock link** → `clockLinkDrawer` → `newStation(null,'clock',name,null,dept)`; PIN pad → "Sam · on the
+  clock since 9:02 / Clock in | Clock out", back to the pad after a few seconds; the token stays in localStorage `fs_clock`)
+  or from a **register's lock screen** (pos_src.html: "Clock in / out" toggles `CLOCKMODE`, the PIN then runs `clockFlow`).
+  The hub reads the last 45 days (`clockLoad`, `ST.clock`): who is on now, hours this week per person, an "out" link to
+  close a forgotten clock-in (`clockFix`), **Timesheet CSV** (`timesheetCSV`). The fake emulates `staff_clock`.
+- **The club calendar and events** (`src/calendar.js`): **Calendar** (`vCalendar`, `CAL`): a month grid with per-day chips
+  (bookings per facility, events, closures, people on shift) and a day panel listing everything in time order
+  (`dayItems(d, dept)`: bookings → `bookingDrawer`, closures → `blockInfoDrawer`, events → `eventDrawer`, shifts →
+  `shiftDrawer`), filtered by department (Everything · Golf · Racket sports · Aquatics · Food & beverage · Club). **Events**
+  (`vEvents`, `CLUB.events = [{id, name, dept ('club' | a department), date, end, start, finish, where, descr, public}]`,
+  `eventDrawer`): the Boo Bash, movie night at the pool; public ones reach the member portal (`member_me` → `events`, the
+  "What's on" card). Loads never re-trigger while running (`calLoad` checks the loading flags — a `.then(render)` on an
+  early-returned load was a microtask loop that froze the page).
 - **The club runs on calendar years, not seasons** (the owner, Oct 2026: "turn the season functionality off on the club
   side… annual revenue, annual profits, as well as quarterly reports"; associations and groups keep their seasons).
   `Y()` for the club = `view.year` or the current year (a `db.seasons[y]` the club has not seen yet is created on the
@@ -377,6 +422,8 @@ Tournament = { id, name, season, days, startDate, field:[{id,memberId,team,paid,
 | `mail_settings` (tenant, org) | each organization's outgoing e-mail sender and provider (`mail-setup.sql`); RLS `can_org`. |
 | `pos_stations`, `pos_fires`, `pos_tickets` (+ station, table_no, server…) + RPC `pos_boot/pin/members/checks/check_put/fire/close/void/expo/bump` | registers and kitchen screens on the floor (`pos-stations-setup.sql`): token-keyed security-definer functions, like admin links. |
 | `bookings` + RPC `member_id_of`, `member_slots`, `member_book`, `member_cancel` | bookings (`booking-setup.sql`): staff on the sheet, members through the security-definer functions that enforce the facility's rules. |
+| `booking_blocks` | closed times on a sheet (`blocks-setup.sql`, which also teaches `member_slots` / `member_book` about them and `member_me` about events). |
+| `staff_clock`, `pos_stations.dept` + RPC `staff_clock`, `club_staff`, `station_dept`, `staff_fits` | the time clock and the club-wide staff list behind the registers (`staff-setup.sql`). |
 | `hub_keys` (org_id, key_hash, label, revoked_at) + RPC `hub_key_org/read/write/people/golf_event/golf_delete/score/share` | admin links (`admin-links-setup.sql`): security-definer functions that act for exactly one organization. |
 | `mm_tournament` | the retired Member-Member app's row (`supabase-setup.sql`). Archive only — no hub code reads or writes it. |
 

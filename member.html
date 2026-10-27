@@ -135,6 +135,7 @@ function render(){
       ${ME.online?'':'<p class="hint">Pay the club the way you always have — the office records it here.</p>'}</div>
     ${ME.online?`<div class="card auto"><div><b style="font-size:16px;color:var(--navy)">Autopay</b><small style="display:block;color:var(--muted);font-size:13px;margin-top:3px">${ME.autopay?`On · ${esc(ME.pm_label||'card on file')} · the balance due is charged when statements go out`:'Off · save a card or bank account and each statement is paid for you'}</small></div>${ME.autopay?'<button class="btn sm" id="autoOff">Turn off</button>':'<button class="btn sm pri" id="autoOn">Set up autopay</button>'}</div>`:''}
     ${(ME.facilities||[]).length?bookCard():''}
+    ${(ME.events||[]).length?`<div class="card"><h2>What’s on</h2>${ME.events.slice(0,8).map(e=>`<div class="row s"><div><b>${esc(e.name)}</b><small>${bcDate(e.date)}${e.end&&e.end!==e.date?' – '+bcDate(e.end):''}${e.start?' · '+t12(e.start)+(e.finish?'–'+t12(e.finish):''):''}${e.where?' · '+esc(e.where):''}${e.descr?'<br>'+esc(e.descr):''}</small></div></div>`).join('')}</div>`:''}
     <div class="card"><h2>Statements</h2>${st.length?st.slice(0,12).map(s=>`<div class="row s"><div><b>${dt(s.period_start)} – ${dt(s.period_end)}</b><small>charges ${fmt(s.charges)} · payments ${fmt(s.payments)} · closing ${fmt(s.closing)}${s.closing>0.004?' · due '+dt(s.due):''}</small></div><button class="btn sm" data-stmt="${esc(s.id)}">PDF</button></div>`).join(''):'<p class="muted">No statements yet.</p>'}</div>
     <div class="card"><h2>Activity</h2>${ledger.length?ledger.map(i=>`<div class="row"><b>${esc(i.descr||'')}</b><span class="a ${i.kind==='charge'?'':'pay'}">${i.kind==='charge'?'':'−'}${fmt(i.amount)}</span><span class="r">${fmt(i.run)}</span><small>${dt(i.posted)}${i.kind==='payment'&&i.method?' · '+(BC_METHOD[i.method]||i.method)+(i.reference&&!/^pi_/.test(i.reference)?' '+esc(i.reference):''):''}</small></div>`).join('')+(items.length>40?'<p class="hint">The last 40 items — statements carry the rest.</p>':''):'<p class="muted">Nothing on your account yet.</p>'}</div>
     <div class="fs"><img src="flagstick-crest.svg" alt="">Flagstick</div>`;
@@ -144,7 +145,7 @@ function render(){
   wireBook();
 }
 /* ---- bookings: the tee sheet, courts, the pool — inside the club's rules (member_book checks them again) ---- */
-const BKV={fac:'',date:'',slots:null,busy:false};
+const BKV={fac:'',date:'',slots:null,blocked:[],busy:false};
 const mins=t=>{ const [h,m]=String(t||'00:00').split(':').map(Number); return h*60+(m||0); }; const hhmm=n=>String(Math.floor(n/60)).padStart(2,'0')+':'+String(n%60).padStart(2,'0');
 const t12=t=>{ const n=mins(t), h=Math.floor(n/60), m=n%60; return `${((h+11)%12)+1}:${String(m).padStart(2,'0')} ${h<12?'am':'pm'}`; };
 const todayISO=()=>new Date().toISOString().slice(0,10); const isoPlus=(iso,n)=>{ const d=new Date(iso+'T12:00'); d.setDate(d.getDate()+n); return d.toISOString().slice(0,10); };
@@ -157,11 +158,12 @@ function bookCard(){ const F=ME.facilities; if(!F.some(f=>f.id===BKV.fac)) BKV.f
     <div class="chips days">${days.map(d=>`<button class="${d===BKV.date?'on':''}" data-bd="${d}">${new Date(d+'T12:00').toLocaleDateString('en-US',{weekday:'short',day:'numeric'})}</button>`).join('')}</div>
     ${S===null?'<p class="muted" style="margin-top:12px">Loading…</p>':`<div class="slots" style="grid-template-columns:${units.length>1?'auto repeat('+units.length+',minmax(0,1fr))':'repeat(auto-fill,minmax(96px,1fr))'}">
       ${units.length>1?'<span></span>'+units.map(u=>`<span class="uh">${esc(unitName(f,u))}</span>`).join(''):''}
-      ${slots.map(t=>(units.length>1?`<span class="th">${t12(t)}</span>`:'')+units.map(u=>{ const T=takenAt(t,u), n=T.reduce((a,x)=>a+(+x.n||1),0), full=f.kind==='tee'?n>=(+f.cap||1):T.length>0, mine=myAt(t,u);
-        return `<button class="sl${mine?' mine':full?' full':''}" data-bs="${t}|${u}"${full&&!mine?' disabled':''}>${units.length>1?'':t12(t)}${f.kind==='tee'&&!mine?`<small>${full?'full':(+f.cap||4)-n+' open'}</small>`:mine?'<small>yours</small>':full?'<small>taken</small>':''}</button>`; }).join('')).join('')}</div>
+      ${slots.map(t=>(units.length>1?`<span class="th">${t12(t)}</span>`:'')+units.map(u=>{ const T=takenAt(t,u), n=T.reduce((a,x)=>a+(+x.n||1),0), mine=myAt(t,u), k=!mine&&blockedAt(t,u), full=k||(f.kind==='tee'?n>=(+f.cap||1):T.length>0);
+        return `<button class="sl${mine?' mine':full?' full':''}" data-bs="${t}|${u}"${full&&!mine?' disabled':''} ${k&&k.reason?`title="${esc(k.reason)}"`:''}>${units.length>1?'':t12(t)}${k?`<small>${esc(k.reason||'closed')}</small>`:f.kind==='tee'&&!mine?`<small>${full?'full':(+f.cap||4)-n+' open'}</small>`:mine?'<small>yours</small>':full?'<small>taken</small>':''}</button>`; }).join('')).join('')}</div>
     <p class="hint">${f.kind==='tee'?`Up to ${f.cap||4} players a tee time · `:''}book up to ${lead} days ahead${f.fee&&+f.fee.amount?` · ${bcFmt(f.fee.amount)} ${f.fee.per==='player'?'per player':''} to your account`:''}.</p>`}
     ${mine.length?`<h2 style="margin-top:18px">My bookings</h2>${mine.map(b=>{ const bf=F.find(x=>x.id===b.facility)||{name:b.facility}; return `<div class="row s"><div><b>${esc(bf.name)} · ${bcDate(b.date)} ${t12(b.time)}</b><small>${(+bf.units||1)>1?esc(unitName(bf,b.unit))+' · ':''}${(b.players||[]).map(p=>esc(p.name)).join(', ')}${b.status==='checked_in'?' · checked in':''}</small></div>${b.status==='booked'?`<button class="btn sm" data-bx="${b.id}">Cancel</button>`:''}</div>`; }).join('')}`:''}</div>`; }
-async function loadSlots(){ const {data,error}=await sb.rpc('member_slots',{p_tenant:TENANT,p_facility:BKV.fac,p_date:BKV.date}); BKV.slots=error?[]:((data&&data.taken)||[]); if(data&&data.mine) ME.bookings=data.mine; render(); }
+async function loadSlots(){ const {data,error}=await sb.rpc('member_slots',{p_tenant:TENANT,p_facility:BKV.fac,p_date:BKV.date}); BKV.slots=error?[]:((data&&data.taken)||[]); BKV.blocked=error?[]:((data&&data.blocked)||[]); if(data&&data.mine) ME.bookings=data.mine; render(); }
+const blockedAt=(t,u)=>(BKV.blocked||[]).find(k=>t>=k.from&&t<k.to&&(!k.units||k.units.includes(u)));
 function wireBook(){ if(!(ME.facilities||[]).length) return; if(BKV.slots===null) loadSlots();
   document.querySelectorAll('[data-bf]').forEach(b=>b.onclick=()=>{ BKV.fac=b.dataset.bf; BKV.slots=null; render(); }); document.querySelectorAll('[data-bd]').forEach(b=>b.onclick=()=>{ BKV.date=b.dataset.bd; BKV.slots=null; render(); });
   document.querySelectorAll('[data-bs]').forEach(b=>b.onclick=()=>{ const [t,u]=b.dataset.bs.split('|'); if(b.classList.contains('mine')){ toast('That one is yours — cancel it below to change it'); return; } bookSheet(ME.facilities.find(x=>x.id===BKV.fac),t,+u); });
@@ -196,7 +198,7 @@ boot();
    page counts, and a reload is tried once per build — if the page that comes back is still the old one, the CDN
    hasn't caught up; wait a while before trying that build again. */
 (function(){
-  const ME='20261027003553', KEY='au_tried', RETRY=10*60*1000; let ready=false, lastCheck=0;
+  const ME='20261027015337', KEY='au_tried', RETRY=10*60*1000; let ready=false, lastCheck=0;
   const typing=()=>{ const a=document.activeElement; return a&&/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)&&a.value&&a.type!=='search'; };
   const safe=()=>!typing()&&(typeof window.__canReload!=='function'||window.__canReload());
   const tried=()=>{ try{ const [b,t]=(sessionStorage.getItem(KEY)||'').split('|'); return b?{build:b,at:+t||0}:null; }catch(_){ return null; } };
