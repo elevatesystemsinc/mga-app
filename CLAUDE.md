@@ -638,6 +638,22 @@ Receipt, **Pay**: tip presets, member search → charge to the account, Cash / C
 (brand logo). `checkTotals(lines, tip, rates)` in poscore is the one money function (the hub's `ticketTotals` wraps it).
 The hub's Tickets page shows station checks (table, server) alongside its own. The fake emulates every `pos_*` function;
 `tests/test_billing.py` runs setup → station → kitchen → account → hub → revoke end to end.
+- **The next layer** (`pos-split-setup.sql`, Oct 2026): **modifiers** — a product's `mods:[{name,required,multi,options:[{name,price}]}]`
+  typed as one group per line (`parseMods` / `modsText` in poscore: "Temperature*: Rare, Medium, Well", "Add-ons+: Bacon +2");
+  tapping such a product opens the sheet (station `modsSheet`, hub `modsDrawer`); a line carries `mods:[{name,price}]` and
+  `lineUnit` / `lineTotal` add the deltas, the kitchen sees them. **Courses** — `product.course` 0 with the order | 1 starters |
+  2 mains | 3 dessert (`COURSES`), a line's course cycles from its actions; **Send** fires course 0 + the lowest unfired course
+  and reads "Fire mains" afterwards (`pos_fire(key, ticket, course)`; held lines say so; More → Fire everything now); a
+  fire row of course ≥ 2 carries `note` "Course n" and the expo shows it. **Seats** — `line.seat` from the seat chips on the
+  check. **Split payments** — `pos_pay(key, ticket, {method, amount (incl. tip), tip, member_id, label, totals, lines})`
+  appends to `pos_tickets.payments` and closes the check once the payments cover subtotal + service + tax (`paid` =
+  'split' when more than one); the pay sheet offers Whole check · Split evenly (2–6 ways) · By seat · Pick items, each
+  portion with its own tip (presets on the portion's subtotal, `portion()` / `portionTotals` / `balanceDue` / `paidSoFar`)
+  and its own method; an account portion is its own `acct_items` charge (`ref pos:<ticket>:<payment>`, tax and service in
+  proportion). `pos_void` voids every charge of the check. **Transfer** — More → Transfer to… (the check's server or a
+  manager) rewrites `server` / `server_id`. **Shift** — `shiftStats(tickets)` (poscore): net sales, service, tax, tips, by
+  payment type, per server, voids, items; the hub's Tickets page shows it per outlet with a branded PDF (`shiftPDF`); a
+  manager at the station reads today's through `pos_shift` (More → Shift numbers).
 
 ### Other
 Checklist (95-task 2026 template, assignees from members/board, notes, print). Golf (courses, WHS, flights,

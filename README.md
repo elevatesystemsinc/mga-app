@@ -222,6 +222,12 @@ manager's PIN is needed to leave the station, and to void a check. The kitchen s
 station with the table, the server and the minutes elapsed; **Bump** clears it. The golf shop works the same way from
 **Settings → Golf shop**, without tables or kitchens.
 
+On the check: items with **modifiers** (temperature, add-ons with their prices — set on the product), **seats**, and
+**courses** — starters go with the order, mains and dessert hold until the server fires them. **Pay** takes the whole check,
+an even split, a seat, or picked items, each with its own tip and its own method, until the check is covered. A check can
+be **transferred** to another server. A manager sees the **shift numbers** at the station; the hub's Tickets page has the
+shift report per outlet (sales, payment types, tips by server, voids, items) as a branded PDF.
+
 ## Bookings
 
 **Bookings** (staff, with the module on) is the tee sheet and every other sheet: tennis and pickleball courts, the pool,

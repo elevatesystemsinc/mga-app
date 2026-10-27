@@ -113,11 +113,36 @@ class FakeDB:
             r=next((t for t in tix if t['id']==a.get('p_ticket') and t.get('tenant','wccc')==tn and t['outlet']==st['outlet']),None)
             if fn=='pos_fire':
                 if not r or r['status']!='open': return err('Check not open')
-                routes=sorted({l.get('route') for l in r['lines'] if l.get('route') and not l.get('fired')}); 
-                for e in routes: fires.append({'id':str(uuid.uuid4()),'tenant':tn,'outlet':st['outlet'],'expo':e,'station':st['id'],'ticket':r['id'],'table_no':r.get('table_no'),'server':r.get('server'),'lines':[l for l in r['lines'] if l.get('route')==e and not l.get('fired')],'note':None,'fired_at':now,'done_at':None})
+                co=a.get('p_course'); ok=lambda l:l.get('route') and not l.get('fired') and (co is None or int(l.get('course') or 0) in (0,co))
+                routes=sorted({l.get('route') for l in r['lines'] if ok(l)})
+                for e in routes: fires.append({'id':str(uuid.uuid4()),'tenant':tn,'outlet':st['outlet'],'expo':e,'station':st['id'],'ticket':r['id'],'table_no':r.get('table_no'),'server':r.get('server'),'lines':[l for l in r['lines'] if ok(l) and l.get('route')==e],'note':('Course %s'%co) if co and co>1 else None,'fired_at':now,'done_at':None})
                 for l in r['lines']:
-                    if l.get('route') and not l.get('fired'): l['fired']=True; l['fired_at']=now
+                    if ok(l): l['fired']=True; l['fired_at']=now
                 return json.dumps({'data':{'fired':len(routes),'lines':r['lines']},'error':None})
+            if fn=='pos_pay':
+                if not r or r['status']!='open': return err('Check not open')
+                d=a.get('p_pay') or {}
+                if d.get('totals'): r['subtotal']=d['totals']['subtotal']; r['svc']=d['totals']['svc']; r['tax']=d['totals']['tax']; r['lines']=d.get('lines') or r['lines']
+                method=d.get('method') or 'cash'; amt=round(float(d.get('amount') or 0),2); tip=round(float(d.get('tip') or 0),2); net=round(amt-tip,2); mid=d.get('member_id')
+                if net<=0: return err('Nothing to pay')
+                owed=round(r['subtotal']+r['svc']+r['tax'],2); paid=round(sum(float(p['amount'])-float(p.get('tip') or 0) for p in r.get('payments') or []),2)
+                if net>owed-paid+0.01: return err('That is more than what is owed')
+                pay={'id':str(uuid.uuid4()),'method':method,'amount':amt,'tip':tip,'member_id':mid,'label':d.get('label'),'at':now,'by':r.get('server')}
+                if method=='account':
+                    if not mid: return err('Pick the member first')
+                    m=next((x for x in club.get('members',[]) if x['id']==mid),None)
+                    if not m: return err('Unknown member')
+                    if (m.get('billing') or {}).get('status')=='suspended': return err('This member is suspended — no charges to the account')
+                    items=(club.get('billing') or {}).get('items') or []; it=next((x for x in items if x['id']==outlet.get('item','fnb')),{'id':outlet.get('item','fnb'),'source':'fnb','gl':''}); share=net/owed if owed else 1
+                    aid=str(uuid.uuid4()); self._rows('acct_items').append({'id':aid,'tenant':tn,'member_id':mid,'kind':'charge','source':it.get('source','fnb'),'item':it['id'],'gl':it.get('gl',''),'ref':'pos:%s:%s'%(r['id'],pay['id']),'descr':(outlet.get('name') or st['outlet'])+' · '+(d.get('label') or ', '.join(l['name'] for l in r['lines']))+((' · tip %s'%tip) if tip else ''),'amount':amt,'tax':round(r['tax']*share,2),'svc':round(r['svc']*share,2),'method':None,'reference':None,'posted':datetime.date.today().isoformat(),'void_at':None,'void_reason':None,'created_at':now,'created_by':r.get('server') or 'station'}); pay['acct_item']=aid
+                r['payments']=(r.get('payments') or [])+[pay]; paid=round(paid+net,2)
+                if paid>=owed-0.005:
+                    tips=round(sum(float(p.get('tip') or 0) for p in r['payments']),2); r.update({'tip':tips,'total':round(owed+tips,2),'paid':'split' if len(r['payments'])>1 else method,'member_id':mid or r.get('member_id'),'acct_item':pay.get('acct_item') or r.get('acct_item'),'status':'closed','closed_at':now,'updated_at':now})
+                else: r.update({'member_id':mid or r.get('member_id'),'updated_at':now})
+                return json.dumps({'data':r,'error':None})
+            if fn=='pos_shift':
+                day=str(a.get('p_date') or datetime.date.today().isoformat())
+                return json.dumps({'data':[t for t in tix if t.get('tenant','wccc')==tn and t['outlet']==st['outlet'] and t['status'] in ('closed','void') and str(t.get('closed_at') or t.get('void_at') or '')[:10]==day],'error':None})
             if fn=='pos_close':
                 if not r or r['status']!='open': return err('Check not open')
                 d=a.get('p_data') or {}; paid=d.get('paid') or 'cash'
@@ -135,9 +160,8 @@ class FakeDB:
             if fn=='pos_void':
                 if not r: return err('Unknown check')
                 r.update({'status':'void','void_at':now,'void_reason':a.get('p_reason') or '','updated_at':now})
-                if r.get('acct_item'):
-                    for i in self._rows('acct_items'):
-                        if i['id']==r['acct_item'] and not i.get('void_at'): i['void_at']=now; i['void_reason']='Check voided at the station: '+(a.get('p_reason') or '')
+                for i in self._rows('acct_items'):
+                    if (i['id']==r.get('acct_item') or str(i.get('ref','')).startswith('pos:'+r['id'])) and not i.get('void_at'): i['void_at']=now; i['void_reason']='Check voided at the station: '+(a.get('p_reason') or '')
                 return json.dumps({'data':True,'error':None})
             if fn=='pos_expo':
                 if st['kind']!='expo': return json.dumps({'data':None,'error':None})
