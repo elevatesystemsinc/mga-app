@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1">
+<meta name="theme-color" content="#0F2A38">
+<meta name="robots" content="noindex">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>Register · Flagstick</title>
+<link rel="icon" href="favicon.png?v=3">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@600;700&family=Public+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script src="config.js"></script>
+<style>
+:root{--navy:#0F2A38;--gold:#C7A13A;--goldl:#D8B75F;--golddk:#7E5F1A;--paper:#F4F0E6;--ivory:#FBFAF5;--line:#E3DCC9;--muted:#56626A;--ink:#14222B;--pos:#1F6B4A;--neg:#B5443A;
+  --serif:'Cormorant Garamond',Georgia,serif;--sans:'Public Sans',system-ui,-apple-system,'Segoe UI',sans-serif}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent} html,body{margin:0;height:100%} [hidden]{display:none!important}
+body{font-family:var(--sans);background:var(--paper);color:var(--ink);font-size:16px;line-height:1.35;-webkit-font-smoothing:antialiased;font-variant-numeric:lining-nums;overscroll-behavior:none;user-select:none}
+button,input{font:inherit;color:inherit} button{cursor:pointer}
+.top{background:radial-gradient(circle at 10% 40%,#1B3D50,var(--navy) 65%);color:#fff;padding:calc(8px + env(safe-area-inset-top,0px)) 14px 8px;display:flex;align-items:center;gap:12px;border-bottom:3px solid var(--gold);min-height:56px}
+.top img{height:34px;max-width:120px;object-fit:contain} .top .t{flex:1;min-width:0} .top b{display:block;font-family:var(--serif);font-size:20px;line-height:1.05;white-space:nowrap;overflow:hidden;text-overflow:ellipsis} .top small{color:#C9CFD2;font-size:12px;display:block}
+.top button{background:none;border:1px solid rgba(255,255,255,.35);color:#fff;border-radius:8px;height:36px;padding:0 12px;font-size:13px;font-weight:600}
+.top .who{background:rgba(216,183,95,.18);border-color:rgba(216,183,95,.5)}
+main{padding:12px;max-width:1280px;margin:0 auto}
+.btn{height:48px;padding:0 18px;border-radius:12px;border:1.5px solid #CFC6AE;background:#fff;font-weight:700;font-size:15px;display:inline-flex;align-items:center;justify-content:center;gap:8px;color:var(--navy)} .btn.pri{background:var(--navy);border-color:var(--navy);color:#fff} .btn.gold{background:var(--gold);border-color:var(--gold);color:var(--navy)} .btn.sm{height:38px;padding:0 12px;font-size:13.5px;border-radius:9px} .btn:disabled{opacity:.45} .btn.w{width:100%} .btn.danger{color:var(--neg)}
+.card{background:#fff;border:1px solid var(--line);border-radius:14px;padding:16px}
+h1{font-family:var(--serif);font-size:30px;line-height:1.05;margin:0 0 6px;color:var(--navy)} h2{font-family:var(--serif);font-size:22px;margin:0 0 8px;color:var(--navy)} .muted{color:var(--muted)} .hint{font-size:13px;color:var(--muted)}
+/* lock */
+.lock{max-width:380px;margin:30px auto;text-align:center} .pin{font-size:34px;letter-spacing:12px;height:54px;color:var(--navy);font-weight:800} .pad{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:10px} .pad button{height:64px;border-radius:14px;border:1.5px solid #CFC6AE;background:#fff;font-size:24px;font-weight:700;color:var(--navy)} .pad button:active{background:var(--ivory)} .pad button.go{background:var(--navy);color:#fff;border-color:var(--navy)}
+.lock.err .pin{color:var(--neg);animation:sh .3s} @keyframes sh{25%{transform:translateX(-6px)}75%{transform:translateX(6px)}}
+/* floor */
+.seg{display:flex;gap:6px;flex-wrap:wrap} .seg button{height:38px;padding:0 14px;border-radius:999px;border:1px solid var(--line);background:#fff;font-weight:600;font-size:13.5px;color:var(--muted)} .seg button.on{background:var(--navy);border-color:var(--navy);color:#fff}
+.floor{display:grid;grid-template-columns:repeat(auto-fill,minmax(118px,1fr));gap:10px;margin-top:12px}
+.tbl{min-height:82px;border:1.5px solid #CFC6AE;border-radius:14px;background:#fff;padding:10px;text-align:left;display:flex;flex-direction:column;justify-content:space-between;gap:4px} .tbl b{font-size:18px;color:var(--navy)} .tbl small{font-size:11.5px;color:var(--muted);display:block} .tbl.open{background:#FBF3DC;border-color:var(--gold)} .tbl.mine{background:#E3F0E8;border-color:var(--pos)} .tbl.new{border-style:dashed;justify-content:center;align-items:center;color:var(--muted);font-weight:700}
+/* check */
+.chk{display:grid;grid-template-columns:minmax(300px,2fr) minmax(0,3fr);gap:12px;align-items:start} @media (max-width:860px){ .chk{grid-template-columns:minmax(0,1fr)} }
+.lines .ln{display:grid;grid-template-columns:34px minmax(0,1fr) 80px;gap:8px;align-items:center;padding:9px 0;border-top:1px solid var(--line);font-size:15px} .lines .ln:first-child{border-top:none} .lines .ln .q{font-weight:800;color:var(--navy);text-align:center} .lines .ln.fired{color:var(--muted)} .lines .ln.fired .q::after{content:' ✓';color:var(--pos);font-size:11px} .lines .ln small{display:block;font-size:12px;color:var(--muted)} .lines .ln .p{text-align:right;font-weight:700}
+.lines .ln.sel{background:var(--ivory);margin:0 -8px;padding:9px 8px;border-radius:8px}
+.tot{display:grid;grid-template-columns:1fr auto;gap:4px 12px;border-top:2px solid var(--line);padding-top:10px;margin-top:8px;font-size:14px} .tot .big{font-size:20px;font-weight:800;color:var(--navy)}
+.menu .cats{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px} .pg{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:8px} .pb{min-height:66px;border:1px solid var(--line);border-radius:12px;background:#fff;padding:8px 10px;text-align:left;display:flex;flex-direction:column;justify-content:space-between;gap:4px} .pb:active{background:var(--ivory)} .pb b{font-size:14px;color:var(--navy);line-height:1.2} .pb span{font-weight:700;font-size:13px} .pb small{color:var(--muted);font-size:11px}
+.bar{position:sticky;bottom:0;background:rgba(244,240,230,.95);backdrop-filter:blur(8px);padding:10px 0 calc(8px + env(safe-area-inset-bottom,0px));display:flex;gap:8px;flex-wrap:wrap;margin-top:10px} .bar .btn{flex:1 1 120px}
+.lineacts{display:flex;gap:6px;flex-wrap:wrap;margin:6px 0 2px} .lineacts .btn{height:36px;padding:0 12px;font-size:13px}
+.sheet{position:fixed;inset:0;background:rgba(15,42,56,.55);display:flex;align-items:flex-end;justify-content:center;z-index:50} .sheet>div{background:#fff;border-radius:16px 16px 0 0;padding:18px 16px calc(18px + env(safe-area-inset-bottom,0px));width:100%;max-width:600px;max-height:92vh;overflow:auto}
+.inp{width:100%;height:46px;border:1.5px solid #CFC6AE;border-radius:10px;padding:0 12px;background:#fff;font-size:16px} .lbl{display:block;font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--golddk);margin:10px 0 6px}
+.pick{border:1px solid var(--line);border-radius:10px;overflow:hidden;margin-top:6px} .pick button{display:flex;gap:10px;align-items:center;width:100%;text-align:left;border:none;border-top:1px solid var(--line);background:#fff;padding:10px 12px;font-size:15px} .pick button:first-child{border-top:none} .pick button small{margin-left:auto;color:var(--muted)}
+.toast{position:fixed;left:50%;bottom:90px;transform:translateX(-50%);background:var(--navy);color:#fff;padding:12px 18px;border-radius:10px;font-weight:600;z-index:60;box-shadow:0 6px 20px rgba(0,0,0,.25);max-width:92vw;text-align:center}
+.chip{display:inline-flex;align-items:center;min-height:24px;padding:2px 10px;border-radius:999px;font-size:12px;font-weight:600;background:var(--ivory);border:1px solid var(--line)}
+</style>
+</head>
+<body>
+<header class="top"><img id="hLogo" src="flagstick-crest-light.svg" alt=""><div class="t"><b id="hTitle">Register</b><small id="hSub">Station</small></div><button class="who" id="hWho" hidden></button><button id="hLock" hidden>Lock</button></header>
+<main id="main"><div class="card"><p class="muted">Starting the station…</p></div></main>
+<script>
+/*PDFFONTS*/
+/*BILLCORE*/
+/*POSCORE*/
+const $=id=>document.getElementById(id); const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const CFG=window.MM_CONFIG||{}; const sb=(CFG.url&&CFG.anonKey&&window.supabase)?window.supabase.createClient(CFG.url,CFG.anonKey,{auth:{persistSession:false}}):null;
+const qs=new URLSearchParams(location.search); const ls={get(k){ try{ return localStorage.getItem(k); }catch(_){ return null; } },set(k,v){ try{ localStorage.setItem(k,v); }catch(_){ } },del(k){ try{ localStorage.removeItem(k); }catch(_){ } }};
+let KEY=(qs.get('s')||'').trim()||ls.get('fs_station')||'', B=null, USER=null, CHECKS=[], CUR=null, SEL=null, VIEW='lock', MINE=true, MENU='', CAT='', PIN='', pollT=null, idleT=null, busy=false;
+if(qs.get('s')){ ls.set('fs_station',KEY); history.replaceState(null,'',location.pathname); }
+const fmt=pcFmt; const uid=()=>(crypto.randomUUID?crypto.randomUUID():Date.now().toString(36)+Math.random().toString(36).slice(2));
+function toast(m){ const d=document.createElement('div'); d.className='toast'; d.textContent=m; document.body.appendChild(d); setTimeout(()=>d.remove(),2600); }
+async function rpc(fn,args){ const {data,error}=await sb.rpc(fn,Object.assign({p_key:KEY},args||{})); if(error){ const msg=error.message||'failed'; if(/not valid|42501/i.test(msg)){ ls.del('fs_station'); KEY=''; B=null; render(); } throw new Error(msg.replace(/^.*?: /,'')); } return data; }
+const rates=()=>B?B.rates:{tax:0,svc:0}; const totals=c=>checkTotals(c.lines,c.tip,rates());
+const isFnb=()=>B&&B.outlet&&B.outlet.kind==='fnb'; const tables=()=>(B&&B.outlet&&B.outlet.tables)||[]; const expos=()=>(B&&B.outlet&&B.outlet.expos)||[];
+const menusOn=()=>((B&&B.outlet&&B.outlet.menus)||[]).filter(m=>m.active!==false);
+const products=()=>{ const on=menusOn().map(m=>m.id); return (B.products||[]).filter(p=>!on.length||!(p.menus||[]).length||p.menus.some(id=>on.includes(id))).filter(p=>!MENU||(p.menus||[]).includes(MENU)||!(p.menus||[]).length); };
+const byDate=(a,b)=>String(a.created_at||'').localeCompare(String(b.created_at||''));
+const age=t=>{ const m=Math.floor((Date.now()-new Date(t))/60000); return m<1?'just now':m<60?m+' min':Math.floor(m/60)+' h '+(m%60)+' m'; };
+function header(){ if(B){ $('hTitle').textContent=B.outlet?B.outlet.name:'Register'; $('hSub').textContent=`${B.station.name} · ${B.club}`; if(B.brand) $('hLogo').src=B.brand; document.title=`${B.outlet?B.outlet.name:'Register'} · ${B.station.name}`; } $('hWho').hidden=!USER; $('hLock').hidden=!USER; if(USER) $('hWho').textContent=USER.name; }
+async function boot(){ if(!sb) return msg('Not connected','The station is not available right now.'); if(!KEY) return msg('No station link','Open this page from the station link the club made for this register (Settings → Food & beverage).');
+  try{ B=await rpc('pos_boot'); }catch(e){ return msg('This station link is not valid',e.message+' — ask a manager for a new link.'); } header(); render(); }
+function msg(t,x){ $('main').innerHTML=`<div class="card" style="max-width:520px;margin:30px auto;text-align:center"><h1>${esc(t)}</h1><p class="muted">${esc(x)}</p></div>`; }
+function touch(){ clearTimeout(idleT); if(USER) idleT=setTimeout(()=>{ if(!busy) lock(); },4*60*1000); }
+document.addEventListener('pointerdown',touch,{passive:true});
+function lock(){ USER=null; CUR=null; VIEW='lock'; PIN=''; clearInterval(pollT); header(); render(); }
+$('hLock').onclick=lock; $('hWho').onclick=()=>{ if(confirm(`Switch server? ${USER.name} is signed out of this station.`)) lock(); };
+/* ---- screens ---- */
+function render(){ touch(); if(!B) return; if(VIEW==='lock') return renderLock(); if(VIEW==='check'&&CUR) return renderCheck(); return renderFloor(); }
+function renderLock(){ $('main').innerHTML=`<div class="lock" id="lock"><h1>${esc(B.outlet?B.outlet.name:'Register')}</h1><p class="muted">${esc(B.station.name)} · enter your PIN</p><div class="pin" id="pinV">${'•'.repeat(PIN.length)}</div>
+    <div class="pad">${[1,2,3,4,5,6,7,8,9].map(n=>`<button data-k="${n}">${n}</button>`).join('')}<button data-k="x">⌫</button><button data-k="0">0</button><button class="go" data-k="go">Go</button></div>
+    <p class="hint" style="margin-top:22px"><button class="btn sm" id="leave">Leave this station</button></p></div>`;
+  document.querySelectorAll('[data-k]').forEach(b=>b.onclick=()=>{ const k=b.dataset.k; if(k==='x') PIN=PIN.slice(0,-1); else if(k==='go') return unlock(); else if(PIN.length<6) PIN+=k; $('pinV').textContent='•'.repeat(PIN.length); if(PIN.length>=4&&k!=='x'&&PIN.length===6) unlock(); });
+  $('leave').onclick=leaveStation; }
+async function unlock(){ if(PIN.length<4) return; try{ const u=await rpc('pos_pin',{p_pin:PIN}); if(!u){ PIN=''; $('lock').classList.add('err'); $('pinV').textContent=''; setTimeout(()=>$('lock').classList.remove('err'),400); return; } USER=u; PIN=''; VIEW='floor'; header(); await loadChecks(); render(); clearInterval(pollT); pollT=setInterval(()=>{ if(VIEW==='floor'&&!busy) loadChecks().then(()=>{ if(VIEW==='floor') render(); }); },8000); }catch(e){ toast(e.message); } }
+async function leaveStation(){ const pin=prompt('Manager PIN to leave this station'); if(!pin) return; try{ const u=await rpc('pos_pin',{p_pin:pin}); if(!u||u.role!=='manager'){ toast('A manager’s PIN is needed'); return; } ls.del('fs_station'); location.href=(CFG.siteBase||'/'); }catch(e){ toast(e.message); } }
+async function loadChecks(){ try{ CHECKS=await rpc('pos_checks'); }catch(e){ toast(e.message); } }
+function renderFloor(){ const open=CHECKS.filter(c=>c.status==='open'), mineF=c=>c.server_id===USER.id; const show=MINE?open.filter(mineF):open; const T=tables(); const byT={}; open.forEach(c=>{ if(c.table_no) byT[c.table_no]=c; }); const tabs=open.filter(c=>!c.table_no);
+  $('main').innerHTML=`<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><div class="seg"><button class="${MINE?'on':''}" data-m="1">My checks · ${open.filter(mineF).length}</button><button class="${MINE?'':'on'}" data-m="0">All open · ${open.length}</button></div><span style="flex:1"></span><button class="btn pri" id="newTab">${isFnb()?'New tab':'New sale'}</button></div>
+    ${T.length?`<h2 style="margin-top:16px">Tables</h2><div class="floor">${T.map(t=>{ const c=byT[t]; const cls=c?(mineF(c)?'mine':'open'):''; const hide=MINE&&c&&!mineF(c); return `<button class="tbl ${cls}" data-t="${esc(t)}"${hide?' style="opacity:.45"':''}><b>${esc(t)}</b>${c?`<small>${esc(c.server||'')} · ${fmt(totals(c).total)}<br>${age(c.created_at)}${c.guests?' · '+c.guests+' guests':''}</small>`:'<small>open</small>'}</button>`; }).join('')}</div>`:''}
+    ${tabs.length||!T.length?`<h2 style="margin-top:16px">${isFnb()?'Tabs':'Open sales'}</h2><div class="floor">${tabs.filter(c=>!MINE||mineF(c)).map(c=>`<button class="tbl ${mineF(c)?'mine':'open'}" data-c="${c.id}"><b>${esc(c.guest||(c.member_id?'Member':'Tab'))}</b><small>${esc(c.server||'')} · ${fmt(totals(c).total)}<br>${checkText(c.lines).slice(0,40)||age(c.created_at)}</small></button>`).join('')||'<span class="muted">Nothing open.</span>'}</div>`:''}`;
+  document.querySelectorAll('[data-m]').forEach(b=>b.onclick=()=>{ MINE=b.dataset.m==='1'; render(); });
+  document.querySelectorAll('[data-t]').forEach(b=>b.onclick=()=>{ const c=byT[b.dataset.t]; if(c) openCheck(c); else newCheck({table_no:b.dataset.t}); });
+  document.querySelectorAll('[data-c]').forEach(b=>b.onclick=()=>openCheck(open.find(c=>c.id===b.dataset.c)));
+  $('newTab').onclick=()=>{ const name=isFnb()?prompt('Name for the tab (a first name, a seat at the bar)'):''; if(isFnb()&&!name) return; newCheck({guest:name||''}); }; }
+function newCheck(o){ CUR=Object.assign({id:uid(),table_no:null,guest:'',member_id:null,server:USER.name,server_id:USER.id,guests:0,lines:[],note:'',tip:0,status:'open',created_at:new Date().toISOString()},o); SEL=null; VIEW='check'; render(); save(); }
+function openCheck(c){ CUR=c; SEL=null; VIEW='check'; render(); }
+async function save(){ if(!CUR) return; Object.assign(CUR,totals(CUR)); try{ const r=await rpc('pos_check_put',{p_check:CUR}); if(r&&r.id){ const i=CHECKS.findIndex(c=>c.id===r.id); if(i>=0) CHECKS[i]=Object.assign(CHECKS[i],r); else CHECKS.push(r); } }catch(e){ toast(e.message); } }
+function renderCheck(){ const c=CUR, t=totals(c), P=products(), cats=[...new Set(P.map(p=>p.cat||''))].sort(); if(CAT&&!cats.includes(CAT)) CAT='';
+  const unf=c.lines.filter(l=>l.route&&!l.fired).length;
+  $('main').innerHTML=`<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px"><button class="btn sm" id="back">‹ ${isFnb()?'Floor':'Sales'}</button><h2 style="margin:0;flex:1">${c.table_no?'Table '+esc(c.table_no):esc(c.guest||'Tab')}${c.member_id?' · member':''}</h2>${isFnb()?`<span class="chip">${esc(c.server)}</span><button class="btn sm" id="guests">${c.guests||0} guests</button>`:''}</div>
+    <div class="chk"><div class="card"><div class="lines">${c.lines.length?c.lines.map(l=>`<div class="ln${l.fired?' fired':''}${SEL===l.id?' sel':''}" data-l="${l.id}"><span class="q">${l.qty}</span><span>${esc(l.name)}${l.note?`<small>${esc(l.note)}</small>`:''}${l.route&&!l.fired?`<small>to ${esc((expos().find(e=>e.id===l.route)||{}).name||'kitchen')} — not sent</small>`:''}</span><span class="p">${fmt(l.qty*l.price)}</span></div>`).join(''):'<p class="muted" style="margin:4px 0 8px">Tap items on the menu.</p>'}</div>
+      ${SEL&&c.lines.find(l=>l.id===SEL)?`<div class="lineacts"><button class="btn" data-la="-">−</button><button class="btn" data-la="+">+</button><button class="btn" data-la="note">Note</button>${c.lines.find(l=>l.id===SEL).fired?'':'<button class="btn danger" data-la="x">Remove</button>'}</div>`:''}
+      <div class="tot"><span>Subtotal</span><b>${fmt(t.subtotal)}</b>${t.svc?`<span>Service charge</span><b>${fmt(t.svc)}</b>`:''}${t.tax?`<span>Tax</span><b>${fmt(t.tax)}</b>`:''}${t.tip?`<span>Tip</span><b>${fmt(t.tip)}</b>`:''}<span class="big">Total</span><b class="big">${fmt(t.total)}</b></div>
+      <div class="bar">${isFnb()&&expos().length?`<button class="btn gold" id="send"${unf?'':' disabled'}>Send${unf?' · '+unf:''}</button>`:''}<button class="btn" id="rcpt">Receipt</button><button class="btn pri" id="pay"${c.lines.length?'':' disabled'}>Pay ${fmt(t.total)}</button></div></div>
+    <div class="card menu">${menusOn().length>1?`<div class="seg" style="margin-bottom:8px">${menusOn().map(m=>`<button class="${MENU===m.id?'on':''}" data-mn="${m.id}">${esc(m.name)}</button>`).join('')}</div>`:''}
+      ${cats.length>1?`<div class="cats seg"><button class="${CAT?'':'on'}" data-ct="">All</button>${cats.map(x=>`<button class="${CAT===x?'on':''}" data-ct="${esc(x)}">${esc(x||'Other')}</button>`).join('')}</div>`:''}
+      <div class="pg">${P.filter(p=>!CAT||(p.cat||'')===CAT).sort((a,b)=>(a.cat||'').localeCompare(b.cat||'')||a.name.localeCompare(b.name)).map(p=>`<button class="pb" data-p="${p.id}"><b>${esc(p.name)}</b><span>${fmt(p.price)}${p.route?` <small>→ ${esc((expos().find(e=>e.id===p.route)||{}).name||'')}</small>`:''}</span></button>`).join('')}<button class="pb" id="openItem"><b>Open item</b><small>any amount</small></button></div></div></div>`;
+  $('back').onclick=()=>{ VIEW='floor'; CUR=null; render(); loadChecks().then(()=>{ if(VIEW==='floor') render(); }); };
+  const g=$('guests'); if(g) g.onclick=()=>{ const n=prompt('Guests at the table',c.guests||''); if(n!=null){ c.guests=Math.max(0,parseInt(n)||0); render(); save(); } };
+  document.querySelectorAll('[data-l]').forEach(x=>x.onclick=()=>{ SEL=SEL===x.dataset.l?null:x.dataset.l; render(); });
+  document.querySelectorAll('[data-la]').forEach(x=>x.onclick=()=>{ const l=c.lines.find(y=>y.id===SEL); if(!l) return; const a=x.dataset.la; if(a==='+') l.qty++; if(a==='-'){ if(l.fired&&l.qty<=1){ toast('Sent to the kitchen — a manager voids it'); return; } l.qty=Math.max(l.fired?1:0,l.qty-1); if(!l.qty) c.lines=c.lines.filter(y=>y!==l); } if(a==='note'){ const n=prompt('Note for the kitchen',l.note||''); if(n!=null) l.note=n.trim(); } if(a==='x'){ c.lines=c.lines.filter(y=>y!==l); SEL=null; } render(); save(); });
+  document.querySelectorAll('[data-mn]').forEach(x=>x.onclick=()=>{ MENU=MENU===x.dataset.mn?'':x.dataset.mn; render(); }); document.querySelectorAll('[data-ct]').forEach(x=>x.onclick=()=>{ CAT=x.dataset.ct; render(); });
+  document.querySelectorAll('[data-p]').forEach(x=>x.onclick=()=>{ const p=B.products.find(y=>y.id===x.dataset.p); const bi=B.item||{}; const same=c.lines.find(l=>l.pid===p.id&&!l.fired&&!l.note); if(same) same.qty++; else c.lines.push({id:uid(),pid:p.id,name:p.name,qty:1,price:+p.price||0,taxable:p.taxable!=null?!!p.taxable:!!bi.taxable,svc:p.svc!=null?!!p.svc:!!bi.svc,route:p.route||null,fired:false}); render(); save(); });
+  $('openItem').onclick=()=>{ const n=prompt('What is it?'); if(!n) return; const a=parseFloat(prompt('Amount $')); if(!(a>0)) return; const bi=B.item||{}; c.lines.push({id:uid(),pid:null,name:n,qty:1,price:Math.round(a*100)/100,taxable:!!bi.taxable,svc:isFnb()&&!!bi.svc,route:null,fired:false}); render(); save(); };
+  const s=$('send'); if(s) s.onclick=fire; $('rcpt').onclick=()=>receipt(c); $('pay').onclick=paySheet; }
+async function fire(){ if(busy) return; busy=true; try{ await save(); const r=await rpc('pos_fire',{p_ticket:CUR.id}); CUR.lines=r.lines; toast(r.fired?`Sent to ${r.fired} station${r.fired===1?'':'s'}`:'Nothing to send'); render(); }catch(e){ toast(e.message); } finally{ busy=false; } }
+function paySheet(){ const c=CUR; const d=document.createElement('div'); d.className='sheet'; let who=c.member_id?{id:c.member_id,name:'Member'}:null;
+  const draw=()=>{ const t=totals(c); d.innerHTML=`<div><h2>Pay ${fmt(t.total)}</h2>${isFnb()?`<span class="lbl">Tip</span><div class="seg">${[0,15,18,20,25].map(p=>`<button data-tp="${p}" class="${Math.round(t.subtotal*p)/100===c.tip&&(p||!c.tip)?'on':''}">${p?p+'%':'None'}</button>`).join('')}<input class="inp" id="tipA" inputmode="decimal" value="${c.tip||''}" placeholder="$" style="width:110px;height:38px"></div>`:''}
+      ${B.billing?`<span class="lbl">Charge to a member account</span>${who?`<div class="chip" style="font-size:14px;padding:8px 12px">${esc(who.name)}${who.memberNo?' · #'+esc(who.memberNo):''} <button class="btn sm" id="whoX" style="margin-left:8px">change</button></div>`:`<input class="inp" id="mq" placeholder="Member name or number…" autocomplete="off"><div class="pick" id="mqL" hidden></div>`}<button class="btn pri w" id="payAcct" style="margin-top:10px"${who?'':' disabled'}>Charge ${fmt(t.total)} to the account</button>`:''}
+      <span class="lbl">Or at the register</span><div style="display:grid;grid-template-columns:1fr 1fr;gap:8px"><button class="btn" id="payCash">Cash</button><button class="btn" id="payCard">Card</button></div>
+      <div style="display:flex;gap:8px;margin-top:14px"><button class="btn" id="payX" style="flex:1">Back</button>${USER.role==='manager'?'<button class="btn danger" id="payVoid">Void check</button>':''}</div></div>`;
+    d.querySelectorAll('[data-tp]').forEach(b=>b.onclick=()=>{ c.tip=Math.round(t.subtotal*(+b.dataset.tp))/100; draw(); }); const ta=d.querySelector('#tipA'); if(ta) ta.onchange=()=>{ c.tip=Math.round((parseFloat(ta.value)||0)*100)/100; draw(); };
+    const mq=d.querySelector('#mq'); if(mq){ let tm=null; mq.oninput=()=>{ clearTimeout(tm); tm=setTimeout(async()=>{ const q=mq.value.trim(); if(q.length<2){ d.querySelector('#mqL').hidden=true; return; } try{ const L=await rpc('pos_members',{p_q:q}); const h=d.querySelector('#mqL'); h.innerHTML=L.map(m=>`<button data-mid="${m.id}" ${m.suspended?'disabled':''}><span>${esc(m.name)}${m.suspended?' · suspended':''}</span><small>${m.memberNo?'#'+esc(m.memberNo):''}</small></button>`).join('')||'<button disabled>No match</button>'; h.hidden=false; h.querySelectorAll('[data-mid]').forEach(b=>b.onclick=()=>{ who=L.find(m=>m.id===b.dataset.mid); c.member_id=who.id; draw(); }); }catch(e){ toast(e.message); } },250); }; }
+    const wx=d.querySelector('#whoX'); if(wx) wx.onclick=()=>{ who=null; c.member_id=null; draw(); };
+    const close=async paid=>{ if(busy) return; busy=true; try{ Object.assign(c,totals(c)); const r=await rpc('pos_close',{p_ticket:c.id,p_data:{paid,member_id:c.member_id,guest:c.guest,tip:c.tip,subtotal:c.subtotal,svc:c.svc,tax:c.tax,total:c.total,lines:c.lines}}); d.remove(); toast(paid==='account'?`Charged to ${who?who.name:'the account'}`:`Closed · ${paid}`); CHECKS=CHECKS.filter(x=>x.id!==c.id); const closed=Object.assign({},c,r||{}); if(confirm('Print or send the receipt?')) receipt(closed); CUR=null; VIEW='floor'; render(); }catch(e){ toast(e.message); } finally{ busy=false; } };
+    const pa=d.querySelector('#payAcct'); if(pa) pa.onclick=()=>close('account'); d.querySelector('#payCash').onclick=()=>close('cash'); d.querySelector('#payCard').onclick=()=>close('card'); d.querySelector('#payX').onclick=()=>{ d.remove(); render(); save(); };
+    const pv=d.querySelector('#payVoid'); if(pv) pv.onclick=async()=>{ const why=prompt('Why is this check voided?'); if(!why) return; try{ await rpc('pos_void',{p_ticket:c.id,p_reason:why}); d.remove(); CHECKS=CHECKS.filter(x=>x.id!==c.id); CUR=null; VIEW='floor'; toast('Voided'); render(); }catch(e){ toast(e.message); } }; };
+  document.body.appendChild(d); draw(); }
+/* the receipt: a narrow branded slip (jsPDF loaded on demand) */
+function loadJsPDF(){ if(window.jspdf) return Promise.resolve(); return new Promise((res,rej)=>{ const sc=document.createElement('script'); sc.src='https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js'; sc.onload=()=>res(); sc.onerror=()=>rej(new Error('Couldn’t load the PDF maker')); document.head.appendChild(sc); }); }
+async function receipt(c){ try{ await loadJsPDF(); }catch(e){ toast(e.message); return; } const t=totals(c), lines=c.lines||[], W=227, L=14, R=W-14, H=250+lines.length*13+(t.svc?13:0)+(t.tax?13:0)+(t.tip?13:0);
+  const doc=new window.jspdf.jsPDF({unit:'pt',format:[W,H]}); bcFonts(doc); const font=(f,s,z,col)=>{ doc.setFont(f,s); doc.setFontSize(z); doc.setTextColor(...col); }; const INK=[20,34,43],MUTED=[86,98,106],NAVY=[15,42,56]; let y=18;
+  if(B.brand){ const h=34, w=crestW(doc,B.brand,h); if(drawCrest(doc,B.brand,(W-w)/2,y,h)) y+=h+8; }
+  font('Cormorant','bold',15,NAVY); doc.text(B.club||'',W/2,y,{align:'center'}); y+=13; font('PublicSans','bold',9,INK); doc.text(B.outlet.name,W/2,y,{align:'center'}); y+=11;
+  font('PublicSans','normal',7.5,MUTED); doc.text(new Date(c.closed_at||c.created_at).toLocaleString('en-US',{month:'short',day:'numeric',year:'numeric',hour:'numeric',minute:'2-digit'}),W/2,y,{align:'center'}); y+=10; doc.text(`${c.table_no?'Table '+c.table_no+' · ':''}${c.server||''}${c.guests?' · '+c.guests+' guests':''}`,W/2,y,{align:'center'}); y+=12; doc.setDrawColor(199,161,58); doc.setLineWidth(.6); doc.line(L,y,R,y); y+=11;
+  font('PublicSans','normal',8.5,INK); for(const l of lines){ doc.text(doc.splitTextToSize(`${l.qty>1?l.qty+' × ':''}${l.name}`,R-L-50)[0],L,y); doc.text(fmt(l.qty*l.price),R,y,{align:'right'}); y+=13; }
+  doc.setDrawColor(225,217,198); doc.line(L,y-4,R,y-4); y+=4; const tot=(k,v,b)=>{ font('PublicSans',b?'bold':'normal',b?10:8.5,INK); doc.text(k,L,y); doc.text(v,R,y,{align:'right'}); y+=b?15:13; };
+  tot('Subtotal',fmt(t.subtotal)); if(t.svc) tot(`Service charge ${rates().svc}%`,fmt(t.svc)); if(t.tax) tot(`Tax ${rates().tax}%`,fmt(t.tax)); if(t.tip) tot('Tip',fmt(t.tip)); tot('Total',fmt(t.total),true);
+  font('PublicSans','normal',8,MUTED); doc.text(c.paid==='account'?'Charged to member account':c.paid==='cash'?'Paid in cash':c.paid==='card'?'Paid by card':'Open check',W/2,y,{align:'center'}); y+=14; font('PublicSans','normal',7.5,MUTED); doc.text(`Thank you — ${B.club||''}`,W/2,y,{align:'center'});
+  const blob=doc.output('blob'), name=`receipt-${String(c.id).slice(0,8)}.pdf`, file=new File([blob],name,{type:'application/pdf'});
+  if(navigator.canShare&&navigator.canShare({files:[file]})&&navigator.share&&/iPhone|iPad|Android/i.test(navigator.userAgent)){ try{ await navigator.share({files:[file],title:'Receipt'}); return; }catch(e){ if(e&&e.name==='AbortError') return; } }
+  const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download=name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(url),4000); }
+boot();
+/*AUTOUPDATE*/
+</script>
+</body>
+</html>

@@ -209,6 +209,19 @@ member's account** — one line on their statement with tax and service charge b
 be held and picked up again, voided with a reason (the account charge goes with it), and the day's tickets export to CSV.
 Setup holds the outlets and products with prices, categories, tax and service flags and stock counts (CSV import).
 
+## The restaurant floor: registers, servers, the kitchen
+
+Set up each restaurant in **Settings → Food & beverage**: its prep stations (Kitchen, Grill line, Bar…), its tables
+("1-12, Patio 1-6, Bar"), its menus, and for every item where it fires — a salad to the kitchen, a steak to the grill
+line, a drink rung at the bar nowhere. Add the servers, bartenders and managers with a PIN each. Then make a **register
+station** for every device at a register and an **expo screen** for every kitchen display: each gets its own link, opened
+once on that device, which stays signed in. Bartenders never see the hub: the station shows a PIN pad, then the floor
+(their own tables green, the rest gold, tabs by name), then the check — tap items, **Send** fires each course to the right
+kitchen screen, **Pay** charges the member's account (name or number), or cash / card, with a tip and a receipt. A
+manager's PIN is needed to leave the station, and to void a check. The kitchen screen shows every fired course for its
+station with the table, the server and the minutes elapsed; **Bump** clears it. The golf shop works the same way from
+**Settings → Golf shop**, without tables or kitchens.
+
 ## Bookings
 
 **Bookings** (staff, with the module on) is the tee sheet and every other sheet: tennis and pickleball courts, the pool,

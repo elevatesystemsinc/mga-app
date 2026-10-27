@@ -83,6 +83,70 @@ class FakeDB:
             facs=[f for f in ((club.get('booking') or {}).get('facilities') or []) if f.get('members',True)]
             bks=sorted([b for b in self._rows('bookings') if b.get('tenant','wccc')==a['p_tenant'] and b['member_id']==m['id'] and b['status'] in ('booked','checked_in') and b['date']>=datetime.date.today().isoformat()],key=lambda b:(b['date'],b['time']))
             return json.dumps({'data':{'member':{k:m.get(k) for k in ('id','first','last','memberNo','email','address1','city','state','zip','status')},'club':club.get('name'),'message':(club.get('billing') or {}).get('message'),'items':items,'statements':st,'facilities':facs,'bookings':bks,'brand':(club.get('brand') or {}).get('logo'),'autopay':u['autopay'],'pm_label':u['pm_label'],'online':bool(t.get('stripe_account')) and bool((t.get('stripe_status') or {}).get('charges_enabled'))},'error':None})
+        if fn.startswith('pos_'):
+            key=a.get('p_key') or ''; h=hashlib.sha256(key.encode()).hexdigest() if key else None
+            st=next((r for r in self._rows('pos_stations') if r['key_hash']==h and not r.get('revoked_at')),None) if len(key)>=16 else None
+            if not st: return json.dumps({'data':None,'error':{'message':'This station link is not valid','code':'42501'}})
+            tn=st.get('tenant','wccc'); club=self.get('mga_hub','club',tn) or {}; pos=club.get('pos') or {}; outlet=next((o for o in pos.get('outlets',[]) if o['id']==st['outlet']),None) or {}
+            tix=self._rows('pos_tickets'); fires=self._rows('pos_fires'); now=datetime.datetime.utcnow().isoformat()+'Z'
+            if fn=='pos_boot':
+                st['last_seen']=now; t=next((t for t in self._rows('tenants') if t['slug']==tn),{}); mods=t.get('modules') or {}
+                staff=[{'id':x['id'],'name':x['name'],'role':x.get('role','server')} for x in pos.get('staff',[]) if x.get('active',True) and (not x.get('outlets') or st['outlet'] in x['outlets'])]
+                items=(club.get('billing') or {}).get('items') or []; it=next((x for x in items if x['id']==outlet.get('item')),None)
+                return json.dumps({'data':{'station':{'id':st['id'],'name':st['name'],'kind':st['kind'],'expo':st.get('expo'),'outlet':st['outlet']},'club':club.get('name'),'brand':(club.get('brand') or {}).get('logo'),'tenant':tn,'outlet':outlet,'products':[x for x in pos.get('products',[]) if x['outlet']==st['outlet'] and x.get('active',True)],'staff':staff,'rates':{'tax':((club.get('billing') or {}).get('tax') or {}).get('rate',0),'svc':((club.get('billing') or {}).get('svc') or {}).get('rate',0)},'item':it,'billing':bool(mods.get('billing') or mods.get('club'))},'error':None})
+            if fn=='pos_pin':
+                pin=str(a.get('p_pin') or ''); hh=hashlib.sha256((tn+':'+pin).encode()).hexdigest() if len(pin)>=4 else None
+                x=next((x for x in pos.get('staff',[]) if x.get('pin')==hh and x.get('active',True) and (not x.get('outlets') or st['outlet'] in x['outlets'])),None)
+                return json.dumps({'data':{'id':x['id'],'name':x['name'],'role':x.get('role','server')} if x else None,'error':None})
+            if fn=='pos_members':
+                q=str(a.get('p_q') or '').lower(); L=[m for m in club.get('members',[]) if m.get('status','Active')!='Inactive' and len(q)>=2 and (q in (m.get('first','')+' '+m.get('last','')).lower() or m.get('memberNo','')==q)][:8]
+                return json.dumps({'data':[{'id':m['id'],'name':(m.get('first','')+' '+m.get('last','')).strip(),'memberNo':m.get('memberNo'),'suspended':(m.get('billing') or {}).get('status')=='suspended'} for m in L],'error':None})
+            if fn=='pos_checks': return json.dumps({'data':[t for t in tix if t.get('tenant','wccc')==tn and t['outlet']==st['outlet'] and t['status']=='open'],'error':None})
+            if fn=='pos_check_put':
+                c=dict(a['p_check']); cid=c.get('id') or str(uuid.uuid4()); ex=next((t for t in tix if t['id']==cid),None)
+                row={'id':cid,'tenant':tn,'outlet':st['outlet'],'station':st['id'],'table_no':c.get('table_no'),'server':c.get('server'),'server_id':c.get('server_id'),'guests':c.get('guests') or 0,'member_id':c.get('member_id'),'guest':c.get('guest'),'lines':c.get('lines') or [],'note':c.get('note'),'subtotal':c.get('subtotal') or 0,'svc':c.get('svc') or 0,'tax':c.get('tax') or 0,'tip':c.get('tip') or 0,'total':c.get('total') or 0,'status':'open','paid':None,'acct_item':None,'created_at':(ex or {}).get('created_at') or now,'created_by':c.get('server') or 'station','updated_at':now,'closed_at':None,'void_at':None,'void_reason':None}
+                if ex:
+                    if ex['status']!='open': return json.dumps({'data':ex,'error':None})
+                    ex.update({k:row[k] for k in ('table_no','server','server_id','guests','member_id','guest','lines','note','subtotal','svc','tax','tip','total','updated_at')}); row=ex
+                else: tix.append(row)
+                return json.dumps({'data':row,'error':None})
+            r=next((t for t in tix if t['id']==a.get('p_ticket') and t.get('tenant','wccc')==tn and t['outlet']==st['outlet']),None)
+            if fn=='pos_fire':
+                if not r or r['status']!='open': return err('Check not open')
+                routes=sorted({l.get('route') for l in r['lines'] if l.get('route') and not l.get('fired')}); 
+                for e in routes: fires.append({'id':str(uuid.uuid4()),'tenant':tn,'outlet':st['outlet'],'expo':e,'station':st['id'],'ticket':r['id'],'table_no':r.get('table_no'),'server':r.get('server'),'lines':[l for l in r['lines'] if l.get('route')==e and not l.get('fired')],'note':None,'fired_at':now,'done_at':None})
+                for l in r['lines']:
+                    if l.get('route') and not l.get('fired'): l['fired']=True; l['fired_at']=now
+                return json.dumps({'data':{'fired':len(routes),'lines':r['lines']},'error':None})
+            if fn=='pos_close':
+                if not r or r['status']!='open': return err('Check not open')
+                d=a.get('p_data') or {}; paid=d.get('paid') or 'cash'
+                for k in ('lines','tip','subtotal','svc','tax','total','member_id','guest'):
+                    if d.get(k) is not None: r[k]=d[k]
+                r.update({'paid':paid,'status':'closed','closed_at':now,'updated_at':now})
+                if paid=='account':
+                    if not r.get('member_id'): return err('Pick the member first')
+                    m=next((x for x in club.get('members',[]) if x['id']==r['member_id']),None)
+                    if not m: return err('Unknown member')
+                    if (m.get('billing') or {}).get('status')=='suspended': return err('This member is suspended — no charges to the account')
+                    items=(club.get('billing') or {}).get('items') or []; it=next((x for x in items if x['id']==outlet.get('item','fnb')),{'id':outlet.get('item','fnb'),'source':'fnb','gl':''})
+                    aid=str(uuid.uuid4()); self._rows('acct_items').append({'id':aid,'tenant':tn,'member_id':r['member_id'],'kind':'charge','source':it.get('source','fnb'),'item':it['id'],'gl':it.get('gl',''),'ref':'pos:'+r['id'],'descr':(outlet.get('name') or st['outlet'])+' · '+', '.join((str(l['qty'])+'× ' if l['qty']>1 else '')+l['name'] for l in r['lines']),'amount':r['total'],'tax':r['tax'],'svc':r['svc'],'method':None,'reference':None,'posted':datetime.date.today().isoformat(),'void_at':None,'void_reason':None,'created_at':now,'created_by':r.get('server') or 'station'}); r['acct_item']=aid
+                return json.dumps({'data':r,'error':None})
+            if fn=='pos_void':
+                if not r: return err('Unknown check')
+                r.update({'status':'void','void_at':now,'void_reason':a.get('p_reason') or '','updated_at':now})
+                if r.get('acct_item'):
+                    for i in self._rows('acct_items'):
+                        if i['id']==r['acct_item'] and not i.get('void_at'): i['void_at']=now; i['void_reason']='Check voided at the station: '+(a.get('p_reason') or '')
+                return json.dumps({'data':True,'error':None})
+            if fn=='pos_expo':
+                if st['kind']!='expo': return json.dumps({'data':None,'error':None})
+                mine=[f for f in fires if f.get('tenant','wccc')==tn and f['expo']==st.get('expo')]
+                return json.dumps({'data':{'station':{'id':st['id'],'name':st['name'],'outlet':st['outlet'],'expo':st.get('expo')},'open':sorted([f for f in mine if not f['done_at']],key=lambda f:f['fired_at']),'done':sorted([f for f in mine if f['done_at']],key=lambda f:f['done_at'],reverse=True)[:12]},'error':None})
+            if fn=='pos_bump':
+                for f in fires:
+                    if f['id']==a.get('p_fire') and f['expo']==st.get('expo'): f['done_at']=None if a.get('p_undo') else now
+                return json.dumps({'data':True,'error':None})
         if fn in ('member_slots','member_book','member_cancel'):   # booking-setup.sql, in miniature
             me=next((u for u in self.auth_users if u['id']==self.me),None); em=(me or {}).get('email','').lower()
             club=self.get('mga_hub','club',a['p_tenant']) or {}; m=next((x for x in club.get('members',[]) if str(x.get('email','')).lower()==em),None)

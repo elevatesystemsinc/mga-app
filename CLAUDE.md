@@ -66,6 +66,7 @@ src/
   pos.js               Point of sale (module 'pos'): outlets, products & stock, the register, tickets to accounts or cash / card
   bookings.js          Bookings (module 'club'): the tee sheet, courts, pool, lessons — the sheet, check-in, fees, the printed sheet
   settings.js          Settings: white-label branding (the logo on every output), outgoing e-mail per organization (Resend / Microsoft 365), module setup
+  poscore.js           checkTotals: the money on a check (service charge, tax, tip), shared by the hub and the station page   [shared]
   autoupdate.js        version.json polling + safe reload (__BUILD__ placeholder)                     [shared]
   cashier_src.html     cashier page   (markers /*CALCCORE*/ /*AUTOUPDATE*/)
   checkin_src.html     check-in page  (markers /*CKCORE*/  /*AUTOUPDATE*/)
@@ -73,7 +74,9 @@ src/
   gamecast_src.html    GameCast: follow a game live, read-only, no group ID (markers /*GOLFCORE*/ /*AUTOUPDATE*/)
   survey_src.html      public survey page (marker /*AUTOUPDATE*/ only)
   member_src.html      the member portal: sign in by e-mail link, balance, statements, pay online, autopay (markers /*PDFFONTS*/ /*BILLCORE*/ /*AUTOUPDATE*/)
-build.sh               → index.html, cashier.html, checkin.html, score.html, gamecast.html, survey.html, member.html, version.json (repo root)
+  pos_src.html         a register station on the floor: PIN lock, tables and tabs, the check, send to the kitchen, pay, receipt (markers /*PDFFONTS*/ /*BILLCORE*/ /*POSCORE*/ /*AUTOUPDATE*/)
+  expo_src.html        a kitchen expo screen: the rail of fired courses for one prep station, bump / recall (marker /*AUTOUPDATE*/)
+build.sh               → index.html, cashier.html, checkin.html, score.html, gamecast.html, survey.html, member.html, pos.html, expo.html, version.json (repo root)
 ```
 `index.html` = `head.html` + one `<script>` of the modules **in the order listed in `build.sh`** + `boot();`.
 Everything shares one global scope (no modules/imports) — later files may call earlier files' functions, and
@@ -355,6 +358,7 @@ Tournament = { id, name, season, days, startDate, field:[{id,memberId,team,paid,
 | `member_users`, `tenants.stripe_account/stripe_status` + RPC `member_me(p_tenant)`, `member_autopay_off(p_tenant)` | the member portal and online payments (`member-setup.sql`); Edge Functions `mail`, `stripe`, `stripe-webhook`. |
 | `pos_tickets` | point of sale tickets (`pos-setup.sql`), staff only. |
 | `mail_settings` (tenant, org) | each organization's outgoing e-mail sender and provider (`mail-setup.sql`); RLS `can_org`. |
+| `pos_stations`, `pos_fires`, `pos_tickets` (+ station, table_no, server…) + RPC `pos_boot/pin/members/checks/check_put/fire/close/void/expo/bump` | registers and kitchen screens on the floor (`pos-stations-setup.sql`): token-keyed security-definer functions, like admin links. |
 | `bookings` + RPC `member_id_of`, `member_slots`, `member_book`, `member_cancel` | bookings (`booking-setup.sql`): staff on the sheet, members through the security-definer functions that enforce the facility's rules. |
 | `hub_keys` (org_id, key_hash, label, revoked_at) + RPC `hub_key_org/read/write/people/golf_event/golf_delete/score/share` | admin links (`admin-links-setup.sql`): security-definer functions that act for exactly one organization. |
 | `mm_tournament` | the retired Member-Member app's row (`supabase-setup.sql`). Archive only — no hub code reads or writes it. |
@@ -608,6 +612,32 @@ only): restaurants and the golf shop are POS outlets (`outletDrawer(null,'fnb'|'
 Facilities, the Game library, Organizations and Logins. **Receipts** (`receiptPDF(t)`, pos.js): a narrow branded slip —
 logo, outlet, lines, service / tax / tip, total, how it was paid — from the tickets page, the register's "Last ticket" bar,
 and by e-mail to the member (`emailReceipt`).
+
+### Restaurants on the floor — stations, kitchen screens, servers (`pos-stations-setup.sql`, `pos_src.html` → `pos.html`, `expo_src.html` → `expo.html`, `poscore.js`)
+The owner, Oct 2026: a club has several restaurants (Creekside Grill, Nines Bistro, the men's locker room…), each with
+more than one register; bartenders never see the hub; a salad fires to one expo station and a steak to another; drinks
+rung at the bar fire nowhere; servers sign in with a PIN and see their own tables; a manager PIN leaves the station. Set up
+in **Settings → Food & beverage** (and **Golf shop** for the shop's registers): per outlet (`CLUB.pos.outlets[]`, `outletSetup`)
+**prep stations** `expos:[{id,name}]`, **tables** (`parseTables`: "1-12, Patio 1-6, Bar"), **menus** `[{id,name,active}]`; each
+product carries `route` (the expo id it fires to, null = nowhere) and `menus` ([] = every menu); **staff** `CLUB.pos.staff =
+[{id,name,role server|bartender|manager, outlets ([] = all), pin (sha256 of `<tenant>:<pin>`, `pinHash`), active}]`. A
+**station** is a row in `pos_stations` (`kind` register | expo, `expo` = the prep station an expo screen follows, `key_hash`
+of a token shown once — `newStation` / `stationLinkModal`, QR included; `revokeStation`); the device opens
+`pos.html?s=TOKEN` / `expo.html?k=TOKEN` once and keeps the token in localStorage (`fs_station` / `fs_expo`). Everything a
+station does goes through security-definer functions keyed by the token: `pos_boot` (outlet, products, staff names, rates,
+the brand, whether billing is on), `pos_pin` (→ {id,name,role} or null), `pos_members` (name, number, suspended — never
+e-mail or balance), `pos_checks` / `pos_check_put` (open checks = `pos_tickets` rows with `status open`, `table_no`, `server`,
+`server_id`, `guests`, `station`; every station of the outlet sees them), `pos_fire` (one `pos_fires` row per expo for the
+unfired routed lines, lines marked `fired`), `pos_close` (paid account | cash | card; account → the acct_items charge with
+tax / svc, suspended members refused), `pos_void`, `pos_expo` / `pos_bump` (the kitchen screen; `pos_fires` has an anon
+select policy and is in the realtime publication so screens update at once). **The station page**: lock screen with a PIN
+pad (wrong PIN shakes; 6 digits auto-submit; 4-minute idle lock; "Leave this station" needs a manager PIN and forgets the
+token), the floor (My checks / All open, the table grid — yours green, others gold — and tabs by name), the check (lines
+with sent ✓, qty ± / note / remove on a selected line, menus and categories, products with their expo, Open item, **Send**,
+Receipt, **Pay**: tip presets, member search → charge to the account, Cash / Card, a manager may void), the receipt slip
+(brand logo). `checkTotals(lines, tip, rates)` in poscore is the one money function (the hub's `ticketTotals` wraps it).
+The hub's Tickets page shows station checks (table, server) alongside its own. The fake emulates every `pos_*` function;
+`tests/test_billing.py` runs setup → station → kitchen → account → hub → revoke end to end.
 
 ### Other
 Checklist (95-task 2026 template, assignees from members/board, notes, print). Golf (courses, WHS, flights,
