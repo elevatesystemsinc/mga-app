@@ -35,14 +35,9 @@ CSV export. Close the survey when you are done; the link then says so.
 
 - `main` → **app.wcccmga.org** — the club hub, the product going forward. The club is at `/`; each organization has its
   own address: `/mga`, `/lga`, `/smga`, and `/<id>` for a small group. (Render: one Rewrite rule, `/*` → `/index.html`.)
-- **hub.wcccmga.org** — the MGA's address. Served from `main` as well (bare host = the MGA hub, `/club` = the club
-  hub), once the Render site for that domain is switched from the old `Hub` branch to `main`; until then it runs the
-  old MGA Hub code against its own row, kept in two-way sync (below).
-
-The MGA's hub on app.wcccmga.org and hub.wcccmga.org show the **same data**: the two are kept in two-way sync while
-anyone has the club hub or the MGA hub open (every half minute, and right after a save). An edit on either site
-reaches the other, edits to different things never collide, and when the very same field is changed in both places
-the later save wins. The sidebar shows "MGA Hub in sync" with the time of the last pass and a *Sync now* link.
+- **hub.wcccmga.org** — the MGA's address, served from `main` as well (bare host = the MGA hub, `/club` = the club
+  hub) once the Render site for that domain points at `main`. The old MGA Hub code and its data are history; nothing
+  syncs with them any more.
 
 ## Organizations and members
 
@@ -259,9 +254,8 @@ shop, billing, facilities, the game library.
 The club's Tournaments page and dashboard also list every association's and small group's tournaments — name, dates,
 field size and status, with a button into that organization's hub. Their budgets and money stay in their own hubs.
 
-First time on a database the club hub offers **Set up from the MGA Hub**: it builds the directory from the MGA's list,
-registers the three associations and copies the MGA Hub's data into the MGA's hub. The club hub's Organizations page can
-re-run that import later.
+First time on a database the club hub offers **Set up the club**: an empty directory with the three associations
+registered; the roster is then imported from the Directory page.
 
 Both use the same Supabase project. Render serves the repo root of each branch; the built pages are committed,
 so a push is a deploy (see `CLAUDE.md` for the build).

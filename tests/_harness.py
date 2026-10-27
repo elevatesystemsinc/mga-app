@@ -415,3 +415,13 @@ async def cloud(ctx,fdb,no_session=False):
     await ctx.route('**/supabase.min.js',lambda r:r.fulfill(path=FAKE,content_type='text/javascript'))
     await ctx.route('**/fonts.googleapis.com/**',lambda r:r.fulfill(body='',content_type='text/css'))
     if os.path.exists(XLSX): await ctx.route('**/xlsx.full.min.js',lambda r:r.fulfill(path=XLSX,content_type='text/javascript'))
+
+def seed_from_main(fdb,main,tenant='wccc'):
+    """the club row (directory) and the MGA row (memberships + everything else) from a document in the old MGA Hub shape"""
+    strip=('status','joined','notes')
+    persons=[dict({'status':'Active'},**{k:v for k,v in m.items() if k not in strip}) for m in main['members']]
+    orgs=[{'id':'mga','kind':'association','name':'Men’s Golf Association','short':'MGA'},{'id':'lga','kind':'association','name':'Ladies’ Golf Association','short':'LGA'},{'id':'smga','kind':'association','name':'Senior Men’s Golf Association','short':'SMGA'}]
+    club={'v':2,'id':'club','kind':'club','name':'Walnut Creek Country Club','short':'WCCC','members':persons,'orgs':orgs,'activeSeason':main.get('activeSeason','2026'),'seasons':{main.get('activeSeason','2026'):{}},'tournaments':[],'_rev':1,'_w':'seed','_at':1}
+    mga={k:copy.deepcopy(v) for k,v in main.items() if k not in ('members','_rev','_w','_at')}
+    mga.update({'v':2,'id':'mga','kind':'association','name':orgs[0]['name'],'short':orgs[0]['short'],'memberships':[{'id':m['id'],'status':m.get('status','Active'),'joined':m.get('joined',''),'notes':m.get('notes','')} for m in main['members']],'_rev':1,'_w':'seed','_at':1})
+    fdb.seed('mga_hub','club',club,tenant); fdb.seed('mga_hub','mga',mga,tenant); return club,mga

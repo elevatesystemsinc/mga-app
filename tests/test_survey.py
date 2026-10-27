@@ -3,18 +3,17 @@ The board builds the member survey from the template and opens it; a member answ
 sign-in; the hub reads the results; the response holds nothing about who sent it; closing the survey closes the link."""
 import asyncio,sys,json
 from playwright.async_api import async_playwright
-from _harness import FakeDB,cloud,page
+from _harness import seed_from_main, FakeDB,cloud,page
 from test_sync import seed_main,open_hub,settled
 async def main():
   bad=0
   def check(name,cond,info=''):
     nonlocal bad; print(('OK   ' if cond else 'FAIL ')+name,info); bad+=(not cond)
-  fdb=FakeDB(); fdb.seed('mga_hub','main',seed_main())
+  fdb=FakeDB(); seed_from_main(fdb,seed_main())
   async with async_playwright() as p:
     b=await p.chromium.launch()
     A=await b.new_context(); await cloud(A,fdb)
-    pg,errs=await open_hub(A,'club'); await pg.evaluate("()=>migrateFromHub()"); await pg.close()
-    hub,herr=await open_hub(A,'mga'); await settled([hub])
+    errs=[]; hub,herr=await open_hub(A,'mga'); await settled([hub])
     # the organization's own hub offers admin links (so one can be made from a phone): the Board page of an association, the Members page of a group
     r=await hub.evaluate("()=>{ go('board'); return {card:!!document.getElementById('ogKeys'), btn:!!document.getElementById('ogNewKey'), input:!!document.getElementById('ogKL')}; }")
     check('admin links card on the organization hub',r['card'] and r['btn'] and r['input'],json.dumps(r))

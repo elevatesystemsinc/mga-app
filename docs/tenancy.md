@@ -142,7 +142,7 @@ and RLS enforces the same on the tables.
    Open `https://wccc.flagstickhub.com` → the club hub, same data as app.wcccmga.org.
 6. **Move Walnut Creek**: tell the board the new address; when ready, set a redirect on the old site
    (Render → Redirects: `app.wcccmga.org/*` → `https://wccc.flagstickhub.com/*`, 301) or just leave the extra host in
-   place. Also set `hub.wcccmga.org` the same way once PR #2 is merged and the two-way sync is off.
+   place. Also set `hub.wcccmga.org` the same way (the old MGA Hub and its sync are gone; nothing depends on it now).
 7. **Create the next client** from the portal: name, slug, plan, the first staff login; hand over the address and the
    one-time password (or let the invite e-mail do it). Their staff then invite their boards from the hub. Their hub is live immediately at `<slug>.flagstickhub.com` (with option b, add that host name
    on Render and a CNAME first).

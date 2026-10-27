@@ -154,7 +154,6 @@ function renderInner(){
   $('brandName').textContent=lock?clubName:(o.name||o.short); $('brandSub').textContent=lock?(o?'Club hub':'Choose a hub'):clubName;
   $('topName').textContent=title; document.title=(o?(isClub()?clubName:orgShort()+' · '+clubName):clubName)+' · Flagstick';
   const lc=$('loginClub'); if(lc) lc.textContent=TENANT_INFO&&TENANT_INFO.name||clubName;   // the sign-in card names the tenant, even before its document is open
-  $('btnSwitch').hidden=!CLUB||(!db&&!setupNeeded)||KEYMODE||(SCOPED&&SCOPE_ORGS.length<2); if(typeof paintHubSync==='function') paintHubSync();
   if(!db){ $('nav').innerHTML=''; $('seasonBox').hidden=true; (setupNeeded?vSetup:SCOPED&&cloudReady&&(ORG_ID==='club'||!allowedOrg(ORG_ID))?vNotYours:vPicker)($('main')); return; }
   if(!isClub()&&!hasModule(db.kind==='group'?'groups':'associations')){ $('nav').innerHTML=''; $('seasonBox').hidden=true; vLocked($('main'),db.kind); return; }
   $('seasonBox').hidden=isClub();   // the club has no seasons: it reports by year and quarter
@@ -186,15 +185,12 @@ function vPicker(m){
 function vSetup(m){
   m.innerHTML=head('Set up the club hub','This is the first time the club hub has been opened on this database.')+`
   <div class="card pad" style="max-width:680px;display:flex;flex-direction:column;gap:14px">
-    <p style="margin:0">The MGA Hub’s data becomes the starting point:</p>
-    <div class="mini">${[['1','The club directory is built from the MGA’s member list — same people, same ids, so fields, boards and Calcuttas keep working'],['2','The MGA, LGA and SMGA are registered as associations'],['3','The MGA Hub’s tournaments, budgets, treasury, Calcuttas and drawings are copied into the MGA’s hub here']].map(([n,t])=>`<div class="mr" style="grid-template-columns:24px minmax(0,1fr)"><b>${n}</b><span>${t}</span></div>`).join('')}</div>
-    <p class="hint">hub.wcccmga.org keeps working on its own data; nothing there changes. You can re-import from it later from the club hub’s Organizations page.</p>
-    <div class="actions"><button class="btn pri" id="suGo">Set up from the MGA Hub</button><button class="btn" id="suEmpty">Start empty</button></div>
+    <p style="margin:0">The club starts with an empty directory and the three associations (MGA, LGA, SMGA) registered. Import the club's roster from the Directory page, then build out each organization from its own hub.</p>
+    <div class="actions"><button class="btn pri" id="suEmpty">Set up the club</button></div>
     <p class="hint" id="suMsg" aria-live="polite"></p></div>`;
   const msg=$('suMsg');
-  $('suGo').onclick=async()=>{ $('suGo').disabled=true; msg.textContent='Importing…'; try{ const r=await migrateFromHub(); toast(`Set up · ${r.people} people · ${r.tournaments} tournaments`); chooseOrg('club'); }catch(e){ $('suGo').disabled=false; msg.textContent=e.message||'That didn’t work'; } };
-  $('suEmpty').onclick=async()=>{ if(!confirm('Start with an empty directory? The MGA Hub can still be imported later.')) return;
-    try{ const C=docState('club',CLUB_META); C.db=normalize(null,CLUB_META); C.db.orgs=clone(DEFAULT_ORGS); CLUB=C.db; await putDoc('club',clone(C.db)); setupNeeded=false; watchDoc(C); chooseOrg('club'); }catch(e){ msg.textContent=e.message||'That didn’t work'; } };
+  $('suEmpty').onclick=async()=>{ $('suEmpty').disabled=true;
+    try{ const C=docState('club',CLUB_META); C.db=normalize(null,CLUB_META); C.db.orgs=clone(DEFAULT_ORGS); CLUB=C.db; await putDoc('club',clone(C.db)); setupNeeded=false; watchDoc(C); chooseOrg('club'); }catch(e){ $('suEmpty').disabled=false; msg.textContent=e.message||'That didn’t work'; } };
 }
 /* ---------- Organizations (club hub) ---------- */
 function vOrgs(m){
@@ -207,15 +203,10 @@ function vOrgs(m){
   ${!hasModule('associations')||!hasModule('groups')?`<div class="banner">${[!hasModule('associations')?'Associations':'',!hasModule('groups')?'Small groups':''].filter(Boolean).join(' and ')} are not part of this club’s Flagstick subscription; their hubs are closed and their data kept. Contact Flagstick to add the module.</div>`:''}`+`
   <div class="card" style="overflow:hidden"><div class="cardhead"><h2 class="h2">Associations</h2></div><div class="t">${grp('association')}</div></div>
   <div class="card" style="overflow:hidden"><div class="cardhead"><h2 class="h2">Small groups</h2></div><div class="t">${grp('group')}</div></div>
-  ${CLOUD?`<div class="card pad" style="display:flex;flex-direction:column;gap:10px"><h2 class="h2">MGA Hub (hub.wcccmga.org)</h2>
-    <p class="hint" style="margin:0">${linkedOrg()?`The ${esc(linkedOrg().short||linkedOrg().name)} hub here and hub.wcccmga.org are kept in two-way sync (status in the sidebar). `:''}${CLUB.migratedAt?'Last imported '+new Date(CLUB.migratedAt).toLocaleString()+'.':'Not imported yet.'} Re-importing updates the directory from the MGA’s member list and <b>replaces</b> the MGA’s hub here with the MGA Hub’s current data${linkedOrg()?' — with the sync on you should not need it':''}.</p>
-    <div class="actions">${linkedOrg()?'<button class="btn" id="oSync">Sync now</button>':''}<button class="btn" id="oMig">Re-import from the MGA Hub</button></div></div>`:''}`;
-  const os=$('oSync'); if(os) os.onclick=async()=>{ os.disabled=true; await hubSync({force:true}); os.disabled=false; render(); toast(HUB_SYNC.state==='ok'?'In sync with the MGA Hub':'Sync failed: '+(HUB_SYNC.msg||'')); };
+  `;
   m.querySelectorAll('[data-o]').forEach(r=>r.onclick=()=>chooseOrg(r.dataset.o));   // the row opens that organization's hub
   m.querySelectorAll('[data-oe]').forEach(b=>b.onclick=e=>{ e.stopPropagation(); editOrg(CLUB.orgs.find(x=>x.id===b.dataset.oe)); });
   if($('oGrp')) $('oGrp').onclick=()=>editOrg(null,'group'); if($('oAssoc')) $('oAssoc').onclick=()=>editOrg(null,'association');
-  const mg=$('oMig'); if(mg) mg.onclick=async()=>{ if(!confirm('Replace the MGA’s hub here with the MGA Hub’s current data, and update the directory from its member list?')) return; mg.disabled=true;
-    try{ const r=await migrateFromHub(); toast(`Imported · ${r.people} people · ${r.tournaments} tournaments`); render(); }catch(e){ mg.disabled=false; toast(e.message||'Import failed'); } };
 }
 /* ---------- Game library (club hub): which games the club makes available to its organizations ---------- */
 function vLibrary(m){
@@ -234,11 +225,10 @@ function editOrg(o,kind){
     body:field('Name','ogN',o?.name||'',{ph:kind==='group'?'e.g. The Misfits':'e.g. Ladies’ Golf Association'})+pair(field('Short name','ogS',o?.short||'',{ph:kind==='group'?'e.g. Misfits':'e.g. LGA'}),o?field('Address id','ogI',o.id,{disabled:true}):field('Address id','ogI','',{ph:'letters and digits, e.g. misfits'}))+
       (o?'':`<p class="hint">The id becomes the address (${esc(orgURL('misfits'))}) and can’t change later. Leave it blank to use the short name.</p>`)+
       (o?`<label class="check"><input type="checkbox" id="ogA"${o.archived?' checked':''}>Archived — hidden from the picker; its data is kept</label>`:'')+
-      (o&&kind==='association'?`<label class="check"><input type="checkbox" id="ogH"${o.hubRow?' checked':''}>Keep in two-way sync with the MGA Hub (hub.wcccmga.org)</label><p class="hint">Edits on either site reach the other within about half a minute while someone has this hub or the club hub open.</p>`:'')+
       (o&&CLOUD&&sessionOK&&!KEYMODE?`<div class="fld" style="margin-top:6px"><span class="lbl">Admin links</span>${adminLinksBlock(o)}</div>`:''),
     wire:r=>{ if(o&&CLOUD&&sessionOK&&!KEYMODE) adminLinks(r,o); },
     save:()=>{ const name=fv('ogN'); if(!name){ toast('Give it a name'); return false; }
-      if(o){ Object.assign(o,{name,short:fv('ogS'),archived:$('ogA').checked}); if($('ogH')) o.hubRow=$('ogH').checked?'main':''; return; }
+      if(o){ Object.assign(o,{name,short:fv('ogS'),archived:$('ogA').checked}); delete o.hubRow; return; }
       let id=(fv('ogI')||fv('ogS')||name).toLowerCase().replace(/[^a-z0-9-]/g,'').slice(0,24);
       if(!id||id==='club'||id==='main'||CLUB.orgs.some(x=>x.id===id)){ toast('That address id is taken — choose another'); return false; }
       CLUB.orgs.push({id,kind,name,short:fv('ogS')}); toast(name+' created — open it from the organization picker'); }});
@@ -1078,14 +1068,7 @@ function wireChrome(){
   $('dClose').onclick=closeDrawer; $('scrim').onclick=closeDrawer;
   document.addEventListener('keydown',e=>{ if(e.key==='Escape'&&drawerOpen()) closeDrawer(); });
   $('seasonSel').onchange=e=>{ if(e.target.value==='__new'){ e.target.value=Y(); newSeasonPrompt(); return; } db.activeSeason=e.target.value; persist(); go(view.page==='tournament'?'tournaments':view.page); };
-  $('btnBackup').onclick=()=>{ if(!db) return; dl(JSON.stringify(db,null,2),'application/json',ORG_ID+'_hub_backup_'+new Date().toISOString().slice(0,10)+'.json'); toast('Backup downloaded'); };
-  $('btnSwitch').onclick=()=>{ view.page='pick'; render(); window.scrollTo(0,0); };
-  $('btnRestore').onclick=()=>$('fileRestore').click();
-  $('fileRestore').onchange=e=>{ const f=e.target.files[0]; if(!f) return; const r=new FileReader();
-    r.onload=()=>{ try{ const d=JSON.parse(r.result); if(!db||!d.tournaments||!d.seasons) throw 0; if((d.kind||'association')!==db.kind) throw 0; if(!confirm(`Replace everything in the ${orgShort()} hub with this backup?`)) return;
-      const D=DOCS[ORG_ID]; syncTo(D.db,normalize(d,D.meta)); persist(); go('dash'); toast('Backup restored'); }catch(_){ toast('That isn’t a backup of this hub'); } };
-    r.readAsText(f); e.target.value=''; };
-  $('syncBtn').onclick=()=>{ if(!CLOUD||!sessionOK) return; if(!cloudReady) startCloud(); else pushAll(); };
+  $('syncErr').onclick=()=>{ if(!CLOUD||!sessionOK) return; if(!cloudReady) startCloud(); else pushAll(); };
   $('btnSignOut').onclick=async()=>{ if(KEYMODE){ if(!confirm('Leave this hub? You will need the admin link again to come back.')) return; dropKey(); location.reload(); return; } await sb.auth.signOut(); location.reload(); };
 }
 const loginEmail=()=>{ const e=$('loginEmail'); const v=e&&!e.hidden?e.value.trim():''; return v||(TENANT_INFO&&TENANT_INFO.login_email)||CFG.boardEmail||''; };
@@ -1112,7 +1095,7 @@ async function boot(){
   if(data&&data.session){ const ok=await checkAccess(); if(!ok.ok){ await sb.auth.signOut(); $('login').classList.add('show'); $('loginErr').textContent=ok.msg||''; if(PORTAL) portalBoot(); return; } }
   if(PORTAL){ sessionOK=!!(data&&data.session); portalBoot(); return; }
   if(data&&data.session){ sessionOK=true; $('btnSignOut').hidden=false; startCloud(); }
-  else if(HUBKEY){ KEYMODE=true; sessionOK=true; $('btnSignOut').hidden=false; $('btnSignOut').textContent='Leave this hub'; $('btnRestore').hidden=true; startCloud(); }
+  else if(HUBKEY){ KEYMODE=true; sessionOK=true; $('btnSignOut').hidden=false; $('btnSignOut').textContent='Leave this hub'; startCloud(); }
   else { $('login').classList.add('show'); setTimeout(()=>$('loginPw').focus(),100); }
 }
 /* the admin link was revoked or never existed: back to the board sign-in, with a word about why */

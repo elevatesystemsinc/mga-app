@@ -31,12 +31,12 @@ const orgNames=(slug,ids)=>(ids||[]).map(id=>{ const o=orgsOf(slug).find(x=>x.id
 
 /* ---------- boot / data ---------- */
 function portalBoot(){
-  $('side').classList.add('portal'); $('seasonBox').hidden=true; $('btnSwitch').hidden=true; $('btnBackup').hidden=true; $('btnRestore').hidden=true;
+  $('side').classList.add('portal'); $('seasonBox').hidden=true; 
   $('brandName').textContent='Flagstick'; $('brandSub').textContent='Client portal'; $('topName').textContent='Flagstick'; document.title='Portal · Flagstick';
   const lc=$('loginClub'); if(lc) lc.textContent='Flagstick'; const ls=$('loginSub'); if(ls) ls.textContent='Administrator sign-in';
   if(!TENANCY){ $('nav').innerHTML=''; $('main').innerHTML=head('Flagstick portal','')+`<div class="banner">The database has not been prepared for tenants yet — run <b>tenants-setup.sql</b> and <b>portal-setup.sql</b> in the Supabase SQL editor, then reload.</div>`; return; }
   if(!sessionOK){ $('nav').innerHTML=''; $('login').classList.add('show'); setTimeout(()=>{ const e=$('loginEmail'); if(e&&!e.value) e.focus(); else $('loginPw').focus(); },100); return; }
-  $('btnSignOut').hidden=false; paintSync('synced'); portalNav(); vPortal($('main')); loadPortal();
+  $('btnSignOut').hidden=false; $('who').textContent='Signed in as '+((ACCESS&&ACCESS.email)||'Flagstick admin'); $('who').hidden=false; portalNav(); vPortal($('main')); loadPortal();
 }
 function portalNav(){
   const items=[['clients','Clients',I.org],['team','Team',I.shield],['activity','Activity',I.ledger]];
@@ -271,11 +271,11 @@ function vActivity(m){
 }
 /* ---------- what a tenant's address shows instead of a hub ---------- */
 function vNoTenant(m){
-  $('nav').innerHTML=''; $('seasonBox').hidden=true; $('btnSwitch').hidden=true;
+  $('nav').innerHTML=''; $('seasonBox').hidden=true; 
   m.innerHTML=head('No club at this address','')+`<div class="card pad" style="max-width:640px"><p style="margin:0 0 8px">Nothing is set up at <b>${esc(HOSTNAME||TENANT_HINT)}</b>.</p><p class="hint" style="margin:0">A club’s hub lives at <i>club</i>.${esc(BASE_DOMAIN)}. If this is your club’s address, ask Flagstick to add it under the client’s host names.</p></div>`;
 }
 function vSuspended(m){
-  $('nav').innerHTML=''; $('seasonBox').hidden=true; $('btnSwitch').hidden=true;
+  $('nav').innerHTML=''; $('seasonBox').hidden=true; 
   m.innerHTML=head(TENANT_INFO&&TENANT_INFO.name||'This club','')+`<div class="card pad" style="max-width:640px"><p style="margin:0 0 8px"><b>This hub is paused.</b></p><p class="hint" style="margin:0">Your data is safe. Please contact Flagstick to reactivate the subscription.</p></div>`;
 }
 function vLocked(m,kind){

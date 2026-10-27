@@ -68,7 +68,7 @@ async def main():
     fdb.me='u-mgaboard@x.org'
     c3=await b.new_context(); await cloud(c3,fdb)
     p4,e4=await open_page(c3,'?org=club&tenant=app.wcccmga.org',ready="()=>cloudReady&&db&&db.id==='mga'")
-    r=await p4.evaluate("()=>({org:db&&db.id,scoped:SCOPED,orgs:CLUB.orgs.map(o=>o.id),members:CLUB.members.length,nav:[...document.querySelectorAll('#nav [data-go]')].map(b=>b.dataset.go),sw:document.getElementById('btnSwitch').hidden,url:location.search})")
+    r=await p4.evaluate("()=>({org:db&&db.id,scoped:SCOPED,orgs:CLUB.orgs.map(o=>o.id),members:CLUB.members.length,nav:[...document.querySelectorAll('#nav [data-go]')].map(b=>b.dataset.go),sw:!document.getElementById('btnSwitch'),url:location.search})")
     bad+=check('board login lands on the MGA with a cut-down club document and no club hub',r['org']=='mga' and r['scoped'] and r['orgs']==['mga'] and r['members']==1 and 'logins' not in r['nav'] and 'board' in r['nav'] and r['sw'] and 'org=mga' in r['url'] and not e4,r,e4)
     r=await p4.evaluate("""()=>{ const keep=db; db=null; render(); const r=[...document.querySelectorAll('[data-org]')].map(b=>b.dataset.org); db=keep; render(); return r; }""")
     bad+=check('the picker offers only its organization',r==['mga'],r)
@@ -116,7 +116,7 @@ async def main():
     fdb.me='u-zach@flagstick.test'; fdb.admin=True
     c6=await b.new_context(); await cloud(c6,fdb)
     pp,ep=await open_page(c6,'?portal=1',ready="()=>PS.tenants&&PS.tenants.length")
-    r=await pp.evaluate("()=>({rows:[...document.querySelectorAll('[data-t]')].map(r=>r.dataset.t), title:document.querySelector('#main h1').textContent, chips:[...document.querySelectorAll('[data-t=\"pines\"] .chip')].map(c=>c.textContent), nav:[...document.querySelectorAll('#nav [data-pv]')].map(b=>b.dataset.pv), sync:document.getElementById('syncTxt').textContent})")
+    r=await pp.evaluate("()=>({rows:[...document.querySelectorAll('[data-t]')].map(r=>r.dataset.t), title:document.querySelector('#main h1').textContent, chips:[...document.querySelectorAll('[data-t=\"pines\"] .chip')].map(c=>c.textContent), nav:[...document.querySelectorAll('#nav [data-pv]')].map(b=>b.dataset.pv), sync:document.getElementById('who').textContent})")
     bad+=check('portal lists the active clients with their modules',r['rows']==['pines','wccc'] and r['title']=='Clients' and r['chips']==['Active'] and r['nav']==['clients','team','activity'] and r['sync']=='Signed in as board@test' and not ep,r,ep)
     await pp.evaluate("()=>{ document.querySelector('[data-t=\"wccc\"]').click(); }"); await pp.wait_for_timeout(300)
     r=await pp.evaluate("()=>({h1:document.querySelector('#main h1').textContent, cards:[...document.querySelectorAll('#main h2')].map(h=>h.textContent.trim()), staff:[...document.querySelectorAll('[data-u]')].map(x=>x.querySelector('small').textContent), board:[...document.querySelectorAll('.card .tr')].filter(x=>x.textContent.includes('Board')).length})")
