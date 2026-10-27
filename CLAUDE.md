@@ -759,6 +759,10 @@ groups, printed scorecards — the printed cards include a live-scoring QR that 
   `save` returns `false` to keep it open. After mutating `db`: `persist(); render();`.
 - **Mobile matters** (phones at registration, cashier, auction). Check 390 px width; no horizontal overflow. Tables
   stack on phones automatically (≤640px, see head.html); give a table `keep` only when it has its own phone layout.
+- **Receipts and slips print on 80 mm Epson-style thermal printers** (the owner, Oct 2026): `RECEIPT` in billcore = 227 pt wide, 14 pt
+  margins (inside the 72 mm printable width), **black only** — no greys, no gold, no colour (they dither), rules 0.75–1 pt, type
+  ≥ 8.5 pt — and the logo cut to one bit through `monoLogo(src)` (canvas threshold, cached). `receipt` (station) and `receiptPDF`
+  (hub) are the two slips; keep anything new on paper to the same rules. Statements and reports stay full-colour letter pages.
 - **Printed/PDF output must look as polished as the rest of the brand** — the user rejected a plain browser
   print view as "lazy". PDFs are generated files the user downloads (jsPDF), not print-preview windows.
 - **Privacy on public-facing sheets:** no emails, GHIN numbers or handicap indexes on anything left on a table.

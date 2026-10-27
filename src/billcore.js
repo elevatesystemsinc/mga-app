@@ -9,6 +9,14 @@ const bcDate=iso=>iso?new Date(String(iso).slice(0,10)+'T12:00').toLocaleDateStr
 const bcSign=i=>i.kind==='charge'?(parseFloat(i.amount)||0):-(parseFloat(i.amount)||0);
 /* a logo in a PDF band: fitted to the height, width by its own proportions (at most 2.6× the height); returns the width drawn */
 function crestW(doc,src,h){ let w=h*850/1024; try{ const p=doc.getImageProperties(src); if(p&&p.width&&p.height) w=Math.min(h*2.6,h*p.width/p.height); }catch(_){} return w; }
+/* receipts print on 80 mm thermal paper (Epson TM series: 203 dpi, black only, 72 mm printable): the slip is 227 pt wide with
+   14 pt margins, every mark is solid black (no greys, no colour — they dither), rules are 1 pt, and the logo is cut to one bit */
+const RECEIPT={W:227,L:14,R:213,INK:[0,0,0]};
+const MONO_LOGO={};
+function monoLogo(src){ if(!src) return Promise.resolve(null); if(MONO_LOGO[src]) return Promise.resolve(MONO_LOGO[src]);
+  return new Promise(res=>{ const im=new Image(); im.onload=()=>{ try{ const c=document.createElement('canvas'); c.width=im.naturalWidth||im.width; c.height=im.naturalHeight||im.height; const g=c.getContext('2d'); g.fillStyle='#fff'; g.fillRect(0,0,c.width,c.height); g.drawImage(im,0,0);
+      const d=g.getImageData(0,0,c.width,c.height), px=d.data; for(let i=0;i<px.length;i+=4){ const lum=(px[i]*299+px[i+1]*587+px[i+2]*114)/1000; const v=lum<150?0:255; px[i]=px[i+1]=px[i+2]=v; px[i+3]=255; } g.putImageData(d,0,0);
+      MONO_LOGO[src]=c.toDataURL('image/png'); res(MONO_LOGO[src]); }catch(_){ res(src); } }; im.onerror=()=>res(null); im.src=src; }); }
 function drawCrest(doc,src,x,y,h){ if(!src) return 0; const w=crestW(doc,src,h); try{ doc.addImage(src,'PNG',x,y,w,h); }catch(_){ return 0; } return w; }
 function bcFonts(doc){ [['ps400','PS-400.ttf','PublicSans','normal'],['ps700','PS-700.ttf','PublicSans','bold'],['ps800','PS-800.ttf','PublicSansXB','normal'],['cg700','CG-700.ttf','Cormorant','bold']].forEach(([k,f,fam,st])=>{ doc.addFileToVFS(f,PDF_FONTS[k]); doc.addFont(f,fam,st); }); }
 function statementPage(doc,ctx){
