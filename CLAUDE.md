@@ -763,6 +763,26 @@ groups, printed scorecards — the printed cards include a live-scoring QR that 
   `save` returns `false` to keep it open. After mutating `db`: `persist(); render();`.
 - **Mobile matters** (phones at registration, cashier, auction). Check 390 px width; no horizontal overflow. Tables
   stack on phones automatically (≤640px, see head.html); give a table `keep` only when it has its own phone layout.
+- **Check numbers, signed slips and the daily close-out** (`pos-closeout-setup.sql`, applied; pos.js from `CO=` down; the owner, Oct
+  2026: paper slips stay, the scans tie them to the digital tickets, the day closes and locks). Every check gets **`check_no`**
+  `MMDD-NNNC` (`pos_check_no`: a counter per outlet per day in `pos_counters`, a check digit — `checkDigit` / `checkNoFor` /
+  `checkNoValid` in poscore match `pos_check_digit`) and **`day`** (the club's local date, sent by the client: the server is UTC);
+  `pos_check_put` assigns both on a new check, the hub's register asks `pos_next_check`. The slip prints **CHECK 1027-0143** large
+  (people and OCR) and a **QR** `fs:<ticket>:<payment>` per slip block (`drawQR` / `loadQRLib` in billcore). **Daily close-out**
+  (`vCloseout`, rail: Food & beverage → Daily close-out; `CO`): outlet + day; drop the scanner's PDF or photos → `fileToCanvases`
+  (pdf.js pages, images downscaled) → `readSlipImage` (jsQR, else tesseract.js; tests inject `CO.reader`) → the QR, else
+  `matchSlipText(text, the day's numbers)` (poscore: OCR look-alikes mapped to digits, exact or one-character-off against the
+  list only) → `attachSlip` (bucket **`slips`**, private, `<tenant>/<ticket>/<payment>.jpg`; the path on `payments[].slip` and on
+  the charge's **`acct_items.slip`**); anything unread, or a ticket with more than one payment, waits in the **tray** for a tap.
+  The page shows slips scanned / expected (`slipPays`: account + card payments; a hub-register ticket from before split payments
+  counts one implied payment), what is still open or out for a tip, tips to enter from the scans (`settleTicket(t,tips,{partial})`),
+  tips by server with the ones over the limit (`CLUB.pos.tipFlag` {pct 30, amount 50}, Settings → F&B → Service charge & tips),
+  the cash drawer against the count, voids, notes, **Close-out PDF** (`closeoutPDF`, letter, branded) and e-mail (`CLUB.pos.closeoutTo`),
+  **Close the day** (`closeDay` → a `pos_days` row; refused with a check open or a slip out; missing scans only ask) and **Reopen the
+  day** (`reopenDay`, a manager's PIN: `managerPIN` checks `clubStaff` managers' PIN hashes in the hub). A closed day is locked:
+  `pos_reopen` / `pos_void` refuse at the station (`pos_day_closed`), the hub's `reopenTicket` / `voidTicket` / `settleTicket` go through
+  `dayLockOK` (manager PIN). The account page and the member portal show **Signed slip** on a charge that has one (`showSlip` /
+  `slipURL` → a signed URL; storage policies: staff by tenant path, a member only the slips behind their own charges).
 - **Receipts and slips print on 80 mm Epson-style thermal printers** (the owner, Oct 2026): `RECEIPT` in billcore = 227 pt wide, 14 pt
   margins (inside the 72 mm printable width), **black only** — no greys, no gold, no colour (they dither), rules 0.75–1 pt, type
   ≥ 8.5 pt — and the logo cut to one bit through `monoLogo(src)` (canvas threshold, cached). `receipt` (station) and `receiptPDF`

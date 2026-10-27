@@ -9,6 +9,7 @@
   window.supabase={createClient(){ return {
     auth:{getSession:async()=>({data:{session:(window.MM_CONFIG||{}).noSession?null:{user:{email:'board@test'}}}}),signInWithPassword:async()=>({error:null}),signOut:async()=>({}),signUp:async({email})=>({data:{user:{id:'u-'+email}},error:null}),updateUser:async()=>({data:{},error:null}),verifyOtp:async()=>({data:{},error:null}),signInWithOtp:async()=>({data:{},error:null}),onAuthStateChange:()=>({data:{subscription:{unsubscribe(){}}}}),resetPasswordForEmail:async()=>({data:{},error:null})},
     functions:{invoke(name,o){ return call('fn',{name,body:(o&&o.body)||{}}); }},
+    storage:{from(bucket){ return {upload:(path,blob)=>call('storage',{op:'put',bucket,path,size:blob&&blob.size||0}),createSignedUrl:(path)=>call('storage',{op:'url',bucket,path}),remove:(paths)=>call('storage',{op:'del',bucket,paths})}; }},
     from(t){ return new Q(t); },
     rpc(fn,args){ return call('rpc',{fn,args:args||{}}); },
     channel(){ const subs=[]; const ch={on(ev,opts,cb){ subs.push({opts,cb}); return ch; },

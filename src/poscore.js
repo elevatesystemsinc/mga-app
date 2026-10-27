@@ -34,3 +34,17 @@ function shiftStats(tickets){ const S={sales:0,n:0,tax:0,svc:0,tips:0,by:{accoun
     for(const p of pays){ const tip=parseFloat(p.tip)||0; S.tips+=tip; S.servers[sv].tips+=tip; const k=p.method==='account'?'account':p.method==='card'?'card':'cash'; S.by[k]+=(parseFloat(p.amount)||0)-tip; }
     for(const l of t.lines||[]){ const k=l.name; S.items[k]=S.items[k]||{qty:0,amount:0}; S.items[k].qty+=parseFloat(l.qty)||0; S.items[k].amount+=lineTotal(l); } }
   const r2=v=>Math.round(v*100)/100; ['sales','tax','svc','tips','voidAmt'].forEach(k=>S[k]=r2(S[k])); Object.keys(S.by).forEach(k=>S.by[k]=r2(S.by[k])); Object.values(S.servers).forEach(s=>{ s.sales=r2(s.sales); s.tips=r2(s.tips); }); S.avg=S.n?r2(S.sales/S.n):0; return S; }
+
+/* ---- check numbers: MMDD-NNNC — the day, a counter per outlet per day, a check digit (weights 7,3,1 over the seven digits, mod 10;
+   the same sum as pos_check_digit in SQL). Printed large on the slip; read back from a scan by matchSlipText. ---- */
+function checkDigit(body){ let s=0; for(let i=0;i<body.length;i++) s+=(parseInt(body[i])||0)*[7,3,1][i%3]; return String((10-s%10)%10); }
+function checkNoFor(day,n){ const d=String(day||'').replace(/-/g,'').slice(4,8), k=String(n).padStart(3,'0'); return `${d}-${k}${checkDigit(d+k)}`; }
+function checkNoValid(no){ const m=/^(\d{4})-(\d{3})(\d)$/.exec(String(no||'')); return !!m&&checkDigit(m[1]+m[2])===m[3]; }
+/* OCR reads of a thermal slip: letters that are digits in disguise, then the day's numbers as the only answers allowed.
+   exact = the token is a valid number on the list; fuzzy = one character off a number on the list (and no other). */
+const OCR_DIGIT={O:'0',o:'0',D:'0',Q:'0',U:'0',I:'1',i:'1',l:'1',L:'1','|':'1','!':'1',Z:'2',z:'2',S:'5',s:'5',B:'8',G:'6',b:'6',T:'7',A:'4',q:'9',g:'9'};
+function matchSlipText(text,nos){ const list=(nos||[]).filter(Boolean); if(!list.length) return null; const set=new Set(list);
+  const toks=(String(text||'').match(/[0-9ODQUIilL|!ZzSsBGbTAqg]{4}\s*[-–—_~.:]?\s*[0-9ODQUIilL|!ZzSsBGbTAqg]{4}/g)||[]).map(t=>{ const d=t.replace(/[^0-9ODQUIilL|!ZzSsBGbTAqg]/g,'').split('').map(c=>OCR_DIGIT[c]||c).join(''); return d.length===8?d.slice(0,4)+'-'+d.slice(4):null; }).filter(Boolean);
+  for(const t of toks) if(set.has(t)&&checkNoValid(t)) return {no:t,how:'exact'};
+  for(const t of toks){ const near=list.filter(n=>{ let d=0; for(let i=0;i<9;i++) if(n[i]!==t[i]) d++; return d===1; }); if(near.length===1) return {no:near[0],how:'fuzzy'}; }
+  return null; }

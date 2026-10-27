@@ -57,8 +57,14 @@ class FakeDB:
         for r in self._rows('hub_keys'):
             if r['key_hash']==h and not r.get('revoked_at'): return r.get('tenant','wccc')
         return 'wccc'
+    def _checkno(self,tn,outlet,day):
+        C=self._rows('pos_counters'); c=next((x for x in C if x['tenant']==tn and x['outlet']==outlet and x['day']==day),None)
+        if not c: c={'tenant':tn,'outlet':outlet,'day':day,'n':0}; C.append(c)
+        c['n']+=1; d=day.replace('-','')[4:8]; body=d+'%03d'%c['n']; s=sum(int(ch)*[7,3,1][i%3] for i,ch in enumerate(body)); return '%s-%03d%d'%(d,c['n'],(10-s%10)%10)
+    def _day_closed(self,tn,outlet,day): return any(x['tenant']==tn and x['outlet']==outlet and x['day']==day for x in self._rows('pos_days'))
     def _rpc(self,fn,a):
         err=lambda m:json.dumps({'data':None,'error':{'message':m,'code':'42501'}})
+        if fn=='pos_next_check': return json.dumps({'data':self._checkno(a.get('p_tenant') or 'wccc',a['p_outlet'],a.get('p_day') or datetime.date.today().isoformat()),'error':None})
         if fn in('calcutta_get','calcutta_put'): return json.dumps({'data':None,'error':None})
         if fn=='tenant_lookup':
             if not self.tenancy: return json.dumps({'data':None,'error':{'message':'Could not find the function public.tenant_lookup(p_host) in the schema cache','code':'PGRST202'}})
@@ -115,6 +121,7 @@ class FakeDB:
             if fn=='pos_check_put':
                 c=dict(a['p_check']); cid=c.get('id') or str(uuid.uuid4()); ex=next((t for t in tix if t['id']==cid),None)
                 row={'id':cid,'tenant':tn,'outlet':st['outlet'],'station':st['id'],'table_no':c.get('table_no'),'server':c.get('server'),'server_id':c.get('server_id'),'guests':c.get('guests') or 0,'member_id':c.get('member_id'),'guest':c.get('guest'),'lines':c.get('lines') or [],'note':c.get('note'),'subtotal':c.get('subtotal') or 0,'svc':c.get('svc') or 0,'tax':c.get('tax') or 0,'tip':c.get('tip') or 0,'total':c.get('total') or 0,'status':'open','paid':None,'acct_item':None,'created_at':(ex or {}).get('created_at') or now,'created_by':c.get('server') or 'station','updated_at':now,'closed_at':None,'void_at':None,'void_reason':None}
+                if not ex: row['day']=c.get('day') or datetime.date.today().isoformat(); row['check_no']=self._checkno(tn,st['outlet'],row['day'])
                 if ex:
                     if ex['status']!='open': return json.dumps({'data':ex,'error':None})
                     ex.update({k:row[k] for k in ('table_no','server','server_id','guests','member_id','guest','lines','note','subtotal','svc','tax','tip','total','updated_at')}); row=ex
@@ -155,7 +162,7 @@ class FakeDB:
                 return json.dumps({'data':r,'error':None})
             if fn=='pos_shift':
                 day=str(a.get('p_date') or datetime.date.today().isoformat())
-                return json.dumps({'data':[t for t in tix if t.get('tenant','wccc')==tn and t['outlet']==st['outlet'] and t['status'] in ('closed','void') and str(t.get('closed_at') or t.get('void_at') or '')[:10]==day],'error':None})
+                return json.dumps({'data':[t for t in tix if t.get('tenant','wccc')==tn and t['outlet']==st['outlet'] and t['status'] in ('closed','void') and (t.get('day') or str(t.get('closed_at') or t.get('void_at') or '')[:10])==day],'error':None})
             if fn=='pos_close':
                 if not r or r['status']!='open': return err('Check not open')
                 d=a.get('p_data') or {}; paid=d.get('paid') or 'cash'
@@ -184,6 +191,7 @@ class FakeDB:
                 return json.dumps({'data':r,'error':None})
             if fn=='pos_reopen':
                 if not r: return err('Unknown check')
+                if r['status']!='open' and self._day_closed(tn,st['outlet'],r.get('day') or str(r.get('closed_at') or r.get('created_at') or '')[:10]): return err("That day is closed — a manager reopens it from the hub's close-out page")
                 if r['status']!='open':
                     for i in self._rows('acct_items'):
                         if (i['id']==r.get('acct_item') or str(i.get('ref','')).startswith('pos:'+r['id'])) and not i.get('void_at'): i['void_at']=now; i['void_reason']='Check reopened at the station'
@@ -191,6 +199,7 @@ class FakeDB:
                 return json.dumps({'data':r,'error':None})
             if fn=='pos_void':
                 if not r: return err('Unknown check')
+                if self._day_closed(tn,st['outlet'],r.get('day') or str(r.get('closed_at') or r.get('created_at') or '')[:10]): return err("That day is closed — a manager reopens it from the hub's close-out page")
                 r.update({'status':'void','void_at':now,'void_reason':a.get('p_reason') or '','updated_at':now})
                 for i in self._rows('acct_items'):
                     if (i['id']==r.get('acct_item') or str(i.get('ref','')).startswith('pos:'+r['id'])) and not i.get('void_at'): i['void_at']=now; i['void_reason']='Check voided at the station: '+(a.get('p_reason') or '')
@@ -395,6 +404,11 @@ class FakeDB:
         return json.dumps({'data':{'error':'Unknown action'},'error':None})
     async def handle(self,source,payload):   # one synchronous step per call → atomic like a Postgres statement
         d=json.loads(payload); op=d['op']; a=d['args']; t=a.get('table')
+        if op=='storage':
+            S=self._rows('_storage')
+            if a['op']=='put': S[:]=[x for x in S if x['path']!=a['path']]; S.append({'bucket':a['bucket'],'path':a['path'],'size':a.get('size',0)}); return json.dumps({'data':{'path':a['path']},'error':None})
+            if a['op']=='url': return json.dumps({'data':{'signedUrl':'fake://'+a['bucket']+'/'+a['path']},'error':None} if any(x['path']==a['path'] for x in S) else {'data':None,'error':{'message':'Object not found'}})
+            if a['op']=='del': S[:]=[x for x in S if x['path'] not in a['paths']]; return json.dumps({'data':[],'error':None})
         if op=='rpc': return self._rpc(a['fn'],a['args'])
         if op=='fn': return self._fn(a['name'],a['body'])
         if op=='poll':

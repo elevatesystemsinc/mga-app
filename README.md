@@ -219,7 +219,15 @@ charged to an account or a card prints a slip with Additional tip, Total and Sig
 out**, and the server closes it out with the tip that was written — an account tip lands on the member's charge. A
 manager's PIN is needed to leave the station, and to void a check; a manager's **Closed today** lists the day's closed
 checks (or any earlier day) with **Reopen** — the payments are cleared, an account charge is voided, and the check goes
-back on the floor to be changed and paid again; the hub's Tickets page has the same Reopen on every ticket. The kitchen screen shows every fired course for its
+back on the floor to be changed and paid again; the hub's Tickets page has the same Reopen on every ticket.
+Every check carries a number, printed large on the slip ("CHECK 1027-0143") with a small QR beneath it. At the end of the
+night the signed slips go through a document scanner, and **Daily close-out** (under Food & beverage) takes the scanner's
+PDF or phone photos: each page is read, matched to its check and stored against the payment and the member's charge, so
+the account page and the member portal show the signed slip beside the digital one. The page lists slips scanned against
+slips expected, anything still open or out for a tip, tips by server with the ones over the club's limit flagged, the
+cash drawer against the count, and voids. **Close the day** records it and locks it: nothing on that day can be reopened,
+voided or re-tipped from a station, and the hub asks for a manager's PIN. The close-out PDF is what the paper stack is
+stapled to. The kitchen screen shows every fired course for its
 station with the table, the server and the minutes elapsed; **Bump** clears it. The golf shop works the same way from
 **Settings → Shops** (a golf shop and a racket sports shop each sit under their own rail section), without tables or kitchens.
 

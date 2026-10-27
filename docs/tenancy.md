@@ -158,7 +158,7 @@ and RLS enforces the same on the tables.
    the **magic link** template (members sign in to `member.html` with it) and add `https://<slug>.flagstickhub.com/member.html`
    style redirects (the wildcard already covers it). Each club then connects its own Stripe account from Billing setup;
    until a key is set the hub and the portal say online payments aren't switched on.
-9. **Restaurant stations** (`pos-stations-setup.sql`, `pos-split-setup.sql`, `pos-reopen-setup.sql` and `pos-tips-setup.sql`, all applied): nothing to configure on Flagstick's side — the club makes
+9. **Restaurant stations** (`pos-stations-setup.sql`, `pos-split-setup.sql`, `pos-reopen-setup.sql`, `pos-tips-setup.sql` and `pos-closeout-setup.sql` (check numbers, the `slips` bucket, `pos_days`), all applied): nothing to configure on Flagstick's side — the club makes
    its station links in Settings → Food & beverage (the link stays behind each station's Link button); a manager reopens closed checks from the station, the hub from Tickets. Kitchen screens use realtime on `pos_fires` (added to the publication).
 10. **White-label e-mail** (`mail-setup.sql`, applied): a club or association sets its sender in Settings → Outgoing e-mail.
    Through Flagstick's mailer the club's domain must be verified in Resend (add the domain there, give the club the DNS
