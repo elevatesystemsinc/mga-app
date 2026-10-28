@@ -299,9 +299,9 @@ const GAME_CATALOG=[
   {id:'match',name:'Singles match play',group:'Match play',engine:{format:'match',teamSize:1},desc:'Two players in a group, hole by hole; the better net score wins the hole.',hcp:'100% of the difference'},
   {id:'nassau',name:'Nassau (front · back · 18)',group:'Match play',engine:{format:'match',teamSize:1,matchScoring:'nassau'},desc:'Three singles bets in one match: front nine, back nine and the eighteen — a point for each.',hcp:'100% of the difference'},
   {id:'fourballmatch',name:'Four-ball match play',group:'Match play',engine:{format:'match',teamSize:2},sizes:[2],desc:'Two against two, best net ball of each side on every hole.',hcp:'90%, everyone off the low man'},
-  {id:'waltz321',name:'Reverse waltz (3-2-1, all on 9 & 18)',group:'Match play',engine:{format:'match',teamSize:4,matchScoring:'nassau',countPattern:'321',matchBy:'strokes'},sizes:[2,3,4,5,6],desc:'Team against team, three bets: the front, the back and the 18 — each goes to the side with the lower total of its counted balls. Each hole counts the best three balls, then two, then one, repeating from the first hole — and every ball on 9 and 18.',hcp:'full handicaps (100%), strokes where they fall'},
-  {id:'waltz123',name:'Waltz (1-2-3)',group:'Match play',engine:{format:'match',teamSize:4,matchScoring:'nassau',countPattern:'123w',matchBy:'strokes',all918:true},sizes:[2,3,4,5,6],desc:'Team against team by total score: each hole counts the best ball, then the best two, then three, repeating — and every ball on 9 and 18 when that switch is on. One bet on the 18 by default (the winning side takes the whole pot); put money on the front and back for a Nassau.',hcp:'100% · club default'},
-  {id:'teamnassau',name:'Team Nassau (best ball)',group:'Match play',engine:{format:'match',teamSize:4,matchScoring:'nassau'},sizes:[2,3,4,5,6],desc:'Team against team, best ball of each side on every hole; points for the front, the back and the 18.',hcp:'100% of the difference, everyone off the low man'},
+  {id:'waltz321',name:'Reverse waltz (3-2-1, all on 9 & 18)',group:'Team games',engine:{format:'match',teamSize:4,matchScoring:'nassau',countPattern:'321',matchBy:'strokes'},sizes:[2,3,4,5,6],desc:'Team against team, three bets: the front, the back and the 18 — each goes to the side with the lower total of its counted balls. Each hole counts the best three balls, then two, then one, repeating from the first hole — and every ball on 9 and 18.',hcp:'full handicaps (100%), strokes where they fall'},
+  {id:'waltz123',name:'Waltz (1-2-3)',group:'Team games',engine:{format:'match',teamSize:4,matchScoring:'nassau',countPattern:'123w',matchBy:'strokes',all918:true},sizes:[2,3,4,5,6],desc:'Team against team by total score: each hole counts the best ball, then the best two, then three, repeating — and every ball on 9 and 18 when that switch is on. One bet on the 18 by default (the winning side takes the whole pot); put money on the front and back for a Nassau.',hcp:'100% · club default'},
+  {id:'teamnassau',name:'Team Nassau (best ball)',group:'Team games',engine:{format:'match',teamSize:4,matchScoring:'nassau'},sizes:[2,3,4,5,6],desc:'Team against team, best ball of each side on every hole; points for the front, the back and the 18.',hcp:'100% of the difference, everyone off the low man'},
   {id:'hilo',name:'Hi-Lo (low ball · high ball)',group:'Match play',engine:{format:'match',teamSize:2,matchScoring:'hilo'},sizes:[2],desc:'Two against two, two points a hole: the better low ball and the better high ball.',hcp:'90%, everyone off the low man'},
   {id:'foursomesmatch',name:'Foursomes match play',group:'Match play',engine:{format:'match',teamSize:2,matchForm:'foursomes'},sizes:[2],desc:'Alternate shot, one ball per side, hole by hole.',hcp:'50% of combined, difference'},
   // team — own ball
@@ -569,8 +569,8 @@ function drawTiers(players,size,idxOf){ size=Math.max(2,+size||2);
   const sorted=players.slice().sort((a,b)=>(idxOf(a)??99)-(idxOf(b)??99)||a.name.localeCompare(b.name));
   return Array.from({length:size},(_,k)=>{ const ps=sorted.slice(Math.round(k*sorted.length/size),Math.round((k+1)*sorted.length/size)); const ix=ps.map(idxOf).filter(x=>x!=null);
     return {letter:TIER_LETTERS[k]||String(k+1),players:ps,lo:ix.length?Math.min(...ix):null,hi:ix.length?Math.max(...ix):null}; }); }
-function drawTeams(players,size,method,idxOf){
-  size=Math.max(2,+size||2); const n=Math.ceil(players.length/size), teams=Array.from({length:n},()=>[]);
+function drawTeams(players,size,method,idxOf,nTeams){
+  size=Math.max(2,+size||2); const n=Math.max(1,+nTeams||Math.ceil(players.length/size)), teams=Array.from({length:n},()=>[]);   // the number of teams can be set; otherwise as many as the size needs
   if(method==='random'){ shuffled(players).forEach((p,i)=>teams[i%n].push(p)); return teams; }
   const sorted=players.slice().sort((a,b)=>(idxOf(a)??99)-(idxOf(b)??99)||a.name.localeCompare(b.name));
   if(method==='abcd'){ // one player from each handicap tier per team: tier A is dealt first, so slot k of every team is its tier-k player
@@ -581,9 +581,9 @@ function drawTeams(players,size,method,idxOf){
 }
 /* a full draw for a competition: teams of `size` from `players`; an odd player joins a team (one team of size+1) or
    sits out. Returns {teams:{pid:'S1'…}, sitOut:[pid], list:[[player…]]} — what is saved before any reveal. */
-function drawFor(players,size,method,idxOf,odd){
+function drawFor(players,size,method,idxOf,odd,nTeams){
   size=Math.max(2,+size||2); if(players.length<size) return null;
-  let teams=drawTeams(players,size,method||'random',idxOf).filter(t=>t.length), sitOut=[];
+  let teams=drawTeams(players,size,method||'random',idxOf,nTeams).filter(t=>t.length), sitOut=[];
   const short=teams.filter(t=>t.length<size), full=teams.filter(t=>t.length>=size);
   if(short.length&&full.length){ const left=short.flat(); teams=full; if(odd==='out') sitOut=left.map(p=>p.id); else left.forEach(p=>teams[secureInt(teams.length)].push(p)); }
   const map={}; teams.forEach((t,i)=>t.forEach(p=>{ map[p.id]='S'+(i+1); }));

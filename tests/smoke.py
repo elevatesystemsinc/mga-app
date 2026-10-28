@@ -395,6 +395,14 @@ async def main():
       return {before, after:evPlayers(ev).length, left, inPots, lb, had, scores, players:g.players.length, btn}; }""")
     ok=ok and r7['before']==6 and r7['after']==5 and not r7['left'] and not r7['inPots'] and not r7['lb'] and r7['had']>0 and r7['scores']==0 and r7['players']==5 and r7['btn']==5
     print('remove a player mid-round', r7, 'OK' if r7['after']==5 and not r7['lb'] and r7['scores']==0 else 'FAIL')
+    # every team game says how many teams: the designer's Number of teams (auto, or 2–8; match play by holes locks it at two), the picker and the draw follow it
+    r6n=await pg.evaluate("""()=>{ const g=GAME(); const pot=newPot('waltz123',g); pot.rules.teamSize=2; g.pots.push(pot); pot.inn={}; g.players.forEach(p=>pot.inn[p.id]=true); designGame(g); const d=GD.draft, dp=d.pots.find(x=>x.id===pot.id);
+      const sel=document.getElementById('gdNT_'+pot.id); const opts0=[...sel.options].map(o=>o.textContent); sel.value='3'; sel.dispatchEvent(new Event('change')); const by=document.getElementById('gdNBy_'+pot.id); const byOpts=[...by.options].map(o=>o.value);
+      $('gdSave').click(); const saved=g.pots.find(x=>x.id===pot.id); const n3=potTeamCount(g,saved); runDraw(g,saved,{method:'random'}); const teams=[...new Set(Object.values(saved.teams))].sort(); const sizes=teams.map(t=>Object.values(saved.teams).filter(x=>x===t).length);
+      designGame(g); const by2=document.getElementById('gdNBy_'+pot.id); by2.value='holes'; by2.dispatchEvent(new Event('change')); const sel2=document.getElementById('gdNT_'+pot.id); const locked=[...sel2.options].map(o=>o.value); $('gdSave').click(); const nHoles=potTeamCount(g,g.pots.find(x=>x.id===pot.id)); const summary=potRulesText(g.pots.find(x=>x.id===pot.id));
+      g.pots.pop(); render(); return {opts0:opts0[0], byOpts, n3, teams, sizes, locked, nHoles, summary}; }""")
+    ok6n=r6n['opts0'].startswith('As many as the players make (3 teams of 2 from 5)') and r6n['byOpts']==['strokes','holes'] and r6n['n3']==3 and r6n['teams']==['S1','S2','S3'] and r6n['sizes']==[2,2,1] and r6n['locked']==['2'] and r6n['nHoles']==2 and 'two teams' in r6n['summary']
+    ok=ok and ok6n; print('team games: the number of teams is a setting; match play locks it at two', r6n, 'OK' if ok6n else 'FAIL')
     # the same from the designer: Cancel leaves the round alone, Save takes the player out of the event with their scores
     r7b=await pg.evaluate("""()=>{ const g=GAME(), ev=gameEvent(g); const p=g.players.find(x=>x.id==='gp_p3'), gpid=p.gpid; const had=Object.keys(scoresFor(ev)[gpid]||{}).length;
       designGame(g); const d=GD.draft; removePlayer(d,d.players.find(x=>x.id==='gp_p3'),{keepEvent:true}); const stillInEv=evPlayers(ev).some(x=>x.p.id===gpid), stillScored=Object.keys(scoresFor(ev)[gpid]||{}).length; $('gdCancel').click();

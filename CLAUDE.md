@@ -368,6 +368,12 @@ Tournament = { id, name, season, days, startDate, field:[{id,memberId,team,paid,
     lead over the best of the others, `opp` 'the field'), `nassauSegments` carries the field with its winners per segment, and
     `nassauSettle` (shared by `nassauPayouts` on the phones and `payNassau` in the hub) pays the pool to the lowest total, tied sides
     sharing, everyone tied a push. Match play by holes with three sides still pairs (S1 v S2) — a three-way match has no meaning.
+    **Every team game says how many teams** (the owner, Oct 28: "on all team games I should be able to set how many teams and the size per
+    team… stop making the waltzes match play, make the option"): the designer's **Number of teams** (`pot.rules.teams`, '' = as many as
+    the players make; `potTeamCount(g,pot)`) beside Players per team on every team pot; `pickTeams`, `runDraw` (`drawTeams(…, nTeams)`) and
+    the phones' draw (`comp.nTeams` → `drawFor`) follow it. The waltzes and the team Nassau sit under **Team games** in the catalog; their
+    **Played as** is Total score (any number of teams, each bet to the lowest total) or Match play (two teams, hole by hole) — choosing
+    match play, or any by-holes match format, locks the count at two.
     first hole either side is missing); a Nassau by total score posts each side as its own holes come in (`nSide`,
     per-side `thru`, `startedA/B`), and a bet is settled once both sides have every hole of it (the owner: "I don't
     want any format to wait unless it is a true match play"). Each side's row carries **its
