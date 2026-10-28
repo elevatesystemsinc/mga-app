@@ -643,12 +643,9 @@ function payNassau(g,pot,rows){
   const st=nassauStakes(pot), M=nassauSegments(rows), byG=new Map(potPlayers(g,pot).filter(p=>p.gpid).map(p=>[p.gpid,p]));
   if(!M.length){ toast('No match yet — pick the teams and get some scores in'); return; }
   const segs=[['front','Front nine'],['back','Back nine'],['total','The 18']];
-  const calc=()=>{ const pays=new Map(), add=(pid,amt,note)=>{ const x=pays.get(pid)||{amount:0,notes:[]}; x.amount+=amt; x.notes.push(note); pays.set(pid,x); }; const lines=[];
-    for(const m of M){ for(const [k,label] of segs){ const s=n0($('pn_'+k)?$('pn_'+k).value:st[k]); if(!s) continue; const seg=m[k], a=m.A.members.map(id=>byG.get(id)).filter(Boolean), b=m.B.members.map(id=>byG.get(id)).filter(Boolean), pool=s*(a.length+b.length);
-        if(!seg.done){ lines.push({label,txt:`${m.A.name} vs ${m.B.name} · not finished`,amt:0}); a.concat(b).forEach(p=>add(p.id,s,label+' · open, stake back')); continue; }
-        if(seg.up===0){ lines.push({label,txt:(m.by==='strokes'?'Tied':'Halved')+' — a push',amt:0}); a.concat(b).forEach(p=>add(p.id,s,label+' · '+(m.by==='strokes'?'tied':'halved'))); continue; }
-        const W=seg.up>0?a:b, L=seg.up>0?b:a, each=Math.round(pool*100/W.length)/100, byTxt=m.by==='strokes'?`by ${Math.abs(seg.up)} stroke${Math.abs(seg.up)===1?'':'s'}`:`${Math.abs(seg.up)} up`;
-        lines.push({label,txt:`${(seg.up>0?m.A:m.B).name} ${byTxt}`,amt:pool}); W.forEach(p=>add(p.id,each,`${label} · won ${byTxt}`)); } }
+  const calc=()=>{ const stakes={}; segs.forEach(([k])=>{ stakes[k]=n0($('pn_'+k)?$('pn_'+k).value:st[k]); });
+    // the same sums as the phones (nassauSettle, by event player id), then onto the game's players
+    const R=nassauSettle(stakes,M,r=>(r.members||[]).filter(id=>byG.get(id))), lines=R.lines, pays=new Map(); R.pays.forEach((x,gpid)=>{ const p=byG.get(gpid); if(p) pays.set(p.id,x); });
     const el=$('pnPrev'); if(el) el.innerHTML=lines.map(l=>`<div class="mr num" style="grid-template-columns:100px minmax(0,1fr) 90px"><b>${l.label}</b><span>${esc(l.txt)}</span><b class="r">${l.amt?gMoney(l.amt):'—'}</b></div>`).join('')+[...pays.entries()].map(([pid,x])=>{ const p=g.players.find(y=>y.id===pid); return `<div class="mr num" style="grid-template-columns:minmax(0,1fr) 90px"><span>${esc(p?gpName(p):'—')} <span class="muted">${esc(x.notes.join(' · '))}</span></span><b class="r">${gMoney(x.amount)}</b></div>`; }).join('');
     return pays; };
   openDrawer({kicker:gameTitle(g)+' · '+pot.name,title:'Settle the match',saveLabel:'Record payouts',wide:true,

@@ -591,14 +591,29 @@ function matchPairs(pub){
   const out=[], T=eventTeams(pub).filter(t=>!t.key.startsWith('solo:')).sort((a,b)=>a.key.localeCompare(b.key,undefined,{numeric:true}));
   const inOneGroup=(pub.groups||[]).some(g=>groupTeams(g).filter(s=>!s.key.startsWith('solo:')).length>=2);   // the usual case: both sides ride together
   if(T.length>=2&&(T.some(t=>t.groups.length>1)||!inOneGroup)){
+    // three or more sides on total score (three carts in a waltz): one field — every side against the lowest total, not pairs
+    if(T.length>=3&&(pub.matchScoring||'holes')==='nassau'&&matchByOf(pub)==='strokes'){ const g=T[0].groups[0]; return [{g,c:pub.courses[g.course],sides:T,order:Array.from({length:18},(_,k)=>k+1)}]; }
     for(let i=0;i+1<T.length;i+=2){ const g=T[i].groups[0]; out.push({g,c:pub.courses[g.course],A:T[i],B:T[i+1],order:Array.from({length:18},(_,k)=>k+1)}); } return out; }
   for(const g of pub.groups||[]){ const c=pub.courses[g.course]; if(!c) continue; const sides=groupTeams(g).map(S=>Object.assign(S,{members:S.members.map(p=>Object.assign({},p,{_c:c}))})); if(sides.length<2) continue;
     for(let i=0;i+1<sides.length;i+=2) out.push({g,c,A:sides[i],B:sides[i+1],order:playOrder(g.startHole)}); }
   return out;
 }
+/* a field of sides on total score: each side's counted balls to par per segment; a bet goes to the lowest total once every side
+   has the segment in (ties share); a side's v is its lead over the best of the others */
+function fieldNassauRows(pub,M,scores){ const {c,sides,order}=M, grossPlay=(pub.scoring||'gross')==='gross', stakes=pub.nassau&&typeof pub.nassau==='object'?pub.nassau:null, liveSeg=k=>!stakes||k==='18'||(+(k==='F'?stakes.front:stakes.back)||0)>0;
+  const parOf=(S,h)=>(c.par[S.captain.set||'M']||c.par.M)[h-1], kOf=(S,h)=>pub.countPattern||(+pub.count>1)?Math.min(S.members.length,countOn(pub,'bestball',h,S.members.length,parOf(S,h))):1;
+  const balls=(S,h)=>{ const out=[]; for(const p of S.members){ const s=+((scores[p.id]||{})[h]); if(!s) continue; out.push(grossPlay?s:s-strokesAt(pub,p._c||c,p.set,h,segPH(pub,p,'match')||0)); } return out.length?out:null; };
+  const side=(S,h)=>{ const v=balls(S,h); if(!v) return null; const k=kOf(S,h); if(k<=1) return Math.min(...v); if(v.length<k) return null; return v.slice().sort((x,y)=>x-y).slice(0,k).reduce((a,b)=>a+b,0); };
+  const T=sides.map(S=>{ let nF=0,nB=0,rF=0,rB=0; for(const h of order){ const v=side(S,h); if(v==null) continue; const r=v-kOf(S,h)*parOf(S,h); if(h<=9){ nF++; rF+=r; } else { nB++; rB+=r; } } return {S,nF,nB,rF,rB,n:nF+nB}; });
+  const doneF=T.every(t=>t.nF>=9), done18=doneF&&T.every(t=>t.nB>=9);
+  const SEG=[{k:'F',label:'Front',rel:t=>t.rF,started:t=>t.nF>0,done:doneF},{k:'B',label:'Back',rel:t=>t.rB,started:t=>t.nB>0,done:done18},{k:'18',label:'18',rel:t=>t.rF+t.rB,started:t=>t.n>0,done:done18}];
+  return T.map(t=>{ const segs=SEG.filter(s=>liveSeg(s.k)).map(s=>{ const own=s.rel(t), others=T.filter(x=>x!==t).map(s.rel), best=others.length?Math.min(...others):own, started=s.started(t); return {k:s.k,label:s.label,v:best-own,rel:own,done:s.done,started,txt:started?toParTxt(own):'—'}; });
+    const pts=segs.reduce((a,s)=>a+(!s.done?0:(s.v>0?1:s.v===0?0.5:0)),0), t18=segs.find(s=>s.k==='18')||segs[segs.length-1], sg=(t.S.groups&&t.S.groups[0])||M.g, scs=pub.courses[sg.course]||c;
+    return {id:t.S.key,name:t.S.members.map(p=>p.name).join(' / '),members:t.S.members.map(p=>p.id),opp:'the field',field:true,sides:sides.length,group:sg.label||'',groupId:sg.id,course:sg.course,courseName:scs.name,
+      n:t.n,thru:t.n>=18?'F':String(t.n),status:segs.map(s=>s.k+' '+s.txt).join(' · '),pts,holesWon:0,holesLost:0,gross:0,toPar:0,net:null,netToPar:null,holesUp:t18?t18.v:0,segs,by:'strokes',flight:[...new Set(t.S.members.map(p=>p.flight).filter(Boolean))].join('/'),team:t.S.members.length>1,unit:'match',over:done18,holes:[]}; }); }
 function matchBoard(pub,scores,opt){
   opt=opt||{}; const rows=[];
-  for(const M of matchPairs(pub)){ const {g,c,A,B,order}=M; if(!c) continue;
+  for(const M of matchPairs(pub)){ if(M.sides){ if(M.c) rows.push(...fieldNassauRows(pub,M,scores)); continue; } const {g,c,A,B,order}=M; if(!c) continue;
     { const all=A.members.concat(B.members);
       // match play: everyone off the low man. A Nassau by total score (the reverse waltz): full handicaps — the owner was clear it is not relative to the low
       const totalScore=(pub.matchScoring||'holes')==='nassau'&&matchByOf(pub)==='strokes';
@@ -720,7 +735,9 @@ function splitShares(amount,holders){ const tot=holders.reduce((a,h)=>a+h.n,0); 
 /* the three bets of each match from the board's rows: `up` is A's lead — holes, or strokes when the match is decided by total score */
 function nassauSegments(rows){
   const out=[];
-  rows.filter(r=>r.holesUp>=0&&r.segs).forEach(A=>{ const B=rows.find(r=>r!==A&&r.opp===A.name&&r.name===A.opp); if(!B||out.some(m=>m.A===B)) return;
+  const F=rows.filter(r=>r.field&&r.segs); if(F.length>=2){ const seg=k=>{ const S=F.map(r=>[r,r.segs.find(s=>s.k===k)]).filter(([,s])=>s); if(!S.length) return {done:false,winners:[],up:0,by:0}; const done=S.every(([,s])=>s.done), best=Math.min(...S.map(([,s])=>s.rel)), rest=S.map(([,s])=>s.rel).filter(v=>v>best); return {done,winners:S.filter(([,s])=>s.rel===best).map(([r])=>r),up:done?1:0,by:rest.length?Math.min(...rest)-best:0}; };
+    out.push({field:true,sides:F,by:'strokes',front:seg('F'),back:seg('B'),total:seg('18')}); }
+  rows.filter(r=>!r.field&&r.holesUp>=0&&r.segs).forEach(A=>{ const B=rows.find(r=>r!==A&&r.opp===A.name&&r.name===A.opp); if(!B||out.some(m=>m.A===B)) return;
     const S=k=>A.segs.find(s=>s.k===k)||{v:0,done:false};
     out.push({A,B,by:A.by||'holes',front:{up:S('F').v,done:S('F').done},back:{up:S('B').v,done:S('B').done},total:{up:S('18').v,done:S('18').done}}); });
   return out;
@@ -758,15 +775,26 @@ function compPayouts(pub,comp,scores){
     ps.forEach(pid=>out.push({pid,amount:(each+(odd-->0?1:0))/100,note:gOrdinal(r.pos)+(tied(r.pos)?' (tied)':'')})); });
   return {kind:'finish',rows:out,total:out.reduce((a,x)=>a+x.amount,0),lines,standings:rows};
 }
-function nassauPayouts(pub,comp,rows){
-  const st=Object.assign({front:5,back:5,total:10},comp.nassau||{}), M=nassauSegments(rows), pays=new Map(), lines=[];
-  const add=(pid,amt,note)=>{ const x=pays.get(pid)||{amount:0,notes:[]}; x.amount+=amt; x.notes.push(note); pays.set(pid,x); };
-  if(!M.length) return {kind:'nassau',rows:[],total:0,lines:[],note:'no match yet',standings:rows};
-  for(const m of M) for(const [k,label] of [['front','Front nine'],['back','Back nine'],['total','The 18']]){ const s=+st[k]||0; if(!s) continue; const seg=m[k], a=m.A.members||[], b=m.B.members||[], pool=s*(a.length+b.length);
+/* the money on a Nassau, segment by segment: a pair — the losers' stakes to the winners, a tie is a push; a field — the pool
+   (every player's stake) to the side with the lowest total, tied sides sharing, everyone tied a push; an unfinished bet gives
+   the stake back. pays: member id → {amount, notes}. Shared by the phones' Finish tab and the hub's Settle the match drawer. */
+function nassauSettle(st,M,memberIds){ const pays=new Map(), lines=[], add=(pid,amt,note)=>{ const x=pays.get(pid)||{amount:0,notes:[]}; x.amount+=amt; x.notes.push(note); pays.set(pid,x); }, ids=memberIds||(r=>r.members||[]);
+  for(const m of M) for(const [k,label] of [['front','Front nine'],['back','Back nine'],['total','The 18']]){ const s=+st[k]||0; if(!s) continue; const seg=m[k];
+    if(m.field){ const all=m.sides.flatMap(ids), pool=s*all.length;
+      if(!seg.done){ lines.push({label,txt:`${m.sides.length} sides · not finished`,amt:0}); all.forEach(pid=>add(pid,s,label+' · open, stake back')); continue; }
+      const W=seg.winners.flatMap(ids); if(W.length>=all.length){ lines.push({label,txt:'Everyone tied — a push',amt:0}); all.forEach(pid=>add(pid,s,label+' · tied')); continue; }
+      const each=Math.round(pool*100/W.length)/100, names=seg.winners.map(r=>r.name).join(' and '), byTxt=seg.winners.length>1?'tied for the low total — share':`by ${seg.by} stroke${seg.by===1?'':'s'}`;
+      lines.push({label,txt:`${names} ${byTxt}`,amt:pool}); W.forEach(pid=>add(pid,each,`${label} · ${seg.winners.length>1?'tied low — shared':'won '+byTxt}`)); continue; }
+    const a=ids(m.A), b=ids(m.B), pool=s*(a.length+b.length);
     if(!seg.done){ lines.push({label,txt:`${m.A.name} vs ${m.B.name} · not finished`,amt:0}); a.concat(b).forEach(pid=>add(pid,s,label+' · open, stake back')); continue; }
     if(seg.up===0){ lines.push({label,txt:(m.by==='strokes'?'Tied':'Halved')+' — a push',amt:0}); a.concat(b).forEach(pid=>add(pid,s,label+' · '+(m.by==='strokes'?'tied':'halved'))); continue; }
     const W=seg.up>0?a:b, each=Math.round(pool*100/W.length)/100, byTxt=m.by==='strokes'?`by ${Math.abs(seg.up)} stroke${Math.abs(seg.up)===1?'':'s'}`:`${Math.abs(seg.up)} up`;
     lines.push({label,txt:`${(seg.up>0?m.A:m.B).name} ${byTxt}`,amt:pool}); W.forEach(pid=>add(pid,each,`${label} · won ${byTxt}`)); }
+  return {lines,pays}; }
+function nassauPayouts(pub,comp,rows){
+  const st=Object.assign({front:5,back:5,total:10},comp.nassau||{}), M=nassauSegments(rows);
+  if(!M.length) return {kind:'nassau',rows:[],total:0,lines:[],note:'no match yet',standings:rows};
+  const {lines,pays}=nassauSettle(st,M);
   const out=[...pays.entries()].filter(([,x])=>x.amount>0).map(([pid,x])=>({pid,amount:Math.round(x.amount*100)/100,note:x.notes.join(' · ')}));
   return {kind:'nassau',rows:out,total:out.reduce((a,x)=>a+x.amount,0),lines,standings:rows};
 }
@@ -1178,7 +1206,7 @@ window.__canReload=()=>!queue.length;
    page counts, and a reload is tried once per build — if the page that comes back is still the old one, the CDN
    hasn't caught up; wait a while before trying that build again. */
 (function(){
-  const ME='20261028151927', KEY='au_tried', RETRY=10*60*1000; let ready=false, lastCheck=0;
+  const ME='20261028152655', KEY='au_tried', RETRY=10*60*1000; let ready=false, lastCheck=0;
   const typing=()=>{ const a=document.activeElement; return a&&/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)&&a.value&&a.type!=='search'; };
   const safe=()=>!typing()&&(typeof window.__canReload!=='function'||window.__canReload());
   const tried=()=>{ try{ const [b,t]=(sessionStorage.getItem(KEY)||'').split('|'); return b?{build:b,at:+t||0}:null; }catch(_){ return null; } };

@@ -363,7 +363,11 @@ Tournament = { id, name, season, days, startDate, field:[{id,memberId,team,paid,
     player's PH, not PH − low man; the owner: "it should not be relative to the low"); by-holes matches stay off the
     low man. **A gross competition is gross everywhere**: `matchBoard` takes the balls as written when the competition's `scoring` is
     'gross' (`grossPlay`) — it used to net every ball whatever the pot said, so the Misfits' gross waltz showed and settled on nets
-    (Oct 28, 2026). **Only true match play waits**: a by-holes match counts a hole once both sides have it (and stops at the
+    (Oct 28, 2026). **Only true match play waits**: a by-holes match counts a hole once both sides have it (and stops at the **Three or more sides on total score are a field** (the Misfits' three carts of four, the same day): `matchPairs`
+    returns one `{sides}` match instead of pairs, `fieldNassauRows` gives every side its own row (own to par per segment, `v` = its
+    lead over the best of the others, `opp` 'the field'), `nassauSegments` carries the field with its winners per segment, and
+    `nassauSettle` (shared by `nassauPayouts` on the phones and `payNassau` in the hub) pays the pool to the lowest total, tied sides
+    sharing, everyone tied a push. Match play by holes with three sides still pairs (S1 v S2) — a three-way match has no meaning.
     first hole either side is missing); a Nassau by total score posts each side as its own holes come in (`nSide`,
     per-side `thru`, `startedA/B`), and a bet is settled once both sides have every hole of it (the owner: "I don't
     want any format to wait unless it is a true match play"). Each side's row carries **its
