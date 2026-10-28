@@ -361,7 +361,9 @@ Tournament = { id, name, season, days, startDate, field:[{id,memberId,team,paid,
     balls up (count pattern, count>1 or total score) **100%** ('match'), four-ball match play 90% ('match4') — a 90%
     waltz once mis-scored a live game by two strokes. A Nassau by total score plays **full handicaps** (`rel` = the
     player's PH, not PH − low man; the owner: "it should not be relative to the low"); by-holes matches stay off the
-    low man. **Only true match play waits**: a by-holes match counts a hole once both sides have it (and stops at the
+    low man. **A gross competition is gross everywhere**: `matchBoard` takes the balls as written when the competition's `scoring` is
+    'gross' (`grossPlay`) — it used to net every ball whatever the pot said, so the Misfits' gross waltz showed and settled on nets
+    (Oct 28, 2026). **Only true match play waits**: a by-holes match counts a hole once both sides have it (and stops at the
     first hole either side is missing); a Nassau by total score posts each side as its own holes come in (`nSide`,
     per-side `thru`, `startedA/B`), and a bet is settled once both sides have every hole of it (the owner: "I don't
     want any format to wait unless it is a true match play"). Each side's row carries **its

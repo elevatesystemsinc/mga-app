@@ -3384,8 +3384,10 @@ function matchBoard(pub,scores,opt){
       const four=pub.matchForm==='foursomes';   // alternate shot: one ball per side off the team handicap
       const tph=S=>teamPH(pub,'foursomes',S.members), lowT=four?Math.min(...[A,B].map(S=>tph(S)??0)):0;
       const hcpOf=p=>(((p._c||c).hcp)[p.set||'M']||(p._c||c).hcp.M);
-      const nets=(S,h)=>{ if(four){ const s=+((scores[S.captain.id]||{})[h]); if(!s) return null; const v=s-strokesAt(pub,S.captain._c||c,S.captain.set,h,(tph(S)??0)-lowT); return [v]; }
-        const out=[]; for(const p of S.members){ const s=+((scores[p.id]||{})[h]); if(!s) continue; out.push(s-strokesAt(pub,p._c||c,p.set,h,rel(p))); } return out.length?out:null; };
+      // a gross match (the competition's scoring, not the event's) plays the balls as written: no strokes anywhere
+      const grossPlay=(pub.scoring||'gross')==='gross';
+      const nets=(S,h)=>{ if(four){ const s=+((scores[S.captain.id]||{})[h]); if(!s) return null; const v=grossPlay?s:s-strokesAt(pub,S.captain._c||c,S.captain.set,h,(tph(S)??0)-lowT); return [v]; }
+        const out=[]; for(const p of S.members){ const s=+((scores[p.id]||{})[h]); if(!s) continue; out.push(grossPlay?s:s-strokesAt(pub,p._c||c,p.set,h,rel(p))); } return out.length?out:null; };
       // a side's score on a hole: its best ball, or the sum of the k best balls when the match counts more than one
       const parOf=(S,h)=>(c.par[S.captain.set||'M']||c.par.M)[h-1], kOf=(S,h)=>pub.countPattern||(+pub.count>1)?Math.min(S.members.length,countOn(pub,'bestball',h,S.members.length,parOf(S,h))):1;
       const side=(S,h)=>{ const v=nets(S,h); if(!v) return null; const k=kOf(S,h);
@@ -8814,7 +8816,7 @@ async function resultsPDF(t,opt){
    page counts, and a reload is tried once per build — if the page that comes back is still the old one, the CDN
    hasn't caught up; wait a while before trying that build again. */
 (function(){
-  const ME='20261027053032', KEY='au_tried', RETRY=10*60*1000; let ready=false, lastCheck=0;
+  const ME='20261028151927', KEY='au_tried', RETRY=10*60*1000; let ready=false, lastCheck=0;
   const typing=()=>{ const a=document.activeElement; return a&&/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)&&a.value&&a.type!=='search'; };
   const safe=()=>!typing()&&(typeof window.__canReload!=='function'||window.__canReload());
   const tried=()=>{ try{ const [b,t]=(sessionStorage.getItem(KEY)||'').split('|'); return b?{build:b,at:+t||0}:null; }catch(_){ return null; } };
