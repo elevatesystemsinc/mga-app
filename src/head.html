@@ -84,6 +84,10 @@ body{font-variant-numeric:lining-nums}
 .pad{padding:20px 22px}
 .cardhead{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:18px 22px}
 .grid{display:grid;gap:16px}
+/* a block that stacks cards, grids and notes with the page's own rhythm (tab bodies that are not direct children of .main) */
+.stack{display:flex;flex-direction:column;gap:20px} .stack>:empty{display:none}
+/* an empty state right under a card head is a note, not a page-sized empty */
+.cardhead+.empty{padding:6px 22px 26px} .cardhead+.empty b{font-size:17px}
 .g4{grid-template-columns:repeat(4,minmax(0,1fr))} .g3{grid-template-columns:repeat(3,minmax(0,1fr))} .g2{grid-template-columns:repeat(2,minmax(0,1fr))}
 .split{display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:20px;align-items:start}
 .kpi{display:flex;flex-direction:column;gap:6px}

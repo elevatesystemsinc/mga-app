@@ -34,7 +34,7 @@ const NAV_PAGE={teesheet:'bookings',racketbook:'bookings',aquabook:'bookings',pr
 /* which department a rail entry drives (bookings by facility department, registers by outlet department, staff by theirs) */
 const NAV_DEPT={teesheet:'golf',racketbook:'racket',aquabook:'aquatics',bookings:'',proshop:'golf',racketshop:'racket',pos:'fnb',golfstaff:'golf',racketstaff:'racket',aquastaff:'aquatics',fnbstaff:'fnb',staff:''};
 const NAV_OWNS={fund:['fund','fundev'],tournaments:['tournaments','tournament'],accounts:['accounts','account'],bookings:['bookings','booksetup'],teesheet:['bookings'],racketbook:['bookings'],aquabook:['bookings'],pos:['pos'],proshop:['pos'],racketshop:['pos'],posmenu:['possetup'],golfstaff:['staff'],racketstaff:['staff'],aquastaff:['staff'],fnbstaff:['staff'],calendar:['calendar'],events:['events']};
-const NAV_SECTIONS={nonprofit:[['',['dash']],['Fundraising',['fund']],['Golf',['tournaments','golf','library']],['Point of sale',['pos','postickets','closeout','posmenu']],['Donors',['members','logins']],['Organization',['calendar','events','treasury','budget','surveys','orgs']],['',['settings']]],
+const NAV_SECTIONS={nonprofit:[['',['dash']],['Fundraising',['fund']],['Golf',['tournaments','golf','library']],['Point of sale',['pos','postickets','closeout','posmenu']],['Donors & guests',['members']],['Organization',['treasury','budget','surveys']],['',['settings']]],
   club:[['',['dash']],['Fundraising',['fund']],['Golf',['tournaments','golf','teesheet','library','proshop','golfstaff']],['Racket sports',['racketbook','racketshop','racketstaff']],['Aquatics',['aquabook','aquastaff']],['Food & beverage',['pos','postickets','closeout','posmenu','fnbstaff']],['Membership',['members','accounts','collections','billsetup','logins']],['Club',['calendar','events','bookings','staff','reports','orgs','treasury','budget','surveys']],['',['settings']]],
   association:[['',['dash']],['Golf',['tournaments','golf']],['Membership',['members','board']],['Money',['treasury','budget']],['',['surveys','settings']]],
   group:[['',['dash']],['Golf',['games','ledger','tournaments','golf']],['',['members','surveys','settings']]]};
@@ -59,7 +59,7 @@ function navHTML(items,live){ const secs=(isClub()&&typeof isNonprofit==='functi
   const col=navCollapsed();
   for(const [title,keys] of secs){ const its=keys.map(k=>items.find(x=>x[0]===k)).filter(Boolean); if(!its.length) continue; its.forEach(x=>placed.add(x[0])); const open=!title||!col.has(title)||its.some(x=>navActive(x[0]));
     out.push((title?`<button class="navsec${open?'':' closed'}" data-sec="${esc(title)}"><span>${esc(title)}</span>${I.chev}</button>`:'')+(open?its.map(btn).join(''):'')); }
-  const rest=items.filter(x=>!placed.has(x[0])); if(rest.length) out.push(rest.map(btn).join(''));
+  const rest=isClub()&&typeof isNonprofit==='function'&&isNonprofit()?[]:items.filter(x=>!placed.has(x[0])); if(rest.length) out.push(rest.map(btn).join(''));
   return out.join('')+live.map(e=>`<button class="nav livelink" data-golfev="${e.id}"><span class="livedot"></span><span class="trunc">Leaderboard · ${esc(e.name)}</span></button>`).join(''); }
 /* the organization on screen: the club's record from CLUB.orgs wins over what the document says */
 const curOrg=()=>!db?null:isClub()?Object.assign({},CLUB_META,{name:CLUB.name||CLUB_META.name,crest:CLUB.crest||CLUB_META.crest}):(orgMeta()||{id:db.id,kind:db.kind,name:db.name,short:db.short});
@@ -152,7 +152,7 @@ function renderInner(){
   const title=o?(isClub()?'Club Hub':orgShort()+' Hub'):'Club Hub';
   // the sidebar leads with the Flagstick mark (head.html); this line names the hub you are in, in words only
   const lock=!o||isClub();
-  $('brandName').textContent=lock?clubName:(o.name||o.short); $('brandSub').textContent=lock?(o?'Club hub':'Choose a hub'):clubName;
+  $('brandName').textContent=lock?clubName:(o.name||o.short); $('brandSub').textContent=lock?(o?(typeof isNonprofit==='function'&&isNonprofit()?'Nonprofit hub':'Club hub'):'Choose a hub'):clubName;
   $('topName').textContent=title; document.title=(o?(isClub()?clubName:orgShort()+' · '+clubName):clubName)+' · Flagstick';
   const lc=$('loginClub'); if(lc) lc.textContent=TENANT_INFO&&TENANT_INFO.name||clubName;   // the sign-in card names the tenant, even before its document is open
   if(!db){ $('nav').innerHTML=''; $('seasonBox').hidden=true; (setupNeeded?vSetup:SCOPED&&cloudReady&&(ORG_ID==='club'||!allowedOrg(ORG_ID))?vNotYours:vPicker)($('main')); return; }
@@ -287,7 +287,7 @@ function vDash(m){
     ${kpi(isClub()?'Net (projected)':'Season net (projected)',fmtS(sc.projected),`Actuals for ${sc.past.length} completed · budget for ${sc.upcoming.length} upcoming`,netCls(sc.projected))}
     ${kpi('Next up',next?dayShort(next,0)||'TBD':'—',next?`${esc(next.name)} · ${daysOut(next)===0?'today':daysOut(next)+' days out'}`:'No upcoming tournaments')}
     ${kpi('Sponsor money received',fmt(sc.received),`of ${fmt(sc.pledged)} pledged this ${isClub()?'year':'season'}`)}
-    ${kpi('Members',String(sc.active),isClub()?'active in the club directory':`active · ${db.board.filter(b=>b.memberId).length} on the board`)}
+    ${kpi(isClub()&&typeof isNonprofit==='function'&&isNonprofit()?'Donors & guests':'Members',String(sc.active),isClub()?(typeof isNonprofit==='function'&&isNonprofit()?'people on the list':'active in the club directory'):`active · ${db.board.filter(b=>b.memberId).length} on the board`)}
   </div>
   <div class="split">
     <div class="card" style="overflow:hidden">
@@ -679,7 +679,7 @@ function editPerPlayer(t,p){
 
 /* ---------- Members ---------- */
 function vMembers(m){
-  const y=Y(), s=db.seasons[y], amt=n0(s.dues.amount), club=isClub(), simple=club||db.kind==='group', short=orgShort();
+  const y=Y(), s=db.seasons[y], amt=n0(s.dues.amount), club=isClub(), simple=club||db.kind==='group', short=orgShort(), np=club&&typeof isNonprofit==='function'&&isNonprofit();
   const boardOf=id=>db.board.filter(b=>b.memberId===id).map(b=>b.role);
   let list=members().sort((a,b)=>(a.last||'').localeCompare(b.last||'')||(a.first||'').localeCompare(b.first||''));
   const total=list.length, active=list.filter(x=>x.status!=='Inactive').length;
@@ -691,20 +691,20 @@ function vMembers(m){
   if(f==='Active') list=list.filter(x=>x.status!=='Inactive'); if(f==='Inactive') list=list.filter(x=>x.status==='Inactive');
   if(f==='Board') list=list.filter(x=>boardOf(x.id).length); if(f==='Dues unpaid') list=list.filter(x=>x.status!=='Inactive'&&memberDues(y,x.id)<amt);
   const cols=simple?'grid-template-columns:40px minmax(0,1.5fr) minmax(0,1.5fr) 130px 70px 110px 110px 90px 40px':'grid-template-columns:40px minmax(0,1.5fr) minmax(0,1.5fr) 130px 70px 150px 120px 90px 40px';
-  const headRow=simple?'<span></span><span>Name</span><span>Email</span><span>Phone</span><span>Hcp</span><span>Member #</span><span>GHIN</span><span>Status</span><span></span>'
+  const headRow=np?'<span></span><span>Name</span><span>Email</span><span>Phone</span><span>Hcp</span><span>City</span><span>Since</span><span>Status</span><span></span>':simple?'<span></span><span>Name</span><span>Email</span><span>Phone</span><span>Hcp</span><span>Member #</span><span>GHIN</span><span>Status</span><span></span>'
                     :`<span></span><span>Name</span><span>Email</span><span>Phone</span><span>Hcp</span><span>Board</span><span>${y} dues</span><span>Status</span><span></span>`;
   const rowOf=x=>{ const br=boardOf(x.id), paid=memberDues(y,x.id), pend=memberCharges(y,x.id).filter(c=>c.status!=='collected');
     const du=x.status==='Inactive'?['—','']:paid>=amt?['Paid '+fmt(paid),'ok']:pend.length?[`Billed ${fmt(sum(pend,c=>c.amount))} · ${pend.some(c=>c.status==='charged')?'on club account':'with club'}`,'gold']:paid>0?[fmt(paid)+' of '+fmt(amt),'gold']:s.duesPayments.length?['Unpaid','warn']:['Not recorded',''];
-    const mid=simple?`<span class="muted">${esc(x.memberNo||'')}</span><span class="muted">${esc(x.ghin||'')}</span>`:`<span>${br.map(r=>`<span class="chip navy">${esc(r)}</span>`).join(' ')}</span><span><span class="chip ${du[1]}">${du[0]}</span></span>`;
+    const mid=np?`<span class="muted trunc">${esc(x.city||'')}</span><span class="muted">${x.joined?esc(String(x.joined).slice(0,4)):''}</span>`:simple?`<span class="muted">${esc(x.memberNo||'')}</span><span class="muted">${esc(x.ghin||'')}</span>`:`<span>${br.map(r=>`<span class="chip navy">${esc(r)}</span>`).join(' ')}</span><span><span class="chip ${du[1]}">${du[0]}</span></span>`;
     return `<div class="tr num click" data-m="${x.id}" style="${cols}"><span class="av">${initials(x)}</span><div class="cell2"><b class="trunc">${esc(memberName(x))}</b>${!simple&&(x.ghin||x.memberNo)?`<small>${x.ghin?'GHIN '+esc(x.ghin):'#'+esc(x.memberNo)}</small>`:''}</div><span class="trunc muted">${esc(x.email||'')}</span><span class="muted">${esc(x.phone||'')}</span><span>${esc(x.hcp??'')}</span>${mid}<span><span class="chip ${x.status==='Inactive'?'':'ok'}">${esc(x.status||'Active')}</span></span><span class="ib">${I.edit}</span></div>`; };
-  m.innerHTML=head(club?'Directory':'Members',club?`Every member of ${esc(CLUB.name||CLUB_META.name)}. Associations and small groups pick their members from this list.`:`Everyone in the ${esc(short)}. Board seats and tournament fields are picked from this list.`,
-      (simple?'':btn('Dues settings','mDues','')+btn('Bill dues','mBill',''))+(KEYMODE||SCOPED?'':btn(club?'Import club roster':'Import member list','mCsv','',I.down))+btn('Add member','mAdd','pri',I.plus))+`
-  <div class="toolbar"><div class="search">${I.search}<input class="inp" id="mq" placeholder="Search name, email, phone, member # or GHIN" value="${esc(view.mq)}" aria-label="Search members"></div>
+  m.innerHTML=head(np?'Donors & guests':club?'Directory':'Members',np?`Everyone ${esc(CLUB.name||CLUB_META.name)} knows — donors, guests, sponsors’ people and players. Event guest lists and tournament fields are picked from here; nobody is a “member”.`:club?`Every member of ${esc(CLUB.name||CLUB_META.name)}. Associations and small groups pick their members from this list.`:`Everyone in the ${esc(short)}. Board seats and tournament fields are picked from this list.`,
+      (simple?'':btn('Dues settings','mDues','')+btn('Bill dues','mBill',''))+(KEYMODE||SCOPED?'':btn(np?'Import a list':club?'Import club roster':'Import member list','mCsv','',I.down))+btn(np?'Add a person':'Add member','mAdd','pri',I.plus))+`
+  <div class="toolbar"><div class="search">${I.search}<input class="inp" id="mq" placeholder="${np?'Search name, email, phone or city':'Search name, email, phone, member # or GHIN'}" value="${esc(view.mq)}" aria-label="Search members"></div>
     <div class="seg">${filters.map(x=>`<button class="${f===x?'on':''}" data-mf="${x}">${x}</button>`).join('')}</div>
-    <span class="muted" style="margin-left:auto;font-size:13px">${active} active${simple?` of ${total}`:` · ${y} dues ${fmt(amt)}${n0(s.dues.installments)>1?` (${s.dues.installments} × ${fmt(amt/s.dues.installments)})`:''}`}</span></div>
+    <span class="muted" style="margin-left:auto;font-size:13px">${active} active${np?` of ${total} people`:simple?` of ${total}`:` · ${y} dues ${fmt(amt)}${n0(s.dues.installments)>1?` (${s.dues.installments} × ${fmt(amt/s.dues.installments)})`:''}`}</span></div>
   <div class="card" style="overflow:hidden">${list.length?`<div class="tw"><div class="t" style="min-width:980px"><div class="tr th" style="${cols}">${headRow}</div>
   ${list.map(rowOf).join('')}</div></div>`
-  :`<div class="empty"><b>${total?'No members match':club?'The directory is empty':'No members yet'}</b><span>${total?'Try a different search or filter.':club?'Import the club software’s member export, or add members one at a time.':`Import the ${esc(short)} member list, add club members from the directory, or add people one at a time.`}</span></div>`}</div>`;
+  :`<div class="empty"><b>${total?(np?'Nobody matches':'No members match'):np?'Nobody on the list yet':club?'The directory is empty':'No members yet'}</b><span>${total?'Try a different search or filter.':np?'Import a spreadsheet of donors, past guests or players, or add people one at a time.':club?'Import the club software’s member export, or add members one at a time.':`Import the ${esc(short)} member list, add club members from the directory, or add people one at a time.`}</span></div>`}</div>`;
   const qi=$('mq'); qi.oninput=()=>{ view.mq=qi.value; const pos=qi.selectionStart; render(); const n=$('mq'); n.focus(); n.setSelectionRange(pos,pos); };
   m.querySelectorAll('[data-mf]').forEach(b=>b.onclick=()=>{view.mfilter=b.dataset.mf;render();});
   m.querySelectorAll('[data-m]').forEach(r=>r.onclick=()=>editMember(memberById(r.dataset.m)));
@@ -713,7 +713,7 @@ function vMembers(m){
 /* one form for the club directory and for an organization's members: person fields go to the directory,
    status / joined / notes (and dues) belong to this organization */
 function editMember(mm){
-  const y=Y(), s=db.seasons[y], club=isClub(), simple=club||db.kind==='group', short=orgShort(); const pays=mm&&!simple?clone(s.duesPayments.filter(p=>p.memberId===mm.id)):[];
+  const y=Y(), s=db.seasons[y], club=isClub(), simple=club||db.kind==='group', short=orgShort(), np=club&&typeof isNonprofit==='function'&&isNonprofit(); const pays=mm&&!simple?clone(s.duesPayments.filter(p=>p.memberId===mm.id)):[];
   let pickedId=mm?mm.id:'';
   const locked=(KEYMODE||SCOPED)&&!!(mm&&personById(mm.id)), L={disabled:locked};   // an admin link or a board login may add people to the directory, not change them
   const payHTML=()=>pays.map((p,i)=>`<div class="mr num" style="grid-template-columns:90px minmax(0,1fr) 28px"><input class="inp r" data-di="${i}" data-k="amount" inputmode="decimal" value="${esc(p.amount)}" aria-label="Dues amount"><input class="inp" data-di="${i}" data-k="date" value="${esc(p.date)}" placeholder="Date" aria-label="Dues date"><button class="ib" data-ddel="${i}" aria-label="Remove">${I.x}</button></div>`).join('')||'<div class="mr"><span class="muted">No dues recorded for '+y+'.</span></div>';
@@ -721,12 +721,12 @@ function editMember(mm){
   const candidates=!mm&&!club?persons().filter(p=>!membershipOf(p.id)):[];   // club members who aren't in this organization yet
   const candHTML=q=>{ q=q.toLowerCase().trim(); if(!q) return ''; return candidates.filter(p=>[memberName(p),p.email,p.memberNo].join(' ').toLowerCase().includes(q)).slice(0,8)
     .map(p=>`<button type="button" data-pk="${p.id}"><span class="av">${initials(p)}</span><b>${esc(memberName(p))}</b><span class="muted" style="margin-left:auto;font-size:12.5px">${esc(p.email||(p.memberNo?'#'+p.memberNo:''))}</span></button>`).join('')||'<span class="muted" style="padding:10px 14px;display:block">Nobody in the directory matches — fill in the form to add a new person.</span>'; };
-  openDrawer({kicker:club?'Directory':short+' member',title:mm?memberName(mm):'Add member',
+  openDrawer({kicker:np?'Donors & guests':club?'Directory':short+' member',title:mm?memberName(mm):np?'Add a person':'Add member',
     body:(candidates.length?`<div class="fld"><span class="lbl">Already a club member? Add them from the directory</span><input class="inp" id="mfPick" placeholder="Search the club directory" autocomplete="off" aria-label="Search the club directory"><div class="pick" id="mfPickL" style="max-height:230px"></div><p class="hint" id="mfPicked" style="margin:0"></p></div>`:'')+
       (locked?'<p class="hint" style="margin-top:0">Directory details are kept by the club — ask the club to change them.</p>':'')+
       pair(field('First name','mfF',mm?.first||'',L),field('Last name','mfL',mm?.last||'',L))+pair(field('Email','mfE',mm?.email||'',L),field('Phone','mfP',mm?.phone||'',L))+
-      pair(field('Handicap index','mfH',mm?.hcp??'',L),field('GHIN','mfG',mm?.ghin||'',L))+pair(field('Member #','mfNo',mm?.memberNo||'',L),field('Address','mfA',mm?.address1||'',L))+`<div style="display:grid;grid-template-columns:minmax(0,2fr) 70px minmax(0,1fr);gap:12px">${field('City','mfC',mm?.city||'',L)}${field('State','mfSt',mm?.state||'',L)}${field('Zip','mfZ',mm?.zip||'',L)}</div>`+
-      pair(field(club?'Club status':short+' status','mfS',mm?.status||'Active',{type:'select',options:['Active','Inactive']}),field('Joined','mfJ',mm?.joined||'',{type:'date'}))+
+      pair(field('Handicap index','mfH',mm?.hcp??'',L),field('GHIN','mfG',mm?.ghin||'',L))+(np?field('Address','mfA',mm?.address1||'',L)+`<input type="hidden" id="mfNo" value="${esc(mm?.memberNo||'')}">`:pair(field('Member #','mfNo',mm?.memberNo||'',L),field('Address','mfA',mm?.address1||'',L)))+`<div style="display:grid;grid-template-columns:minmax(0,2fr) 70px minmax(0,1fr);gap:12px">${field('City','mfC',mm?.city||'',L)}${field('State','mfSt',mm?.state||'',L)}${field('Zip','mfZ',mm?.zip||'',L)}</div>`+
+      pair(field(np?'Status':club?'Club status':short+' status','mfS',mm?.status||'Active',{type:'select',options:['Active','Inactive']}),field(np?'Known since':'Joined','mfJ',mm?.joined||'',{type:'date'}))+
       (club&&typeof acctOn==='function'&&acctOn()&&!locked?`<p class="lbl" style="margin-top:4px">Billing</p>`+membershipFields(mm||{}):'')+
       (simple?'':`<div class="fld"><div style="display:flex;justify-content:space-between;align-items:center"><span class="lbl">${y} dues · ${fmt(s.dues.amount)}, not prorated</span><button class="btn sm" id="dAdd" type="button">${I.plus}Record payment</button></div><div class="mini"><div id="dRows">${payHTML()}</div></div></div>`)+
       (mm&&mm.ggId?`<p class="hint">Golf Genius ID ${esc(mm.ggId)}${mm.memberType?' · member type '+esc(mm.memberType):''}</p>`:'')+(inT.length?`<div class="fld"><span class="lbl">Tournaments</span><span>${inT.map(t=>esc(t.name)+' ('+t.season+')').join(', ')}</span></div>`:'')+field('Notes','mfNt',mm?.notes||'',{type:'textarea'}),
@@ -948,8 +948,8 @@ function planRoster(people,fileDate){
 }
 function importRoster(){
   const club=isClub(), short=orgShort();
-  openDrawer({kicker:club?'Directory':'Members',title:club?'Import club roster':'Import member list',
-    body:`<p style="margin:0">${club?'Upload the club software’s member export (<b>.xlsx</b> or <b>.csv</b>) or any spreadsheet with first and last name columns.':`Upload the ${esc(short)} member list — the Golf Genius contact list export (<b>.xlsx</b>) or any spreadsheet or CSV with first and last name columns.`}</p>
+  openDrawer({kicker:club&&typeof isNonprofit==='function'&&isNonprofit()?'Donors & guests':club?'Directory':'Members',title:club&&typeof isNonprofit==='function'&&isNonprofit()?'Import a list':club?'Import club roster':'Import member list',
+    body:`<p style="margin:0">${club&&typeof isNonprofit==='function'&&isNonprofit()?'Upload a spreadsheet (<b>.xlsx</b> or <b>.csv</b>) of donors, past guests, sponsors’ contacts or players — anything with first and last name columns.':club?'Upload the club software’s member export (<b>.xlsx</b> or <b>.csv</b>) or any spreadsheet with first and last name columns.':`Upload the ${esc(short)} member list — the Golf Genius contact list export (<b>.xlsx</b>) or any spreadsheet or CSV with first and last name columns.`}</p>
       <p class="hint">Picks up email, phone, handicap index, GHIN, member number, Golf Genius ID and address. People already in the club directory are matched by member number, Golf Genius ID, GHIN, email, then name, so a newer export updates them instead of adding duplicates${club?'':`, and club members who aren’t in the ${esc(short)} yet are added to it`}. A match on name alone that disagrees on an identifier is left for you to decide. You’ll see a preview before anything is saved.</p>
       <input type="file" id="rosterF" accept=".xlsx,.xls,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv" class="inp" style="padding-top:8px"><p class="hint" id="rosterMsg" aria-live="polite"></p>`,
     wire:r=>{ r.querySelector('#rosterF').onchange=async e=>{ const f=e.target.files[0]; if(!f) return; const msg=r.querySelector('#rosterMsg'); msg.style.color=''; msg.textContent='Reading '+f.name+'…';
@@ -1074,9 +1074,9 @@ function wireChrome(){
   $('syncErr').onclick=()=>{ if(!CLOUD||!sessionOK) return; if(!cloudReady) startCloud(); else pushAll(); };
   $('btnSignOut').onclick=async()=>{ if(KEYMODE){ if(!confirm('Leave this hub? You will need the admin link again to come back.')) return; dropKey(); location.reload(); return; } await sb.auth.signOut(); location.reload(); };
 }
-const loginEmail=()=>{ const e=$('loginEmail'); const v=e&&!e.hidden?e.value.trim():''; return v||(TENANT_INFO&&TENANT_INFO.login_email)||CFG.boardEmail||''; };
+const loginEmail=()=>{ const e=$('loginEmail'); if(e&&!e.hidden) return e.value.trim(); return (TENANT_INFO&&TENANT_INFO.login_email)||CFG.boardEmail||''; };   /* a visible box is the answer; the configured address only fills in where the box is hidden (the legacy single-login hub) */
 /* the sign-in card: the tenant's board e-mail (editable, so a Flagstick admin can sign in anywhere); the portal always asks */
-function paintLogin(){ const lc=$('loginClub'); if(lc&&TENANT_INFO) lc.textContent=TENANT_INFO.name; const e=$('loginEmail'); if(!e) return; const show=PORTAL||TENANCY||!CFG.boardEmail; e.hidden=!show; if(!e.value) e.value=PORTAL?'':((TENANT_INFO&&TENANT_INFO.login_email)||CFG.boardEmail||''); }
+function paintLogin(){ const lc=$('loginClub'); if(lc&&TENANT_INFO) lc.textContent=TENANT_INFO.name; const e=$('loginEmail'); if(!e) return; const show=PORTAL||TENANCY||!CFG.boardEmail; e.hidden=!show; if(!e.value&&!PORTAL&&!TENANCY) e.value=CFG.boardEmail||''; }   /* every client's sign-in starts blank (the owner, Oct 29: no one else's address on it) */
 async function doLogin(){
   const pw=$('loginPw').value, email=loginEmail(); if(!pw) return; if(!email){ $('loginErr').textContent='Enter the e-mail address.'; return; } $('loginBtn').disabled=true; $('loginErr').textContent='';
   const {error}=await sb.auth.signInWithPassword({email,password:pw});
@@ -1088,10 +1088,11 @@ async function doLogin(){
   startCloud();
 }
 async function boot(){
-  wireChrome(); restoreView(); render();
-  if(!CLOUD){ setSync('local'); return; }
+  wireChrome(); restoreView();
+  if(!CLOUD){ render(); setSync('local'); return; }
+  if(seedTenantFromCache()) render();   /* a known client paints right away in its own shape; a first visit waits for the lookup instead of flashing the wrong rail */
   $('loginBtn').onclick=doLogin; $('loginPw').onkeydown=e=>{ if(e.key==='Enter') doLogin(); }; const le=$('loginEmail'); if(le) le.onkeydown=e=>{ if(e.key==='Enter') $('loginPw').focus(); };
-  await resolveTenant(); paintLogin();
+  await resolveTenant(); if(!$('main').children.length) render(); paintLogin();
   if(TENANCY&&!TENANT&&!PORTAL){ setSync('local'); render(); return; }          // no club at this address
   if(AUTH_HASH&&typeof authLanding==='function') await authLanding();          // arrived by a sign-in, invite or reset link
   const {data}=await sb.auth.getSession();

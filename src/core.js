@@ -305,12 +305,18 @@ const tenantStatus=()=>TENANT_INFO&&TENANT_INFO.status||'active';
 /* tenant filter / tenant column on row queries (no-ops until tenants-setup.sql has run) */
 const tq=q=>TENANCY&&TENANT?q.eq('tenant',TENANT):q;
 const trow=o=>TENANCY&&TENANT?Object.assign({tenant:TENANT},o):o;
+/* the tenant row is remembered per host so the first paint already knows the client's kind and modules — without it the rail
+   flashed the full club management set before tenant_lookup answered (the owner, Oct 29). The lookup still runs and wins. */
+const TENANT_CACHE_KEY=()=>'fs_tenant_'+String(TENANT_HINT||'');
+function applyTenant(data){ TENANCY=true; if(data&&data.slug){ TENANT=data.slug; TENANT_INFO=data; CLUB_META.name=data.name||CLUB_META.name; if(data.short) CLUB_META.short=data.short; } }
+function seedTenantFromCache(){ if(!CLOUD) return false; try{ const d=JSON.parse(localStorage.getItem(TENANT_CACHE_KEY())||'null'); if(d&&d.slug){ applyTenant(d); return true; } }catch(_){} return false; }
 async function resolveTenant(){
   if(!CLOUD) return;
   try{ const {data,error}=await sb.rpc('tenant_lookup',{p_host:TENANT_HINT});
     if(error){ if(/does not exist|PGRST202|schema cache|42883|404/i.test((error.message||'')+' '+(error.code||'')+' '+(error.status||''))) return; throw error; }
-    TENANCY=true;
-    if(data&&data.slug){ TENANT=data.slug; TENANT_INFO=data; CLUB_META.name=data.name||CLUB_META.name; if(data.short) CLUB_META.short=data.short; }
+    const before=JSON.stringify(TENANT_INFO||null); applyTenant(data);
+    try{ if(data&&data.slug) localStorage.setItem(TENANT_CACHE_KEY(),JSON.stringify(data)); else localStorage.removeItem(TENANT_CACHE_KEY()); }catch(_){}
+    if(JSON.stringify(TENANT_INFO||null)!==before&&typeof render==='function') render();
   }catch(e){ console.warn('tenant lookup failed',e); }
 }
 /* after sign-in: may this login open this tenant (or the portal)? */

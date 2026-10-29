@@ -107,14 +107,14 @@ function vSurveys(m){
   view.sid=null;
   const list=surveysData().slice().sort((a,b)=>(b.createdAt||'').localeCompare(a.createdAt||''));
   m.innerHTML=head('Surveys','Ask the members and read what comes back. Every survey is anonymous — nobody can see who answered.',
-    btn('From the member survey template','svTpl','',I.lib)+btn('New survey','svNew','pri',I.plus))+
+    (isClub()&&typeof isNonprofit==='function'&&isNonprofit()?'':btn('From the member survey template','svTpl','',I.lib))+btn('New survey','svNew','pri',I.plus))+
     (list.length?`<div class="grid g3">${list.map(s=>{ const R=SV_R[s.id]; return `<button class="card pad svcard" data-sv="${s.id}">
       <div style="display:flex;justify-content:space-between;gap:10px;align-items:flex-start"><b class="h2" style="margin:0">${esc(s.title)}</b>${svStatusChip(s)}</div>
       <small class="muted">${(s.sections||[]).length} section${(s.sections||[]).length===1?'':'s'} · ${svQuestions(s).length} questions${R?` · ${R.length} response${R.length===1?'':'s'}`:''}</small>
       <small class="muted">${s.status==='draft'?'Not open yet':s.status==='open'?'Taking responses since '+svDay((s.openedAt||'').slice(0,10)):'Closed '+svDay((s.closedAt||'').slice(0,10))}</small></button>`; }).join('')}</div>`
-    :`<div class="card pad" style="max-width:640px"><b>No surveys yet.</b><p class="muted" style="margin:6px 0 0">Start from the member survey template — Thursday nights, weekend tournaments and membership, with ratings, trade-offs and room for comments — or build one from a blank page. Open it when it is ready and share the link.</p></div>`);
+    :`<div class="card pad" style="max-width:640px"><b>No surveys yet.</b><p class="muted" style="margin:6px 0 0">${isClub()&&typeof isNonprofit==='function'&&isNonprofit()?'Ask your donors, guests, sponsors and players what they thought of the evening or the tournament — build it question by question, open it and share the link. Answers are anonymous.':'Start from the member survey template — Thursday nights, weekend tournaments and membership, with ratings, trade-offs and room for comments — or build one from a blank page. Open it when it is ready and share the link.'}</p></div>`);
   $('svNew').onclick=()=>{ const s=newSurvey(); surveysData().push(s); persist(); editSurvey(s,true); };
-  $('svTpl').onclick=()=>{ const s=memberSurveyTemplate(); surveysData().push(s); persist(); go('surveys',{sid:s.id,stab:'questions'}); toast('Survey created from the template — edit anything, then open it'); };
+  const tpl=$('svTpl'); if(tpl) tpl.onclick=()=>{ const s=memberSurveyTemplate(); surveysData().push(s); persist(); go('surveys',{sid:s.id,stab:'questions'}); toast('Survey created from the template — edit anything, then open it'); };
   m.querySelectorAll('[data-sv]').forEach(b=>b.onclick=()=>go('surveys',{sid:b.dataset.sv,stab:null}));
   if(svCloud()) list.forEach(s=>{ if(!SV_R[s.id]&&s.status!=='draft') loadResponses(s).then(()=>{ if(view.page==='surveys'&&!view.sid) render(); }); });
 }

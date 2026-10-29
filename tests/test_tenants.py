@@ -108,7 +108,7 @@ async def main():
     c5=await b.new_context(); await cloud(c5,fdb)
     p9,e9=await open_page(c5,'?org=club&tenant=app.wcccmga.org',ready="()=>document.getElementById('login').classList.contains('show')")
     r=await p9.evaluate("()=>({login:document.getElementById('login').classList.contains('show'), err:document.getElementById('loginErr').textContent, email:document.getElementById('loginEmail').value, club:document.getElementById('loginClub').textContent})")
-    bad+=check('a login from another club is refused; the card names the tenant and its e-mail',r['login'] and 'does not belong' in r['err'] and r['email']=='pro@wccc.org' and r['club']=='Walnut Creek Country Club' and not e9,r,e9)
+    bad+=check('a login from another club is refused; the card names the tenant and starts blank (no one else’s address on it)',r['login'] and 'does not belong' in r['err'] and r['email']=='' and r['club']=='Walnut Creek Country Club' and not e9,r,e9)
     # ---- 5. the portal
     p10,e10=await open_page(c5,'?portal=1',ready="()=>document.getElementById('login').classList.contains('show')")
     r=await p10.evaluate("()=>({login:document.getElementById('login').classList.contains('show'), err:document.getElementById('loginErr').textContent, sub:document.getElementById('loginSub').textContent})")

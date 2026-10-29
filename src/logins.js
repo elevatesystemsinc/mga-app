@@ -83,15 +83,17 @@ function loginsCard(m,orgId,opt){
   paint(); if(!HL.rows) paintAll();
 }
 /* the club hub's Logins page (staff): the staff list, then every organization's board logins */
+/* the staff logins as a card appended to a page (the Logins page; a nonprofit's Settings → Users) */
+function staffLoginsCard(m,opt){ opt=opt||{}; const staff=(HL.rows||[]).filter(u=>u.role==='staff'), box=document.createElement('div'); box.className='card'; box.style.overflow='hidden';
+  box.innerHTML=`<div class="cardhead"><div><h2 class="h2">${esc(opt.title||'Staff')}</h2>${opt.note?`<span class="muted">${esc(opt.note)}</span>`:''}</div><span class="muted" style="font-size:13px">Managed by Flagstick — ask them to add or remove ${opt.title?'logins':'staff'}</span></div>
+      <div class="t">${HL.rows?(staff.length?staff.map(loginLine).join(''):'<div class="tr"><span class="muted">No logins listed.</span></div>'):'<div class="tr"><span class="muted">Loading…</span></div>'}</div>`;
+  m.appendChild(box); box.querySelectorAll('[data-lu]').forEach(r=>{ const u=(HL.rows||[]).find(x=>x.user_id===r.dataset.lu); if(u&&u.role==='staff') r.onclick=()=>loginEditor(u,null,()=>loadLogins().then(()=>render())); });
+  if(!HL.rows) loadLogins().then(()=>render()); }
 function vLogins(m){
   if(!isClub()||!canManageLogins()){ go('dash'); return; }
-  const staff=(HL.rows||[]).filter(u=>u.role==='staff');
-  m.innerHTML=head('Logins','Who can sign in to '+esc(CLUB.name)+' and what they see. Staff see the whole club; a board login sees its own organization only.')+
-    `<div class="card" style="overflow:hidden"><div class="cardhead"><h2 class="h2">Staff</h2><span class="muted" style="font-size:13px">Managed by Flagstick — ask them to add or remove staff</span></div>
-      <div class="t">${HL.rows?(staff.length?staff.map(loginLine).join(''):'<div class="tr"><span class="muted">No staff logins listed.</span></div>'):'<div class="tr"><span class="muted">Loading…</span></div>'}</div></div>`;
+  m.innerHTML=head('Logins','Who can sign in to '+esc(CLUB.name)+' and what they see. Staff see the whole club; a board login sees its own organization only.');
+  staffLoginsCard(m);
   for(const o of CLUB.orgs.filter(x=>!x.archived)) loginsCard(m,o.id,{title:(o.short||o.name)+' · board logins'});
-  m.querySelectorAll('[data-lu]').forEach(r=>{ const u=(HL.rows||[]).find(x=>x.user_id===r.dataset.lu); if(u&&u.role==='staff') r.onclick=()=>loginEditor(u,null,()=>loadLogins().then(()=>render())); });
-  if(!HL.rows) loadLogins().then(()=>render());
 }
 /* invite / edit one login for one organization (staff may also edit a staff row's name) */
 function loginEditor(u,orgId,done){

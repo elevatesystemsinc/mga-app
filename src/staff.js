@@ -8,7 +8,11 @@
    staff_clock(key, pin, action); the hub reads them for who is on now and the hours of the week. */
 const ST={dept:'',week:'',clock:null,loading:false,at:0}; CACHE_RESETS.push(()=>{ if(!ST.loading) ST.clock=null; });
 const STAFF_ROLES=[['server','Server'],['bartender','Bartender'],['manager','Manager — can leave a station and void checks'],['pro','Pro / instructor'],['attendant','Attendant'],['lifeguard','Lifeguard'],['staff','Staff']];
-const ROLE_NAME=Object.fromEntries(STAFF_ROLES.map(([k,l])=>[k,l.split(' — ')[0]]));
+/* a nonprofit's people are board and committee members, staff and volunteers — "users", under Settings (the owner, Oct 29) */
+const NP_ROLES=[['board','Board member'],['committee','Committee member'],['staff','Staff'],['volunteer','Volunteer'],['manager','Manager — can leave a register and void checks']];
+const staffRoles=()=>typeof isNonprofit==='function'&&isNonprofit()?NP_ROLES:STAFF_ROLES;
+const ROLE_NAME=Object.fromEntries(STAFF_ROLES.concat(NP_ROLES).map(([k,l])=>[k,l.split(' — ')[0]]));
+const npUsers=()=>typeof isNonprofit==='function'&&isNonprofit();
 const staffOn=()=>!!CLUB&&isClub()&&(hasModule('club')||hasModule('pos'))&&!KEYMODE&&!SCOPED;
 const deptName=k=>k?((DEPTS.find(d=>d[0]===k)||[])[1]||k):'Every department';
 /* the list, with the old restaurant-only list folded in once */
@@ -67,20 +71,29 @@ function vStaff(m){ if(!staffOn()){ go('dash'); return; } if(STN.rows==null){ if
 }
 const t12s=t=>t12(t).replace(':00','').replace(' ','');
 /* ---- a person ---- */
-function staffMemberDrawer(x,dept){ const outs=posOn()?posSettings().outlets:[]; const logins=typeof LOGINS!=='undefined'&&LOGINS&&Array.isArray(LOGINS.rows)?LOGINS.rows:[];
+function staffMemberDrawer(x,dept){ const outs=posOn()?posSettings().outlets:[]; const logins=typeof LOGINS!=='undefined'&&LOGINS&&Array.isArray(LOGINS.rows)?LOGINS.rows:[]; const np=npUsers();
   const dsel=x?x.depts:(dept?[dept]:[]);
-  openDrawer({kicker:'Staff',title:x?x.name:'New person',wide:true,
-    body:pair(field('Name','sfN',x?x.name:'',{ph:'First name, as the kitchen and the schedule see it'}),field('Role','sfR',x?x.role:(dept==='fnb'||!dept?'server':dept==='golf'||dept==='racket'?'pro':dept==='aquatics'?'lifeguard':'staff'),{type:'select',options:STAFF_ROLES}))+
-      `<div class="fld"><span class="lbl">Departments</span><div class="chips">${DEPTS.map(([k,l])=>`<label class="check" style="margin:0"><input type="checkbox" data-sdp="${k}"${dsel.includes(k)?' checked':''}>${l}</label>`).join('')}</div><p class="hint">Their schedule, time clock and registers follow these. Nothing ticked = everywhere.</p></div>`+
-      (outs.length?`<div class="fld"><span class="lbl">Registers they may unlock</span><div class="chips">${outs.map(o=>`<label class="check" style="margin:0"><input type="checkbox" data-so="${o.id}"${!x||!x.outlets.length||x.outlets.includes(o.id)?' checked':''}>${esc(o.name)}</label>`).join('')}</div></div>`:'')+
-      pair(field('PIN','sfP','',{type:'password',ph:x&&x.pin?'•••• (set — enter to change)':'4 to 6 digits',hint:'Unlocks a register and clocks in. Stored hashed; nobody can read it back.'}),field('Hub login e-mail (optional)','sfE',x?x.email||'':'',{ph:'sam@club.com',hint:logins.length?'Ties this person to their staff login.':''}))+
+  openDrawer({kicker:np?'Users':'Staff',title:x?x.name:np?'New user':'New person',wide:true,
+    body:pair(field('Name','sfN',x?x.name:'',{ph:np?'Full name':'First name, as the kitchen and the schedule see it'}),field('Role','sfR',x?x.role:np?'board':(dept==='fnb'||!dept?'server':dept==='golf'||dept==='racket'?'pro':dept==='aquatics'?'lifeguard':'staff'),{type:'select',options:staffRoles()}))+
+      (np?field('Title or committee','sfT',x?x.title||'':'',{ph:'Treasurer · Gala committee · Tournament chair'}):'')+
+      (np?'':`<div class="fld"><span class="lbl">Departments</span><div class="chips">${DEPTS.map(([k,l])=>`<label class="check" style="margin:0"><input type="checkbox" data-sdp="${k}"${dsel.includes(k)?' checked':''}>${l}</label>`).join('')}</div><p class="hint">Their schedule, time clock and registers follow these. Nothing ticked = everywhere.</p></div>`)+
+      (outs.length>1?`<div class="fld"><span class="lbl">Registers they may unlock</span><div class="chips">${outs.map(o=>`<label class="check" style="margin:0"><input type="checkbox" data-so="${o.id}"${!x||!x.outlets.length||x.outlets.includes(o.id)?' checked':''}>${esc(o.name)}</label>`).join('')}</div></div>`:'')+
+      pair(field(np?'Register PIN (optional)':'PIN','sfP','',{type:'password',ph:x&&x.pin?'•••• (set — enter to change)':'4 to 6 digits',hint:np?'Only needed to unlock the register at an event. Stored hashed; nobody can read it back.':'Unlocks a register and clocks in. Stored hashed; nobody can read it back.'}),field(np?'Login e-mail':'Hub login e-mail (optional)','sfE',x?x.email||'':'',{ph:np?'pat@foundation.org':'sam@club.com',hint:np?'Their sign-in to this hub, if they have one — logins are below on this page.':logins.length?'Ties this person to their staff login.':''}))+
       `<label class="check"><input type="checkbox" id="sfA"${!x||x.active!==false?' checked':''}>Active</label>`,
-    save:async()=>{ const name=fv('sfN'); if(!name){ toast('Name them'); return false; } const pin=fv('sfP'); if(pin&&!/^\d{4,6}$/.test(pin)){ toast('PIN: 4 to 6 digits'); return false; } if(!x&&!pin){ toast('Set a PIN'); return false; }
-      const depts=[...$('dBody').querySelectorAll('[data-sdp]')].filter(c=>c.checked).map(c=>c.dataset.sdp), picked=[...$('dBody').querySelectorAll('[data-so]')].filter(c=>c.checked).map(c=>c.dataset.so);
-      const d={name,role:fv('sfR'),depts,outlets:outs.length&&picked.length===outs.length?[]:picked,email:fv('sfE').trim().toLowerCase()||null,active:$('sfA').checked};
+    save:async()=>{ const name=fv('sfN'); if(!name){ toast('Name them'); return false; } const pin=fv('sfP'); if(pin&&!/^\d{4,6}$/.test(pin)){ toast('PIN: 4 to 6 digits'); return false; } if(!x&&!pin&&!np){ toast('Set a PIN'); return false; }
+      const depts=[...$('dBody').querySelectorAll('[data-sdp]')].filter(c=>c.checked).map(c=>c.dataset.sdp), soBoxes=[...$('dBody').querySelectorAll('[data-so]')], picked=soBoxes.filter(c=>c.checked).map(c=>c.dataset.so);
+      const d={name,role:fv('sfR'),depts,outlets:!soBoxes.length||picked.length===outs.length?[]:picked,email:fv('sfE').trim().toLowerCase()||null,active:$('sfA').checked}; if(np) d.title=fv('sfT').trim();
       if(pin){ const h=await pinHash(pin); if(clubStaff().some(y=>y!==x&&y.pin===h)){ toast('That PIN is already in use — pick another'); return false; } d.pin=h; }
       if(x) Object.assign(x,d); else clubStaff().push(Object.assign({id:uid()},d)); persist(); },
     del:x?()=>{ if(!confirm(`Remove ${x.name}? Their shifts and clock-ins stay on record.`)) return false; const S=clubStaff(); S.splice(S.indexOf(x),1); persist(); }:null}); }
+/* Settings → Users for a nonprofit: the people (board, committees, staff, volunteers), then who can sign in */
+function usersCards(m){ const people=clubStaff().slice().sort((a,b)=>a.name.localeCompare(b.name)), logins=(typeof HL!=='undefined'&&HL.rows)||[];
+  const box=document.createElement('div'); box.className='card'; box.style.overflow='hidden';
+  box.innerHTML=`<div class="cardhead"><div><h2 class="h2">Users</h2><span class="muted">Board and committee members, staff and volunteers — who they are, their role, and whether they sign in</span></div><div class="actions">${btn('New user','usNew','pri',I.plus)}</div></div>
+    <div class="t fit"><div class="tr th" style="grid-template-columns:minmax(140px,1.4fr) 130px minmax(120px,1.2fr) 110px 70px"><span>Name</span><span>Role</span><span>Title / committee</span><span>Signs in</span><span>PIN</span></div>
+    ${people.map(x=>{ const lg=x.email&&logins.find(u=>(u.email||'').toLowerCase()===x.email); return `<button class="tr${x.active===false?' void':''}" data-us="${x.id}" style="grid-template-columns:minmax(140px,1.4fr) 130px minmax(120px,1.2fr) 110px 70px;text-align:left;background:none;border-left:none;border-right:none;width:100%"><div class="cell2"><b>${esc(x.name)}</b>${x.email?`<small>${esc(x.email)}</small>`:''}</div><span>${esc(ROLE_NAME[x.role]||x.role||'')}</span><span class="muted trunc">${esc(x.title||'')}</span><span>${lg?'<span class="pos">yes</span>':x.email?'<span class="muted">no login yet</span>':'<span class="muted">—</span>'}</span><span>${x.pin?'<span class="pos">set</span>':'<span class="muted">—</span>'}</span></button>`; }).join('')||'<div class="empty"><b>No users yet</b><span>Add the board, the committee chairs and anyone who works the events.</span></div>'}</div>`;
+  m.appendChild(box); box.querySelector('#usNew').onclick=()=>staffMemberDrawer(null,''); box.querySelectorAll('[data-us]').forEach(b=>b.onclick=()=>staffMemberDrawer(staffById(b.dataset.us),''));
+  if(typeof staffLoginsCard==='function'&&canManageLogins()) staffLoginsCard(m,{title:'Logins',note:'Who can sign in to this hub. Flagstick adds and removes logins — ask them for a new one; a user above with the same e-mail is tied to it.'}); }
 /* ---- a shift ---- */
 function shiftDrawer(s,init){ const d=s?clone(s):Object.assign({id:uid(),staffId:'',dept:'club',date:todayISO(),start:'09:00',end:'17:00',where:'',note:''},init||{}); const people=clubStaff().filter(x=>x.active!==false).sort((a,b)=>a.name.localeCompare(b.name)); const p=staffById(d.staffId);
   const places=[].concat(posOn()?posSettings().outlets.filter(o=>d.dept==='fnb'?o.kind==='fnb':o.kind==='proshop'&&outletDept(o)===d.dept).map(o=>o.name):[],bookOn()?bookSettings().facilities.filter(f=>facDept(f)===d.dept).map(f=>f.name):[]);

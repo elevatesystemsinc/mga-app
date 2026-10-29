@@ -72,6 +72,7 @@ function render(){ if(PROG) return renderProgress(); const s=D.silent||{}, items
   if(TAB==='about'){ const raised=Object.values(highs).reduce((a,h)=>a+Number(h.amount||0),0);
     body=`<div class="card"><h1>${esc(D.name||'')}</h1><p class="muted">${esc(date)}${D.time?' · '+esc(D.time):''}${D.venue?' · '+esc(D.venue):''}</p>${D.descr?`<p style="margin-top:12px;white-space:pre-wrap">${esc(D.descr)}</p>`:''}
       ${items.length?`<p style="margin-top:14px"><span class="chip ${bidOpen()?'ok':''}">${esc(closesTxt())}</span> <span class="hint">${items.length} silent auction items · ${E.bidders||0} bidders so far</span></p>`:''}</div>
+      ${D.progress&&D.progress.goal?`<div class="card"><div style="display:flex;justify-content:space-between;align-items:baseline"><b style="font-size:20px;color:var(--navy)">${fmt(D.progress.raised)} <span class="muted" style="font-size:14px">of ${fmt(D.progress.goal)}</span></b><b style="color:var(--golddk)">${D.progress.pct}%</b></div><div class="therm"><div style="width:${Math.min(100,D.progress.pct)}%"></div></div></div>`:''}
       ${(D.levels||[]).length?`<div class="card"><h2>Sponsorship</h2>${D.levels.map(l=>`<p><b>${esc(l.name)}</b> · ${fmt(l.amount)}${l.perks?`<br><span class="hint">${esc(l.perks)}</span>`:''}</p>`).join('')}</div>`:''}
       ${(D.raffles||[]).length?`<div class="card"><h2>Raffles</h2>${D.raffles.map(r=>`<p><b>${esc(r.name)}</b> · ${fmt(r.price)} a ticket${r.prizes.length?`<br><span class="hint">${r.prizes.map(p=>esc(p.name)+(p.winner?' — won by '+esc(p.winner.name)+' (ticket '+p.winner.ticket+')':'')).join(' · ')}</span>`:''}</p>`).join('')}<p class="hint">Tickets are sold in the room.</p></div>`:''}`; }
   else if(TAB==='tickets'){ body=`<div class="card"><h2>Tickets</h2>${(D.tickets||[]).map(t=>`<p><b>${esc(t.name)}</b> · ${fmt(t.price)}${t.descr?`<br><span class="hint">${esc(t.descr)}</span>`:''}</p>`).join('')}
@@ -145,7 +146,7 @@ load(); timer=setInterval(load,6000); document.addEventListener('visibilitychang
    page counts, and a reload is tried once per build — if the page that comes back is still the old one, the CDN
    hasn't caught up; wait a while before trying that build again. */
 (function(){
-  const ME='20261029151459', KEY='au_tried', RETRY=10*60*1000; let ready=false, lastCheck=0;
+  const ME='20261029161536', KEY='au_tried', RETRY=10*60*1000; let ready=false, lastCheck=0;
   const typing=()=>{ const a=document.activeElement; return a&&/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)&&a.value&&a.type!=='search'; };
   const safe=()=>!typing()&&(typeof window.__canReload!=='function'||window.__canReload());
   const tried=()=>{ try{ const [b,t]=(sessionStorage.getItem(KEY)||'').split('|'); return b?{build:b,at:+t||0}:null; }catch(_){ return null; } };

@@ -887,6 +887,23 @@ groups, printed scorecards — the printed cards include a live-scoring QR that 
   (`PROG`, `renderProgress`) is the **public progress page**: the goal, raised, "to go", where it came from, a link to the event page —
   never a name. Turning the event page off turns it off. `tests/test_fund.py` covers the golf box, the dashboard's auto-created event,
   the thermometers, the goal drawer and the public page.
+  **The nonprofit pass (Oct 29, the owner: "go through this entire software and make it tailored for a nonprofit organization that also
+  runs golf tournaments"):** the rail is exactly its sections (`navHTML` appends no leftovers for a nonprofit — Dues collection, Staff &
+  schedule, Organizations and Logins no longer leak in): Fundraising · Golf · Point of sale · **Donors & guests** · Organization (Treasury,
+  Budget, Surveys) · Settings. **Users** replace staff: Settings → **Users** (`usersCards` in staff.js: the people with `NP_ROLES` board
+  member / committee member / staff / volunteer / manager, a `title` ("Treasurer", "Gala committee"), an optional register PIN, their
+  login e-mail; then the staff logins through `staffLoginsCard` from logins.js — the Logins page shares it). `staffMemberDrawer` hides
+  departments and does not demand a PIN for a nonprofit. **Donors & guests** is the directory in their words (`vMembers` / `editMember` /
+  `importRoster` with `np`: "Add a person", "Import a list", City and Since columns, no member number, "Known since"). The register hides
+  *Charge to account* when billing is off and the Tickets page is a **Sales & daily report** (no shifts, servers or tips: sales, cash, card,
+  sales tax, items sold, top items; `shiftPDF` reads "Sales report"). Surveys drop the member template. **No rail flash**: core.js
+  remembers the tenant row per host (`seedTenantFromCache` / `applyTenant`, localStorage `fs_tenant_<host>`) so the first paint knows the
+  client's kind and modules; a first visit waits for `tenant_lookup` instead of painting the club rail. The brand line reads "Nonprofit
+  hub". **The sign-in starts blank on every client's hub** (`paintLogin` only prefills `CFG.boardEmail` where there is no tenancy).
+  `.stack` (head.html) gives tab bodies the page's rhythm; `.cardhead+.empty` keeps in-card empties short; fund cards that hold `.lr` rows
+  carry `lg`. `fundPublishIfChanged` republishes an event page when its published copy would differ (data written outside the drawers, a
+  new build). Demo data for the Battle of the Nines tenant was written straight to its row (people, users, products, the event, the
+  tournament field, bids, register sales) for the owner's presentation.
 - **Legacy app (retired):** the original Member-Member app used to live on `main` (its history is still in git);
   its `mm_tournament` table is still in Supabase as an archive, to be dropped when that system is deprecated. The
   hub's import / Verify / two-way sync / "Retire current app" code was removed in Oct 2026. Stored documents may still carry `db.legacy`, `t.source` (`kind:'mm-app'`) and
