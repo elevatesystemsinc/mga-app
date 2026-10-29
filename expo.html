@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0F2A38">
+<meta name="robots" content="noindex">
+<title>Expo · Flagstick</title>
+<link rel="icon" href="favicon.png?v=3">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@500;600;700;800&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script src="config.js"></script>
+<style>
+:root{--navy:#0F2A38;--gold:#C7A13A;--ivory:#FBFAF5;--line:#2A4656;--muted:#9FB0BA;--ink:#F4F0E6;--pos:#4FBF8E;--amber:#E0A93A;--red:#E06A5A}
+*{box-sizing:border-box} html,body{margin:0;height:100%} [hidden]{display:none!important}
+body{font-family:'Public Sans',system-ui,sans-serif;background:#0B1F2A;color:var(--ink);font-size:18px;line-height:1.3;-webkit-font-smoothing:antialiased;font-variant-numeric:lining-nums;user-select:none}
+.top{display:flex;align-items:center;gap:14px;padding:12px 18px;background:var(--navy);border-bottom:3px solid var(--gold)} .top b{font-size:22px;font-weight:800} .top small{color:var(--muted);font-size:14px;margin-left:auto} .top .n{background:var(--gold);color:var(--navy);font-weight:800;border-radius:999px;padding:2px 12px;font-size:16px}
+main{padding:14px;display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px;align-items:start}
+.f{background:#13303E;border:2px solid var(--line);border-radius:14px;overflow:hidden;display:flex;flex-direction:column} .f.warn{border-color:var(--amber)} .f.late{border-color:var(--red)}
+.f .h{display:flex;align-items:center;gap:10px;padding:10px 14px;background:rgba(255,255,255,.04);border-bottom:1px solid var(--line)} .f .h b{font-size:24px} .f .h span{color:var(--muted);font-size:14px} .f .h .t{margin-left:auto;font-weight:800;font-size:18px} .f.warn .t{color:var(--amber)} .f.late .t{color:var(--red)}
+.f .l{padding:8px 14px;display:flex;flex-direction:column;gap:6px} .f .l div{display:flex;gap:10px;align-items:baseline;font-size:20px;font-weight:600} .f .l div b{min-width:30px;color:var(--gold)} .f .l small{display:block;color:var(--amber);font-size:14px;font-weight:600}
+.f .c{padding:6px 14px 0;color:var(--gold);font-weight:800;font-size:13px;letter-spacing:.1em;text-transform:uppercase}
+.f button{margin:8px 14px 14px;height:52px;border-radius:12px;border:none;background:var(--pos);color:#0B1F2A;font-weight:800;font-size:18px;cursor:pointer} .f.done{opacity:.55} .f.done button{background:transparent;border:1px solid var(--line);color:var(--muted);font-size:14px;height:40px}
+.empty{grid-column:1/-1;text-align:center;padding:60px 20px;color:var(--muted);font-size:22px}
+.secth{grid-column:1/-1;color:var(--muted);font-size:13px;letter-spacing:.14em;text-transform:uppercase;font-weight:700;margin-top:8px}
+</style>
+</head>
+<body>
+<header class="top"><b id="hT">Expo</b><span class="n" id="hN">0</span><small id="hS"></small></header>
+<main id="main"><div class="empty">Starting…</div></main>
+<script>
+const $=id=>document.getElementById(id); const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const CFG=window.MM_CONFIG||{}; const sb=(CFG.url&&CFG.anonKey&&window.supabase)?window.supabase.createClient(CFG.url,CFG.anonKey,{auth:{persistSession:false}}):null;
+const qs=new URLSearchParams(location.search); const ls={get(k){ try{ return localStorage.getItem(k); }catch(_){ return null; } },set(k,v){ try{ localStorage.setItem(k,v); }catch(_){ } },del(k){ try{ localStorage.removeItem(k); }catch(_){ } }};
+let KEY=(qs.get('k')||'').trim()||ls.get('fs_expo')||'', D=null, seen=new Set(), first=true, audio=null;
+if(qs.get('k')){ ls.set('fs_expo',KEY); history.replaceState(null,'',location.pathname); }
+async function rpc(fn,args){ const {data,error}=await sb.rpc(fn,Object.assign({p_key:KEY},args||{})); if(error){ if(/not valid|42501/i.test(error.message)){ ls.del('fs_expo'); } throw new Error(error.message); } return data; }
+function ping(){ try{ audio=audio||new (window.AudioContext||window.webkitAudioContext)(); const o=audio.createOscillator(), g=audio.createGain(); o.frequency.value=880; o.connect(g); g.connect(audio.destination); g.gain.setValueAtTime(.2,audio.currentTime); g.gain.exponentialRampToValueAtTime(.001,audio.currentTime+.35); o.start(); o.stop(audio.currentTime+.35); }catch(_){} }
+async function load(){ try{ D=await rpc('pos_expo'); }catch(e){ $('main').innerHTML=`<div class="empty">${esc(e.message.replace(/^.*?: /,''))}</div>`; return; } if(!D){ $('main').innerHTML='<div class="empty">This link is not an expo screen.</div>'; return; }
+  const ids=new Set(D.open.map(f=>f.id)); if(!first&&[...ids].some(i=>!seen.has(i))) ping(); seen=ids; first=false; render(); }
+const mins=t=>Math.floor((Date.now()-new Date(t))/60000);
+function render(){ if(!D) return; $('hT').textContent=D.station.name; $('hS').textContent=new Date().toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'}); $('hN').textContent=D.open.length;
+  const card=(f,done)=>{ const m=mins(f.fired_at); return `<div class="f${done?' done':m>=15?' late':m>=8?' warn':''}"><div class="h"><b>${f.table_no?esc(f.table_no):'Tab'}</b><span>${esc(f.server||'')}</span><span class="t">${done?'done':m<1?'now':m+' min'}</span></div>${f.note?`<div class="c">${esc(f.note)}</div>`:''}<div class="l">${(f.lines||[]).map(l=>`<div><b>${l.qty}</b><span>${esc(l.name)}${(l.mods||[]).length?`<small>${esc(l.mods.map(m=>m.name).join(', '))}</small>`:''}${l.seat?`<small style="color:var(--muted)">seat ${esc(l.seat)}</small>`:''}${l.note?`<small>${esc(l.note)}</small>`:''}</span></div>`).join('')}</div><button data-b="${f.id}" data-u="${done?1:0}">${done?'Recall':'Bump'}</button></div>`; };
+  $('main').innerHTML=(D.open.length?D.open.map(f=>card(f,false)).join(''):'<div class="empty">Nothing on the rail.</div>')+(D.done.length?`<div class="secth">Bumped</div>${D.done.slice(0,6).map(f=>card(f,true)).join('')}`:'');
+  document.querySelectorAll('[data-b]').forEach(b=>b.onclick=async()=>{ try{ await rpc('pos_bump',{p_fire:b.dataset.b,p_undo:b.dataset.u==='1'}); await load(); }catch(e){ console.error(e); } }); }
+(async()=>{ if(!sb) return $('main').innerHTML='<div class="empty">Not connected.</div>'; if(!KEY) return $('main').innerHTML='<div class="empty">Open this screen from its expo link (Settings → Food & beverage).</div>';
+  await load(); setInterval(load,15000); setInterval(render,30000);
+  try{ sb.channel('expo-'+KEY.slice(0,8)).on('postgres_changes',{event:'*',schema:'public',table:'pos_fires',filter:D&&D.station?`expo=eq.${D.station.expo}`:undefined},()=>load()).subscribe(); }catch(_){} })();
+/* Keeps every open device on the latest version: checks version.json about once a minute and, when a
+   newer build is live, reloads at a safe moment (nothing unsaved, no editor open, not mid-typing).
+   The host's CDN caches version.json and the pages separately (up to 5 min each), so right after a deploy they can
+   disagree in either direction. Two rules keep that from turning into a reload loop: only a build NEWER than this
+   page counts, and a reload is tried once per build — if the page that comes back is still the old one, the CDN
+   hasn't caught up; wait a while before trying that build again. */
+(function(){
+  const ME='20261029224942', KEY='au_tried', RETRY=10*60*1000; let ready=false, lastCheck=0;
+  const typing=()=>{ const a=document.activeElement; return a&&/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)&&a.value&&a.type!=='search'; };
+  const safe=()=>!typing()&&(typeof window.__canReload!=='function'||window.__canReload());
+  const tried=()=>{ try{ const [b,t]=(sessionStorage.getItem(KEY)||'').split('|'); return b?{build:b,at:+t||0}:null; }catch(_){ return null; } };
+  async function check(){ lastCheck=Date.now(); if(location.protocol==='file:') return;
+    try{ const r=await fetch('version.json?t='+Date.now(),{cache:'no-store'}); if(!r.ok) return; const v=await r.json(); if(!v||!v.build||!(v.build>ME)) return;
+      const t=tried(); if(t&&t.build===v.build&&Date.now()-t.at<RETRY) return;   // already reloaded for this build and still got the old page
+      ready=v.build; }catch(_){} }
+  setInterval(()=>{ if(ready){ if(safe()){ try{ sessionStorage.setItem(KEY,ready+'|'+Date.now()); }catch(_){ } location.reload(); } } else if(Date.now()-lastCheck>60000) check(); },3000);
+  document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='visible') check(); });
+  window.__build=ME;
+})();
+</script>
+</body>
+</html>

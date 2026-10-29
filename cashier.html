@@ -4,8 +4,9 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#0F2A38">
-<title>Calcutta · Cashier</title>
-<link rel="icon" href="crest.png?v=2">
+<title>Cashier · Flagstick</title>
+<link rel="icon" href="favicon.png?v=3">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@600;700&family=Public+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
@@ -19,7 +20,7 @@ button,input,select{font:inherit;color:inherit} button{cursor:pointer}
 :focus-visible{outline:2px solid var(--gold);outline-offset:2px}
 body{font-variant-numeric:lining-nums} .num{font-variant-numeric:lining-nums tabular-nums} .muted{color:var(--muted)} .pos{color:var(--pos)} .neg{color:var(--neg)} .r{text-align:right}
 .top{background:var(--navy);color:#fff;padding:calc(12px + env(safe-area-inset-top,0px)) 20px 12px;display:flex;align-items:center;gap:14px;position:sticky;top:0;z-index:20}
-.top img{width:34px;height:44px;object-fit:contain}
+.top img{width:42px;height:42px;object-fit:contain}
 .top .t{flex:1;min-width:0} .top b{display:block;font-family:var(--serif);font-size:22px;line-height:1.05;white-space:nowrap;overflow:hidden;text-overflow:ellipsis} .top small{color:var(--goldl);font-size:12.5px}
 .pill{font-size:12px;font-weight:700;padding:5px 11px;border-radius:999px;background:rgba(111,191,142,.18);color:#bfe8cf;white-space:nowrap}
 .pill.wait{background:rgba(216,183,95,.2);color:var(--goldl)} .pill.off{background:rgba(224,123,98,.22);color:#f3c1b4}
@@ -93,7 +94,7 @@ select.pay.paid{background:#E3F0E8;border-color:#BCD9C7;color:var(--pos)}
 </style>
 </head>
 <body>
-<header class="top"><img src="crest.png?v=2" alt=""><div class="t"><b id="tName">Calcutta</b><small>Calcutta · Cashier</small></div><span class="pill" id="sync">Connecting…</span></header>
+<header class="top"><img src="flagstick-crest-light.svg" alt="Flagstick"><div class="t"><b id="tName">Calcutta</b><small>Calcutta · Cashier</small></div><span class="pill" id="sync">Connecting…</span></header>
 <main id="main"><div class="card" style="padding:22px"><p class="muted">Loading…</p></div></main>
 <script>
 /* =====================================================================
@@ -440,14 +441,21 @@ function paneTotals(el,T,P){
 }
 window.__canReload=()=>!modalOpen&&!dirty&&!saving;
 /* Keeps every open device on the latest version: checks version.json about once a minute and, when a
-   newer build is live, reloads at a safe moment (nothing unsaved, no editor open, not mid-typing). */
+   newer build is live, reloads at a safe moment (nothing unsaved, no editor open, not mid-typing).
+   The host's CDN caches version.json and the pages separately (up to 5 min each), so right after a deploy they can
+   disagree in either direction. Two rules keep that from turning into a reload loop: only a build NEWER than this
+   page counts, and a reload is tried once per build — if the page that comes back is still the old one, the CDN
+   hasn't caught up; wait a while before trying that build again. */
 (function(){
-  const ME='20261008185759'; let ready=false, lastCheck=0;
+  const ME='20261029224942', KEY='au_tried', RETRY=10*60*1000; let ready=false, lastCheck=0;
   const typing=()=>{ const a=document.activeElement; return a&&/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)&&a.value&&a.type!=='search'; };
   const safe=()=>!typing()&&(typeof window.__canReload!=='function'||window.__canReload());
+  const tried=()=>{ try{ const [b,t]=(sessionStorage.getItem(KEY)||'').split('|'); return b?{build:b,at:+t||0}:null; }catch(_){ return null; } };
   async function check(){ lastCheck=Date.now(); if(location.protocol==='file:') return;
-    try{ const r=await fetch('version.json?t='+Date.now(),{cache:'no-store'}); if(!r.ok) return; const v=await r.json(); if(v&&v.build&&v.build!==ME) ready=true; }catch(_){} }
-  setInterval(()=>{ if(ready){ if(safe()) location.reload(); } else if(Date.now()-lastCheck>60000) check(); },3000);
+    try{ const r=await fetch('version.json?t='+Date.now(),{cache:'no-store'}); if(!r.ok) return; const v=await r.json(); if(!v||!v.build||!(v.build>ME)) return;
+      const t=tried(); if(t&&t.build===v.build&&Date.now()-t.at<RETRY) return;   // already reloaded for this build and still got the old page
+      ready=v.build; }catch(_){} }
+  setInterval(()=>{ if(ready){ if(safe()){ try{ sessionStorage.setItem(KEY,ready+'|'+Date.now()); }catch(_){ } location.reload(); } } else if(Date.now()-lastCheck>60000) check(); },3000);
   document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='visible') check(); });
   window.__build=ME;
 })();

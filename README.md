@@ -1,30 +1,288 @@
-# MGA Hub (side branch)
+# Club Hub
 
-The season-wide hub for the Walnut Creek CC MGA: members, board, every tournament
-(1–3 days, meals, events, field, sponsors, budget) and the season budget.
-One static `index.html` (plus the cashier, check-in and scoring pages), Supabase, Render.
-The hub keeps its own table (`mga_hub`). It replaced the original Member-Member app
-(app.wcccmga.org), which is retired; its `mm_tournament` table is left in Supabase as an archive.
+The hub for Walnut Creek Country Club and the organizations inside it. It began as the MGA Hub
+(members, board, every tournament with its meals, events, field, sponsors and budget, the season budget,
+the Calcutta, check-in, the 50/50 drawing, live scoring) and is growing into a club-wide hub with three tiers:
+the **club** (master member directory, club-run tournaments), **associations** (MGA, LGA, SMGA — each with its
+own hub) and **small groups** (a roster, games with entry fees and payouts, live scoring, a money-game ledger).
 
-## Set up the branch (once)
+One static `index.html` (plus the cashier, check-in and scoring pages), Supabase, Render. The hub keeps its
+own table (`mga_hub`), one row per organization.
 
-1. In the repo: `git checkout -b hub`
-2. Replace `index.html` and `README.md` with the ones from this zip, add `crest.png`
-   and `hub-setup.sql`. Leave `config.js` handling exactly as it is on `main`.
-3. `git add -A && git commit -m "MGA Hub" && git push -u origin hub`
+
+The product is **Flagstick** (golf software), and its crest is the only logo in the app: the white-and-gold crest leads the
+sidebar on every hub and the scoring, cashier and check-in pages; the navy-and-gold crest marks every organization card
+and row, the login card and the picker; printed scorecards, PDFs and the drawing overlays carry it too. The hub you are
+in is named in words beneath the mark.
+
+Flagstick serves many clubs from one installation: each client has its own address (`<club>.flagstickhub.com`), its own
+logins and the modules its subscription turns on. Golf management is the package (everything in this guide); Club
+management, member billing and point of sale are the coming tier, switched on per client in Flagstick's portal at
+app.flagstickhub.com. A club's **staff** logins see the whole club and invite **board** logins for each association from
+the club hub's Logins page; a board login sees its own organization only. See `docs/tenancy.md`.
+
+## Surveys
+
+Every hub has a **Surveys** page. Build a survey in sections (Thursday nights, weekend tournaments, membership…) with 0–10
+ratings, trade-off sliders (better food ↔ higher payouts), pick-one / pick-any questions, yes/no and written answers, with
+a comment box under any question and a suggestions box at the end of each section. *From the member survey template* gives
+you the full season-review survey in one click. **Open the survey** creates the private link to send out; members answer
+on their phones with no sign-in. Surveys are **anonymous**: nothing about who answered is asked or stored, only the answers
+and the day. The Results tab shows averages, distributions, how the sliders lean, option counts and every comment, with a
+CSV export. Close the survey when you are done; the link then says so.
+
+## Branches and sites
+
+- `main` → **app.wcccmga.org** — the club hub, the product going forward. The club is at `/`; each organization has its
+  own address: `/mga`, `/lga`, `/smga`, and `/<id>` for a small group. (Render: one Rewrite rule, `/*` → `/index.html`.)
+- **hub.wcccmga.org** — the MGA's address, served from `main` as well (bare host = the MGA hub, `/club` = the club
+  hub) once the Render site for that domain points at `main`. The old MGA Hub code and its data are history; nothing
+  syncs with them any more.
+
+## Organizations and members
+
+The **club hub** keeps the **Directory** (every club member, one record each — import the club software's export, or
+add people by hand) and the list of **Organizations**: associations (MGA, LGA, SMGA) and small groups, each with its
+own hub. An organization's **Members** page is the club members who belong to it: add one from the directory, import
+the organization's own list (club members are matched and joined; new people are added to the directory too), and keep
+status, join date, notes and dues per organization. Editing a person's details anywhere updates the directory.
+
+## Live scoring, always
+
+Every tournament round and every small-group game has an open scoring event the moment it exists — nothing to switch
+on. A tournament's rounds are suggested from its length and team size (change them under Rounds & results), the field
+flows into each round's event as players sign up, and the Golf page, the scoring link and the leaderboard are ready
+from day one. The sidebar and dashboards show the leaderboards of events happening today.
+
+
+## GameCast
+
+Every game and event has a **GameCast** link (the game page's Live scoring card, the Golf event page, the share step of a new
+game): a page for everyone who is not scoring — the bar, the spouses, the group chat. No group ID. It shows the real course from the
+air — Oak and Pecan's holes drawn on satellite imagery — with each group on the hole it is playing, a hole's story (par, yardage, who has played it and what they made), a live feed of the
+moments as they come in (birdies, eagles, skins taken, the lead changing hands) and the leaderboard for each competition that is
+on the live board. Follow one player and the page stays on them. `&view=tv` is the bar-screen version that cycles through the
+groups. It only reads; nothing on it can touch the game. Competitions kept quiet for the call-out never appear on it.
+
+## Rounds & results
+
+Each tournament declares its rounds — one or more per day, each with a format (a day can be scramble on the front
+and shamble on the back, the next day best ball). **Create scoring events** builds the live-scoring events from the
+field in one click, teams and all; later days copy the first day's flights, and groups can be copied too. **Results**
+total every round per team or player, overall and by flight, print to a branded **results sheet (PDF)**, and can be
+sent to the Calcutta as finishes. **Flights** are set once per tournament by combined Handicap Index (with the optional
+partner handicap differential cap, e.g. 10 strokes: a +2 and a 12 play as +2 and 8) and pushed to every round; day one
+groups are built by handicap, later days **paired by the standings** (leaders off last with tee times, on hole 1 for a
+shotgun), and every group stays editable. Tournament
+details has checkboxes for which tabs a tournament uses: the Calcutta, sponsors, meals, checklist and the 50/50 drawing
+are optional; registration, check-in and rounds are always there.
+
+## Game library
+
+The club hub's **Game library** lists every game the hub can score — stroke play, maximum score, Stableford and modified,
+quota and Chicago, par/bogey, singles, Nassau, four-ball, Hi-Lo and foursomes match play, best ball of any size,
+aggregate, 1-2-3, cha-cha-cha, 1-2-3 by par, yellow ball, shamble, team Stableford, scramble and Florida scramble,
+foursomes, greensome, Chapman, a front/back split, and the side games (skins, dots, closest to the pin, long drive,
+low gross/net pots, blind-draw partners, hole-in-one) plus random, ABCD and balanced partner draws — and lets the club
+switch any of them off for its associations and small groups. **Draw partners** on an event (or a game) draws teams
+before or after the round.
+
+## Formats
+
+Scoring events (and small-group games) support stroke play, Stableford, modified Stableford, quota, par/bogey, singles
+and four-ball match play, best ball (any 1 to size−1 balls of a 2- to 6-player team, or 1-2-3), aggregate, scramble
+(2–6 players), shamble, foursomes, greensome/Chapman, team Stableford, and a front/back split. Allowances default to
+the USGA tables (club defaults where the USGA has none) and are editable per event. `docs/formats.md` spells out every
+format's team score and handicap math, with worked examples.
+
+## Small groups
+
+**Setting up a game from a phone.** New game is three steps. *Who's playing*: tap the names — the group's members,
+anyone who has played before, anyone else at the club through the search box, guests by name; last time's players
+come already ticked. *What are we playing*: **Same as last time**, one of the group's other past games, or build it
+from the starters in plain words (skins, stroke play, blind-draw partners, quota, team Nassau, dots — tap all that
+apply); the day's name, date, course and tee sit in one line behind Change. *Share*: the scoring link with Send and
+Copy, a QR code, the groups with their IDs, the sheet images. Everything else — the payout split, handicaps, pops on
+par 3s, house rules, who is in which competition — has a sensible default and lives behind **More options**, which
+opens the full designer with the same game in it. **Same as last time** on the Games page creates today's game in one
+tap.
+
+A small group's hub is the regular game, and small tournaments when it wants them (the same Tournaments page as an
+association, with the Calcutta, meals and the rest switched on per tournament).
+
+**Designing a game.** One screen: the day (date, course, tee time, whether money changes hands before or after the
+round, pot or net settlement), the **competitions**, and who's in. A game can run any number of competitions on the
+same scores, each with its own entry, its own players and its own payout: stroke play paying three places, a best
+ball paying two with partners **drawn after the round**, skins, dots, closest to the pin… Team competitions set how
+the partners come about: picked by hand, drawn before the round, or drawn after it. **Skins** is one pot for the day
+divided by the skins won: a tied hole is nobody's, and a skin that fails validation is lost. Gross or net,
+gross-beats-net and the validation standard on the next hole (par, net par, bogey or net bogey) are each a switch;
+a per-hole format (the pot split over 18 holes, ties carrying forward) is there for groups that play it that way.
+Skins stay off the screen during the round unless you switch "announce live" on; afterwards **Call out the skins**
+walks the cards one hole per tap, a skin stays pending until its validation hole comes up, and a failed validation
+flashes "Didn't validate" before that hole's result. Every other competition has its own **Show on the live
+leaderboard** switch in the designer, and the live scoring page shows one board per competition that is switched on
+(dots are tallied by hand and never show). Removing a player, from the game page or the designer, takes them out
+of every competition, the scoring event, the leaderboard and live scoring, scores and all. Games are deleted from the designer; deleting a scoring event
+that belongs to a game or a tournament round removes that game or round with it. A game plays **full handicaps, 100% across the board** unless the designer switches to the USGA allowances.
+
+**The players finish the game themselves.** On the live scoring page, anyone who has joined with a group ID gets a
+**Finish** tab for a game, and walks the room through it in order: **Close scoring** (shows whose cards are complete;
+after it nobody can change a score), **Call out the skins** (the same hole-by-hole reveal, with the validations),
+**Draw the partners** (random, A-B-C by handicap or snake; saved before the reveal), **The winners** (every competition's
+result and what it pays, computed from the cards by the competition's own rules — a tap records exactly what is shown,
+nothing can be edited there) and **Who's owed what** (in, out and net per player; who pays whom when the game settles
+net). Every phone in the game sees the same steps, a step can only be taken once, and the hub picks it all up — the
+event closed, the teams, the skins called out, the payouts in the game and the ledger — the next time the game page is
+open, marked "from the course by Group …". Reopen scoring in the hub takes it back. Dots and winners entered by hand
+stay in the hub. The **who's-in grid** ticks every player into every competition
+they want, so nine can be in the skins while eight play the team game. A new game starts from the last one.
+
+**On the day.** Everyone plays their own ball; every competition is scored live from those cards. A team competition
+whose partners are not drawn yet shows individual standings until the **drawing**: a full-screen stage that draws
+with real randomness, saves the result first, then reveals the teams one at a time. A competition can be added at any point, even after you have teed off: Design, add it, pick the teams ("Teams =
+the groups" for a group-against-group challenge) and the standings pick up the scores already on the cards. Two
+team matches are built for exactly that: the **reverse waltz** (front, back and 18, each bet going to the side with
+the lower total of its counted balls; each hole counts the best three balls, then two, then one, repeating, with
+every ball counting on 9 and 18 — the board shows each side's total to par for the front, the back and the 18) and a
+plain **team Nassau** on best ball. Set what each segment is worth per player and the match is settled segment by
+segment. **Groups & handicaps** on the game page: move players between groups, set each group's starting hole or tee time,
+pick a player's tee box, and type an index for the day where it differs from the directory. Course and playing
+handicaps update on the spot, and the same card works mid-round: correct an index on the 7th tee and the standings,
+the leaderboard and every phone scoring the round pick it up within half a minute, no reload needed. The **settlement** shows what
+each player put in, pulled out and nets, and for net settlement the fewest payments that square it. The **game sheet
+PDF** carries the competitions and denominations, the teams when they are known, and the groups as they play with
+each player's strokes. The **Ledger** shows who is up or down for the season or any quarter, with a one-click
+settle-up.
+
+**Admin links.** A small group (or an association) can be run without the board password: in the club hub, open the
+organization under Organizations and create an **admin link** (`app.wcccmga.org/misfits#key=…`). Whoever opens it gets
+that organization's hub — its games, tournaments, members and live scoring — and sees the club directory (they can add
+people to it, not change them). Nothing else in the club is reachable with the link, it works on the device it was
+opened on until "Leave this hub", and the club can revoke it at any time. Run `admin-links-setup.sql` once to turn
+this on.
+
+## Dues collected by the club
+
+The club charges no dues of its own. An association sets its dues (Members → Dues settings), and new members are
+billed automatically; **Bill dues** bills everyone who still owes (full year or an installment). Each bill goes to the
+club hub's **Dues collection** page: the club exports the open charges for its billing software (or ticks them off
+one by one), marks them *on account*, and when the money is in marks them *collected* — that records the payment on
+the member in the association's books, credited to the association. The club's own budget and treasury never count it.
+
+## Member accounts (billing)
+
+Flagstick is the club's billing system: each club bills its own members (Flagstick bills the club). It lives in the club
+hub under **Member accounts** (staff logins only, once the billing module is on).
+
+- **Billing setup**: membership classes (Full, Social, Junior…) with what each is charged — monthly, quarterly or yearly —
+  and a food & beverage minimum; the items the club bills with their revenue account and whether sales tax and the service
+  charge apply; the rates; statement rules (due days, finance charge, late fee, the message on statements). Give each
+  member a class and a billing status (active, leave of absence, suspended, resigned) in the Directory.
+- **Run monthly billing** posts every class charge due that month to every billable member, prorated by the day for a
+  mid-month join or resignation, plus unspent minimums for the period that just closed. Running a month twice posts nothing
+  twice.
+- **Accounts**: dues put on account from Dues collection land here; the office posts charges by hand (the item picker adds
+  tax and service charge), records payments (card, check, ACH, cash) and credits; a mistake is **voided with a reason**,
+  never deleted. The list shows who owes, who is **past due** (31–60, 61–90, 90+ by oldest-first settlement), credits, this
+  month's charges and receipts; search by name, member number or e-mail; **Export balances** with aging.
+- **Run statements** first posts the finance charge and late fee on what stayed past due, then closes the period for
+  everyone with a balance or activity, keeps each statement on the member's account, downloads one PDF with a branded page
+  per member, and can **e-mail** each statement and **charge autopay** cards on file.
+- **GL export**: a month's journal (receivables, revenue by item, service charge, sales tax, cash, credits) as CSV for the
+  bookkeeper.
+- **The member portal** (`member.html` on the club's address): a member signs in with a one-time e-mail link — the e-mail
+  the club has on file — and sees their balance, activity and statements (PDF). With **Connect with Stripe** done in
+  Billing setup, members **pay online** by card or bank account straight into the club's own Stripe account, and can turn
+  on **autopay** so each statement is paid for them. Flagstick never holds the money.
+
+## Point of sale
+
+**Point of sale** (staff, with the module on) is the register for the grill, the halfway house and the pro shop: pick
+the outlet, tap the products (or an open item), pick the member or a walk-in, add a tip, and close the ticket **to the
+member's account** — one line on their statement with tax and service charge broken out — or as cash or card. Tickets can
+be held and picked up again, voided with a reason (the account charge goes with it), and the day's tickets export to CSV.
+Setup holds the outlets and products with prices, categories, tax and service flags and stock counts (CSV import).
+
+## The restaurant floor: registers, servers, the kitchen
+
+Set up each restaurant in **Settings → Food & beverage**: its prep stations (Kitchen, Grill line, Bar…), its tables
+("1-12, Patio 1-6, Bar"), its menus, and for every item where it fires — a salad to the kitchen, a steak to the grill
+line, a drink rung at the bar nowhere. Add the servers, bartenders and managers with a PIN each. Then make a **register
+station** for every device at a register and an **expo screen** for every kitchen display: each gets its own link, opened
+once on that device, which stays signed in (the link stays behind the station's **Link** button if a device needs it
+again; revoke the station if a device is lost). Bartenders never see the hub: the station shows a PIN pad, then the floor
+(their own tables green, the rest gold, tabs by name), then the check — tap items, **Send** fires each course to the right
+kitchen screen, **Pay** charges the member's account (name or number), or cash / card. Every food & beverage check carries the
+club's service charge (18% unless Settings → Food & beverage says otherwise), and no tip is asked for on the screen: a check
+charged to an account or a card prints a slip with Additional tip, Total and Signature lines, sits on the floor under **Slips
+out**, and the server closes it out with the tip that was written — an account tip lands on the member's charge. A
+manager's PIN is needed to leave the station, and to void a check; a manager's **Closed today** lists the day's closed
+checks (or any earlier day) with **Reopen** — the payments are cleared, an account charge is voided, and the check goes
+back on the floor to be changed and paid again; the hub's Tickets page has the same Reopen on every ticket.
+Every check carries a number, printed large on the slip ("CHECK 1027-0143") with a small QR beneath it. At the end of the
+night the signed slips go through a document scanner, and **Daily close-out** (under Food & beverage) takes the scanner's
+PDF or phone photos: each page is read, matched to its check and stored against the payment and the member's charge, so
+the account page and the member portal show the signed slip beside the digital one. The page lists slips scanned against
+slips expected, anything still open or out for a tip, tips by server with the ones over the club's limit flagged, the
+cash drawer against the count, and voids. **Close the day** records it and locks it: nothing on that day can be reopened,
+voided or re-tipped from a station, and the hub asks for a manager's PIN. The close-out PDF is what the paper stack is
+stapled to. The kitchen screen shows every fired course for its
+station with the table, the server and the minutes elapsed; **Bump** clears it. The golf shop works the same way from
+**Settings → Shops** (a golf shop and a racket sports shop each sit under their own rail section), without tables or kitchens.
+
+On a member's account page every charge has a **Receipt** button (the register's own ticket when it came from one) and a live
+charge has **Adjust**: say what it should have been and why, and the difference posts as a credit or a further charge against it;
+the original line is never rewritten.
+
+**Starting a menu.** Menus & products → **Add from the library** drops a whole club menu into a restaurant — starters, salads,
+sandwiches and burgers, entrées, kids, desserts, breakfast, the turn, beer, wine, cocktails, spirits, soft drinks — every item
+with its modifiers (temperature, sides, add-ons, pours) and its course, fired to the right kitchen station (made on the spot if
+the restaurant has none). The golf shop gets balls, gloves and apparel with sizes, shoes, accessories, bags, green fees and
+carts, lessons and fittings, club repair; the racket shop gets balls, rackets and paddles, stringing with string and tension
+choices, rentals, lessons and apparel. Untick what you don't sell; prices are a starting point and every item is an ordinary
+product afterwards. Items you already have are skipped.
+
+On the check: items with **modifiers** (temperature, add-ons with their prices — set on the product), **seats**, and
+**courses** — starters go with the order, mains and dessert hold until the server fires them. **Pay** takes the whole check,
+an even split, a seat, or picked items, each with its own tip and its own method, until the check is covered. A check can
+be **transferred** to another server. A manager sees the **shift numbers** at the station; the hub's Tickets page has the
+shift report per outlet (sales, payment types, tips by server, voids, items) as a branded PDF.
+
+## Bookings
+
+**Bookings** (staff, with the module on) is the tee sheet and every other sheet: tennis and pickleball courts, the pool,
+lessons by instructor, rooms. Each facility has its hours, slot length, how many per slot (players per tee time), how far
+ahead members may book, whether members may book it at all, and a fee that goes on the member's account. Staff book on
+the sheet, check people in, cancel, and print the day's sheet. Members book from the **member portal** inside the same
+rules — the next days, open and taken slots, their own bookings with Cancel.
+
+## Settings: your own brand on everything that goes out
+
+Every hub — the club and each association — has **Settings**. **Branding:** upload your logo and it replaces the Flagstick
+crest on statements, receipts, the tee sheet, results sheets, game sheets, printed scorecards, e-mails and the member
+portal; an association can carry its own logo, otherwise the club's. **Outgoing e-mail:** statements and receipts come
+from your own address (the MGA from wcccmga.org, the club from its own domain), either through Flagstick's mailer once
+your domain is verified, or straight out of your own Microsoft 365 mailbox through an app registration you control.
+The club's Settings also gathers the setup of each module: restaurants (Creekside Grill, Nines Bistro…) and the golf
+shop, billing, facilities, the game library.
+
+## The club calendar
+
+The club's Tournaments page and dashboard also list every association's and small group's tournaments — name, dates,
+field size and status, with a button into that organization's hub. Their budgets and money stay in their own hubs.
+
+First time on a database the club hub offers **Set up the club**: an empty directory with the three associations
+registered; the roster is then imported from the Directory page.
+
+Both use the same Supabase project. Render serves the repo root of each branch; the built pages are committed,
+so a push is a deploy (see `CLAUDE.md` for the build).
 
 ## Supabase (same project)
 
-SQL Editor → run `hub-setup.sql`. It creates `public.mga_hub` with RLS and realtime.
-The hub signs in with the shared board login.
-
-## Render (a second static site)
-
-Render → **New → Static Site** → same repo, branch **`hub`**, publish directory `.`.
-Copy the current site's build command and environment variables
-(`SUPABASE_URL`, `SUPABASE_ANON_KEY`, `BOARD_EMAIL`) if it generates `config.js`.
-Optional: give it its own subdomain (e.g. `hub.wcccmga.org`). The current site on
-`main` keeps serving `app.wcccmga.org` untouched.
+SQL Editor → run `hub-setup.sql` (creates `public.mga_hub` with RLS and realtime), `calcutta-setup.sql`
+(cashier and check-in links), `golf-setup.sql` (live scoring), `admin-links-setup.sql` (admin links for small
+groups and associations) and `wrap-setup.sql` (the Finish tab: games wrapped up from the course). The hub signs in with the shared board login; admin links work without it.
 
 ## Staying up to date
 
@@ -139,6 +397,13 @@ each have a search box: names, paddle numbers (101 or #101), lot numbers, flight
   bidders never overwrite each other; on the same one, the latest wins. A laptop that drops offline keeps
   its changes and saves them when it reconnects. **Turn off** locks the link immediately; the data stays.
 
+### Payout exports
+
+On the Payouts sub-tab: **Spreadsheet** (payouts by person, the detail behind each, and the flights), **Payouts PDF**
+(the branded sheet with finishes, team payouts and what each person is owed) and **Winners PDF (no amounts)** — the
+same sheet with no dollar figure on it, listing finishes and who should see the cashier, for posting on the board or
+online.
+
 ## Live scoring (Golf)
 
 One-time: Supabase → SQL Editor → run `golf-setup.sql`. Upload `score.html` alongside
@@ -152,8 +417,10 @@ One-time: Supabase → SQL Editor → run `golf-setup.sql`. Upload `score.html` 
   tee time), course, starting hole, and players (members, field players, or guests), each with
   a tee and men's/women's par.
 - **Open scoring**, then share the link: `…/score.html?e=<your-link>`. Players enter their
-  Group ID and score hole by hole. Scores save as they tap, queue up in dead zones, and send
-  when signal returns. `…&view=board` is a big-screen leaderboard for the clubhouse TV.
+  Group ID and score hole by hole. Each hole starts at par and the scorer taps up or down from there;
+  moving on from a hole (the Save button, the › arrow or a tap on a later hole) records par for anyone
+  left untouched, while going back changes nothing. Scores save as they tap, queue up in dead zones, and
+  send when signal returns. `…&view=board` is a big-screen leaderboard for the clubhouse TV.
 - **Leaderboard:** gross stroke play, to par for holes played, both courses combined. It's in the
   event page, on the Dashboard, and a live link sits in the sidebar while scoring is open.
   Click any player to correct a group's scores from the hub.
@@ -257,3 +524,32 @@ One-time: Supabase → SQL Editor → run `golf-setup.sql`. Upload `score.html` 
 
 - Microsoft 365 sign-in per board member (Supabase Azure provider).
 - Golf Genius sync for members and signups (needs API access from Golf Genius).
+
+## For a nonprofit: galas, auctions and raffles
+
+A nonprofit client starts with **Fundraising** at the top of its rail and the golf tournament under Golf, Tournaments. An
+event holds everything for the night: ticket types with their fair market value, tables and the guest list (guests hold
+paddle numbers), sponsors and levels, the **silent auction**, the **live auction**, **raffles**, **checkout** and the money.
+
+**Publish the event page** and guests open it on their phones: the evening and the sponsorship levels, tickets (they
+reserve, and pay at the door or at checkout), and the silent auction. They join with a name and phone number, get a
+paddle, and bid; a bid under the minimum raise, or after bidding closes, is refused, and "My bids" tells them when they
+have been outbid. Close bidding from the hub and the high bids go to checkout. The live auction is recorded by paddle as
+the hammer falls, paddle-raise gifts the same way. A raffle sells numbered tickets by paddle and draws with real randomness,
+recording every draw: lock the list first (a fingerprint of every ticket goes on the record), and a void needs a reason.
+Silent items and live lots can carry a **reserve** the bidders never see. A **cashier link** puts the cashier's table on a phone
+or laptop without the hub login: look up any paddle, record live-auction sales, raffle tickets, gifts and payments, and the
+hub takes it all in. Each event has a **Budget** tab (the plan per stream and the planned expenses against the actual) and the
+Annual budget page carries every event of the year. A nonprofit also has a plain **register** for merchandise and payments, with
+no restaurant setup. **Checkout** gathers what each paddle owes (tickets, wins, raffle tickets, gifts), takes the payment,
+and prints or e-mails the acknowledgement with the fair market value and the deductible portion. The tax ID and the
+thank-you line live under Fundraising, Settings.
+
+**A fundraiser can include a golf tournament.** Battle of the Nines is a tournament by day and a gala that night: tick
+*Includes a golf tournament* when you create the event and a tournament of the same name is made with it (or link one later
+from the event's Overview, *Add a golf tournament*). Its paid entries, sponsors and 50/50 count toward the event's total and
+its budget toward the plan; the places get donated gifts, listed under *Prizes*, never payouts. Creating a tournament from the
+dashboard makes its fundraising event too, so nothing raised is left out. **Every event has its own goal and thermometer**: set
+it from the Overview (*Goal & progress page*); the bar shows on the event, on the Fundraising page and on the dashboard, and
+once the event page is published the same link with `&p=1` is a **public progress page** — the goal, what has been raised and
+where it came from, never who gave what — for the website, a lobby screen or a post. Several events, several thermometers.

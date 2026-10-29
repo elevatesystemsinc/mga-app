@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Flagstick · For nonprofits</title>
+<meta name="description" content="Flagstick for nonprofits: golf days, galas, dinners and auctions on one system — budgeting, treasury, registration, sponsors, raffles with an official record, and a board that hands off clean.">
+<link rel="icon" href="favicon.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,600;0,700;1,500&family=Public+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#FBFAF5;font-family:'Public Sans',system-ui,sans-serif;color:#14222B;font-variant-numeric:lining-nums;-webkit-font-smoothing:antialiased}
+a{color:#7E5F1A}a:hover{color:#0F2A38}
+.wrap{max-width:1160px;margin:0 auto;padding:0 32px;box-sizing:border-box}
+.serif{font-family:'Cormorant Garamond',Georgia,serif}
+.btn{display:inline-flex;align-items:center;justify-content:center;height:54px;padding:0 28px;border-radius:12px;font-weight:800;font-size:16px;text-decoration:none;box-sizing:border-box}
+.btn.gold{background:#C7A13A;color:#0F2A38}.btn.gold:hover{background:#D8B75F;color:#0F2A38}
+.btn.ghost{border:1px solid rgba(255,255,255,.4);color:#fff}.btn.ghost:hover{border-color:#D8B75F;color:#D8B75F}
+.kicker{font-size:12px;letter-spacing:.24em;text-transform:uppercase;font-weight:800;color:#C7A13A}
+.nav a{color:#fff;text-decoration:none;font-weight:600;font-size:14.5px}.nav a:hover{color:#D8B75F}
+.chip{display:inline-flex;align-items:center;height:30px;padding:0 13px;border-radius:999px;font-size:13px;font-weight:700;border:1px solid #E1D9C6;background:#fff;color:#0F2A38;white-space:nowrap}
+.chip.gold{background:#F6ECCF;border-color:#E5CF8E;color:#6B4F12}
+.grid3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:20px}
+.feat{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:48px;align-items:center;padding:56px 0;border-top:1px solid #E1D9C6}
+.feat ul{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:9px;font-size:16px;color:#14222B}
+.feat li{display:flex;gap:10px;align-items:flex-start}.feat li::before{content:'';width:8px;height:8px;border-radius:999px;background:#C7A13A;margin-top:8px;flex:0 0 auto}
+.shot{background:#fff;border:1px solid #E1D9C6;border-radius:16px;padding:18px;box-shadow:0 16px 40px rgba(15,42,56,.08)}
+.pill{display:flex;flex-direction:column;gap:10px;padding:28px;border-radius:18px;background:#0F2A38;color:#fff;box-sizing:border-box}
+.pill ul{margin:0;padding:0 0 0 18px;font-size:15px;line-height:1.6;color:#C9CFD2}
+.bar{height:8px;border-radius:4px;background:#F1ECE0}.bar>span{display:block;height:8px;border-radius:4px}
+.burger{display:none;width:44px;height:44px;border:none;background:transparent;padding:10px;flex-direction:column;justify-content:center;gap:5px;cursor:pointer;margin-left:auto}
+.burger span{display:block;height:2px;background:#fff;border-radius:2px;transition:transform .2s,opacity .2s}
+.burger.x span:nth-child(1){transform:translateY(7px) rotate(45deg)}.burger.x span:nth-child(2){opacity:0}.burger.x span:nth-child(3){transform:translateY(-7px) rotate(-45deg)}
+.mnav{display:none;flex-direction:column;background:#0F2A38;border-top:1px solid rgba(216,183,95,.3);padding:8px 20px 16px}
+.mnav.open{display:flex}.mnav a{color:#fff;text-decoration:none;font-weight:700;font-size:17px;padding:12px 0;border-bottom:1px solid rgba(255,255,255,.08)}
+.foot a{color:#C9CFD2;text-decoration:none;font-size:13.5px}.foot a:hover{color:#D8B75F}
+@media (max-width:900px){.grid3{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (max-width:760px){.feat,.grid3{grid-template-columns:minmax(0,1fr)}.feat{padding:40px 0}.nav{display:none!important}html,body{overflow-x:hidden}.burger{display:flex}header .btn.gold.top{display:none}header .wrap{height:64px}.h1{font-size:44px!important}.h2{font-size:34px!important}.wrap{padding:0 20px}section{padding-top:48px!important;padding-bottom:48px!important}.kicker{letter-spacing:.16em}}
+</style>
+</head>
+<body>
+<header style="background:#0F2A38">
+  <div class="wrap" style="display:flex;align-items:center;justify-content:space-between;gap:24px;height:76px">
+    <a href="index.html" aria-label="Flagstick home" style="display:flex;align-items:center;gap:12px;text-decoration:none"><img src="flagstick-crest-light.svg" alt="" style="width:40px;height:40px"><span style="display:flex;flex-direction:column"><b style="font-weight:800;font-size:18px;letter-spacing:.2em;color:#fff;line-height:1">FLAGSTICK</b><small style="font-size:9px;letter-spacing:.3em;color:#D8B75F;font-weight:600;margin-top:5px">GOLF SOFTWARE</small></span></a>
+    <nav class="nav" style="display:flex;gap:28px;align-items:center" aria-label="Site"><a href="features.html">Features</a><a href="nonprofits.html" style="color:#D8B75F">Nonprofits</a><a href="about.html">About</a><a href="https://app.flagstickhub.com">Sign in</a></nav>
+    <a class="btn gold top" href="index.html#demo" style="height:44px;padding:0 20px;font-size:15px">Book a demo</a><button class="burger" type="button" aria-label="Open menu" aria-expanded="false" aria-controls="mnav" onclick="var m=document.getElementById('mnav');var o=m.classList.toggle('open');this.setAttribute('aria-expanded',o);this.classList.toggle('x',o)"><span></span><span></span><span></span></button>
+  </div>
+  <nav id="mnav" class="mnav" aria-label="Menu"><a href="index.html">Home</a><a href="features.html">Features</a><a href="nonprofits.html" style="color:#D8B75F">Nonprofits</a><a href="about.html">About</a><a href="https://app.flagstickhub.com">Sign in</a><a class="btn gold" href="index.html#demo" style="margin:10px 0 4px;align-self:stretch">Book a demo</a></nav>
+</header>
+
+<section style="background:#0F2A38;color:#fff;padding:72px 0 80px;background-image:radial-gradient(1100px 520px at 88% 10%, rgba(199,161,58,.16), rgba(15,42,56,0) 60%)">
+  <div class="wrap" style="display:flex;flex-direction:column;gap:22px;max-width:900px">
+    <span class="kicker">For nonprofits · golf days, galas, dinners &amp; auctions</span>
+    <h1 class="serif h1" style="margin:0;font-size:68px;line-height:1;font-weight:700">Run the event.<br>Keep the books.<br><span style="color:#D8B75F">Hand it off clean.</span></h1>
+    <p style="margin:0;font-size:19px;line-height:1.5;color:#C9CFD2;max-width:640px">A golf day, a gala, a dinner, an auction night — Flagstick gives a volunteer board one place for the budget, the guest list, the sponsors, the raffle and the payouts, whatever the event. The money is right, the record is kept, and next year’s committee starts where you left off.</p>
+    <div style="display:flex;gap:12px;flex-wrap:wrap"><a class="btn gold" href="index.html#demo">Book a demo</a><a class="btn ghost" href="#how">How it works</a></div>
+  </div>
+</section>
+
+<section style="background:#fff;border-bottom:1px solid #E1D9C6">
+  <div class="wrap grid3" style="padding:36px 32px;gap:32px">
+    <div style="display:flex;flex-direction:column;gap:4px;border-left:4px solid #C7A13A;padding-left:18px"><span class="serif" style="font-size:34px;line-height:1;color:#0F2A38;font-weight:700">Budget first</span><span style="font-size:15px;color:#3E4A52;line-height:1.5">Plan any event against last year, watch actuals land, and know the net before the night ends.</span></div>
+    <div style="display:flex;flex-direction:column;gap:4px;border-left:4px solid #C7A13A;padding-left:18px"><span class="serif" style="font-size:34px;line-height:1;color:#0F2A38;font-weight:700">A clean record</span><span style="font-size:15px;color:#3E4A52;line-height:1.5">Raffles drawn from a locked list, payouts to the cent, every sheet a PDF the board can file.</span></div>
+    <div style="display:flex;flex-direction:column;gap:4px;border-left:4px solid #C7A13A;padding-left:18px"><span class="serif" style="font-size:34px;line-height:1;color:#0F2A38;font-weight:700">Volunteer-proof</span><span style="font-size:15px;color:#3E4A52;line-height:1.5">Easy to learn, nothing lives on one person’s laptop, and the next board inherits all of it.</span></div>
+  </div>
+</section>
+
+<div class="wrap">
+  <section class="feat" style="border-top:none">
+    <div style="display:flex;flex-direction:column;gap:14px"><span class="kicker">Budget &amp; treasury</span><h2 class="serif h2" style="margin:0;font-size:40px;line-height:1.05;color:#0F2A38">Know the net before the night is over.</h2>
+      <ul><li>A budget per event, line by line: tickets and entries, sponsors, meals, prizes, raffle</li><li>Actuals against plan as money comes in and goes out</li><li>Bank statement import to reconcile without re-keying</li><li>Profit and loss per event — the golf day, the gala, the dinner — and the year rolled up</li><li>The treasurer’s report ready for the board meeting</li></ul></div>
+    <div class="shot" aria-hidden="true"><div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:12px"><b class="serif" style="font-size:22px;color:#0F2A38">Spring Gala · budget vs actual</b><span class="chip gold" style="height:26px;font-size:12px">On plan</span></div>
+      <div style="display:flex;flex-direction:column;gap:10px;font-size:14px">
+        <div><div style="display:flex;justify-content:space-between"><span>Tickets &amp; tables</span><b>collected</b></div><div class="bar"><span style="width:92%;background:#C7A13A"></span></div></div>
+        <div><div style="display:flex;justify-content:space-between"><span>Sponsors</span><b>on plan</b></div><div class="bar"><span style="width:78%;background:#0F2A38"></span></div></div>
+        <div><div style="display:flex;justify-content:space-between"><span>Raffle &amp; auction</span><b>ahead</b></div><div class="bar"><span style="width:100%;background:#1F6B4A"></span></div></div>
+        <div><div style="display:flex;justify-content:space-between"><span>Meals &amp; prizes</span><b>committed</b></div><div class="bar"><span style="width:60%;background:#9A3B2B"></span></div></div>
+      </div></div>
+  </section>
+  <section class="feat">
+    <div class="shot" aria-hidden="true"><div style="display:flex;justify-content:space-between;margin-bottom:10px"><b class="serif" style="font-size:22px;color:#0F2A38">Registration</b><span class="chip" style="height:26px;font-size:12px">Link shared</span></div>
+      <div style="display:grid;grid-template-columns:minmax(0,1.3fr) 90px 70px;gap:10px;font-size:11px;font-weight:700;color:#56626A;letter-spacing:.06em;padding-bottom:8px;border-bottom:1px solid #E1D9C6"><span>GUEST</span><span>PAID</span><span>MEAL</span></div>
+      <div style="display:grid;grid-template-columns:minmax(0,1.3fr) 90px 70px;gap:10px;padding:9px 0;border-bottom:1px solid #E1D9C6;font-size:14px"><span>Walker / Pruitt</span><b style="color:#1F6B4A">Paid</b><span>Chicken</span></div>
+      <div style="display:grid;grid-template-columns:minmax(0,1.3fr) 90px 70px;gap:10px;padding:9px 0;border-bottom:1px solid #E1D9C6;font-size:14px"><span>Dalton / Reyes</span><b style="color:#1F6B4A">Paid</b><span>Fish</span></div>
+      <div style="display:grid;grid-template-columns:minmax(0,1.3fr) 90px 70px;gap:10px;padding:9px 0;border-bottom:1px solid #E1D9C6;font-size:14px"><span>Hall / Morrow</span><b style="color:#9A3B2B">Owes</b><span>Steak</span></div>
+      <div style="display:grid;grid-template-columns:minmax(0,1.3fr) 90px 70px;gap:10px;padding:9px 0;font-size:14px"><span>Nguyen / Barrett</span><b style="color:#1F6B4A">Paid</b><span>Chicken</span></div></div>
+    <div style="display:flex;flex-direction:column;gap:14px"><span class="kicker">Registration &amp; check-in</span><h2 class="serif h2" style="margin:0;font-size:40px;line-height:1.05;color:#0F2A38">A guest list you can trust on the day.</h2>
+      <ul><li>A registration link to share anywhere — no login for the volunteers at the table</li><li>Guests, teams or tables, with payments and meal choices on one list</li><li>Your own questions on the form: shirt size, dietary needs, sponsor affiliation</li><li>Check-in from a phone at the door or the first tee, searchable by name</li><li>Who still owes, at a glance</li></ul></div>
+  </section>
+  <section class="feat">
+    <div style="display:flex;flex-direction:column;gap:14px"><span class="kicker">Sponsors &amp; fundraising</span><h2 class="serif h2" style="margin:0;font-size:40px;line-height:1.05;color:#0F2A38">Every dollar raised, and where it came from.</h2>
+      <ul><li>Sponsor tiers and commitments tracked against the budget</li><li>Table sponsors, hole sponsors, meal sponsors, in-kind — all on the event</li><li>Live and silent auctions run from a cashier phone, bidders and payments tracked</li><li>Side pools and prize funds settled on the same night</li><li>Payout and winners sheets as branded PDFs for the board and the room</li></ul></div>
+    <div class="shot" aria-hidden="true"><div style="display:flex;justify-content:space-between;margin-bottom:10px"><b class="serif" style="font-size:22px;color:#0F2A38">Sponsors</b><span style="font-size:12px;color:#56626A">tier · committed</span></div>
+      <div style="display:flex;flex-direction:column;font-size:14px"><div style="display:flex;justify-content:space-between;padding:8px 0;border-top:1px solid #E1D9C6"><span>Title sponsor</span><b>1 of 1</b></div><div style="display:flex;justify-content:space-between;padding:8px 0;border-top:1px solid #E1D9C6"><span>Gold</span><b>4 of 4</b></div><div style="display:flex;justify-content:space-between;padding:8px 0;border-top:1px solid #E1D9C6"><span>Table sponsors</span><b>14 of 18</b></div><div style="display:flex;justify-content:space-between;padding:8px 0;border-top:1px solid #E1D9C6"><span>In-kind</span><b>6</b></div></div></div>
+  </section>
+  <section class="feat">
+    <div class="shot" aria-hidden="true" style="background:#0F2A38;color:#fff;border-color:#0F2A38"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px"><b>50/50 drawing · official record</b><span style="font-size:11px;font-weight:700;color:#D8B75F">LOCKED</span></div>
+      <div style="display:flex;flex-direction:column;gap:8px;font-size:13.5px;color:#C9CFD2"><div style="display:flex;justify-content:space-between"><span>Tickets in the drum</span><b style="color:#fff">412</b></div><div style="display:flex;justify-content:space-between"><span>List fingerprint</span><b style="color:#fff;font-family:ui-monospace,monospace">9f3a…c21e</b></div><div style="display:flex;justify-content:space-between"><span>Drawn at</span><b style="color:#fff">7:42 PM</b></div><div style="display:flex;justify-content:space-between"><span>Winner</span><b style="color:#D8B75F">Ticket 287</b></div></div></div>
+    <div style="display:flex;flex-direction:column;gap:14px"><span class="kicker">Raffles &amp; drawings</span><h2 class="serif h2" style="margin:0;font-size:40px;line-height:1.05;color:#0F2A38">A drawing nobody can question.</h2>
+      <ul><li>Tickets by name and number, sold at the door, the desk or by hand</li><li>The list locks before the draw — a fingerprint proves it didn’t change</li><li>Cryptographic random picks, staged on screen for the room</li><li>Voids and redraws need a reason and go on the record</li><li>An official record PDF for the file, the auditor and the board</li></ul></div>
+  </section>
+  <section class="feat">
+    <div style="display:flex;flex-direction:column;gap:14px"><span class="kicker">Board &amp; committee</span><h2 class="serif h2" style="margin:0;font-size:40px;line-height:1.05;color:#0F2A38">Management tools a volunteer board actually uses.</h2>
+      <ul><li>Board positions and terms, with who holds what this year</li><li>An event checklist with owners and notes — nothing falls through the cracks</li><li>Decisions and schedule on the event itself, not in a thread</li><li>Dues and membership for organizations that have them</li><li>Everything carries over: next year’s committee opens last year’s event and starts</li></ul></div>
+    <div class="shot" aria-hidden="true"><div style="display:flex;justify-content:space-between;margin-bottom:10px"><b class="serif" style="font-size:22px;color:#0F2A38">Event checklist</b><span class="chip" style="height:26px;font-size:12px">31 of 48 done</span></div>
+      <div style="display:flex;flex-direction:column;font-size:14px">
+        <div style="display:flex;gap:10px;padding:8px 0;border-top:1px solid #E1D9C6;align-items:center"><span style="width:18px;height:18px;border-radius:5px;background:#1F6B4A"></span><span style="flex:1;text-decoration:line-through;color:#56626A">Confirm title sponsor banner</span><span style="font-size:12px;color:#56626A">Maria</span></div>
+        <div style="display:flex;gap:10px;padding:8px 0;border-top:1px solid #E1D9C6;align-items:center"><span style="width:18px;height:18px;border-radius:5px;background:#1F6B4A"></span><span style="flex:1;text-decoration:line-through;color:#56626A">Order raffle tickets</span><span style="font-size:12px;color:#56626A">Dave</span></div>
+        <div style="display:flex;gap:10px;padding:8px 0;border-top:1px solid #E1D9C6;align-items:center"><span style="width:18px;height:18px;border-radius:5px;border:1px solid #E1D9C6"></span><span style="flex:1">Final meal count to the kitchen</span><span style="font-size:12px;color:#56626A">Jen · Fri</span></div>
+        <div style="display:flex;gap:10px;padding:8px 0;border-top:1px solid #E1D9C6;align-items:center"><span style="width:18px;height:18px;border-radius:5px;border:1px solid #E1D9C6"></span><span style="flex:1">Print payout sheets</span><span style="font-size:12px;color:#56626A">Treasurer</span></div></div></div>
+  </section>
+  <section class="feat">
+    <div class="shot" aria-hidden="true"><div style="display:flex;flex-direction:column;gap:8px"><div style="display:flex;justify-content:space-between;align-items:center;padding:10px 12px;border:1px solid #E1D9C6;border-radius:10px"><b>Players &amp; teams</b><span style="font-size:12px;color:#56626A">one record each</span></div><div style="display:flex;justify-content:space-between;align-items:center;padding:10px 12px;border:1px solid #E1D9C6;border-radius:10px"><b>Sponsors &amp; donors</b><span style="font-size:12px;color:#56626A">tier, commitment, contact</span></div><div style="display:flex;justify-content:space-between;align-items:center;padding:10px 12px;border:1px solid #E1D9C6;border-radius:10px"><b>Volunteers &amp; board</b><span style="font-size:12px;color:#56626A">roles and terms</span></div><div style="display:flex;justify-content:space-between;align-items:center;padding:10px 12px;background:#0F2A38;color:#fff;border-radius:10px"><b>Exports</b><span style="font-size:12px;color:#D8B75F">Excel · PDF · CSV</span></div></div></div>
+    <div style="display:flex;flex-direction:column;gap:14px"><span class="kicker">Your people</span><h2 class="serif h2" style="margin:0;font-size:40px;line-height:1.05;color:#0F2A38">Players, sponsors, volunteers — one list, not five.</h2>
+      <ul><li>Import last year’s list; one record per person across every event you run</li><li>Sponsors and donors with their tier, commitment and contact on file</li><li>Registration links and check-in pages you can hand to anyone</li><li>Excel and CSV exports for your mailing tool and your accountant</li><li>Nothing walks out the door when a volunteer does</li></ul></div>
+  </section>
+</div>
+
+<section id="how" style="background:#0F2A38;color:#fff;padding:88px 0">
+  <div class="wrap" style="display:grid;grid-template-columns:minmax(0,.9fr) minmax(0,1.1fr);gap:56px;align-items:center" class="two">
+    <div style="display:flex;flex-direction:column;gap:18px"><span class="kicker">Any event, start to finish</span><h2 class="serif h2" style="margin:0;font-size:44px;line-height:1.08">One event, five steps, no spreadsheets.</h2><p style="margin:0;font-size:16px;line-height:1.6;color:#C9CFD2">The same five steps run a gala, a dinner, an auction night or a golf day. Live scoring is in there for the golf; for everything else it stays out of the way.</p><a class="btn gold" href="index.html#demo" style="align-self:flex-start">Walk through it with us</a></div>
+    <ol style="list-style:none;margin:0;padding:0;display:flex;flex-direction:column">
+      <li style="display:grid;grid-template-columns:44px minmax(0,1fr);gap:16px;padding:14px 0;border-top:1px solid rgba(255,255,255,.12)"><span class="serif" style="font-size:30px;color:#D8B75F;line-height:1">01</span><span><b style="display:block;font-size:16px">Budget the day</b><span style="font-size:14px;color:#C9CFD2">Start from last year, set the targets, see the net you need.</span></span></li>
+      <li style="display:grid;grid-template-columns:44px minmax(0,1fr);gap:16px;padding:14px 0;border-top:1px solid rgba(255,255,255,.12)"><span class="serif" style="font-size:30px;color:#D8B75F;line-height:1">02</span><span><b style="display:block;font-size:16px">Sell it</b><span style="font-size:14px;color:#C9CFD2">Sponsor tiers, a registration link, payments tracked as they land.</span></span></li>
+      <li style="display:grid;grid-template-columns:44px minmax(0,1fr);gap:16px;padding:14px 0;border-top:1px solid rgba(255,255,255,.12)"><span class="serif" style="font-size:30px;color:#D8B75F;line-height:1">03</span><span><b style="display:block;font-size:16px">Run the day</b><span style="font-size:14px;color:#C9CFD2">Check-in from a phone at the door, the checklist ticking down, the room filling.</span></span></li>
+      <li style="display:grid;grid-template-columns:44px minmax(0,1fr);gap:16px;padding:14px 0;border-top:1px solid rgba(255,255,255,.12)"><span class="serif" style="font-size:30px;color:#D8B75F;line-height:1">04</span><span><b style="display:block;font-size:16px">Raise the money</b><span style="font-size:14px;color:#C9CFD2">Raffle from a locked list, auction from a cashier phone, payouts to the cent.</span></span></li>
+      <li style="display:grid;grid-template-columns:44px minmax(0,1fr);gap:16px;padding:14px 0;border-top:1px solid rgba(255,255,255,.12);border-bottom:1px solid rgba(255,255,255,.12)"><span class="serif" style="font-size:30px;color:#D8B75F;line-height:1">05</span><span><b style="display:block;font-size:16px">Close the books</b><span style="font-size:14px;color:#C9CFD2">Actuals against budget, the official record filed, the report for the board written.</span></span></li>
+    </ol>
+  </div>
+</section>
+
+<section style="padding:80px 0;text-align:center"><div class="wrap" style="display:flex;flex-direction:column;align-items:center;gap:20px"><h2 class="serif h2" style="margin:0;font-size:48px;line-height:1.02;color:#0F2A38">Bring us your next event. We’ll show you the books.</h2><a class="btn gold" href="index.html#demo">Book a demo</a></div></section>
+<footer class="foot" style="background:#0B1F2A;color:#C9CFD2;padding:36px 0"><div class="wrap" style="display:flex;justify-content:space-between;gap:24px;flex-wrap:wrap;align-items:center"><b style="font-weight:800;font-size:14px;letter-spacing:.2em;color:#fff">FLAGSTICK</b><nav style="display:flex;gap:22px;flex-wrap:wrap" aria-label="Footer"><a href="index.html">Home</a><a href="features.html">Features</a><a href="about.html">About</a><a href="https://app.flagstickhub.com">Sign in</a></nav><span style="font-size:13px;color:#8FA0AA">© 2026 Flagstick</span></div></footer>
+<style>@media (max-width:760px){#how>.wrap{grid-template-columns:minmax(0,1fr)!important}}</style>
+</body>
+</html>

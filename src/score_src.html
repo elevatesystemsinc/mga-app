@@ -4,8 +4,9 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#0F2A38">
-<title>Live Scoring · Walnut Creek MGA</title>
-<link rel="icon" href="crest.png?v=2">
+<title>Live Scoring · Flagstick</title>
+<link rel="icon" href="favicon.png?v=3">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,600;0,700;1,700&family=Public+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
@@ -14,16 +15,17 @@
 :root{--navy:#0F2A38;--deep:#0A1C27;--gold:#8C6A1F;--goldl:#D8B75F;--ivory:#FBFAF5;--paper:#F4F0E6;--line:#E3DCC9;--muted:#56626A;--ink:#14222B;--pos:#1F6B4A;--neg:#A1402B;
   --serif:'Cormorant Garamond',Georgia,serif;--sans:'Public Sans',system-ui,-apple-system,'Segoe UI',sans-serif}
 *{box-sizing:border-box} html,body{margin:0;height:100%} [hidden]{display:none!important}
+html,body,button,.scale button,.opts button{touch-action:manipulation}   /* no double-tap zoom on the +/− and score buttons */
 body{font-family:var(--sans);background:var(--paper);color:var(--ink);font-size:15px;line-height:1.4;-webkit-font-smoothing:antialiased;-webkit-tap-highlight-color:transparent}
 button,input{font:inherit;color:inherit} button{cursor:pointer}
 :focus-visible{outline:2px solid var(--gold);outline-offset:2px}
 body{font-variant-numeric:lining-nums}
 .num{font-variant-numeric:lining-nums tabular-nums}
 .top{background:var(--navy);color:#fff;padding:calc(12px + env(safe-area-inset-top,0px)) 16px 14px;display:flex;align-items:center;gap:12px;position:sticky;top:0;z-index:10}
-.top img{width:34px;height:44px;object-fit:contain}
+.top img{width:42px;height:42px;object-fit:contain}
 .top .t{display:flex;flex-direction:column;min-width:0;flex:1}
 .top b{font-family:var(--serif);font-size:22px;line-height:1.05;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.top small{color:var(--goldl);font-size:12.5px}
+.top small{color:var(--goldl);font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .pill{font-size:12px;font-weight:700;padding:4px 10px;border-radius:999px;background:rgba(111,191,142,.18);color:#bfe8cf;white-space:nowrap}
 .pill.off{background:rgba(224,123,98,.2);color:#f3c1b4} .pill.wait{background:rgba(216,183,95,.2);color:var(--goldl)}
 main{max-width:640px;margin:0 auto;padding:18px 14px calc(96px + env(safe-area-inset-bottom,0px))}
@@ -45,13 +47,15 @@ h1{font-family:var(--serif);font-weight:700;color:var(--navy);font-size:32px;mar
 .pl .sub{font-size:12.5px;color:var(--muted)}
 .step{height:56px;border-radius:12px;border:1px solid var(--line);background:var(--ivory);font-size:28px;font-weight:600;color:var(--navy)}
 .val{height:56px;border-radius:12px;border:2px solid var(--navy);display:flex;align-items:center;justify-content:center;font-size:28px;font-weight:800;background:#fff}
-.val.empty{border-style:dashed;border-color:#CFC6AE;color:#A8A08A}
+/* an untouched hole reads as the par it will be saved as — no grey, nothing to "fix" (the owner: the dashed grey made people think they had to move it) */
+.val.empty{border-color:var(--navy);color:var(--ink)}
 .val.under{background:#E3F0E8;border-color:var(--pos);color:var(--pos)} .val.over{background:#F8E6DF;border-color:var(--neg);color:var(--neg)}
 .strip{display:grid;grid-template-columns:repeat(9,minmax(0,1fr));gap:6px;margin-top:14px}
 .strip button{height:38px;border-radius:8px;border:1px solid var(--line);background:#fff;font-weight:700;font-size:13px;color:var(--muted)}
 .strip button.done{background:var(--navy);border-color:var(--navy);color:#fff} .strip button.part{border-color:var(--gold);color:var(--gold)}
 .strip button.cur{outline:2px solid var(--gold);outline-offset:1px}
-.tabbar{position:fixed;left:0;right:0;bottom:0;background:#fff;border-top:1px solid var(--line);display:grid;grid-template-columns:repeat(3,1fr);padding-bottom:env(safe-area-inset-bottom,0px);z-index:10}
+.tabbar{position:fixed;left:0;right:0;bottom:0;background:#fff;border-top:1px solid var(--line);display:flex;padding-bottom:env(safe-area-inset-bottom,0px);z-index:10}
+.tabbar button{flex:1 1 0;min-width:0}
 .tabbar button{height:62px;border:none;background:none;font-weight:700;font-size:13.5px;color:var(--muted);border-top:3px solid transparent}
 .tabbar button.on{color:var(--navy);border-top-color:var(--gold)}
 .lb{display:grid;grid-template-columns:44px minmax(0,1fr) 44px 48px;gap:8px;align-items:center;padding:12px 16px;border-top:1px solid var(--line)}
@@ -62,18 +66,66 @@ h1{font-family:var(--serif);font-weight:700;color:var(--navy);font-size:32px;mar
 .sc th{font-size:12px;color:var(--muted);font-weight:700;background:var(--ivory)} .sc td:first-child,.sc th:first-child{text-align:left;padding-left:14px}
 .sc tr.tot td{font-weight:800;background:var(--ivory)}
 .banner{background:#F6ECCF;border:1px solid #E5CF8E;color:#5C4410;border-radius:10px;padding:12px 14px;font-size:14px;margin-bottom:14px}
-.big .lb{grid-template-columns:70px minmax(0,1fr) 90px 110px;font-size:26px;padding:16px 24px}
-.chips{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px}.chips button{height:36px;padding:0 14px;border-radius:999px;border:1px solid var(--line);background:#fff;font-weight:700;font-size:13px;color:var(--muted)}.chips button.on{background:var(--navy);border-color:var(--navy);color:#fff}
+.big .lb{grid-template-columns:clamp(40px,4.5vw,64px) minmax(0,1fr) clamp(44px,5.5vw,80px) clamp(56px,7vw,100px);font-size:clamp(15px,1.7vw,22px);padding:clamp(10px,1.2vw,16px) clamp(14px,2vw,24px)}
+.chips{display:flex;gap:6px;flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;margin:0 -14px 10px;padding:0 14px 2px;-webkit-overflow-scrolling:touch}.chips::-webkit-scrollbar{display:none}
+.chips button{flex:0 0 auto;height:36px;padding:0 14px;border-radius:999px;border:1px solid var(--line);background:#fff;font-weight:700;font-size:13px;color:var(--muted);white-space:nowrap}.chips button.on{background:var(--navy);border-color:var(--navy);color:#fff}
+.chips.sub button{height:32px;font-size:12.5px;padding:0 12px}
+.lb.sk{grid-template-columns:44px minmax(0,1fr) 40px} .big .lb.sk{grid-template-columns:clamp(44px,5vw,80px) minmax(0,1fr) clamp(44px,6vw,90px)} .big .lb.h{font-size:clamp(12px,1.1vw,15px)}
+.lb.none{display:block;text-align:center;padding:26px 16px}
+.lb.m{grid-template-columns:40px minmax(0,1fr) 36px 92px} .big .lb.m{grid-template-columns:clamp(40px,4.5vw,64px) minmax(0,1fr) clamp(36px,5vw,70px) clamp(92px,13vw,190px)} .big .lb .muted{font-size:clamp(12px,1.2vw,16px)}
 .fmtpill{display:inline-block;padding:4px 12px;border-radius:999px;background:#F6ECCF;border:1px solid #E5CF8E;color:#6B4F12;font-weight:800;font-size:12.5px}
 .pop{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--gold);margin-left:6px;vertical-align:2px}
-.big .lb .tp{font-size:30px} .big main{max-width:1100px}
+.big .lb .tp{font-size:clamp(18px,2vw,26px)} .big main{max-width:1100px} .big h1{font-size:clamp(24px,3vw,38px)!important;margin:4px 2px 14px!important;line-height:1.1}
+/* desktop: the same board with room to breathe — a wider card, larger rows, the title above the competitions */
+.ttl{display:none}
+@media (min-width:900px){
+  body:not(.big) main{max-width:1040px;padding:26px 28px 80px}
+  body:not(.big) .ttl{display:block;font-family:var(--serif);font-size:38px;line-height:1.05;margin:4px 2px 16px;color:var(--navy)} body:not(.big) .ttl small{display:block;font-family:var(--sans);font-size:14px;font-weight:600;color:var(--muted);margin-top:6px;letter-spacing:.02em}
+  body:not(.big) .chips button{height:44px;font-size:15px;padding:0 20px}
+  body:not(.big) .lb{grid-template-columns:64px minmax(0,1fr) 90px 120px;gap:14px;padding:16px 24px;font-size:19px}
+  body:not(.big) .lb.h{font-size:13px;padding-top:12px;padding-bottom:12px}
+  body:not(.big) .lb .tp{font-size:26px} body:not(.big) .lb .muted{font-size:14px}
+  body:not(.big) .lb.sk{grid-template-columns:72px minmax(0,1fr) 90px} body:not(.big) .lb.m{grid-template-columns:64px minmax(0,1fr) 70px 220px}
+  body:not(.big) .lb.none{padding:40px 24px;font-size:17px}
+  body:not(.big) main>p.muted,body:not(.big) .card+p.muted{font-size:14px}
+}
+/* the Finish tab: the wrap-up as numbered steps */
+.wstep{margin-bottom:12px;overflow:hidden} .wstep .sh{display:flex;align-items:center;gap:12px;padding:14px 16px}
+.wstep .sn{width:30px;height:30px;border-radius:50%;background:var(--ivory);border:1px solid var(--line);display:flex;align-items:center;justify-content:center;font-weight:800;color:var(--navy);flex:none;font-size:14px}
+.wstep.done .sn{background:var(--pos);border-color:var(--pos);color:#fff} .wstep.now .sn{background:var(--navy);border-color:var(--navy);color:#fff} .wstep.later{opacity:.55}
+.wstep .st{font-weight:800;font-size:17px;color:var(--navy);line-height:1.2} .wstep .ss{font-size:13px;color:var(--muted)} .wstep .sb{padding:0 16px 16px}
+.ln{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;padding:9px 0;border-top:1px solid var(--line);font-size:14.5px;align-items:center} .ln:first-child{border-top:none}
+.ln .k{font-weight:700;color:var(--navy);margin-right:8px} .ln .amt{font-weight:800;font-variant-numeric:tabular-nums;white-space:nowrap} .ln .sub{font-size:12.5px;color:var(--muted)}
+.ln.tot{border-top:2px solid var(--line);font-weight:800}
+.act{display:flex;gap:10px;align-items:center;margin-top:14px;flex-wrap:wrap} .act .btn{flex:1 1 180px}
+.btn.gold{background:var(--goldl);border-color:var(--goldl);color:var(--navy);height:54px;font-size:16px}
+.sel{height:46px;border:1px solid #CFC6AE;border-radius:10px;padding:0 12px;background:#fff;font-size:15px;font-weight:600;width:100%}
+.note{background:var(--ivory);border:1px solid var(--line);border-radius:10px;padding:10px 12px;font-size:13.5px;color:var(--muted);margin-top:10px}
+/* the stage: the skins call-out and the draw, full screen on navy */
+.ov{position:fixed;inset:0;background:var(--navy);color:#fff;z-index:50;display:flex;flex-direction:column}
+.ov .hd{display:flex;align-items:center;gap:12px;padding:calc(12px + env(safe-area-inset-top,0px)) 16px 10px;border-bottom:1px solid rgba(255,255,255,.14)}
+.ov .hd b{font-family:var(--serif);font-size:22px;line-height:1.05;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis} .ov .hd small{display:block;color:var(--goldl);font-size:12.5px;font-family:var(--sans)}
+.ov .x{width:40px;height:40px;border-radius:50%;border:1px solid rgba(255,255,255,.3);background:transparent;color:#fff;font-size:18px}
+.ov .bd{flex:1;overflow:auto;padding:6px 16px 16px;-webkit-overflow-scrolling:touch}
+.ov .bar{display:flex;gap:12px;align-items:center;padding:12px 16px calc(12px + env(safe-area-inset-bottom,0px));border-top:1px solid rgba(255,255,255,.14);font-size:13px;color:rgba(255,255,255,.8)}
+.ov .bar b{color:#fff} .ov .go{margin-left:auto;background:var(--goldl);color:var(--navy);font-weight:800;height:52px;border-radius:12px;border:none;padding:0 22px;font-size:16px;white-space:nowrap}
+.ov .lbl{font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--goldl);margin:12px 0 6px;font-weight:700}
+.skl{display:grid;grid-template-columns:44px minmax(0,1fr);gap:10px;padding:10px 0;border-bottom:1px solid rgba(255,255,255,.12);align-items:center}
+.skl b{font-family:var(--serif);font-size:28px;line-height:1} .skl span{font-weight:600} .skl small{display:block;opacity:.72;font-size:12.5px;margin-top:2px}
+.skl.won span{color:#bfe8cf} .skl.void span{opacity:.6;text-decoration:line-through} .skl.pending span{color:var(--goldl)} .skl.muted{opacity:.6}
+.flash{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:20px;gap:10px}
+.flash .fh{font-size:15px;color:rgba(255,255,255,.8)} .flash .big{font-family:var(--serif);font-size:54px;font-weight:700;line-height:1} .flash.ok .big{color:#bfe8cf} .flash.bad .big{color:#f3c1b4} .flash .fs{font-size:14px;color:rgba(255,255,255,.8);max-width:320px}
+.dteam{display:flex;flex-direction:column;align-items:center;gap:10px;padding:18px 0}
+.dslot{min-width:200px;padding:14px 20px;border-radius:14px;border:1px solid rgba(255,255,255,.25);font-family:var(--serif);font-size:30px;font-weight:700;text-align:center;line-height:1.1}
+.dslot.rolling{color:var(--goldl);opacity:.85} .dslot.won{background:rgba(216,183,95,.16);border-color:var(--goldl)} .dslot.empty{opacity:0}
+.dsum{display:grid;grid-template-columns:80px minmax(0,1fr);gap:10px;padding:8px 0;border-bottom:1px solid rgba(255,255,255,.12);font-size:15px} .dsum span{color:var(--goldl);font-weight:700} .dsum b{font-weight:600}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
 </head>
 <body>
-<header class="top"><img src="crest.png?v=2" alt="Walnut Creek MGA crest"><div class="t"><b id="evName">Live Scoring</b><small id="evSub">Walnut Creek Country Club</small></div><span class="pill" id="sync" hidden></span></header>
+<header class="top"><img src="flagstick-crest-light.svg" alt="Flagstick"><div class="t"><b id="evName">Live Scoring</b><small id="evSub">Walnut Creek Country Club</small></div><span class="pill" id="sync" hidden></span></header>
 <main id="main"><div class="card pad"><p class="muted">Loading…</p></div></main>
-<nav class="tabbar" id="tabs" hidden aria-label="Scoring"><button data-t="score">Score</button><button data-t="board">Leaderboard</button><button data-t="card">Scorecard</button></nav>
+<nav class="tabbar" id="tabs" hidden aria-label="Scoring"><button data-t="score">Score</button><button data-t="board">Leaderboard</button><button data-t="card">Scorecard</button><button data-t="finish" id="tabFinish" hidden>Finish</button></nav>
 <script>
 /*GOLFCORE*/
 
@@ -82,7 +134,7 @@ const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&
 const CFG=window.MM_CONFIG||{}; const sb=(CFG.url&&CFG.anonKey&&window.supabase)?window.supabase.createClient(CFG.url,CFG.anonKey,{auth:{persistSession:false}}):null;
 const qs=new URLSearchParams(location.search), SLUG=(qs.get('e')||'').trim(), BIG=qs.get('view')==='board';
 if(BIG) document.body.classList.add('big');
-let pub=null, scores={}, groupId=null, code='', tab=BIG?'board':'score', holeIdx=0, lbFlight=qs.get('flight')||'', lbSort=null, lbView=qs.get('players')?'players':'teams';
+let pub=null, wrap=null, scores={}, groupId=null, code='', tab=BIG?'board':'score', holeIdx=0, lbFlight=qs.get('flight')||'', lbSort=null, lbView=qs.get('players')?'players':'teams', lbComp=null;
 const KEY='mga_score_'+SLUG, QKEY='mga_scoreq_'+SLUG;
 let queue=[]; try{ queue=JSON.parse(localStorage.getItem(QKEY)||'[]'); }catch(_){}
 const saveQ=()=>{ try{ localStorage.setItem(QKEY,JSON.stringify(queue)); }catch(_){} };
@@ -98,20 +150,43 @@ async function loadScores(){
   for(const q of queue){ (m[q.p]=m[q.p]||{}); if(q.s) m[q.p][q.h]=q.s; else delete m[q.p][q.h]; } // local edits win until they're saved
   scores=m;
 }
+/* the event itself (groups, tees, handicaps, competitions) is re-read every 30 s and whenever the page comes back
+   into view, so a mid-round change in the hub — an index corrected, a player moved, a competition added — reaches
+   every phone and board without a reload */
+let pubSig='', TENANT=null;
+/* which club this address belongs to (tenants-setup.sql); nothing until that has run, and the look-up then matches the slug alone */
+async function resolveTenant(){ try{ const {data,error}=await sb.rpc('tenant_lookup',{p_host:qs.get('tenant')||location.hostname}); if(!error&&data&&data.slug) TENANT=data.slug; }catch(_){} }
+const evArgs=o=>TENANT?Object.assign({p_tenant:TENANT},o):o;
+async function loadEvent(){
+  const {data,error}=await sb.rpc('golf_event',evArgs({p_slug:SLUG}));
+  if(error) return 'error'; if(!data) return 'none';
+  const sig=JSON.stringify(data), changed=sig!==pubSig; pubSig=sig; pub=data; wrap=pub.wrap||null; applyWrap();
+  if(changed){ const comps=(pub.comps||[]).length, name=String(pub.name||'').replace(/\s·\s[A-Z][a-z]{2} \d{1,2}(, \d{4})?$/,'');
+    $('evName').textContent=name; $('evSub').textContent=[pub.date&&new Date(pub.date+'T12:00').toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'}),comps?comps+' competition'+(comps===1?'':'s'):formatSummary(pub)].filter(Boolean).join(' · '); document.title=name+' · '+pub.club+' · Live Scoring';
+    if(groupId&&!group()){ groupId=null; code=''; tab='score'; } } // our group was removed from the event
+  return changed;
+}
+const typing=()=>{ const a=document.activeElement; return !!a&&(a.tagName==='INPUT'||a.tagName==='SELECT'||a.tagName==='TEXTAREA'); };
+async function refresh(){
+  if(document.visibilityState!=='visible') return;
+  const changed=await loadEvent(); if(changed==='error'||changed==='none') return;
+  if(BIG||tab==='board'||tab==='finish'){ await loadScores(); if(!document.querySelector('.ov')) render(); }
+  else if(changed&&!typing()) render();
+}
 async function boot(){
   if(!SLUG) return fail('This link is missing its event. Ask the committee for the scoring link.');
   if(!sb) return fail('Live scoring isn’t connected yet.');
-  const {data,error}=await sb.rpc('golf_event',{p_slug:SLUG});
-  if(error) return fail('Couldn’t reach live scoring. Check your signal and reload.');
-  if(!data) return fail('No event found for this link. Check the link with the committee.');
-  pub=data; $('evName').textContent=pub.name; $('evSub').textContent=[pub.date&&new Date(pub.date+'T12:00').toLocaleDateString('en-US',{month:'short',day:'numeric'}),formatSummary(pub),pub.club].filter(Boolean).join(' · ');
-  document.title=pub.name+' · Live Scoring';
+  await resolveTenant();
+  const r=await loadEvent();
+  if(r==='error') return fail('Couldn’t reach live scoring. Check your signal and reload.');
+  if(r==='none') return fail('No event found for this link. Check the link with the committee.');
   await loadScores();
   sb.channel('s-'+pub.id).on('postgres_changes',{event:'*',schema:'public',table:'golf_scores',filter:'event_id=eq.'+pub.id},p=>{
     const r=p.eventType==='DELETE'?p.old:p.new; if(!r) return; if(queue.some(q=>q.p===r.player_id&&q.h===r.hole)) return;
     scores[r.player_id]=scores[r.player_id]||{}; if(p.eventType==='DELETE') delete scores[r.player_id][r.hole]; else scores[r.player_id][r.hole]=r.strokes;
     if(tab!=='score') render(); }).subscribe();
-  setInterval(async()=>{ if(tab==='board'&&document.visibilityState==='visible'){ await loadScores(); render(); } },30000);
+  setInterval(refresh,30000); setInterval(()=>{ if(tab==='finish'&&!BIG) refresh(); },10000);
+  if(BIG) setInterval(()=>{ const fl=(pub&&pub.flights)||[]; if(fl.length<2||qs.get('flight')) return; lbFlight=fl[(fl.indexOf(lbFlight)+1)%fl.length]; render(); },12000);   // the wall screen walks through the flights, 12 s each; ?flight=A pins one document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='visible') refresh(); });
   const saved=(()=>{ try{ return JSON.parse(localStorage.getItem(KEY)||'null'); }catch(_){ return null; } })();
   const qg=(qs.get('g')||'').trim();
   if(qg&&!BIG){ const ok=await join(qg,true); if(ok) history.replaceState(null,'',location.pathname+'?e='+encodeURIComponent(SLUG)); }
@@ -120,7 +195,7 @@ async function boot(){
 }
 async function join(c,silent){
   c=String(c||'').trim().toUpperCase(); if(!c) return;
-  const {data,error}=await sb.rpc('golf_join',{p_slug:SLUG,p_code:c});
+  const {data,error}=await sb.rpc('golf_join',evArgs({p_slug:SLUG,p_code:c}));
   if(error||!data||!pub.groups.find(g=>g.id===data)){ if(!silent){ $('joinErr').textContent=error?'Couldn’t check that — try again.':'That group ID isn’t in this event.'; } else localStorage.removeItem(KEY); return false; }
   groupId=data; code=c; try{ localStorage.setItem(KEY,JSON.stringify({code:c})); }catch(_){}
   const g=group(), order=playOrder(g.startHole);
@@ -146,11 +221,12 @@ async function flush(){
 addEventListener('online',flush); setInterval(flush,15000);
 
 function render(){
-  setSync(); const tb=$('tabs'); tb.hidden=BIG||!groupId;
-  tb.querySelectorAll('button').forEach(b=>{ b.classList.toggle('on',b.dataset.t===tab); b.onclick=()=>{ tab=b.dataset.t; if(tab==='board') loadScores().then(render); render(); window.scrollTo(0,0); }; });
+  setSync(); const tb=$('tabs'); tb.hidden=BIG||!groupId; $('tabFinish').hidden=!isGame();
+  tb.querySelectorAll('button').forEach(b=>{ b.classList.toggle('on',b.dataset.t===tab); b.onclick=()=>{ tab=b.dataset.t; if(tab==='board'||tab==='finish') loadScores().then(render); render(); window.scrollTo(0,0); }; });
   if(BIG||tab==='board'&&groupId) return renderBoard();
   if(!groupId) return renderJoin();
   if(tab==='card') return renderCard();
+  if(tab==='finish'&&isGame()) return renderFinish();
   renderHole();
 }
 function renderJoin(){
@@ -170,37 +246,43 @@ function renderHole(){
   const p0=g.players[0]||{}; const teeYds=[...new Set(g.players.map(p=>p.tee))].map(t=>{ const y=((c.tees||{})[t]||[])[h-1]; return y?`${t} ${y}`:''; }).filter(Boolean).join(' · ');
   const teams=groupTeams(g);
   // who enters a score on this hole: every player, or one entry per team on scramble holes
-  const rows=fmt==='scramble'?teams.map(t=>({id:t.captain.id,label:t.members.map(p=>p.name.split(' ')[0]).join(' & '),p:t.captain,k:(()=>{ const tph=scrambleTeamPH(pub,t.members); return tph==null?0:strokesOn(tph,hcpH(t.captain)); })(),team:t}))
-    :g.players.map(p=>{ const ph=pub.format==='stroke'?p.ph:segPH(pub,p,fmt); return {id:p.id,label:p.name,p,k:typeof ph==='number'?strokesOn(ph,hcpH(p)):0}; });
-  const thru=r=>{ if(r.team){ let n=0,rel=0; for(let hh=1;hh<=18;hh++){ const x=teamHole(pub,c,r.team,hh,scores); if(x){ n++; rel+=(pub.scoring==='net'&&x.net!=null?x.net:x.gross)-x.par; } } return 'Team · '+(n?toParTxt(rel)+(pub.scoring==='net'?' net':'')+' thru '+n:'not started'); }
-    const tot=Object.entries(scores[r.id]||{}).filter(([hh])=>holeFormat(pub,+hh)!=='scramble'); const rel=tot.reduce((a,[hh,v])=>a+v-(c.par[r.p.set||'M']||c.par.M)[hh-1],0); return tot.length?toParTxt(rel)+' thru '+tot.length:'Not started'; };
+  const oneBall=(FORMATS[fmt]||{}).entry==='team', unit=unitOf(pub);
+  const rows=oneBall?teams.map(t=>({id:t.captain.id,label:t.members.map(p=>p.name.split(' ')[0]).join(' & '),p:t.captain,k:(()=>{ const tph=teamPH(pub,fmt,t.members); return tph==null?0:strokesAt(pub,c,t.captain.set,h,tph); })(),team:t}))
+    :g.players.map(p=>{ const ph=segPH(pub,p,fmt); return {id:p.id,label:p.name,p,k:typeof ph==='number'?strokesAt(pub,c,p.set,h,ph):0}; });
+  const thru=r=>{ if(r.team){ let n=0,rel=0,pts=0; for(let hh=1;hh<=18;hh++){ const x=teamHole(pub,c,r.team,hh,scores); if(x){ n++; rel+=(pub.scoring==='net'&&x.net!=null?x.net:x.gross)-x.par; pts+=x.pts; } } return 'Team · '+(n?(unit==='points'?pts+' pts':toParTxt(rel)+(pub.scoring==='net'?' net':''))+' thru '+n:'not started'); }
+    if(unit==='points'||unit==='holes'){ const me=leaderboard(pub,scores,{}).find(x=>x.id===r.id); return me&&me.n?(unit==='points'?(me.quota!=null?ptsTxt(me)+' vs quota · '+me.ptsRaw+' pts':me.pts+' pts'):(me.holesUp>0?'+':'')+me.holesUp)+' thru '+me.n:'Not started'; }
+    if(unit==='match'){ const me=matchBoard(pub,scores,{}).find(x=>(x.members||[]).includes(r.id)); return me&&me.n?me.status:'Match not started'; }
+    const tot=Object.entries(scores[r.id]||{}).filter(([hh])=>(FORMATS[holeFormat(pub,+hh)]||{}).entry!=='team'); const rel=tot.reduce((a,[hh,v])=>a+v-(c.par[r.p.set||'M']||c.par.M)[hh-1],0); return tot.length?toParTxt(rel)+' thru '+tot.length:'Not started'; };
   $('main').innerHTML=`${!live?`<div class="banner">${pub.status==='final'?'Scoring is closed — scores can no longer be changed.':'Scoring hasn’t opened yet. Scores will save once the committee opens it.'}</div>`:''}
   <div class="card" style="overflow:hidden">
    <div class="pad" style="padding-bottom:12px"><div class="holehead"><button class="nav" id="prev" aria-label="Previous hole"${holeIdx===0?' disabled':''}>‹</button>
      <div style="text-align:center"><div class="n">Hole ${h}</div><div class="meta">Par <b>${par(p0)}</b>${teeYds?' · '+esc(teeYds)+' yds':''} · Hcp ${hcpH(p0)}</div></div>
      <button class="nav" id="next" aria-label="Next hole"${holeIdx===17?' disabled':''}>›</button></div>
      <div class="muted" style="text-align:center;font-size:13px">${esc(c.name)}${g.label?' · '+esc(g.label):''} · Group ${esc(code)} · ${holeIdx+1} of 18</div>
-     ${pub.format==='split'||fmt!=='stroke'?`<div style="text-align:center;margin-top:8px"><span class="fmtpill">${esc(FORMAT_LABEL[fmt])}${fmt==='scramble'?' · one score per team':''}</span></div>`:''}</div>
+     ${pub.format==='split'||fmt!=='stroke'?`<div style="text-align:center;margin-top:8px"><span class="fmtpill">${esc(formatSummary(pub.format==='split'?Object.assign({},pub,{format:fmt}):pub))}${oneBall?' · one score per team':''}</span></div>`:''}</div>
    ${rows.map(r=>{ const v=(scores[r.id]||{})[h], pr=par(r.p);
      return `<div class="pl"><div style="min-width:0"><div class="nm">${esc(r.label)}${r.k>0?'<span class="pop" title="Gets a stroke"></span>'.repeat(Math.min(r.k,2)):''}</div><div class="sub">${thru(r)}${r.p.flight?' · Flight '+esc(r.p.flight):''}</div></div>
       <button class="step" data-m="${r.id}" aria-label="One less for ${esc(r.label)}"${live?'':' disabled'}>−</button>
       <div class="val num ${v?(v<pr?'under':v>pr?'over':''):'empty'}" aria-live="polite">${v||pr}</div>
       <button class="step" data-p="${r.id}" aria-label="One more for ${esc(r.label)}"${live?'':' disabled'}>+</button></div>`; }).join('')}
-   ${fmt==='bestball'||fmt==='shamble'?`<div class="pad" style="padding:10px 14px;border-top:1px solid var(--line);background:var(--ivory);display:flex;flex-direction:column;gap:4px">${teams.map(t=>{ const x=teamHole(pub,c,t,h,scores);
-       return `<div style="display:flex;justify-content:space-between;font-size:14px"><span class="muted">${esc(t.members.map(p=>p.name.split(' ')[0]).join(' & '))}</span><b>${x?'Best '+x.gross+(x.net!=null&&x.net!==x.gross?' · net '+x.net:''):'—'}</b></div>`; }).join('')}</div>`:''}
+   ${(FORMATS[fmt]||{}).team===true&&!oneBall&&teams.some(t=>t.members.length>1)?`<div class="pad" style="padding:10px 14px;border-top:1px solid var(--line);background:var(--ivory);display:flex;flex-direction:column;gap:4px">${teams.map(t=>{ const x=teamHole(pub,c,t,h,scores);
+       return `<div style="display:flex;justify-content:space-between;font-size:14px"><span class="muted">${esc(t.members.map(p=>p.name.split(' ')[0]).join(' & '))}</span><b>${x?(fmt==='teamstable'?x.pts+' pts':(x.bys.length>1?'Team ':'Best ')+x.gross+(x.net!=null&&x.net!==x.gross?' · net '+x.net:'')):'—'}</b></div>`; }).join('')}</div>`:''}
    <div class="pad" style="padding-top:14px;display:flex;gap:10px"><button class="btn" id="parAll" style="flex:1"${live?'':' disabled'}>All par</button><button class="btn pri" id="nextBtn" style="flex:2">${holeIdx===17?'Review scorecard':'Save & next hole'}</button></div>
   </div>
-  <div class="strip" aria-label="Holes">${order.map((hh,i)=>{ const who=holeFormat(pub,hh)==='scramble'?teams.map(t=>t.captain):g.players; const n=who.filter(p=>(scores[p.id]||{})[hh]).length; return `<button data-go="${i}" class="${n===who.length?'done':n?'part':''}${i===holeIdx?' cur':''}" aria-label="Hole ${hh}">${hh}</button>`; }).join('')}</div>
+  <div class="strip" aria-label="Holes">${order.map((hh,i)=>{ const who=(FORMATS[holeFormat(pub,hh)]||{}).entry==='team'?teams.map(t=>t.captain):g.players; const n=who.filter(p=>(scores[p.id]||{})[hh]).length; return `<button data-go="${i}" class="${n===who.length?'done':n?'part':''}${i===holeIdx?' cur':''}" aria-label="Hole ${hh}">${hh}</button>`; }).join('')}</div>
   <p style="text-align:center;margin-top:18px"><button class="btn" id="leave" style="height:40px;font-size:13px">Not your group? Switch group ID</button></p>`;
-  const bump=(id,d)=>{ const r=rows.find(x=>x.id===id), cur=(scores[id]||{})[h]; const nv=Math.max(1,Math.min(20,(cur||par(r.p))+(cur?d:(d>0?0:-1)))); setStroke(id,h,nv); renderHole(); };
+  // one tap is one stroke either way: an untouched hole already reads par, so + makes it par + 1 and − par − 1
+  const bump=(id,d)=>{ const r=rows.find(x=>x.id===id), cur=(scores[id]||{})[h]; const nv=Math.max(1,Math.min(20,(cur||par(r.p))+d)); setStroke(id,h,nv); renderHole(); };
   document.querySelectorAll('[data-m]').forEach(b=>b.onclick=()=>bump(b.dataset.m,-1));
   document.querySelectorAll('[data-p]').forEach(b=>b.onclick=()=>bump(b.dataset.p,1));
   $('parAll').onclick=()=>{ rows.forEach(r=>{ if(!(scores[r.id]||{})[h]) setStroke(r.id,h,par(r.p)); }); renderHole(); };
+  // a hole left behind defaults to par for anyone whose score was not touched — whichever way the scorer moves on
+  const parUp=()=>{ if(live) rows.forEach(r=>{ if(!(scores[r.id]||{})[h]) setStroke(r.id,h,par(r.p)); }); };
   $('prev').onclick=()=>{ holeIdx=Math.max(0,holeIdx-1); renderHole(); };
-  $('next').onclick=()=>{ holeIdx=Math.min(17,holeIdx+1); renderHole(); };
-  $('nextBtn').onclick=()=>{ if(live) rows.forEach(r=>{ if(!(scores[r.id]||{})[h]) setStroke(r.id,h,par(r.p)); });
+  $('next').onclick=()=>{ parUp(); holeIdx=Math.min(17,holeIdx+1); renderHole(); };
+  $('nextBtn').onclick=()=>{ parUp();
     if(holeIdx===17){ tab='card'; render(); } else { holeIdx++; renderHole(); } window.scrollTo(0,0); };
-  document.querySelectorAll('.strip [data-go]').forEach(b=>b.onclick=()=>{ holeIdx=+b.dataset.go; renderHole(); });
+  document.querySelectorAll('.strip [data-go]').forEach(b=>b.onclick=()=>{ if(+b.dataset.go>holeIdx) parUp(); holeIdx=+b.dataset.go; renderHole(); });
   $('leave').onclick=()=>{ if(queue.length&&!confirm('Some scores haven’t reached the server yet. Switch anyway? They’ll keep trying in the background.')) return; groupId=null; code=''; localStorage.removeItem(KEY); render(); };
 }
 function renderCard(){
@@ -215,24 +297,224 @@ function showCardFor(gid,pid){
   $('main').innerHTML=`<p style="margin:0 0 12px"><button class="btn" id="cardBack" style="height:40px">‹ Leaderboard</button></p>`+scorecardHTML(pub,g,scores,{split:true,highlight:pid});
   $('cardBack').onclick=()=>renderBoard(); window.scrollTo(0,0);
 }
+/* a small-group game's competitions ride along with the event; each is its own board */
+const chipIntoView=()=>{ const on=document.querySelector('.chips button.on'); if(on&&on.scrollIntoView) try{ on.scrollIntoView({block:'nearest',inline:'center'}); }catch(_){ } };
+const liveComps=()=>(pub.comps||[]).filter(c=>c.live!==false);
+/* one chip per live competition, plus the round itself — everyone's own gross and net, whatever the games are (the owner:
+   "even if there isn't an individual game") */
+const rawLabel=()=>eventFormats(pub).some(f=>(FORMATS[f]||{}).entry==='team')?'The round':'Individual';
+function compChips(){ const cs=liveComps(); if(!cs.length) return ''; return `<div class="chips">${cs.map(c=>`<button data-comp="${esc(c.id)}" class="${lbComp===c.id?'on':''}">${esc(c.name)}</button>`).join('')}<button data-comp="" class="${lbComp===''?'on':''}">${rawLabel()}</button></div>`; }
+const multiCourse=()=>Object.keys(pub.courses||{}).length>1;
+/* the small line under a name: the course only when the field is split across courses, then the other basis — always
+   to par, never a total, because groups further along would always carry the higher total */
+function matchCell(r){ if(r.segs){ const t=r.segs.find(s=>s.k==='18'); return `<span class="tp ${t&&t.started&&(r.by==='strokes'?t.rel<0:t.v>0)?'pos':''}" style="font-size:15px;white-space:nowrap">${esc(t?t.txt:r.status)}</span>`; } return `<span class="tp ${r.over&&r.pts===1?'pos':''}" style="font-size:14px;line-height:1.2">${esc(r.status)}</span>`; }
+function subLine(r,net){ if(r.unit==='match') return r.segs?`<div class="muted" style="font-size:12px">${r.segs.filter(s=>s.k!=='18').map(s=>esc(s.label+' '+s.txt)).join(' · ')}</div>`:''; const bits=[]; if(multiCourse()&&r.courseName) bits.push(r.courseName.replace(' Course','')); if(r.flight&&!lbFlight) bits.push('Flight '+r.flight);
+  if(r.n){ if(r.quota!=null) bits.push(ptsLine(r)); else if(net) bits.push('Gross '+toParTxt(r.toPar)); else if(r.netToPar!=null) bits.push('Net '+toParTxt(r.netToPar)); }
+  return bits.length?`<div class="muted" style="font-size:12px">${esc(bits.join(' · '))}</div>`:''; }
+function renderSkinsBoard(comp,fromJoin){
+  const sk=comp.skins||{}, r=skinsResult(compPub(pub,comp),scores,sk,comp.players), per=sk.mode==='hole', won=r.wins.filter(w=>w.status==='won');
+  const txt=sk.validate&&sk.validate!=='none'?{par:'par',netpar:'net par',bogey:'bogey',netbogey:'net bogey'}[sk.validate]||'':'';
+  $('main').innerHTML=`${BIG?`<h1 style="font-size:44px;margin:6px 4px 16px">${esc(pub.name)} · ${esc(comp.name)}</h1>`:`<h1 class="ttl">${esc(pub.name)}<small>${esc(comp.name)} · ${sk.net?'net':'gross'} skins · live</small></h1>`}${BIG?'':compChips()}
+   <div class="card" style="overflow:hidden"><div class="lb h${per?'':' sk'}"><span>Hole</span><span>Skin</span><span class="r"></span>${per?'<span class="r">Holes</span>':''}</div>
+   ${r.wins.length?r.wins.map(w=>{ const gr=(pub.groups||[]).find(x=>(x.players||[]).some(p=>p.id===w.pid)); return `<div class="lb num${per?'':' sk'}"${gr?` data-card="${esc(gr.id)}|${esc(w.pid)}" style="cursor:pointer"`:''}><b>${w.hole}</b><div style="min-width:0"><div style="font-weight:700">${esc(w.name)}</div><div class="muted" style="font-size:12px">${w.score}${sk.net&&w.net!==w.score?' (net '+w.net+')':''}${w.status==='void'?' · didn’t validate on '+w.checkHole:w.status==='lead'?` · leading · ${w.open} still to play`:w.status==='pending'?' · validates on '+w.checkHole:txt?' · validated':''}</div></div><span class="r ${w.status==='void'?'neg':w.status==='pending'||w.status==='lead'?'muted':'pos'}" style="font-weight:800">${w.status==='void'?'✕':w.status==='lead'?'▲':w.status==='pending'?'…':'✓'}</span>${per?`<span class="r">${w.count>1?w.count:''}</span>`:''}</div>`; }).join(''):'<div class="lb none"><span class="muted">No skins yet — the first one shows here as the cards come in.</span></div>'}
+   </div><p class="muted" style="text-align:center;font-size:12.5px">${won.length} skin${won.length===1?'':'s'}${r.leading?' · '+r.leading+' leading':''}${r.pending?' · '+r.pending+' pending':''} · ${sk.net?(sk.grossBeatsNet?'net, gross beats net':'net'):'gross'}${txt?' · validated by '+txt+' on the next hole':''} · updates live</p>${skinsWaitTxt(r)?`<p class="muted" style="text-align:center;font-size:12.5px;margin-top:-6px">${esc(skinsWaitTxt(r))}</p>`:''}${fromJoin?'<p style="text-align:center"><button class="btn" id="backJoin">Back</button></p>':''}`;
+  const bj=$('backJoin'); if(bj) bj.onclick=()=>renderJoin();
+  document.querySelectorAll('[data-comp]').forEach(b=>b.onclick=()=>{ lbComp=b.dataset.comp; renderBoard(fromJoin); }); chipIntoView();
+  if(!BIG) document.querySelectorAll('[data-card]').forEach(r=>r.onclick=()=>{ const [gid,pid]=r.dataset.card.split('|'); showCardFor(gid,pid); });
+}
 function renderBoard(fromJoin){
+  const cs=liveComps(); if(lbComp==null||(lbComp&&!cs.some(c=>c.id===lbComp))) lbComp=cs.length?cs[0].id:'';
+  const comp=cs.find(c=>c.id===lbComp)||null;
+  if(comp&&comp.kind==='skins') return renderSkinsBoard(comp,fromJoin);
+  if(comp) return renderCompBoard(comp,fromJoin);
   if(lbSort==null) lbSort=pub.scoring||'gross';
   const flights=pub.flights||[], hasNet=(pub.groups||[]).some(g=>g.players.some(p=>typeof p.ph==='number'||typeof p.ch==='number')), net=lbSort==='net'&&hasNet;
   const mine=new Set((group()||{players:[]}).players.map(p=>p.id));
   if(!BIG&&!lbFlight&&group()&&flights.length){ const me=group().players.find(p=>p.flight); if(me&&renderBoard.first!==false){ lbFlight=me.flight; renderBoard.first=false; } }
-  const BB=isTeamEvent(pub), noPl=eventFormats(pub).includes('scramble'); if(noPl) lbView='teams';
+  if(BIG&&flights.length&&!flights.includes(lbFlight)) lbFlight=flights[0];   // the board screen shows one flight at a time (and rotates through them, see boot)
+  const BB=isTeamEvent(pub), noPl=eventFormats(pub).some(f=>(FORMATS[f]||{}).entry==='team'), unit=unitOf(pub), MATCH=unit==='match'; if(noPl) lbView='teams';
   const lb=eventBoard(pub,scores,{flight:lbFlight,sort:net?'net':'gross',view:BB?lbView:'players'});
-  $('main').innerHTML=`${BIG?`<h1 style="font-size:44px;margin:6px 4px 16px">${esc(pub.name)}${lbFlight?' · Flight '+esc(lbFlight):''}</h1>`:''}
-   ${!BIG&&(flights.length||hasNet||BB)?`<div class="chips">${BB&&!noPl?[['teams','Teams'],['players','Players']].map(([k,l])=>`<button data-vw="${k}" class="${lbView===k?'on':''}">${l}</button>`).join(''):''}${hasNet?['gross','net'].map(x=>`<button data-sort="${x}" class="${(net?'net':'gross')===x?'on':''}">${x==='net'?'Net':'Gross'}</button>`).join(''):''}${flights.length?['',...flights].map(f=>`<button data-fl="${f}" class="${lbFlight===f?'on':''}">${f?'Flight '+f:'All'}</button>`).join(''):''}</div>`:''}
+  const valTxt=r=>MATCH?r.status:unit==='points'?ptsTxt(r):unit==='holes'?(r.n?(r.holesUp>0?'+':'')+r.holesUp:'—'):(r.n?toParTxt(net&&r.netToPar!=null?r.netToPar:r.toPar):'—');
+  const colHead=MATCH?(lb.some(r=>r.segs)?'The 18':'Match'):unit==='points'?(playerFormatOf(pub)==='quota'?'vs quota':'Points'):unit==='holes'?'Holes':(net?'Net':'To par'), mcls=MATCH?' m':'';
+  $('main').innerHTML=`${BIG?`<h1 style="font-size:44px;margin:6px 4px 16px">${esc(pub.name)}${lbFlight?' · Flight '+esc(lbFlight):''}</h1>`:`<h1 class="ttl">${esc(pub.name)}${lbFlight?' · Flight '+esc(lbFlight):''}<small>${esc(MATCH?formatSummary(pub):(net?'Net ':'Gross ')+FORMAT_LABEL[playerFormatOf(pub)].toLowerCase())} · live leaderboard</small></h1>`}
+   ${BIG?'':compChips()}${!BIG&&(flights.length||hasNet||BB)?`<div class="chips sub">${BB&&!noPl&&!MATCH?[['teams','Teams'],['players','Players']].map(([k,l])=>`<button data-vw="${k}" class="${lbView===k?'on':''}">${l}</button>`).join(''):''}${hasNet&&!MATCH&&unit==='strokes'?['gross','net'].map(x=>`<button data-sort="${x}" class="${(net?'net':'gross')===x?'on':''}">${x==='net'?'Net':'Gross'}</button>`).join(''):''}${flights.length?['',...flights].map(f=>`<button data-fl="${f}" class="${lbFlight===f?'on':''}">${f?'Flight '+f:'All'}</button>`).join(''):''}</div>`:''}
    <div class="card" style="overflow:hidden">
-   <div class="lb h"><span>Pos</span><span>${BB&&lbView==='teams'?'Team':'Player'}</span><span class="r">Thru</span><span class="r">${net?'Net':'To par'}</span></div>
-   ${lb.map(r=>`<div class="lb num${mine.has(r.id)||(r.members||[]).some(id=>mine.has(id))?' me':''}" data-card="${esc(r.groupId)}|${esc(r.team?(r.members||[])[0]:r.id)}" style="cursor:pointer"><b>${r.posTxt}</b><div style="min-width:0"><div style="font-weight:700;${r.team?'line-height:1.25':'overflow:hidden;text-overflow:ellipsis;white-space:nowrap'}" title="${esc(r.name)}">${r.team?r.name.split(' / ').map(esc).join('<br>'):esc(r.name)}</div>${BIG?'':`<div class="muted" style="font-size:12px">${esc(r.courseName.replace(' Course',''))}${r.flight&&!lbFlight?' · Flt '+esc(r.flight):''}${r.n?' · '+r.gross+(net&&r.net!=null?' / net '+r.net:''):''}</div>`}</div><span class="r muted">${r.n?r.thru:'—'}</span>${(()=>{ const v=net?r.netToPar:r.toPar; return `<span class="tp ${r.n&&v<0?'pos':r.n?'':'muted'}">${r.n&&v!=null?toParTxt(v):'—'}</span>`; })()}</div>`).join('')||'<div class="lb"><span></span><span class="muted">No players yet.</span></div>'}
-  </div><p class="muted" style="text-align:center;font-size:12.5px">${pub.status==='final'?'Final · ':''}${net?'Net':'Gross'} ${BB&&lbView==='teams'?formatSummary(pub).toLowerCase():'stroke play'}${BIG?'':' · tap a row for the scorecard'}${lbFlight?' · Flight '+esc(lbFlight):''} · updates live</p>${fromJoin?'<p style="text-align:center"><button class="btn" id="backJoin">Back</button></p>':''}`;
+   <div class="lb h${mcls}"><span>Pos</span><span>${MATCH?'Side':BB&&lbView==='teams'?'Team':'Player'}</span><span class="r">Thru</span><span class="r">${colHead}</span></div>
+   ${lb.map(r=>`<div class="lb num${mcls}${mine.has(r.id)||(r.members||[]).some(id=>mine.has(id))?' me':''}" data-card="${esc(r.groupId)}|${esc(r.team?(r.members||[])[0]:r.id)}" style="cursor:pointer"><b>${r.posTxt}</b><div style="min-width:0"><div style="font-weight:700;${r.team?'line-height:1.25':'overflow:hidden;text-overflow:ellipsis;white-space:nowrap'}" title="${esc(r.name)}">${r.team?r.name.split(' / ').map(esc).join('<br>'):esc(r.name)}</div>${BIG&&!MATCH?'':subLine(r,net)}</div><span class="r muted">${r.n?r.thru:'—'}</span>${(()=>{ if(MATCH) return matchCell(r); if(unit==='points') return `<span class="tp ${r.n?'':'muted'}">${r.n?r.pts:'—'}</span>`; if(unit==='holes') return `<span class="tp ${r.n&&r.holesUp>0?'pos':r.n?'':'muted'}">${r.n?(r.holesUp>0?'+':'')+r.holesUp:'—'}</span>`; const v=net?r.netToPar:r.toPar; return `<span class="tp ${r.n&&v<0?'pos':r.n?'':'muted'}">${r.n&&v!=null?toParTxt(v):'—'}</span>`; })()}</div>`).join('')||'<div class="lb"><span></span><span class="muted">No players yet.</span></div>'}
+  </div><p class="muted" style="text-align:center;font-size:12.5px">${pub.status==='final'?'Final · ':''}${MATCH?formatSummary(pub):(net?'Net':'Gross')+' '+(BB&&lbView==='teams'?formatSummary(pub).toLowerCase():FORMAT_LABEL[playerFormatOf(pub)].toLowerCase())}${BIG?'':' · tap a row for the scorecard'}${lbFlight?' · Flight '+esc(lbFlight):''}${BIG&&flights.length>1&&!qs.get('flight')?` · flights ${flights.join(', ')} take turns`:''} · updates live</p>${fromJoin?'<p style="text-align:center"><button class="btn" id="backJoin">Back</button></p>':''}`;
   const bj=$('backJoin'); if(bj) bj.onclick=()=>renderJoin();
+  document.querySelectorAll('[data-comp]').forEach(b=>b.onclick=()=>{ lbComp=b.dataset.comp; renderBoard(fromJoin); }); chipIntoView();
   document.querySelectorAll('[data-fl]').forEach(b=>b.onclick=()=>{ lbFlight=b.dataset.fl; renderBoard.first=false; renderBoard(fromJoin); });
   document.querySelectorAll('[data-sort]').forEach(b=>b.onclick=()=>{ lbSort=b.dataset.sort; renderBoard(fromJoin); });
   document.querySelectorAll('[data-vw]').forEach(b=>b.onclick=()=>{ lbView=b.dataset.vw; renderBoard(fromJoin); });
   if(!BIG) document.querySelectorAll('[data-card]').forEach(r=>r.onclick=()=>{ const [gid,pid]=r.dataset.card.split('|'); showCardFor(gid,pid); });
+}
+/* one competition's board: the event cut down to it (compPub), scored by the shared engine */
+function renderCompBoard(comp,fromJoin){
+  const cp=compPub(pub,comp), unit=unitOf(cp), MATCH=unit==='match', BB=isTeamEvent(cp), net=(cp.scoring||'gross')==='net', mine=new Set((group()||{players:[]}).players.map(p=>p.id));
+  const lb=eventBoard(cp,scores,{sort:net?'net':'gross',view:'teams'});
+  const valTxt=r=>MATCH?r.status:unit==='points'?ptsTxt(r):unit==='holes'?(r.n?(r.holesUp>0?'+':'')+r.holesUp:'—'):(r.n?toParTxt(net&&r.netToPar!=null?r.netToPar:r.toPar):'—');
+  const colHead=MATCH?(lb.some(r=>r.segs)?'The 18':'Match'):unit==='points'?(playerFormatOf(pub)==='quota'?'vs quota':'Points'):unit==='holes'?'Holes':(net?'Net':'To par'), mcls=MATCH?' m':'';
+  const teamsPending=comp.teams==null&&(FORMATS[comp.format]||{}).team&&(+comp.teamSize||1)>=2;
+  $('main').innerHTML=`${BIG?`<h1 style="font-size:44px;margin:6px 4px 16px">${esc(pub.name)} · ${esc(comp.name)}</h1>`:`<h1 class="ttl">${esc(pub.name)}<small>${esc(comp.name)}${formatSummary(cp)!==comp.name?' · '+esc(formatSummary(cp)):''} · live</small></h1>`}${BIG?'':compChips()}
+   ${teamsPending?'<div class="banner">Partners are drawn after the round — individual standings until then.</div>':''}
+   <div class="card" style="overflow:hidden"><div class="lb h${mcls}"><span>Pos</span><span>${MATCH?'Side':BB?'Team':'Player'}</span><span class="r">Thru</span><span class="r">${colHead}</span></div>
+   ${lb.map(r=>`<div class="lb num${mcls}${mine.has(r.id)||(r.members||[]).some(id=>mine.has(id))?' me':''}"${r.groupId?` data-card="${esc(r.groupId)}|${esc(r.team?(r.members||[])[0]:r.id)}" style="cursor:pointer"`:''}><b>${r.posTxt}</b><div style="min-width:0"><div style="font-weight:700;${r.team?'line-height:1.25':'overflow:hidden;text-overflow:ellipsis;white-space:nowrap'}" title="${esc(r.name)}">${r.team?r.name.split(' / ').map(esc).join('<br>'):esc(r.name)}</div>${MATCH?subLine(r,net):BIG||unit!=='strokes'?'':subLine(r,net)}</div><span class="r muted">${r.thru||'—'}</span>${(()=>{ if(MATCH) return matchCell(r); const v=unit==='strokes'?(net?r.netToPar:r.toPar):null; return `<span class="tp ${r.n&&v!=null&&v<0?'pos':r.n?'':'muted'}">${valTxt(r)}</span>`; })()}</div>`).join('')||'<div class="lb"><span></span><span class="muted">No scores yet.</span></div>'}
+   </div><p class="muted" style="text-align:center;font-size:12.5px">${MATCH?formatSummary(cp):(net?'Net':'Gross')+' '+formatSummary(cp).toLowerCase()}${BIG?'':' · tap a row for the scorecard'} · updates live</p>${fromJoin?'<p style="text-align:center"><button class="btn" id="backJoin">Back</button></p>':''}`;
+  const bj=$('backJoin'); if(bj) bj.onclick=()=>renderJoin();
+  document.querySelectorAll('[data-comp]').forEach(b=>b.onclick=()=>{ lbComp=b.dataset.comp; renderBoard(fromJoin); }); chipIntoView();
+  if(!BIG) document.querySelectorAll('[data-card]').forEach(r=>r.onclick=()=>{ const [gid,pid]=r.dataset.card.split('|'); showCardFor(gid,pid); });
+}
+/* ============ the Finish tab: a game wrapped up by the players themselves ============
+   Anyone who has joined with a group ID walks the room through it, in order: close scoring (nothing changes after
+   this) → call out the skins → draw the partners → the winners and what they get → who's owed what. Every step is saved
+   through golf_wrap with a compare-and-swap on the wrap's version, so two phones never record a step twice: the second
+   one simply sees the result. The players record only — the computed result — and the hub takes it into the game. */
+const isGame=()=>!!(pub&&(pub.comps||[]).length);
+const money=v=>{ v=+v||0; const neg=v<0; v=Math.abs(v); return (neg?'−':'')+'$'+(Math.abs(v-Math.round(v))<0.005?String(Math.round(v)):v.toFixed(2)); };
+const when=t=>t?new Date(t).toLocaleTimeString([],{hour:'numeric',minute:'2-digit'}):'';
+/* drawn partners live in the wrap until the hub republishes the event with them: lay them over the competitions */
+function applyWrap(){ const d=(wrap&&wrap.draws)||{}; for(const c of pub.comps||[]){ const x=d[c.id]; if(x&&x.teams&&!(c.teams&&Object.keys(c.teams).length)){ c.teams=Object.assign({},x.teams); c.sitOut=(x.sitOut||[]).slice(); } } if(wrap&&wrap.closedAt) pub.status='final'; }
+const evPlayersOf=ids=>{ const inP=new Set(ids||[]), out=[]; for(const g of pub.groups||[]) for(const p of g.players||[]) if(inP.has(p.id)) out.push(p); return out; };
+const hcpOf=p=>typeof p.ph==='number'?p.ph:(typeof p.ch==='number'?p.ch:null);
+let wrapBusy=false;
+async function wrapCall(action,data){
+  if(wrapBusy) return null; wrapBusy=true;
+  try{ const {data:w,error}=await sb.rpc('golf_wrap',{p_event:pub.id,p_code:code,p_action:action,p_data:data||null,p_rev:+((wrap&&wrap.v)||0)});
+    if(error){ if(/conflict/i.test(error.message)){ await loadEvent(); await loadScores(); return 'conflict'; } alert(error.message||'Couldn’t save that — try again.'); return null; }
+    wrap=w; pub.wrap=w; if(action==='close') pub.status='final'; applyWrap(); return w; }
+  catch(_){ alert('Couldn’t reach live scoring — check your signal and try again.'); return null; }
+  finally{ wrapBusy=false; } }
+/* the steps, in the order the room runs them */
+function wrapSteps(){
+  const w=wrap||{}, closed=!!w.closedAt||pub.status==='final', cs=pub.comps||[], co=w.callouts||{}, paid=w.payouts||null, steps=[];
+  steps.push({k:'close',title:'Close scoring',done:closed});
+  cs.filter(c=>c.kind==='skins').forEach(c=>steps.push({k:'skins',comp:c,title:c.name,done:closed&&(c.live!==false||!!co[c.id])}));
+  cs.filter(c=>c.kind!=='skins'&&(FORMATS[c.format]||{}).team&&(+c.teamSize||1)>=2&&c.teamsBy!=='hand').forEach(c=>steps.push({k:'draw',comp:c,title:c.name+' — the draw',done:closed&&!!(c.teams&&Object.keys(c.teams).length)}));
+  steps.push({k:'winners',title:'The winners',done:!!paid});
+  steps.push({k:'money',title:'Who’s owed what',done:!!paid});
+  const cur=steps.findIndex(x=>!x.done); steps.forEach((x,i)=>{ x.state=x.done?'done':i===cur?'now':'later'; }); return {steps,closed,paid};
+}
+/* what the winners step announces: finishes as computed; skins by player (the call-out already went hole by hole) */
+function announceLines(c,P){ if(c.kind!=='skins'||!P.rows.length) return P.lines; const nm=pubNames(pub); return P.rows.slice().sort((a,b)=>b.amount-a.amount).map(x=>({label:x.note,txt:nm[x.pid]||'?',amt:x.amount})); }
+/* the payouts to record: every competition with something to pay, exactly as shown */
+function payPayload(){ const out={}; for(const c of pub.comps||[]){ const P=compPayouts(pub,c,scores); if(P.rows.length) out[c.id]={kind:P.kind,rows:P.rows,total:Math.round(P.total*100)/100,lines:announceLines(c,P).map(l=>({label:l.label,txt:l.txt,amt:Math.round(l.amt*100)/100}))}; } return out; }
+function cardsStatus(){ const all=[]; for(const g of pub.groups||[]) for(const p of g.players||[]){ const n=Object.keys(scores[p.id]||{}).filter(h=>scores[p.id][h]).length; all.push({p,g,n}); }
+  return {all,complete:all.filter(x=>x.n>=18),partial:all.filter(x=>x.n>0&&x.n<18),none:all.filter(x=>!x.n)}; }
+const first=n=>String(n||'').split(' ')[0];
+function renderFinish(){
+  const {steps,closed,paid}=wrapSteps(), w=wrap||{}; let n=0;
+  const card=(st,body,sub)=>`<div class="card wstep ${st.state}"><div class="sh"><span class="sn">${st.done?'✓':++n+(st.done?'':'')}</span><div style="min-width:0"><div class="st">${esc(st.title)}</div>${sub?`<div class="ss">${sub}</div>`:''}</div></div>${body?`<div class="sb">${body}</div>`:''}</div>`;
+  const html=steps.map(st=>{ n=steps.indexOf(st); const num=steps.indexOf(st)+1; const head=`<span class="sn">${st.done?'✓':num}</span>`;
+    const wrapc=(body,sub)=>`<div class="card wstep ${st.state}"><div class="sh">${head}<div style="min-width:0"><div class="st">${esc(st.title)}</div>${sub?`<div class="ss">${sub}</div>`:''}</div></div>${body?`<div class="sb">${body}</div>`:''}</div>`;
+    if(st.k==='close'){ const C=cardsStatus();
+      if(st.done) return wrapc('',`Closed ${w.closedAt?when(w.closedAt)+' by Group '+esc(w.closedBy||''):'from the hub'} · ${C.complete.length} of ${C.all.length} cards complete`);
+      if(st.state==='later') return wrapc('','');
+      return wrapc(`<div class="ln"><span><span class="k">${C.complete.length} of ${C.all.length}</span> cards complete</span></div>
+        ${C.partial.map(x=>`<div class="ln"><span>${esc(x.p.name)} <span class="sub">· ${x.n} of 18 · Group ${esc(x.g.label||'')}</span></span><span class="sub">${18-x.n} to go</span></div>`).join('')}
+        ${C.none.length?`<div class="ln"><span class="sub">No scores: ${esc(C.none.map(x=>x.p.name).join(', '))} — they won’t count</span></div>`:''}
+        <div class="act"><button class="btn gold" id="wfClose">Close scoring</button></div>
+        <div class="note">After this nobody can change a score. Then the skins, the draw, the winners and the money — in that order, right here.</div>`,'Once every card is in'); }
+    if(st.k==='skins'){ const c=st.comp, P=compPayouts(pub,c,scores), sk=c.skins||{}, called=(w.callouts||{})[c.id];
+      if(st.state==='later') return wrapc('',`${sk.net?'Net':'Gross'} skins · ${money(c.total)} pot`);
+      const list=P.lines.length?P.lines.map(l=>`<div class="ln"><span><span class="k">${esc(l.label)}</span>${esc(l.txt)}</span><b class="amt">${money(l.amt)}</b></div>`).join('')+`<div class="ln tot"><span>${P.r.total} ${sk.mode==='hole'?'hole':'skin'}${P.r.total===1?'':'s'}${P.val?' at '+money(P.val):''}</span><b class="amt">${money(P.total)}</b></div>`:`<div class="ln"><span class="sub">${esc(P.note||'No skins today')}.</span></div>`;
+      if(st.done) return wrapc(list,`${called?'Called out '+when(called.at)+' by Group '+esc(called.by||''):'On the live board all round'} · ${money(c.total)} pot`);
+      return wrapc(`<div class="act"><button class="btn gold" id="wfCall" data-comp="${esc(c.id)}">Call out the skins</button></div><div class="note">Hole by hole from the cards, one tap at a time${sk.validate&&sk.validate!=='none'?' — each skin’s validation shows when its hole is called':''}.</div>`,`${sk.net?'Net':'Gross'} skins · ${money(c.total)} pot · kept quiet during the round`); }
+    if(st.k==='draw'){ const c=st.comp, ps=evPlayersOf(c.players), size=+c.teamSize||2, d=(w.draws||{})[c.id];
+      if(st.state==='later') return wrapc('',`${ps.length} players · teams of ${size}`);
+      if(st.done){ const T={}; Object.entries(c.teams||{}).forEach(([pid,t])=>{ (T[t]=T[t]||[]).push(pid); }); const nm=pubNames(pub);
+        return wrapc(Object.keys(T).sort((a,b)=>+a.slice(1)-+b.slice(1)).map(t=>`<div class="ln"><span><span class="k">Team ${t.slice(1)}</span>${esc(T[t].map(id=>nm[id]||'?').join(' & '))}</span></div>`).join('')+((c.sitOut||[]).length?`<div class="ln"><span class="sub">Sitting out: ${esc(c.sitOut.map(id=>nm[id]||'?').join(', '))}</span></div>`:''),d?`Drawn ${when(d.at)} by Group ${esc(d.by||'')} · ${d.method==='abcd'?TIER_LETTERS.slice(0,size)+' by handicap':d.method==='snake'?'snake by handicap':'random'}`:'Partners set in the hub'); }
+      const letters=TIER_LETTERS.slice(0,size);
+      return wrapc(`<div style="display:grid;gap:10px"><select class="sel" id="wfMethod"><option value="random">Random draw</option><option value="abcd">${letters} — one from each handicap tier</option><option value="snake">Snake by handicap</option></select>
+        ${ps.length%size?`<select class="sel" id="wfOdd"><option value="join">Odd player joins a team (one team of ${size+1})</option><option value="out">Odd player sits out of this competition</option></select>`:''}</div>
+        <div class="act"><button class="btn gold" id="wfDraw" data-comp="${esc(c.id)}"${ps.length<size?' disabled':''}>Draw the partners</button></div>
+        <div class="note">The draw is made and saved before the reveal, with the browser’s cryptographic random numbers. ${ps.length} players · teams of ${size}.</div>`,'Scored from everyone’s own card'); }
+    if(st.k==='winners'){ const cs=(pub.comps||[]).filter(c=>c.kind!=='skins'), rec=paid&&paid.comps||null;
+      if(st.state==='later') return wrapc('','After the skins and the draw');
+      const parts=[]; let grand=0;
+      for(const c of pub.comps||[]){ const R=rec&&rec[c.id]; const P=R?{lines:R.lines||[],rows:R.rows||[],total:R.total||0,note:R.note||'',kind:R.kind}:Object.assign(compPayouts(pub,c,scores),{lines:announceLines(c,compPayouts(pub,c,scores))});
+        grand+=P.total;
+        parts.push(`<div class="lbl" style="font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--gold);font-weight:800;margin:14px 0 4px">${esc(c.name)} <span class="muted" style="letter-spacing:0;text-transform:none;font-weight:600">· ${money(c.total)} pot</span></div>`+
+          (P.lines.length?P.lines.filter(l=>c.kind!=='skins'||l.amt).map(l=>`<div class="ln"><span><span class="k">${esc(l.label)}</span>${esc(l.txt)}${l.each?`<span class="sub"> · ${money(l.each)} each</span>`:''}</span><b class="amt">${l.amt?money(l.amt):'—'}</b></div>`).join(''):'')+
+          (P.rows.length?'':`<div class="ln"><span class="sub">${esc(P.note||'Nothing to pay')}${c.kind==='skins'?'':' — the hub can pay this one by hand'}.</span></div>`)); }
+      const others=((pub.game||{}).others||[]); if(others.length) parts.push(`<div class="note">${esc(others.map(o=>o.name+' ('+money(o.entry)+' a man)').join(', '))} ${others.length===1?'is':'are'} tallied by hand in the hub.</div>`);
+      if(st.done) return wrapc(parts.join('')+`<div class="ln tot"><span>Recorded ${when(paid.at)} by Group ${esc(paid.by||'')}</span><b class="amt">${money(grand)}</b></div>`,'Recorded');
+      return wrapc(parts.join('')+`<div class="ln tot"><span>Total paid out</span><b class="amt">${money(grand)}</b></div>
+        <div class="act"><button class="btn gold" id="wfPay"${Object.keys(payPayload()).length?'':' disabled'}>Record the payouts</button></div>
+        <div class="note">Records exactly what is shown, for everyone — the hub and the ledger pick it up. Amounts can’t be edited here; anything that needs a hand goes through the hub.</div>`,'From the cards, by each competition’s own rules'); }
+    if(st.k==='money'){ if(st.state!=='done') return wrapc('','After the payouts are recorded');
+      const M=wrapMoney(pub,(paid&&paid.comps)||{}), net=(pub.game||{}).settle==='net';
+      return wrapc(`${M.rows.map(r=>`<div class="ln"><span>${esc(r.name)}<span class="sub"> · in ${money(r.inn)}${r.out?' · out '+money(r.out):''}</span></span><b class="amt ${r.net>0.004?'pos':r.net<-0.004?'neg':'muted'}">${r.net>0.004?'+':''}${money(r.net)}</b></div>`).join('')}
+        <div class="ln tot"><span>${money(M.out)} of ${money(M.inn)} paid out</span><b class="amt">${Math.abs(M.inn-M.out)>0.004?money(M.inn-M.out)+' left in the pot':''}</b></div>
+        ${net?`<div class="lbl" style="font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--gold);font-weight:800;margin:14px 0 4px">Who pays whom</div>${M.transfers.length?M.transfers.map(t=>`<div class="ln"><span>${esc(t.from)} <span class="sub">pays</span> ${esc(t.to)}</span><b class="amt">${money(t.amount)}</b></div>`).join(''):'<div class="ln"><span class="sub">Nothing to settle.</span></div>'}`
+             :`<div class="note">Everyone put in; the winners pull out of the pot. Plus is money owed to a player, minus is what they put in.</div>`}`,net?'Net — one figure per player':'Pot — winners pull out'); }
+    return ''; }).join('');
+  $('main').innerHTML=`<h1 class="ttl">${esc(pub.name)}<small>Finishing the game</small></h1>
+    ${!closed?'<div class="banner">Finish the game here when every card is in — any group can run it.</div>':''}${html}
+    <p class="muted" style="text-align:center;font-size:12.5px">Group ${esc(code)} · every phone in the game sees the same steps · ${closed?'scoring is closed':'scoring is open'}</p>`;
+  const c1=$('wfClose'); if(c1) c1.onclick=async()=>{ const C=cardsStatus(); if(!confirm(`Close scoring for everyone?${C.partial.length?` ${C.partial.length} card${C.partial.length===1?' is':'s are'} not complete — missing holes won’t count.`:''} No score can be changed after this.`)) return; c1.disabled=true; await wrapCall('close'); render(); };
+  const c2=$('wfCall'); if(c2) c2.onclick=()=>calloutStage((pub.comps||[]).find(c=>c.id===c2.dataset.comp));
+  const c3=$('wfDraw'); if(c3) c3.onclick=()=>drawStage((pub.comps||[]).find(c=>c.id===c3.dataset.comp));
+  const c4=$('wfPay'); if(c4) c4.onclick=async()=>{ const payload=payPayload(); if(!Object.keys(payload).length) return; if(!confirm('Record these payouts for everyone? This is the final word on the money.')) return; c4.disabled=true; await wrapCall('payouts',{comps:payload}); render(); window.scrollTo(0,document.body.scrollHeight); };
+}
+/* the skins call-out, on stage: hole by hole in play order, one tap each; a won skin reads as a skin until the hole that
+   validates it is called — that hole first flashes the verdict full screen, then shows its own result */
+function calloutStage(comp){
+  const sk=comp.skins||{}, cp=compPub(pub,comp), r=skinsResult(cp,scores,sk,comp.players), per=sk.mode==='hole', validating=sk.validate&&sk.validate!=='none';
+  const total=+comp.total||0, val=per?total/18:(r.total?total/r.total:0), order=playOrder(((cp.groups||[])[0]||{}).startHole||1), winAt=Object.fromEntries(r.wins.map(w=>[w.hole,w]));
+  const vtxt=({par:'par',netpar:'net par',bogey:'bogey',netbogey:'net bogey'})[sk.validate]||'';
+  const lowAt=h=>{ const rows=[]; for(const g of cp.groups||[]){ const c=cp.courses[g.course]; if(!c) continue; for(const p of g.players){ const s=+((scores[p.id]||{})[h]); if(!s) continue; const k=sk.net&&typeof p.ph==='number'?strokesAt(cp,c,p.set,h,p.ph):0; rows.push({name:p.name,s,net:s-k}); } }
+    if(!rows.length) return null; const key=x=>sk.net?x.net:x.s, low=Math.min(...rows.map(key)); return {low,who:rows.filter(x=>key(x)===low)}; };
+  // a skin reads "needs net par or better on hole N" until its verdict flashes, which happens the moment hole N is called,
+  // before N's own result — never skipping ahead; a skin's value (pot ÷ skins won) only at the end
+  const revealed=new Set(); let i=0, flash=null;
+  const decidedBy=h=>validating&&h!=null?r.wins.find(x=>x.checkHole===h&&x.status!=='pending'&&!revealed.has(x.hole)):null;
+  const madeOn=w=>{ for(const g of cp.groups||[]){ const c=cp.courses[g.course]; if(!c) continue; for(const p of g.players){ if(p.id!==w.pid) continue; const s=+((scores[p.id]||{})[w.checkHole]); if(!s) return ''; const k=sk.net&&typeof p.ph==='number'?strokesAt(cp,c,p.set,w.checkHole,p.ph):0; return `made ${s}${k?' (net '+(s-k)+')':''} on hole ${w.checkHole}`; } } return ''; };
+  const lineFor=h=>{ const w=winAt[h], L=lowAt(h); if(!L) return {h,txt:'No scores on this hole',cls:'muted'};
+    if(w){ const name=`${w.name} · ${w.score}${sk.net&&w.net!==w.score?' (net '+w.net+')':''}`, fin=i>=order.length, worth=per?`${w.count>1?w.count+' holes':'1 hole'} · ${money(val*w.count)}`:fin?`skin · ${money(val)}`:'skin';
+      if(validating&&w.checkHole!=null&&!revealed.has(w.hole)) return {h,txt:name,sub:`skin — needs ${vtxt} or better on hole ${w.checkHole} to hold`,cls:'pending'};
+      if(w.status==='won') return {h,txt:name,sub:worth+(validating&&w.checkHole!=null?` · held — ${vtxt} on hole ${w.checkHole}`:''),cls:'won'};
+      if(w.status==='void') return {h,txt:name,sub:`lost — missed ${vtxt} on hole ${w.checkHole}${per?', carried on':', no skin'}`,cls:'void'};
+      return {h,txt:name,sub:`waiting on hole ${w.checkHole}`,cls:'pending'}; }
+    return {h,txt:L.who.length>1?`${L.who.map(x=>first(x.name)).join(', ')} tied at ${L.low}`:`${L.who[0].name} low, but not outright`,sub:per?'carries over':'no skin',cls:'muted'}; };
+  const ov=document.createElement('div'); ov.className='ov'; document.body.appendChild(ov);
+  const close=async()=>{ const done=i>=order.length; ov.remove(); if(done&&!((wrap&&wrap.callouts)||{})[comp.id]) await wrapCall('callout',{comp:comp.id}); render(); };
+  const paint=()=>{ const done=i>=order.length&&!flash;
+    ov.innerHTML=`<div class="hd"><b>${esc(comp.name)}<small>${esc(pub.name)} · from the cards</small></b><button class="x" id="ovX" aria-label="Close">✕</button></div>
+      ${flash?`<div class="flash ${flash.ok?'ok':'bad'}"><div class="fh">Hole ${flash.w.hole} · ${esc(flash.w.name)}</div><div class="big">${flash.ok?'Validated':'Didn’t validate'}</div><div class="fs">${esc(madeOn(flash.w)||'')}${flash.ok?` — ${esc(vtxt)} or better, the skin stands`:` — needed ${esc(vtxt)}${per?', carried on':', no skin'}`}</div></div>`
+      :`<div class="bd"><div class="lbl">${done?'All 18 holes':'Hole by hole'}</div>${order.slice(0,i).map(lineFor).map(l=>`<div class="skl ${l.cls}"><b>${l.h}</b><div><span>${esc(l.txt)}</span>${l.sub?`<small>${esc(l.sub)}</small>`:''}</div></div>`).join('')}
+        ${done?`<div class="lbl" style="margin-top:18px">The skins</div>${r.total?Object.entries(r.per).map(([pid,n])=>`<div class="dsum"><span>${n} ${per?'hole':'skin'}${n===1?'':'s'}</span><b>${esc(pubNames(pub)[pid]||'?')} · ${money(val*n)}</b></div>`).join(''):'<div class="dsum"><span>—</span><b>No skins today — the pot stays put</b></div>'}${r.pending?`<div class="dsum"><span>${r.pending}</span><b>still pending a validation hole</b></div>`:''}`:''}</div>`}
+      <div class="bar"><span><b>${(comp.players||[]).length}</b> in</span><span><b>${money(total)}</b> pot</span>${done?`<button class="go" id="ovGo">Done</button>`:`<button class="go" id="ovGo">${flash?'Show hole '+order[i]:i?'Next hole':'Start at hole '+order[0]}</button>`}</div>`;
+    ov.querySelector('#ovX').onclick=close; ov.querySelector('#ovGo').onclick=done?close:next; const bd=ov.querySelector('.bd'); if(bd) bd.scrollTop=bd.scrollHeight; };
+  const next=()=>{ if(flash){ revealed.add(flash.w.hole); flash=null; if(!decidedBy(order[i])) i++; paint(); return; }   // on to the hole itself (or the next verdict it decides)
+    const w=decidedBy(order[i]); if(w){ flash={w,ok:w.status==='won'}; paint(); return; }   // the hole about to be called decides a skin: the verdict first
+    i++; paint(); };
+  paint();
+}
+/* the draw, on stage: saved first, then revealed one team at a time */
+async function drawStage(comp){
+  const ps=evPlayersOf(comp.players), size=+comp.teamSize||2, method=($('wfMethod')||{}).value||'random', odd=($('wfOdd')||{}).value||'join';
+  const D=drawFor(ps,size,method,hcpOf,odd,comp.nTeams||null); if(!D){ alert('Not enough players to draw'); return; }
+  const w=await wrapCall('draw',{comp:comp.id,teams:D.teams,sitOut:D.sitOut,method,size}); if(!w||w==='conflict'){ render(); return; }
+  const teams=D.list, nm=pubNames(pub), ov=document.createElement('div'); ov.className='ov'; document.body.appendChild(ov);
+  let timer=null; const wait=ms=>new Promise(r=>{ timer=setTimeout(r,ms); }); let open=true;
+  const close=()=>{ open=false; clearTimeout(timer); ov.remove(); render(); };
+  const maxLen=Math.max(...teams.map(t=>t.length));
+  ov.innerHTML=`<div class="hd"><b>${esc(comp.name)}<small>${esc(pub.name)} · the draw</small></b><button class="x" id="ovX" aria-label="Close">✕</button></div>
+    <div class="bd"><div class="lbl" id="dLbl">Team 1 of ${teams.length}</div>${method==='abcd'?`<div style="display:flex;gap:16px;justify-content:center;color:var(--goldl);font-weight:800;letter-spacing:.2em">${Array.from({length:maxLen},(_,k)=>`<span>${TIER_LETTERS[k]||''}</span>`).join('')}</div>`:''}
+      <div class="dteam" id="dTeam">${Array.from({length:maxLen},(_,k)=>`<div class="dslot" id="dS${k}">?</div>`).join('')}</div><div id="dDone"></div></div>
+    <div class="bar"><span><b>${teams.length}</b> teams</span><span>Saved before the reveal</span><button class="go" id="ovGo" hidden>Done</button></div>`;
+  ov.querySelector('#ovX').onclick=close; ov.querySelector('#ovGo').onclick=close;
+  const pool=ps.map(p=>p.name), slot=k=>ov.querySelector('#dS'+k), done=ov.querySelector('#dDone');
+  for(let i=0;i<teams.length&&open;i++){ const t=teams[i]; ov.querySelector('#dLbl').textContent=`Team ${i+1} of ${teams.length}`;
+    for(let k=0;k<maxLen;k++){ const s=slot(k); if(s){ s.textContent=k<t.length?'?':''; s.className='dslot'+(k<t.length?'':' empty'); } }
+    for(let k=0;k<t.length&&open;k++){ const s=slot(k); s.classList.add('rolling'); for(let z=0;z<14;z++){ s.textContent=pool[secureInt(pool.length)]; await wait(40+Math.round(z*z*1.3)); }
+      s.textContent=t[k].name; s.classList.remove('rolling'); s.classList.add('won'); await wait(i===teams.length-1&&k===t.length-1?1200:700); }
+    if(!open) break; done.insertAdjacentHTML('beforeend',`<div class="dsum"><span>Team ${i+1}</span><b>${esc(t.map(p=>p.name).join(' & '))}</b></div>`); await wait(800); }
+  if(!open) return;
+  ov.querySelector('#dLbl').textContent='The partners'; ov.querySelector('#dTeam').style.display='none';
+  if(D.sitOut.length) done.insertAdjacentHTML('beforeend',`<div class="dsum"><span>Sitting out</span><b>${esc(D.sitOut.map(id=>nm[id]||'?').join(', '))}</b></div>`);
+  ov.querySelector('#ovGo').hidden=false;
 }
 boot();
 window.__canReload=()=>!queue.length;
