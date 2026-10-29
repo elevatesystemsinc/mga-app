@@ -524,3 +524,18 @@ One-time: Supabase → SQL Editor → run `golf-setup.sql`. Upload `score.html` 
 
 - Microsoft 365 sign-in per board member (Supabase Azure provider).
 - Golf Genius sync for members and signups (needs API access from Golf Genius).
+
+## For a nonprofit: galas, auctions and raffles
+
+A nonprofit client starts with **Fundraising** at the top of its rail and the golf tournament under Golf, Tournaments. An
+event holds everything for the night: ticket types with their fair market value, tables and the guest list (guests hold
+paddle numbers), sponsors and levels, the **silent auction**, the **live auction**, **raffles**, **checkout** and the money.
+
+**Publish the event page** and guests open it on their phones: the evening and the sponsorship levels, tickets (they
+reserve, and pay at the door or at checkout), and the silent auction. They join with a name and phone number, get a
+paddle, and bid; a bid under the minimum raise, or after bidding closes, is refused, and "My bids" tells them when they
+have been outbid. Close bidding from the hub and the high bids go to checkout. The live auction is recorded by paddle as
+the hammer falls, paddle-raise gifts the same way. A raffle sells numbered tickets by paddle and draws with real randomness,
+recording every draw. **Checkout** gathers what each paddle owes (tickets, wins, raffle tickets, gifts), takes the payment,
+and prints or e-mails the acknowledgement with the fair market value and the deductible portion. The tax ID and the
+thank-you line live under Fundraising, Settings.

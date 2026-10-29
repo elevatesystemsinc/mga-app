@@ -31,8 +31,8 @@ class FakeDB:
     def seed(self,table,id,data,tenant='wccc'): self.rows[self._k(table,id,tenant)]={'table':table,'id':id,'tenant':tenant,'data':copy.deepcopy(data)}
     def get(self,table,id,tenant='wccc'): r=self.rows.get(self._k(table,id,tenant)); return copy.deepcopy(r['data']) if r else None
     # tenants-setup.sql: a tenant row; seeding one switches the fake into tenant mode
-    def seed_tenant(self,slug,name,modules=None,hosts=(),login_email=None,status='active',plan='golf'):
-        self.tenancy=True; self._rows('tenants').append({'slug':slug,'name':name,'short':slug.upper(),'plan':plan,'modules':modules or {'golf':True},'hosts':list(hosts),'login_email':login_email,'status':status,'notes':'','created_at':'2026-01-01T00:00:00Z'})
+    def seed_tenant(self,slug,name,modules=None,hosts=(),login_email=None,status='active',plan='golf',kind='private'):
+        self.tenancy=True; self._rows('tenants').append({'slug':slug,'name':name,'short':slug.upper(),'plan':plan,'kind':kind,'modules':modules or {'golf':True},'hosts':list(hosts),'login_email':login_email,'status':status,'notes':'','created_at':'2026-01-01T00:00:00Z'})
     def _match(self,row,filters):
         for kind,k,v in filters:
             if k=='id': val=row['id']
@@ -70,7 +70,7 @@ class FakeDB:
             if not self.tenancy: return json.dumps({'data':None,'error':{'message':'Could not find the function public.tenant_lookup(p_host) in the schema cache','code':'PGRST202'}})
             h=str(a.get('p_host') or '').lower().split(':')[0]
             t=next((t for t in self._rows('tenants') if h in (t['slug'],t['slug']+'.flagstickhub.com') or h in (t.get('hosts') or [])),None)
-            return json.dumps({'data':({k:t[k] for k in ('slug','name','short','plan','modules','status','login_email')} if t else None),'error':None})
+            return json.dumps({'data':(dict({k:t[k] for k in ('slug','name','short','plan','modules','status','login_email')},kind=t.get('kind','private')) if t else None),'error':None})
         if fn=='my_access':
             grants=self.grants if self.grants is not None else [{'tenant':r['tenant'],'role':r['role'],'orgs':r['orgs'],'manage':r.get('manage',False),'name':r.get('name','')} for r in self._rows('tenant_users') if r['user_id']==self.me]
             tenants=sorted({g['tenant'] for g in grants}|set(self.user_tenants)) if self.grants is None and not self._rows('tenant_users') else sorted({g['tenant'] for g in grants})
@@ -316,6 +316,50 @@ class FakeDB:
             if a.get('p_strokes'): rows.append({'event_id':a['p_event'],'player_id':a['p_player'],'hole':a['p_hole'],'strokes':a['p_strokes']})
             return json.dumps({'data':True,'error':None})
         # survey-setup.sql: the public survey page's two functions (anonymous: answers + the day only)
+        if fn in ('fund_get','fund_join','fund_bid','fund_my','fund_rsvp'):
+            now=datetime.datetime.utcnow().isoformat()+'Z'; tok=a.get('p_token') or ''; sh=next((r for r in self._rows('fund_share') if r.get('token') and r['token']==tok and len(tok)>=16),None)
+            perr=lambda m:json.dumps({'data':None,'error':{'message':m,'code':'P0001'}})
+            if not sh: return json.dumps({'data':None,'error':None}) if fn=='fund_get' else perr('This link is not valid')
+            tn=sh.get('tenant','wccc'); fid=sh['fid']; B=[b for b in self._rows('fund_bidders') if b['fid']==fid and b.get('tenant','wccc')==tn]; X=[b for b in self._rows('fund_bids') if b['fid']==fid and b.get('tenant','wccc')==tn]
+            def highs():
+                H={}
+                for b in sorted(X,key=lambda b:(-float(b['amount']),b['at'])):
+                    if b['item'] not in H:
+                        d=next((d for d in B if d['id']==b['bidder']),{}); H[b['item']]={'amount':float(b['amount']),'bidder':b['bidder'],'paddle':d.get('paddle'),'n':0}
+                    H[b['item']]['n']+=1
+                return H
+            if fn=='fund_get': return json.dumps({'data':{'fid':fid,'status':sh.get('status','open'),'doc':copy.deepcopy(sh['doc']),'highs':highs(),'bidders':len(B),'now':now},'error':None})
+            if fn=='fund_join':
+                name=(a.get('p_name') or '').strip(); ph=''.join(ch for ch in (a.get('p_phone') or '') if ch.isdigit()); em=(a.get('p_email') or '').strip().lower()
+                if not name: return perr('Your name, please')
+                b=next((b for b in B if ph and ''.join(ch for ch in b.get('phone','') if ch.isdigit())==ph),None) or next((b for b in B if em and b.get('email','').lower()==em),None)
+                if not b:
+                    b={'id':str(uuid.uuid4()),'tenant':tn,'fid':fid,'name':name[:80],'phone':(a.get('p_phone') or '')[:30],'email':(a.get('p_email') or '')[:120],'paddle':max([499]+[x['paddle'] for x in B])+1,'created_at':now}; self._rows('fund_bidders').append(b)
+                return json.dumps({'data':{'id':b['id'],'paddle':b['paddle'],'name':b['name']},'error':None})
+            if fn=='fund_bid':
+                bd=next((b for b in B if b['id']==a.get('p_bidder')),None)
+                if not bd: return perr('Join the auction first')
+                sil=sh['doc'].get('silent') or {}
+                if sh.get('status')!='open' or sil.get('closed'): return perr('Bidding is closed')
+                if sil.get('closesAt') and sil['closesAt']<now: return perr('Bidding is closed')
+                it=next((x for x in sil.get('items',[]) if x['id']==a.get('p_item')),None)
+                if not it: return perr('Unknown item')
+                H=highs().get(it['id']); step=max(1,float(sil.get('minRaise') or 10)); minb=max(1,float(it.get('start') or 1)) if not H else H['amount']+step; amt=float(a.get('p_amount') or 0)
+                if amt<minb: return perr('The bid must be at least $%g'%minb)
+                if float(it.get('buyNow') or 0)>0 and H and H['amount']>=float(it['buyNow']): return perr('This item has been bought')
+                self._rows('fund_bids').append({'id':str(uuid.uuid4()),'tenant':tn,'fid':fid,'item':it['id'],'bidder':bd['id'],'amount':round(amt,2),'at':now+str(len(X)).zfill(4)})
+                return json.dumps({'data':{'ok':True,'amount':round(amt,2),'paddle':bd['paddle'],'bought':float(it.get('buyNow') or 0)>0 and amt>=float(it['buyNow'])},'error':None})
+            if fn=='fund_my':
+                H=highs(); out=[]
+                for item in sorted({b['item'] for b in X if b['bidder']==a.get('p_bidder')}):
+                    mine=max(float(b['amount']) for b in X if b['bidder']==a.get('p_bidder') and b['item']==item); out.append({'item':item,'mine':mine,'high':H[item]['amount'],'leading':H[item]['bidder']==a.get('p_bidder')})
+                return json.dumps({'data':out,'error':None})
+            if fn=='fund_rsvp':
+                d=a.get('p_data') or {}
+                if sh.get('status')!='open': return perr('Registration is closed')
+                if not (d.get('name') or '').strip(): return perr('Your name, please')
+                r={'id':str(uuid.uuid4()),'tenant':tn,'fid':fid,'name':d['name'].strip()[:80],'email':(d.get('email') or '')[:120],'phone':(d.get('phone') or '')[:30],'ticket':d.get('ticket'),'qty':max(1,min(20,int(d.get('qty') or 1))),'note':(d.get('note') or '')[:300],'status':'pending','at':now}; self._rows('fund_rsvps').append(r)
+                return json.dumps({'data':{'ok':True,'id':r['id']},'error':None})
         if fn=='survey_get':
             r=next((r for r in self._rows('survey_share') if r.get('token') and r['token']==a.get('p_token')),None)
             return json.dumps({'data':({'sid':r['sid'],'status':r.get('status','draft'),'doc':copy.deepcopy(r['doc'])} if r else None),'error':None})
@@ -417,7 +461,7 @@ class FakeDB:
             rows=self._rows(t); hits=[r for r in rows if self._col_match(r,a['filters'])]
             if op=='select': return json.dumps({'data':(copy.deepcopy(hits[0]) if hits else None) if a['single'] else copy.deepcopy(hits),'error':None})
             if op=='upsert':
-                row=dict(a['payload']); key=('user_id','tenant') if 'user_id' in row and 'tenant' in row else ('user_id',) if 'user_id' in row else ('slug',) if 'slug' in row else ('sid',) if 'sid' in row else ('tenant','org') if 'org' in row and 'id' not in row else ('id',)
+                row=dict(a['payload']); key=('user_id','tenant') if 'user_id' in row and 'tenant' in row else ('user_id',) if 'user_id' in row else ('slug',) if 'slug' in row else ('sid',) if 'sid' in row else ('fid',) if 'fid' in row and 'doc' in row else ('tenant','org') if 'org' in row and 'id' not in row else ('id',)
                 old=next((r for r in rows if all(r.get(k)==row.get(k) for k in key)),None)
                 if old: old.update(copy.deepcopy(row))
                 else: row.setdefault('created_at',datetime.datetime.utcnow().isoformat()+'Z'); rows.append(copy.deepcopy(row))

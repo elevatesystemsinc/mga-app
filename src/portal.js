@@ -15,6 +15,7 @@ const STATUS_LABEL={prospect:'Prospect',trial:'Trial',active:'Active',suspended:
 const STATUS_CHIP={prospect:'',trial:'gold',active:'ok',suspended:'warn',inactive:'inact'};
 const tStatusChip=s=>`<span class="chip ${STATUS_CHIP[s]||''}">${esc(STATUS_LABEL[s]||s||'')}</span>`;
 const planLabel=p=>({club:'Club management',golf:'Golf management'}[p]||p||'—');
+const kindLabel=k=>clientKindOf(k||'private').name;
 const tenantURL=slug=>'https://'+slug+'.'+BASE_DOMAIN+'/';
 const modulesOf=t=>Object.assign({},(t&&t.modules)||{},{golf:true});
 const modChips=t=>{ const m=modulesOf(t), preset=PLAN_PRESETS[t&&t.plan]||PLAN_PRESETS.golf; return MODULE_CATALOG.filter(x=>m[x.id]&&!x.base&&!preset[x.id]&&!(m.club&&x.addon)).map(x=>`<span class="chip gold">${esc(x.name)}${x.addon?' add-on':''}</span>`).join(' '); };
@@ -116,12 +117,12 @@ function vClient(m,slug){
       <span>${esc(c.phone||'')}</span><span style="min-width:0;overflow:hidden;text-overflow:ellipsis">${c.email?`<a href="mailto:${esc(c.email)}">${esc(c.email)}</a>`:''}</span><span class="muted" style="font-size:12.5px">${esc(c.notes||'')}</span><span class="ib">${I.edit}</span></div>`;
   const erow=e=>`<div class="tr" style="grid-template-columns:150px minmax(0,1fr) 160px;min-height:40px"><span class="muted" style="font-size:12.5px">${fwhen(e.at)}</span><span style="font-size:13.5px">${esc(e.text)}</span><span class="muted" style="font-size:12.5px;text-align:right">${esc(e.actor||'')}</span></div>`;
   const addr=addrLine(t.address);
-  m.innerHTML=`<div class="phead"><div><p style="margin:0 0 4px;font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--gold-dk,#7E5F1A);font-weight:700"><a href="#" id="ptBack" style="color:inherit;text-decoration:none">Clients</a> › ${esc(planLabel(t.plan))}</p><h1 class="h1">${esc(t.name)}</h1>
+  m.innerHTML=`<div class="phead"><div><p style="margin:0 0 4px;font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--gold-dk,#7E5F1A);font-weight:700"><a href="#" id="ptBack" style="color:inherit;text-decoration:none">Clients</a> › ${esc(kindLabel(t.kind))} · ${esc(planLabel(t.plan))}</p><h1 class="h1">${esc(t.name)}</h1>
       <p class="sub"><a href="${esc(tenantURL(t.slug))}" target="_blank" rel="noopener">${esc(t.slug)}.${esc(BASE_DOMAIN)}</a>${(t.hosts||[]).length?' · '+(t.hosts||[]).map(esc).join(', '):''} · ${tStatusChip(t.status)}${t.started_on?' · client since '+fdate(t.started_on):''}</p></div>
       <div class="actions">${btn('Open hub','ptOpen','',I.chev)}${btn('Status','ptStatus','')}${btn('Edit client','ptEdit','pri',I.edit)}</div></div><div class="rule"></div>
     ${PS.err?`<div class="banner">${esc(PS.err)}</div>`:''}
     <div class="grid g2" style="align-items:start">
-      ${card('Subscription',`<div style="padding:0 22px 18px">${kv('Plan',esc(planLabel(t.plan)))}${kv('Status',tStatusChip(t.status)+(t.ended_on?' <span class="muted" style="font-size:13px">since '+fdate(t.ended_on)+'</span>':''))}${kv('Client since',fdate(t.started_on))}${kv('Renews',fdate(t.renews_on))}${kv('Billing e-mail',t.billing_email?`<a href="mailto:${esc(t.billing_email)}">${esc(t.billing_email)}</a>`:'')}
+      ${card('Subscription',`<div style="padding:0 22px 18px">${kv('Type of client',esc(kindLabel(t.kind)))}${kv('Plan',esc(planLabel(t.plan)))}${kv('Status',tStatusChip(t.status)+(t.ended_on?' <span class="muted" style="font-size:13px">since '+fdate(t.ended_on)+'</span>':''))}${kv('Client since',fdate(t.started_on))}${kv('Renews',fdate(t.renews_on))}${kv('Billing e-mail',t.billing_email?`<a href="mailto:${esc(t.billing_email)}">${esc(t.billing_email)}</a>`:'')}
         <div style="border-top:1px solid var(--line);padding-top:10px;margin-top:4px"><span class="muted" style="font-size:13px">Modules</span>
         <div class="mini" style="margin-top:8px" id="ptMods">${MODULE_CATALOG.map(x=>modRow(x,mods,'data-mod')).join('')}</div>
         <div class="actions" style="margin-top:10px"><button class="btn" id="ptModSave">Save modules</button><span class="hint" style="margin-left:8px">The club’s hub picks changes up on its next load.</span></div></div></div>`)}
@@ -150,7 +151,8 @@ function readModulesD(root){ const m={golf:true}; root.querySelectorAll('[data-m
 function editClient(t){
   const a=(t&&t.address)||{};
   openDrawer({kicker:t?'Client':'New client',title:t?t.name:'New client',wide:true,saveLabel:t?'Save':'Create client',
-    body:pair(field('Club name','ptN',t?.name||'',{ph:'e.g. Walnut Creek Country Club'}),field('Short name','ptS',t?.short||'',{ph:'e.g. WCCC'}))+
+    body:field('Type of client','ptKind',t?.kind||'private',{type:'select',options:CLIENT_KINDS.map(k=>[k.id,k.name]),hint:clientKindOf(t?.kind).desc})+
+      pair(field('Name','ptN',t?.name||'',{ph:'e.g. Walnut Creek Country Club'}),field('Short name','ptS',t?.short||'',{ph:'e.g. WCCC'}))+
       (t?'':field('Address (subdomain)','ptSlug','',{ph:'e.g. wccc  →  wccc.'+BASE_DOMAIN})+'<p class="hint">Lower-case letters, digits and dashes. It becomes the club’s address and can’t change later.</p>')+
       `<div class="fld"><span class="lbl">Plan</span>${seg('ptPlan',[['golf','Golf management'],['club','Club management']],t?.plan||'golf')}<p class="hint">Golf management is the package; Point of sale is its add-on for a golf-only client. Club management is the full club — billing, point of sale, bookings and the member portal.</p></div>`+moduleBoxes(modulesOf(t))+
       (t?'':`<div class="fld"><span class="lbl">Status</span>${seg('ptSt0',[['prospect','Prospect'],['trial','Trial'],['active','Active']],'active')}</div>`)+
@@ -162,11 +164,11 @@ function editClient(t){
       field('Other host names','ptH',(t?.hosts||[]).join(', '),{ph:'e.g. app.wcccmga.org, hub.wcccmga.org'})+'<p class="hint">Other addresses that open this club (their own domain). Each needs a CNAME to the site and a custom domain on Render.</p>'+
       field('Notes','ptNo',t?.notes||'',{type:'textarea'})+
       (t?'':`<div class="fld" style="margin-top:6px"><span class="lbl">First staff login (optional)</span>${pair(field('','ptLE','',{type:'email',ph:'head.pro@club.org'}),field('','ptLN','',{ph:'Name'}))}${seg('ptLMode',[['set','Set a password now'],['invite','E-mail an invite']],'set')}<p class="hint">A staff login for the whole club. With “set a password” the password is generated and shown once; an invite e-mails them a link to choose their own.</p></div>`),
-    wire:r=>{ wireModRows(r,'data-modd'); wireSeg(r,'ptPlan',v=>{ const p=PLAN_PRESETS[v]||{}; const club=r.querySelector('[data-modd=club]'); r.querySelectorAll('[data-modd]').forEach(c=>{ if(!c.disabled||c.dataset.modd!=='golf') { if(c.dataset.modd!=='golf'){ c.disabled=false; c.checked=!!p[c.dataset.modd]; } } }); if(club) club.onchange(); }); wireSeg(r,'ptSt0'); wireSeg(r,'ptLMode'); },
+    wire:r=>{ wireModRows(r,'data-modd'); const ks=r.querySelector('#ptKind'); if(ks) ks.onchange=()=>{ const k=clientKindOf(ks.value); const hint=ks.closest('.fld')&&ks.closest('.fld').querySelector('.hint'); if(hint) hint.textContent=k.desc; const ps=r.querySelector('#ptPlan'); if(ps){ ps.dataset.val=k.plan; ps.querySelectorAll('button').forEach(b=>b.classList.toggle('on',b.dataset.v===k.plan)); } r.querySelectorAll('[data-modd]').forEach(c=>{ if(c.dataset.modd==='golf') return; c.disabled=false; c.checked=!!k.modules[c.dataset.modd]; }); const club=r.querySelector('[data-modd=club]'); if(club&&club.onchange) club.onchange(); }; wireSeg(r,'ptPlan',v=>{ const p=PLAN_PRESETS[v]||{}; const club=r.querySelector('[data-modd=club]'); r.querySelectorAll('[data-modd]').forEach(c=>{ if(!c.disabled||c.dataset.modd!=='golf') { if(c.dataset.modd!=='golf'){ c.disabled=false; c.checked=!!p[c.dataset.modd]; } } }); if(club) club.onchange(); }); wireSeg(r,'ptSt0'); wireSeg(r,'ptLMode'); },
     save:()=>{ const name=fv('ptN'); if(!name){ toast('Give the club a name'); return false; }
       const slug=(t?t.slug:fv('ptSlug')).toLowerCase(); if(!/^[a-z0-9][a-z0-9-]{1,30}$/.test(slug)||['app','portal','www','api','admin','mail'].includes(slug)){ toast('Choose a different address: letters, digits and dashes'); return false; }
       const body=$('dBody');
-      const rec={name,short:fv('ptS'),plan:body.querySelector('#ptPlan').dataset.val,modules:readModulesD(body),started_on:fv('ptFrom')||null,renews_on:fv('ptRen')||null,
+      const rec={name,short:fv('ptS'),kind:fv('ptKind')||'private',plan:body.querySelector('#ptPlan').dataset.val,modules:readModulesD(body),started_on:fv('ptFrom')||null,renews_on:fv('ptRen')||null,
         address:{line1:fv('ptA1'),line2:fv('ptA2'),city:fv('ptCity'),state:fv('ptState'),zip:fv('ptZip')},phone:fv('ptPh'),website:fv('ptWeb'),billing_email:fv('ptBE'),timezone:fv('ptTz'),
         hosts:fv('ptH').split(/[,\s]+/).map(h=>h.trim().toLowerCase()).filter(Boolean),notes:fv('ptNo'),updated_at:new Date().toISOString()};
       const first=t?null:{email:fv('ptLE'),name:fv('ptLN'),mode:body.querySelector('#ptLMode').dataset.val,status:body.querySelector('#ptSt0').dataset.val};
@@ -180,7 +182,7 @@ async function saveClient(t,slug,rec,first){
       // the club's own document, so the hub opens straight onto an empty directory rather than first-run set-up
       const club=normalize(null,{id:'club',kind:'club',name:rec.name,short:rec.short||''}); club.name=rec.name; club.short=rec.short||''; club.orgs=[];
       const {error:e2}=await sb.from('mga_hub').insert({tenant:slug,id:'club',data:Object.assign(club,{_rev:1,_w:CLIENT,_at:Date.now()}),updated_at:new Date().toISOString()}); if(e2) throw e2;
-      await logEvent(slug,'created','Client created on the '+planLabel(rec.plan)+' plan');
+      await logEvent(slug,'created','Client created: '+kindLabel(rec.kind)+' on the '+planLabel(rec.plan)+' plan');
       let made=null; if(first.email){ try{ made=await createLogin({tenant:slug,email:first.email,name:first.name,role:'staff',mode:first.mode,redirect:tenantURL(slug)}); logEvent(slug,'login',(first.mode==='invite'?'Invited staff ':'Created staff login ')+first.email); }catch(e){ toast('Client created, but the login failed: '+e.message); } }
       toast(rec.name+' created');
       await loadPortal(); openClient(slug);

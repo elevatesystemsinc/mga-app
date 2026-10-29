@@ -828,6 +828,26 @@ groups, printed scorecards — the printed cards include a live-scoring QR that 
   steps are in `docs/tenancy.md` §6. Roadmap there: Club management (billing, POS) as modules, finer roles, Flagstick's
   own subscriptions.
 
+- **Built Oct 2026 (client types, the nonprofit feature set):** `client-kinds-setup.sql` (`tenants.kind`, `tenant_lookup` returns it;
+  `CLIENT_KINDS` in core.js: private country club · country club · semi-private golf club · municipal course · nonprofit · other, each
+  with the plan and modules it starts with — the portal's New client asks the type first and sets the boxes; `clientKind()` /
+  `isNonprofit()` in the hub) and the **Fundraising events** module (`events`; `src/fund.js`, `fund-setup.sql`, `auction_src.html` →
+  `auction.html?k=TOKEN`, `tests/test_fund.py`). A nonprofit's rail: **Fundraising** (first section) · Golf (Tournaments = the golf
+  tournament, with its sponsors, check-in, rounds and the 50/50) · Membership (Directory reads **Donors & guests**) · Club. One event
+  (`CLUB.fund.events[]`, `normFundEvent`): tickets (price, fair market value, qty) and tables, guests (from the directory or by name;
+  each holds a **paddle** 101 up; RSVPs from the page land as `fund_rsvps` and are accepted onto the list), sponsors and levels, the
+  **silent auction** (items with opening bid / buy now / value, `minRaise`, `closesAt`, `closed`; bids are `fund_bids` placed on the
+  page through `fund_bid`, which refuses under the minimum, after close, or on a bought item; the hub reads the high bid per item,
+  `fundLoad` → `FB.bids`, polled every 10 s on the tabs that show money), the **live auction** (lots sold by paddle), **paddle raise**
+  donations, **raffles** (tickets numbered in order of sale by paddle, a draw with `secureInt` over every ticket in the drum, the
+  winner recorded before the reveal, a log line per draw), **checkout** (`paddles(e)` = guests + page bidders 500 up; `paddleTotals`
+  = tickets + silent wins + lots + raffle tickets + donations − payments; record a payment by method; the **acknowledgement PDF**
+  `fundReceiptPDF`: what they paid, the fair market value received, the amount that may be deductible, the tax ID and thank-you line
+  from Fundraising → Settings; e-mail through `sendMail`), **money** (streams, expenses, net, CSV). `fundPub(e)` → `fund_share` is what
+  the page shows (`pushFund` on every edit that matters); the page (`auction.html`) has The evening · Tickets (RSVP, pay at the door) ·
+  Silent auction (join with name + phone → `fund_join` → a paddle; bid; buy now) · My bids (leading / outbid / won), re-read every 6 s.
+  No money moves online yet: tickets, bids and raffle tickets are settled at checkout (card / cash / check / Zelle recorded); Stripe
+  for tickets and bids is the next layer. The golf tournament is the existing Tournaments page.
 - **Legacy app (retired):** the original Member-Member app used to live on `main` (its history is still in git);
   its `mm_tournament` table is still in Supabase as an archive, to be dropped when that system is deprecated. The
   hub's import / Verify / two-way sync / "Retire current app" code was removed in Oct 2026. Stored documents may still carry `db.legacy`, `t.source` (`kind:'mm-app'`) and

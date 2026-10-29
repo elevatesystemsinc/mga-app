@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0F2A38">
+<meta name="robots" content="noindex">
+<title>Event · Flagstick</title>
+<link rel="icon" href="favicon.png?v=3">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@600;700&family=Public+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script src="config.js"></script>
+<style>
+:root{--navy:#0F2A38;--gold:#C7A13A;--goldl:#D8B75F;--golddk:#7E5F1A;--paper:#F4F0E6;--ivory:#FBFAF5;--line:#E3DCC9;--muted:#56626A;--ink:#14222B;--pos:#1F6B4A;--neg:#B5443A;
+  --serif:'Cormorant Garamond',Georgia,serif;--sans:'Public Sans',system-ui,-apple-system,'Segoe UI',sans-serif}
+*{box-sizing:border-box} html,body{margin:0} [hidden]{display:none!important}
+body{font-family:var(--sans);background:var(--paper);color:var(--ink);font-size:16px;line-height:1.4;-webkit-font-smoothing:antialiased;font-variant-numeric:lining-nums}
+button,input,textarea,select{font:inherit;color:inherit} button{cursor:pointer}
+.top{background:radial-gradient(circle at 10% 40%,#1B3D50,var(--navy) 65%);color:#fff;padding:calc(14px + env(safe-area-inset-top,0px)) 18px 14px;display:flex;align-items:center;gap:14px;border-bottom:3px solid var(--gold)}
+.top img{height:44px;max-width:120px;object-fit:contain} .top .t{flex:1;min-width:0} .top b{display:block;font-family:var(--serif);font-size:24px;line-height:1.05;white-space:nowrap;overflow:hidden;text-overflow:ellipsis} .top small{color:#C9CFD2;font-size:13px}
+.top .me{font-size:12.5px;color:#D8B75F;font-weight:700;text-align:right;white-space:nowrap}
+main{max-width:760px;margin:0 auto;padding:16px 14px 90px}
+.card{background:#fff;border:1px solid var(--line);border-radius:14px;padding:18px 18px 16px;margin-bottom:14px}
+h1{font-family:var(--serif);font-size:32px;line-height:1.05;margin:0 0 6px;color:var(--navy)} h2{font-family:var(--serif);font-size:24px;margin:0 0 10px;color:var(--navy);line-height:1.05}
+.muted{color:var(--muted)} .hint{font-size:13px;color:var(--muted)} p{margin:0 0 8px}
+.tabs{display:flex;gap:6px;overflow-x:auto;margin:0 0 14px;padding-bottom:2px} .tabs button{flex:none;height:40px;padding:0 16px;border-radius:999px;border:1.5px solid #CFC6AE;background:#fff;font-weight:700;font-size:14px} .tabs button.on{background:var(--navy);border-color:var(--navy);color:#fff}
+.inp{width:100%;height:46px;border:1.5px solid #CFC6AE;border-radius:10px;padding:0 12px;background:#fff;font-size:16px} textarea.inp{height:auto;padding:10px 12px}
+.lbl{display:block;font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin:10px 0 4px}
+.btn{height:48px;padding:0 18px;border-radius:12px;border:1.5px solid #CFC6AE;background:#fff;font-weight:700;font-size:15px;color:var(--navy)} .btn.pri{background:var(--navy);border-color:var(--navy);color:#fff} .btn.gold{background:var(--gold);border-color:var(--gold);color:var(--navy)} .btn.w{width:100%} .btn:disabled{opacity:.5}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.item{border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin-bottom:10px;background:#fff} .item.mine{border-color:var(--pos);box-shadow:inset 3px 0 0 var(--pos)} .item.out{border-color:var(--neg);box-shadow:inset 3px 0 0 var(--neg)}
+.item .hd{display:flex;justify-content:space-between;gap:10px;align-items:flex-start} .item .hd b{font-size:17px} .item .hd .no{color:var(--muted);font-weight:700;margin-right:6px}
+.item .cur{font-family:var(--serif);font-size:28px;color:var(--navy);line-height:1;white-space:nowrap} .item .sub{font-size:13px;color:var(--muted);margin-top:4px}
+.item .bid{display:flex;gap:8px;margin-top:10px;align-items:center} .item .bid .inp{width:120px;height:44px} .item .bid .btn{height:44px}
+.chip{display:inline-block;font-size:11.5px;font-weight:700;padding:2px 8px;border-radius:999px;background:var(--ivory);border:1px solid var(--line);color:var(--muted)} .chip.ok{background:#E3F0E8;color:var(--pos);border-color:#BFD9C8} .chip.bad{background:#F6E0DD;color:var(--neg);border-color:#E6B9B3}
+.toast{position:fixed;left:50%;bottom:30px;transform:translateX(-50%);background:var(--navy);color:#fff;padding:12px 18px;border-radius:10px;font-weight:600;z-index:60;max-width:92vw;text-align:center}
+.fs{margin:20px 0 0;font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);display:flex;gap:6px;align-items:center;justify-content:center} .fs img{height:18px}
+.therm{height:12px;border-radius:999px;background:var(--line);overflow:hidden;margin-top:8px} .therm div{height:100%;background:linear-gradient(90deg,var(--gold),#E0C060)}
+@media (max-width:480px){ .row2{grid-template-columns:1fr} }
+</style>
+</head>
+<body>
+<header class="top"><img id="hLogo" src="flagstick-crest-light.svg" alt=""><div class="t"><b id="hTitle">Event</b><small id="hSub"></small></div><div class="me" id="hMe"></div></header>
+<main id="main"><div class="card"><p class="muted">Loading…</p></div></main>
+<script>
+/* The event page for a nonprofit's gala (fund-setup.sql): the evening, tickets (an RSVP — pay at the door), and the silent
+   auction. A guest joins with a name and phone and gets a paddle number; bids go through fund_bid, which refuses anything
+   under the minimum or after bidding closes. The page re-reads the auction every 6 seconds. Nothing here is a login. */
+const $=id=>document.getElementById(id); const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const CFG=window.MM_CONFIG||{}; const sb=(CFG.url&&CFG.anonKey&&window.supabase)?window.supabase.createClient(CFG.url,CFG.anonKey,{auth:{persistSession:false}}):null;
+const KEY=(new URLSearchParams(location.search).get('k')||'').trim(); const ls={get(k){ try{ return JSON.parse(localStorage.getItem(k)||'null'); }catch(_){ return null; } },set(k,v){ try{ localStorage.setItem(k,JSON.stringify(v)); }catch(_){ } }};
+const fmt=v=>'$'+Number(v||0).toLocaleString('en-US',{minimumFractionDigits:0,maximumFractionDigits:0});
+let E=null, D=null, ME=null, TAB='about', MY=[], busy=false, timer=null, draftBids={};
+async function rpc(fn,args){ const {data,error}=await sb.rpc(fn,Object.assign({p_token:KEY},args||{})); if(error) throw new Error((error.message||'failed').replace(/^.*?: /,'')); return data; }
+function toast(m){ const d=document.createElement('div'); d.className='toast'; d.textContent=m; document.body.appendChild(d); setTimeout(()=>d.remove(),2800); }
+function fail(t,x){ $('main').innerHTML=`<div class="card"><h1>${esc(t)}</h1><p class="muted">${esc(x||'')}</p></div>`; }
+async function load(){ if(!sb) return fail('Not connected','This page is not available right now.'); if(!KEY) return fail('No event','Open the link the organization sent you.');
+  let r=null; try{ r=await rpc('fund_get'); }catch(e){ return fail('Couldn’t load the event',e.message); } if(!r) return fail('This link is not valid','Ask the organization for the current one.');
+  E=r; D=r.doc||{}; ME=ls.get('fs_fund_'+E.fid); $('hTitle').textContent=D.name||'Event'; $('hSub').textContent=D.org||''; if(D.brand) $('hLogo').src=D.brand; document.title=`${D.name||'Event'} · ${D.org||''}`; $('hMe').textContent=ME?`${ME.name} · paddle #${ME.paddle}`:'';
+  if(ME){ try{ MY=await rpc('fund_my',{p_bidder:ME.id}); }catch(_){ MY=[]; } }
+  if(!document.activeElement||!document.activeElement.matches('input,textarea')) render(); }
+function closesTxt(){ const s=D.silent||{}; if(s.closed||E.status==='closed') return 'Bidding is closed'; if(s.closesAt){ const t=new Date(s.closesAt), ms=t-Date.now(); if(ms<=0) return 'Bidding is closed'; const mins=Math.round(ms/60000); return `Bidding closes ${mins<90?'in '+mins+' min':t.toLocaleString('en-US',{weekday:'short',hour:'numeric',minute:'2-digit'})}`; } return 'Bidding is open'; }
+const bidOpen=()=>{ const s=D.silent||{}; return E.status==='open'&&!s.closed&&!(s.closesAt&&new Date(s.closesAt)-Date.now()<=0); };
+function render(){ const s=D.silent||{}, items=(s.items||[]).slice().sort((a,b)=>(+a.no||0)-(+b.no||0)), highs=E.highs||{}, myMap={}; MY.forEach(m=>myMap[m.item]=m);
+  const date=D.date?new Date(D.date+'T12:00').toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric',year:'numeric'}):'';
+  const tabs=[['about','The evening'],['tickets','Tickets'],['silent',`Silent auction${items.length?' · '+items.length:''}`],['mine',`My bids${MY.length?' · '+MY.length:''}`]].filter(([k])=>!(k==='tickets'&&!(D.tickets||[]).length));
+  let body='';
+  if(TAB==='about'){ const raised=Object.values(highs).reduce((a,h)=>a+Number(h.amount||0),0);
+    body=`<div class="card"><h1>${esc(D.name||'')}</h1><p class="muted">${esc(date)}${D.time?' · '+esc(D.time):''}${D.venue?' · '+esc(D.venue):''}</p>${D.descr?`<p style="margin-top:12px;white-space:pre-wrap">${esc(D.descr)}</p>`:''}
+      ${items.length?`<p style="margin-top:14px"><span class="chip ${bidOpen()?'ok':''}">${esc(closesTxt())}</span> <span class="hint">${items.length} silent auction items · ${E.bidders||0} bidders so far</span></p>`:''}</div>
+      ${(D.levels||[]).length?`<div class="card"><h2>Sponsorship</h2>${D.levels.map(l=>`<p><b>${esc(l.name)}</b> · ${fmt(l.amount)}${l.perks?`<br><span class="hint">${esc(l.perks)}</span>`:''}</p>`).join('')}</div>`:''}
+      ${(D.raffles||[]).length?`<div class="card"><h2>Raffles</h2>${D.raffles.map(r=>`<p><b>${esc(r.name)}</b> · ${fmt(r.price)} a ticket${r.prizes.length?`<br><span class="hint">${r.prizes.map(p=>esc(p.name)+(p.winner?' — won by '+esc(p.winner.name)+' (ticket '+p.winner.ticket+')':'')).join(' · ')}</span>`:''}</p>`).join('')}<p class="hint">Tickets are sold in the room.</p></div>`:''}`; }
+  else if(TAB==='tickets'){ body=`<div class="card"><h2>Tickets</h2>${(D.tickets||[]).map(t=>`<p><b>${esc(t.name)}</b> · ${fmt(t.price)}${t.descr?`<br><span class="hint">${esc(t.descr)}</span>`:''}</p>`).join('')}
+      ${D.rsvp?`<div style="margin-top:14px"><span class="lbl">Reserve</span><div class="row2"><input class="inp" id="rvN" placeholder="Your name" value="${esc(ME?ME.name:'')}"><input class="inp" id="rvE" placeholder="E-mail" type="email"></div><div class="row2" style="margin-top:10px"><input class="inp" id="rvP" placeholder="Phone" type="tel"><select class="inp" id="rvT">${(D.tickets||[]).map(t=>`<option value="${esc(t.id)}">${esc(t.name)} · ${fmt(t.price)}</option>`).join('')}</select></div><div class="row2" style="margin-top:10px"><input class="inp" id="rvQ" type="number" min="1" max="20" value="1" placeholder="How many"><input class="inp" id="rvNo" placeholder="A note (seating, dietary)"></div><button class="btn pri w" id="rvGo" style="margin-top:12px">Reserve</button><p class="hint" style="margin-top:8px">We will hold your seats; payment is taken at the door or at checkout.</p></div>`:'<p class="hint">Registration is closed.</p>'}</div>`; }
+  else if(TAB==='silent'){ body=`<div class="card"><h2>Silent auction</h2><p><span class="chip ${bidOpen()?'ok':''}">${esc(closesTxt())}</span> <span class="hint">Minimum raise ${fmt(s.minRaise||10)}</span></p>
+      ${ME?'':`<div style="margin-top:10px"><span class="lbl">Join to bid</span><div class="row2"><input class="inp" id="jnN" placeholder="Your name"><input class="inp" id="jnP" placeholder="Mobile number" type="tel"></div><input class="inp" id="jnE" placeholder="E-mail (for your receipt)" type="email" style="margin-top:10px"><button class="btn pri w" id="jnGo" style="margin-top:10px">Get my paddle</button></div>`}</div>
+      ${items.map(it=>{ const h=highs[it.id], my=myMap[it.id], min=h?Number(h.amount)+Number(s.minRaise||10):Math.max(1,Number(it.start||1)), bought=it.buyNow>0&&h&&Number(h.amount)>=it.buyNow, cls=my?(my.leading?'mine':'out'):'';
+        return `<div class="item ${cls}" id="it-${it.id}"><div class="hd"><div><span class="no">${it.no?'#'+it.no:''}</span><b>${esc(it.name)}</b>${it.category?` <span class="chip">${esc(it.category)}</span>`:''}<div class="sub">${it.donor?'Donated by '+esc(it.donor)+' · ':''}value ${fmt(it.value)}${it.buyNow>0?' · buy now '+fmt(it.buyNow):''}</div>${it.descr?`<div class="sub" style="color:var(--ink)">${esc(it.descr)}</div>`:''}</div><div style="text-align:right"><div class="cur">${h?fmt(h.amount):fmt(it.start||0)}</div><div class="sub">${h?`paddle #${h.paddle} · ${h.n} bid${h.n===1?'':'s'}`:'opening bid'}</div></div></div>
+          ${my?`<div class="sub" style="margin-top:6px"><span class="chip ${my.leading?'ok':'bad'}">${my.leading?'You are the high bidder':'You have been outbid'}</span></div>`:''}
+          ${bidOpen()&&ME&&!bought?`<div class="bid"><input class="inp" type="number" inputmode="numeric" min="${min}" step="1" value="${draftBids[it.id]||min}" data-bi="${it.id}"><button class="btn pri" data-bb="${it.id}">Bid</button>${it.buyNow>0?`<button class="btn gold" data-bn="${it.id}">Buy now ${fmt(it.buyNow)}</button>`:''}</div>`:bought?'<div class="sub" style="margin-top:6px"><span class="chip">Sold at buy now</span></div>':''}</div>`; }).join('')||'<div class="card"><p class="muted">No items yet.</p></div>'}`; }
+  else { body=`<div class="card"><h2>My bids</h2>${ME?`<p class="hint">${esc(ME.name)} · paddle #${ME.paddle}</p>`:'<p class="muted">Join the silent auction to bid.</p>'}${MY.map(m=>{ const it=items.find(x=>x.id===m.item)||{name:'Item'}; return `<div class="item ${m.leading?'mine':'out'}"><div class="hd"><div><span class="no">${it.no?'#'+it.no:''}</span><b>${esc(it.name)}</b><div class="sub">your bid ${fmt(m.mine)} · high ${fmt(m.high)}</div></div><span class="chip ${m.leading?'ok':'bad'}">${m.leading?(bidOpen()?'Leading':'Won'):'Outbid'}</span></div></div>`; }).join('')||(ME?'<p class="muted">No bids yet — the items are on the Silent auction tab.</p>':'')}
+      ${!bidOpen()&&MY.some(m=>m.leading)?'<p style="margin-top:10px"><b>Congratulations.</b> Please see checkout before you leave to settle up and collect your items.</p>':''}</div>`; }
+  $('main').innerHTML=`<div class="tabs">${tabs.map(([k,l])=>`<button class="${TAB===k?'on':''}" data-tab="${k}">${l}</button>`).join('')}</div>${body}<div class="fs"><img src="flagstick-crest.svg" alt="">Flagstick</div>`;
+  document.querySelectorAll('[data-tab]').forEach(b=>b.onclick=()=>{ TAB=b.dataset.tab; render(); window.scrollTo(0,0); });
+  const jn=$('jnGo'); if(jn) jn.onclick=join; const rv=$('rvGo'); if(rv) rv.onclick=rsvp;
+  document.querySelectorAll('[data-bi]').forEach(i=>i.oninput=()=>{ draftBids[i.dataset.bi]=i.value; });
+  document.querySelectorAll('[data-bb]').forEach(b=>b.onclick=()=>bid(b.dataset.bb,Number(document.querySelector(`[data-bi="${b.dataset.bb}"]`).value)));
+  document.querySelectorAll('[data-bn]').forEach(b=>b.onclick=()=>{ const it=items.find(x=>x.id===b.dataset.bn); if(confirm(`Buy “${it.name}” now for ${fmt(it.buyNow)}?`)) bid(it.id,Number(it.buyNow)); }); }
+async function join(){ const name=$('jnN').value.trim(), phone=$('jnP').value.trim(), email=$('jnE').value.trim(); if(!name){ toast('Your name, please'); return; } if(!phone&&!email){ toast('A mobile number or e-mail, so we can find you again'); return; }
+  try{ const r=await rpc('fund_join',{p_name:name,p_phone:phone,p_email:email}); ME={id:r.id,paddle:r.paddle,name:r.name}; ls.set('fs_fund_'+E.fid,ME); $('hMe').textContent=`${ME.name} · paddle #${ME.paddle}`; toast(`You are paddle #${ME.paddle}`); await load(); render(); }catch(e){ toast(e.message); } }
+async function bid(item,amount){ if(busy||!ME) return; if(!amount||amount<=0){ toast('Enter your bid'); return; } busy=true; try{ const r=await rpc('fund_bid',{p_bidder:ME.id,p_item:item,p_amount:amount}); delete draftBids[item]; toast(r&&r.bought?'Yours — bought at buy now':`Bid placed · ${fmt(amount)}`); await load(); render(); }catch(e){ toast(e.message); await load(); render(); } finally{ busy=false; } }
+async function rsvp(){ const d={name:$('rvN').value.trim(),email:$('rvE').value.trim(),phone:$('rvP').value.trim(),ticket:$('rvT').value,qty:parseInt($('rvQ').value)||1,note:$('rvNo').value.trim()}; if(!d.name){ toast('Your name, please'); return; } if(!d.email&&!d.phone){ toast('An e-mail or phone, so we can confirm'); return; }
+  try{ await rpc('fund_rsvp',{p_data:d}); $('main').querySelector('.card').innerHTML=`<h2>Thank you, ${esc(d.name)}</h2><p>We are holding ${d.qty} × ${esc(((D.tickets||[]).find(t=>t.id===d.ticket)||{}).name||'ticket')} for you. Payment is taken at the door or at checkout.</p>`; }catch(e){ toast(e.message); } }
+load(); timer=setInterval(load,6000); document.addEventListener('visibilitychange',()=>{ if(!document.hidden) load(); });
+/* Keeps every open device on the latest version: checks version.json about once a minute and, when a
+   newer build is live, reloads at a safe moment (nothing unsaved, no editor open, not mid-typing).
+   The host's CDN caches version.json and the pages separately (up to 5 min each), so right after a deploy they can
+   disagree in either direction. Two rules keep that from turning into a reload loop: only a build NEWER than this
+   page counts, and a reload is tried once per build — if the page that comes back is still the old one, the CDN
+   hasn't caught up; wait a while before trying that build again. */
+(function(){
+  const ME='20261029144635', KEY='au_tried', RETRY=10*60*1000; let ready=false, lastCheck=0;
+  const typing=()=>{ const a=document.activeElement; return a&&/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)&&a.value&&a.type!=='search'; };
+  const safe=()=>!typing()&&(typeof window.__canReload!=='function'||window.__canReload());
+  const tried=()=>{ try{ const [b,t]=(sessionStorage.getItem(KEY)||'').split('|'); return b?{build:b,at:+t||0}:null; }catch(_){ return null; } };
+  async function check(){ lastCheck=Date.now(); if(location.protocol==='file:') return;
+    try{ const r=await fetch('version.json?t='+Date.now(),{cache:'no-store'}); if(!r.ok) return; const v=await r.json(); if(!v||!v.build||!(v.build>ME)) return;
+      const t=tried(); if(t&&t.build===v.build&&Date.now()-t.at<RETRY) return;   // already reloaded for this build and still got the old page
+      ready=v.build; }catch(_){} }
+  setInterval(()=>{ if(ready){ if(safe()){ try{ sessionStorage.setItem(KEY,ready+'|'+Date.now()); }catch(_){ } location.reload(); } } else if(Date.now()-lastCheck>60000) check(); },3000);
+  document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='visible') check(); });
+  window.__build=ME;
+})();
+</script>
+</body>
+</html>

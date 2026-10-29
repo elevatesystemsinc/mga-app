@@ -278,8 +278,22 @@ const MODULE_CATALOG=[
   {id:'golf', name:'Golf management', base:true, desc:'The package: the club directory, tournaments, rounds and results, live scoring and formats, the game library, associations (MGA, LGA, SMGA…), small groups, dues collection, the club’s treasury and budget'},
   {id:'pos',  name:'Point of sale', addon:true, desc:'An add-on for a golf-only client (a municipal course, a pro shop): the register for the shop and the grill — products, stock, tickets as cash / card, and to member accounts where billing is on'},
   {id:'club', name:'Club management', includes:['pos','billing'], desc:'The full club: member accounts & billing (classes, monthly billing, statements, finance charges, the GL), point of sale, bookings (tee sheet, courts, pools, lessons), the member portal with online payment and autopay'},
+  {id:'events', name:'Fundraising events', desc:'For a nonprofit: galas and events with tickets and tables, sponsors, a silent auction members bid in from their phones, the live auction by paddle, raffles with a legitimate drawing, checkout and acknowledgement letters'},
 ];
 const PLAN_PRESETS={golf:{golf:true},club:{golf:true,club:true}};
+/* the type of client (tenants.kind): what it is decides the plan and modules it starts with, and what the hub calls things.
+   The owner, Oct 2026: "ask me the type… and then have feature sets consistent with those types". */
+const CLIENT_KINDS=[
+  {id:'private',   name:'Private country club',     plan:'club', modules:{golf:true,club:true,pos:true,billing:true}, desc:'Members only: the full club — billing, point of sale, bookings, the member portal, associations and groups'},
+  {id:'country',   name:'Country club',             plan:'club', modules:{golf:true,club:true,pos:true,billing:true}, desc:'The full club with a membership and public play'},
+  {id:'semi',      name:'Semi-private golf club',   plan:'golf', modules:{golf:true,pos:true}, desc:'A membership and daily-fee play: tournaments, live scoring, the tee sheet, the shop and the grill'},
+  {id:'muni',      name:'Municipal course',         plan:'golf', modules:{golf:true,pos:true}, desc:'Daily-fee golf: tournaments and leagues, live scoring, the shop and the grill — no member billing'},
+  {id:'nonprofit', name:'Nonprofit organization',   plan:'golf', modules:{golf:true,events:true}, desc:'Galas and events, a golf tournament, the silent and live auctions, raffles, checkout and acknowledgements'},
+  {id:'other',     name:'Other',                    plan:'golf', modules:{golf:true}, desc:'Start from golf management and switch modules on by hand'},
+];
+const clientKindOf=k=>CLIENT_KINDS.find(x=>x.id===k)||CLIENT_KINDS[0];
+const clientKind=()=>(TENANCY&&TENANT_INFO&&TENANT_INFO.kind)||'private';
+const isNonprofit=()=>clientKind()==='nonprofit';
 /* the switches on the tenant row: golf (always), pos, club. Club management includes billing and point of sale. */
 function hasModule(k){ if(k==='golf'||k==='associations'||k==='groups') return true; if(!TENANCY||!TENANT_INFO) return true; const m=TENANT_INFO.modules||{}; if(k==='billing'||k==='pos') return !!(m[k]||m.club); return !!m[k]; }
 /* a login's scope inside the tenant (portal-setup.sql): staff see the whole club; an 'org' login only its organizations */
