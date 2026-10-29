@@ -282,7 +282,7 @@ function vDash(m){
   }
   const ms=members(), unpaid=isClub()?0:ms.filter(x=>x.status!=='Inactive'&&memberDues(Y(),x.id)<n0(sc.s.dues.amount)).length;
   if(ms.length&&unpaid&&sc.s.duesPayments.length) attention.push([String(unpaid),`member${unpaid>1?'s have':' has'} not paid full ${Y()} dues`,'warn',null]);
-  m.innerHTML=head(isClub()?`${Y()}`:`${Y()} Season`,esc(CLUB.name||CLUB_META.name)+(isClub()?'':' · '+esc(orgName())),(isClub()?yearBar(false):'')+btn('New tournament','dNew','pri',I.plus))+`
+  m.innerHTML=head(isClub()?`${Y()}`:`${Y()} Season`,esc(CLUB.name||CLUB_META.name)+(isClub()?'':' · '+esc(orgName())),(isClub()?yearBar(false):'')+btn('New tournament','dNew','pri',I.plus))+(typeof fundDashThermos==='function'?fundDashThermos():'')+`
   <div class="grid g4">
     ${kpi(isClub()?'Net (projected)':'Season net (projected)',fmtS(sc.projected),`Actuals for ${sc.past.length} completed · budget for ${sc.upcoming.length} upcoming`,netCls(sc.projected))}
     ${kpi('Next up',next?dayShort(next,0)||'TBD':'—',next?`${esc(next.name)} · ${daysOut(next)===0?'today':daysOut(next)+' days out'}`:'No upcoming tournaments')}
@@ -364,7 +364,8 @@ function editNewTournament(){
       const days=+$('nDays').dataset.val||1; const src=db.tournaments.find(t=>t.id===fv('nCopy'));
       let t=newTournament({season:Y(),name,days,startDate:fv('nStart'),venue:fv('nVenue'),entryFee:fnum('nFee'),skinsFee:fnum('nSkins'),plannedPlayers:fnum('nPlayers'),teamSize:+fv('nTeam'),ggEvent:fv('nGG'),features:readFeatures('nf'),hcpDiff:+fv('nDiff')||0});
       if(src) copyStructure(src,t);
-      db.tournaments.push(t); view.tid=t.id; view.page='tournament'; view.ttab=t.features.meals?'meals':'field'; toast('Tournament created');
+      if(typeof isNonprofit==='function'&&isNonprofit()) t.features=Object.assign({},NONPROFIT_FEATURES,t.features.calcutta?{}:{});   // a charity tournament: gifts to the places, the 50/50, no Calcutta
+      db.tournaments.push(t); if(typeof fundForTournament==='function'&&typeof fundOn==='function'&&fundOn()&&isNonprofit()) fundForTournament(t); view.tid=t.id; view.page='tournament'; view.ttab=t.features.meals?'meals':'field'; toast('Tournament created');
     }});
 }
 function copyStructure(src,t){

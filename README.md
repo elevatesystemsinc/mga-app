@@ -544,3 +544,12 @@ Annual budget page carries every event of the year. A nonprofit also has a plain
 no restaurant setup. **Checkout** gathers what each paddle owes (tickets, wins, raffle tickets, gifts), takes the payment,
 and prints or e-mails the acknowledgement with the fair market value and the deductible portion. The tax ID and the
 thank-you line live under Fundraising, Settings.
+
+**A fundraiser can include a golf tournament.** Battle of the Nines is a tournament by day and a gala that night: tick
+*Includes a golf tournament* when you create the event and a tournament of the same name is made with it (or link one later
+from the event's Overview, *Add a golf tournament*). Its paid entries, sponsors and 50/50 count toward the event's total and
+its budget toward the plan; the places get donated gifts, listed under *Prizes*, never payouts. Creating a tournament from the
+dashboard makes its fundraising event too, so nothing raised is left out. **Every event has its own goal and thermometer**: set
+it from the Overview (*Goal & progress page*); the bar shows on the event, on the Fundraising page and on the dashboard, and
+once the event page is published the same link with `&p=1` is a **public progress page** — the goal, what has been raised and
+where it came from, never who gave what — for the website, a lobby screen or a post. Several events, several thermometers.

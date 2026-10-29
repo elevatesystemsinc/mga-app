@@ -868,6 +868,25 @@ groups, printed scorecards — the printed cards include a live-scoring QR that 
   **Budget** tab (`e.budget = {streams:{tickets,sponsors,silent,live,raffles,donations}, expenses:[]}`, `ftBudget`, `fundPlan`) sets the
   plan per stream and the planned expenses against the actual; the **Annual budget** page carries a Fundraising events card
   (`fundBudgetCard(y)`: planned in / net against raised / net per event); the Fundraising page shows the year's planned and actual net.
+  **A fundraiser with a golf tournament, and per-event thermometers** (Battle of the Nines, Oct 29: "a fundraising event can also be a golf
+  tournament… keep track of how much money has been raised for that entire tournament and the evening event after… a big status bar";
+  then "it's not really a year goal. It's a per event goal… multiple goals and thermometers"): `e.tournamentId` links an event to a
+  tournament (`fundTournament(e)`); the event drawer's *Includes a golf tournament* box (new events) and the Overview's golf card
+  (`golfCardHTML` / `linkGolfDrawer`: create one of the same name, `tournamentForFund`, or pick an existing one; Open, Prizes, Unlink)
+  make the link, and ui.js's New tournament calls `fundForTournament(t)` on a nonprofit so every tournament gets its event; a charity
+  tournament starts with `NONPROFIT_FEATURES` (sponsors, budget, 50/50 on; meals, checklist, Calcutta off). `golfMoney(t)` reads
+  `tcalc`: actual revenue (entries received, sponsor payments, the 50/50, income lines) and expenses (actual once played, budget until
+  then); `fundTotals` carries `golf` / `golfExp` / `golfB` / `golfExpB`, `raised` and `net` include them, `FUND_STREAMS` has a read-only
+  `golf` row on the Budget tab (its plan is the tournament's own budget, `fundPlan`), and the Money tab lists it. **Places get donated
+  gifts, never payouts** (the owner: "payouts on the golf side of things for charity events aren't really all that important"): the
+  golf card's Prizes box (`e.golfPrizes`, free text) is the only prize tooling on a fundraiser. **Goals are per event** (`e.goal`; no
+  year goal): `fundThermoHTML(e,{small,click,always,actions})` is the one bar (event Overview with *Goal & progress page* →
+  `progressDrawer`; the Fundraising page shows every event of the year with a goal; `fundDashThermos()` puts up to four on the club
+  dashboard, next ones first); `fundPub(e).progress = fundProgress(e)` ({goal, raised, pct, streams by name — the tournament under its
+  own name —, golf, at}) rides the event's own `fund_share` row, the event page shows the bar on The evening, and `auction.html?k=TOKEN&p=1`
+  (`PROG`, `renderProgress`) is the **public progress page**: the goal, raised, "to go", where it came from, a link to the event page —
+  never a name. Turning the event page off turns it off. `tests/test_fund.py` covers the golf box, the dashboard's auto-created event,
+  the thermometers, the goal drawer and the public page.
 - **Legacy app (retired):** the original Member-Member app used to live on `main` (its history is still in git);
   its `mm_tournament` table is still in Supabase as an archive, to be dropped when that system is deprecated. The
   hub's import / Verify / two-way sync / "Retire current app" code was removed in Oct 2026. Stored documents may still carry `db.legacy`, `t.source` (`kind:'mm-app'`) and
