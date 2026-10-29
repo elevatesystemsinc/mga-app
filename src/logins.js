@@ -83,12 +83,40 @@ function loginsCard(m,orgId,opt){
   paint(); if(!HL.rows) paintAll();
 }
 /* the club hub's Logins page (staff): the staff list, then every organization's board logins */
+/* may this session create and manage the club's own staff logins? Flagstick, or a staff login of this club (the Edge Function
+   admin-users checks the same thing on its side) */
+const iAmStaff=()=>!!(ACCESS&&(ACCESS.admin||(GRANT&&GRANT.role==='staff')));
 /* the staff logins as a card appended to a page (the Logins page; a nonprofit's Settings → Users) */
-function staffLoginsCard(m,opt){ opt=opt||{}; const staff=(HL.rows||[]).filter(u=>u.role==='staff'), box=document.createElement('div'); box.className='card'; box.style.overflow='hidden';
-  box.innerHTML=`<div class="cardhead"><div><h2 class="h2">${esc(opt.title||'Staff')}</h2>${opt.note?`<span class="muted">${esc(opt.note)}</span>`:''}</div><span class="muted" style="font-size:13px">Managed by Flagstick — ask them to add or remove ${opt.title?'logins':'staff'}</span></div>
-      <div class="t">${HL.rows?(staff.length?staff.map(loginLine).join(''):'<div class="tr"><span class="muted">No logins listed.</span></div>'):'<div class="tr"><span class="muted">Loading…</span></div>'}</div>`;
-  m.appendChild(box); box.querySelectorAll('[data-lu]').forEach(r=>{ const u=(HL.rows||[]).find(x=>x.user_id===r.dataset.lu); if(u&&u.role==='staff') r.onclick=()=>loginEditor(u,null,()=>loadLogins().then(()=>render())); });
+function staffLoginsCard(m,opt){ opt=opt||{}; const staff=(HL.rows||[]).filter(u=>u.role==='staff'), box=document.createElement('div'); box.className='card'; box.style.overflow='hidden'; const mine=iAmStaff();
+  box.innerHTML=`<div class="cardhead"><div><h2 class="h2">${esc(opt.title||'Staff')}</h2><span class="muted">${esc(opt.note||'Staff logins see the whole club. Set the e-mail and a password here, or e-mail an invite.')}</span></div><div class="actions">${mine?btn('New login','slNew','pri',I.plus):`<span class="muted" style="font-size:13px">Managed by Flagstick</span>`}</div></div>
+      <div class="t">${HL.rows?(staff.length?staff.map(loginLine).join(''):'<div class="tr"><span class="muted">No logins yet.</span></div>'):'<div class="tr"><span class="muted">Loading…</span></div>'}</div>`;
+  m.appendChild(box); const nb=box.querySelector('#slNew'); if(nb) nb.onclick=()=>staffLoginDrawer(null,{});
+  box.querySelectorAll('[data-lu]').forEach(r=>{ const u=(HL.rows||[]).find(x=>x.user_id===r.dataset.lu); if(u&&u.role==='staff') r.onclick=()=>mine?staffLoginDrawer(u,{}):loginEditor(u,null,()=>loadLogins().then(()=>render())); });
   if(!HL.rows) loadLogins().then(()=>render()); }
+/* a staff login of this club, from the hub (the owner, Oct 29: "create a login for users of Battle of the Nines… set the email and
+   password"): create with a password set now (shown once) or an e-mailed invite; later the name, a new password, a reset link, removal */
+function staffLoginDrawer(u,init){ init=init||{}; const a=u?(HL.auth[u.user_id]||{}):{}, me=ACCESS&&ACCESS.user_id, done=()=>loadLogins().then(()=>render());
+  openDrawer({kicker:CLUB.name,title:u?(u.name||u.email||'Login'):'New login',wide:true,saveLabel:u?'Save':'Create login',
+    body:(u?`<p class="muted" style="margin:0 0 10px">${esc(u.email||a.email||'')} · ${a.last_sign_in_at?'last signed in '+fwhen(a.last_sign_in_at):'never signed in'}</p>`+field('Name','suN',u.name||a.name||'')
+       :pair(field('E-mail','suE',init.email||'',{type:'email',ph:'name@example.org'}),field('Name','suN',init.name||'')))+
+      `<p class="hint">A login sees everything in this hub${typeof isNonprofit==='function'&&isNonprofit()?': the fundraising events, the tournament, the register, donors and settings':''}.</p>`+
+      (u?`<div class="fld" style="margin-top:6px"><span class="lbl">Password</span><div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center"><input class="inp" id="suPw" placeholder="New password (8+ characters)" style="flex:1;min-width:200px" autocomplete="new-password"><button class="btn" id="suGen" type="button">Generate</button><button class="btn" id="suSet" type="button">Set password</button></div>
+          <div class="actions" style="margin-top:8px"><button class="btn" id="suReset" type="button">E-mail a reset link</button></div><div id="suMsg"></div>${fnNote()}</div>`
+        :`<div class="fld"><span class="lbl">Password</span>${seg('suMode',[['set','Set a password now'],['invite','E-mail an invite']],'set')}
+          <div id="suSetBox" style="display:flex;gap:8px;align-items:center;margin-top:8px"><input class="inp" id="suPw" placeholder="Type one, or leave blank to generate" style="flex:1" autocomplete="new-password"><button class="btn" id="suGen" type="button">Generate</button></div>
+          <p class="hint">Set now: the password is shown once after the login is created and you hand it over. Invite: they get an e-mail with a link to ${esc(SITE_BASE)} and choose their own.</p>${fnNote()}</div>`),
+    del:u&&u.user_id!==me?()=>{ if(!confirm('Remove '+(u.email||'this login')+' from '+CLUB.name+'? They can no longer sign in here.')) return false; (async()=>{ const {error}=await sb.from('tenant_users').delete().eq('user_id',u.user_id).eq('tenant',TENANT); if(error){ toast(error.message); return; } toast('Login removed'); done(); })(); }:null, delLabel:'Remove this login',
+    wire:r=>{ wireSeg(r,'suMode',v=>{ const b=r.querySelector('#suSetBox'); if(b) b.style.display=v==='set'?'flex':'none'; }); const g=r.querySelector('#suGen'); if(g) g.onclick=()=>{ r.querySelector('#suPw').value=genPassword(); };
+      if(u){ const msg=r.querySelector('#suMsg');
+        r.querySelector('#suSet').onclick=async()=>{ const pw=r.querySelector('#suPw').value; if(pw.length<8){ toast('8 characters or more'); return; } try{ await adminFn('set_password',{user_id:u.user_id,password:pw,tenant:TENANT}); msg.innerHTML=`<div class="banner" style="margin-top:8px">Password set for ${esc(u.email||'')}: <code>${esc(pw)}</code> — copy it now.</div>`; }catch(e){ msg.innerHTML=e.message==='FN_MISSING'?fnNote():`<p class="hint" style="color:var(--neg)">${esc(e.message)}</p>`; } };
+        r.querySelector('#suReset').onclick=async()=>{ const {error}=await sb.auth.resetPasswordForEmail(u.email||a.email,{redirectTo:SITE_BASE}); msg.innerHTML=error?`<p class="hint" style="color:var(--neg)">${esc(error.message)}</p>`:`<div class="banner" style="margin-top:8px">Reset e-mail sent to ${esc(u.email||a.email||'')}.</div>`; }; } },
+    save:()=>{ const name=fv('suN');
+      if(u){ (async()=>{ const {error}=await sb.from('tenant_users').update({name}).eq('user_id',u.user_id).eq('tenant',TENANT); if(error){ toast(error.message); return; } toast('Saved'); done(); })(); return; }
+      const body=$('dBody'), email=fv('suE').trim().toLowerCase(), mode=body.querySelector('#suMode').dataset.val, pw=body.querySelector('#suPw').value; if(!email){ toast('Enter the e-mail address'); return false; } if(mode==='set'&&pw&&pw.length<8){ toast('8 characters or more'); return false; }
+      const have=(HL.rows||[]).find(x=>(x.email||'').toLowerCase()===email); if(have){ toast(email+' already has a login here'); return false; }
+      (async()=>{ try{ const r=await createLogin({tenant:TENANT,email,name,role:'staff',mode,password:pw||undefined,redirect:SITE_BASE});
+          if(typeof clubStaff==='function'){ const p=clubStaff().find(x=>(x.email||'').toLowerCase()===email); if(!p&&name&&typeof isNonprofit==='function'&&isNonprofit()){ clubStaff().push({id:uid(),name,role:'staff',title:'',depts:[],outlets:[],pin:null,email,active:true}); persist(); } }
+          await loadLogins(); loginResult(r,SITE_BASE); }catch(e){ toast(e.message); } })(); }}); }
 function vLogins(m){
   if(!isClub()||!canManageLogins()){ go('dash'); return; }
   m.innerHTML=head('Logins','Who can sign in to '+esc(CLUB.name)+' and what they see. Staff see the whole club; a board login sees its own organization only.');
@@ -98,12 +126,11 @@ function vLogins(m){
 /* invite / edit one login for one organization (staff may also edit a staff row's name) */
 function loginEditor(u,orgId,done){
   const o=orgId?orgMeta(orgId):null, a=u?(HL.auth[u.user_id]||{}):{}, isStaff=u&&u.role==='staff';
-  const iAmStaff=!!(ACCESS&&(ACCESS.admin||(GRANT&&GRANT.role==='staff')));
   const otherOrgs=u?(u.orgs||[]).filter(x=>x!==orgId):[];
   openDrawer({kicker:o?(o.short||o.name):CLUB.name,title:u?(u.name||u.email||'Login'):'Invite to the '+(o?(o.short||o.name):'club')+' board',saveLabel:u?'Save':'Invite',
     body:(u?`<p class="muted" style="margin:0 0 10px">${esc(u.email||a.email||'')} · ${a.last_sign_in_at?'last signed in '+fwhen(a.last_sign_in_at):'never signed in'}</p>`+field('Name','lgN',u.name||a.name||'')
        :pair(field('E-mail','lgE','',{type:'email',ph:'name@example.com'}),field('Name','lgN','')))+
-      (isStaff?'<p class="hint">A staff login sees the whole club. Flagstick manages staff; only the name can be changed here.</p>':
+      (isStaff?'<p class="hint">A staff login sees the whole club. Only the name can be changed here.</p>':
         `<label class="check"><input type="checkbox" id="lgMan"${u&&u.manage?' checked':''}>Board administrator — may invite and remove ${esc(o?(o.short||o.name):'this board')}’s logins</label>`+
         (otherOrgs.length?`<p class="hint">Also has: ${otherOrgs.map(esc).join(', ')}.</p>`:'')+
         (u?'':`<div class="fld" style="margin-top:6px"><span class="lbl">How they get in</span>${seg('lgMode',[['invite','E-mail an invite'],['set','Set a password now']],'invite')}<div id="lgSetBox" style="display:none;gap:8px;align-items:center;margin-top:8px"><input class="inp" id="lgPw" placeholder="Leave blank to generate one" style="flex:1" autocomplete="new-password"><button class="btn" id="lgGen">Generate</button></div><p class="hint">Invite: they get an e-mail with a link to ${esc(SITE_BASE)} and choose their password. Set now: the password is shown once and you hand it over.</p>${fnNote()}</div>`)+

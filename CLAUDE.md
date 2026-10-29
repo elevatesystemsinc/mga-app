@@ -904,6 +904,12 @@ groups, printed scorecards — the printed cards include a live-scoring QR that 
   carry `lg`. `fundPublishIfChanged` republishes an event page when its published copy would differ (data written outside the drawers, a
   new build). Demo data for the Battle of the Nines tenant was written straight to its row (people, users, products, the event, the
   tournament field, bids, register sales) for the owner's presentation.
+  **Staff logins from the hub** (the owner, Oct 29: "create a login for users of Battle of the Nines… set the email and password"):
+  `staffLoginDrawer(u, {email,name})` in logins.js — New login (e-mail, name, *Set a password now* shown once after creation, or *E-mail
+  an invite*), and for an existing login the name, Set password, a reset link, Remove (never yourself). `iAmStaff()` (Flagstick, or a
+  staff login of this club) gates it; the Edge Function `admin-users` already allows a tenant's staff to create / invite / set_password
+  for its own logins. The Logins page's staff card and Settings → Users's Logins card carry **New login**; a user row with an e-mail and
+  no login shows *Create login* prefilled. On a nonprofit, a login created with a name also lands on the Users list.
 - **Legacy app (retired):** the original Member-Member app used to live on `main` (its history is still in git);
   its `mm_tournament` table is still in Supabase as an archive, to be dropped when that system is deprecated. The
   hub's import / Verify / two-way sync / "Retire current app" code was removed in Oct 2026. Stored documents may still carry `db.legacy`, `t.source` (`kind:'mm-app'`) and
