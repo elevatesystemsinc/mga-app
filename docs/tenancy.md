@@ -158,7 +158,7 @@ and RLS enforces the same on the tables.
    the **magic link** template (members sign in to `member.html` with it) and add `https://<slug>.flagstickhub.com/member.html`
    style redirects (the wildcard already covers it). Each club then connects its own Stripe account from Billing setup;
    until a key is set the hub and the portal say online payments aren't switched on.
-9a. **Client types and the nonprofit set** (`client-kinds-setup.sql`, `fund-setup.sql`, both applied): New client asks the type;
+9a. **Client types and the nonprofit set** (`client-kinds-setup.sql`, `fund-setup.sql`, `fund-cashier-setup.sql`, all applied): New client asks the type;
    a nonprofit starts with Golf management + Fundraising events. Nothing else to configure on Flagstick's side.
 9. **Restaurant stations** (`pos-stations-setup.sql`, `pos-split-setup.sql`, `pos-reopen-setup.sql`, `pos-tips-setup.sql` and `pos-closeout-setup.sql` (check numbers, the `slips` bucket, `pos_days`), all applied): nothing to configure on Flagstick's side — the club makes
    its station links in Settings → Food & beverage (the link stays behind each station's Link button); a manager reopens closed checks from the station, the hub from Tickets. Kitchen screens use realtime on `pos_fires` (added to the publication).

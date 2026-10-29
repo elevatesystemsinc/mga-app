@@ -288,7 +288,7 @@ const CLIENT_KINDS=[
   {id:'country',   name:'Country club',             plan:'club', modules:{golf:true,club:true,pos:true,billing:true}, desc:'The full club with a membership and public play'},
   {id:'semi',      name:'Semi-private golf club',   plan:'golf', modules:{golf:true,pos:true}, desc:'A membership and daily-fee play: tournaments, live scoring, the tee sheet, the shop and the grill'},
   {id:'muni',      name:'Municipal course',         plan:'golf', modules:{golf:true,pos:true}, desc:'Daily-fee golf: tournaments and leagues, live scoring, the shop and the grill — no member billing'},
-  {id:'nonprofit', name:'Nonprofit organization',   plan:'golf', modules:{golf:true,events:true}, desc:'Galas and events, a golf tournament, the silent and live auctions, raffles, checkout and acknowledgements'},
+  {id:'nonprofit', name:'Nonprofit organization',   plan:'golf', modules:{golf:true,events:true,pos:true}, desc:'Galas and events, a golf tournament, the silent and live auctions with a cashier, raffle drawings, a register for payments, budgets by event and by year — no club billing, no restaurant'},
   {id:'other',     name:'Other',                    plan:'golf', modules:{golf:true}, desc:'Start from golf management and switch modules on by hand'},
 ];
 const clientKindOf=k=>CLIENT_KINDS.find(x=>x.id===k)||CLIENT_KINDS[0];

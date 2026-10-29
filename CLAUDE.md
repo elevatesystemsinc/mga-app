@@ -848,6 +848,26 @@ groups, printed scorecards — the printed cards include a live-scoring QR that 
   Silent auction (join with name + phone → `fund_join` → a paddle; bid; buy now) · My bids (leading / outbid / won), re-read every 6 s.
   No money moves online yet: tickets, bids and raffle tickets are settled at checkout (card / cash / check / Zelle recorded); Stripe
   for tickets and bids is the next layer. The golf tournament is the existing Tournaments page.
+  **The package, second pass** (the owner, Oct 29: "a nonprofit is going to have its own set of features… point of sale, obviously…
+  not the restaurant… raffle drawings… a live auction and a silent auction with cashier… it's not a Calcutta… reserves… paddle numbers…
+  annual budgeting… budgeting for each event"): a nonprofit's modules are golf + events + **pos** (never club); its rail is
+  Fundraising · Golf (Tournaments, Events & live scoring, Game library) · **Point of sale** (Register, Tickets, Daily close-out,
+  Products) · **Donors** (Donors & guests, Logins) · **Organization** (Calendar, Events, Treasury, Annual budget, Surveys,
+  Organizations) · Settings (`NAV_SECTIONS.nonprofit`, `navHTML`); `posSettings()` seeds one outlet **Event sales** (kind proshop,
+  dept club) instead of Grill + Pro shop, Settings has General · Point of sale (no Food & beverage). **Reserves**: silent items and
+  live lots carry `reserve` (bidders never see it; a high bid under it is not a sale — `silentWins`; the Sold drawer and the
+  cashier warn under it). **The cashier** (`fund-cashier-setup.sql`): `e.cashierKey` → `auction.html?k=TOKEN&c=KEY` (`cashierDrawer`,
+  Overview and Live auction tabs); `fund_share.priv` = `fundPriv(e)` (guests with paddles and tickets, items and lots with reserves,
+  raffle tickets, gifts, payments, `absorbed`) is pushed with every `pushFund`; the page's **Cashier** tab (`cashierHTML` /
+  `wireCashier`) lists every paddle with what it owes (`cashState` applies the actions the hub has not absorbed yet), takes a
+  payment, records a live-auction sale, raffle tickets and a gift through `fund_cashier(token, key, kind, data)` → one `fund_actions`
+  row each; `fundLoad` reads them and `absorbActions(e)` takes each into the event once (by action id, `e.absorbed`), then the event
+  is the record. **Raffle legitimacy, as the 50/50**: Lock the list (`raffleLock`: a SHA-256 fingerprint of every ticket, `raffleCanon`)
+  before a draw; selling stops while locked; the draw refuses a list that changed; a void (`raffleVoid`) or an unlock needs a reason
+  and is logged; **Record** prints `raffleRecordPDF` (tickets, buyers, the fingerprint, every draw, the log). **Budgets**: the event's
+  **Budget** tab (`e.budget = {streams:{tickets,sponsors,silent,live,raffles,donations}, expenses:[]}`, `ftBudget`, `fundPlan`) sets the
+  plan per stream and the planned expenses against the actual; the **Annual budget** page carries a Fundraising events card
+  (`fundBudgetCard(y)`: planned in / net against raised / net per event); the Fundraising page shows the year's planned and actual net.
 - **Legacy app (retired):** the original Member-Member app used to live on `main` (its history is still in git);
   its `mm_tournament` table is still in Supabase as an archive, to be dropped when that system is deprecated. The
   hub's import / Verify / two-way sync / "Retire current app" code was removed in Oct 2026. Stored documents may still carry `db.legacy`, `t.source` (`kind:'mm-app'`) and

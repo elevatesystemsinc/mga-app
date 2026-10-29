@@ -316,7 +316,7 @@ class FakeDB:
             if a.get('p_strokes'): rows.append({'event_id':a['p_event'],'player_id':a['p_player'],'hole':a['p_hole'],'strokes':a['p_strokes']})
             return json.dumps({'data':True,'error':None})
         # survey-setup.sql: the public survey page's two functions (anonymous: answers + the day only)
-        if fn in ('fund_get','fund_join','fund_bid','fund_my','fund_rsvp'):
+        if fn in ('fund_get','fund_join','fund_bid','fund_my','fund_rsvp','fund_cashier_get','fund_cashier'):
             now=datetime.datetime.utcnow().isoformat()+'Z'; tok=a.get('p_token') or ''; sh=next((r for r in self._rows('fund_share') if r.get('token') and r['token']==tok and len(tok)>=16),None)
             perr=lambda m:json.dumps({'data':None,'error':{'message':m,'code':'P0001'}})
             if not sh: return json.dumps({'data':None,'error':None}) if fn=='fund_get' else perr('This link is not valid')
@@ -329,6 +329,16 @@ class FakeDB:
                     H[b['item']]['n']+=1
                 return H
             if fn=='fund_get': return json.dumps({'data':{'fid':fid,'status':sh.get('status','open'),'doc':copy.deepcopy(sh['doc']),'highs':highs(),'bidders':len(B),'now':now},'error':None})
+            if fn in ('fund_cashier_get','fund_cashier'):
+                key=a.get('p_key') or ''
+                if not sh.get('cashier_key') or len(key)<16 or sh['cashier_key']!=key: return perr('Not a cashier link')
+                acts=sorted([x for x in self._rows('fund_actions') if x['fid']==fid and x.get('tenant','wccc')==tn],key=lambda x:x['at'])
+                if fn=='fund_cashier_get': return json.dumps({'data':{'fid':fid,'status':sh.get('status','open'),'doc':copy.deepcopy(sh['doc']),'priv':copy.deepcopy(sh.get('priv') or {}),'highs':highs(),'bidders':[{'id':b['id'],'name':b['name'],'paddle':b['paddle'],'phone':b.get('phone',''),'email':b.get('email','')} for b in sorted(B,key=lambda b:b['paddle'])],'actions':copy.deepcopy(acts)},'error':None})
+                d=a.get('p_data') or {}
+                if a.get('p_kind') not in ('sale','raffle','donation','payment'): return perr('Unknown action')
+                if int(d.get('paddle') or 0)<=0: return perr('Which paddle?')
+                row={'id':str(uuid.uuid4()),'tenant':tn,'fid':fid,'kind':a['p_kind'],'data':d,'by':(d.get('by') or '')[:60],'at':now+str(len(acts)).zfill(4)}; self._rows('fund_actions').append(row)
+                return json.dumps({'data':row,'error':None})
             if fn=='fund_join':
                 name=(a.get('p_name') or '').strip(); ph=''.join(ch for ch in (a.get('p_phone') or '') if ch.isdigit()); em=(a.get('p_email') or '').strip().lower()
                 if not name: return perr('Your name, please')

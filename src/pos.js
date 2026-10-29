@@ -8,7 +8,7 @@ const outletDept=o=>o.kind==='fnb'?'fnb':(o.dept==='tennis'?'racket':o.dept||'go
 const posOn=()=>!!CLUB&&isClub()&&hasModule('pos')&&!KEYMODE&&!SCOPED;
 const posKey=()=>'fs_pos_'+((typeof TENANT!=='undefined'&&TENANT)||'local');
 function posSettings(){ CLUB.pos=CLUB.pos||{}; const p=CLUB.pos;
-  if(!Array.isArray(p.outlets)||!p.outlets.length) p.outlets=[{id:'grill',name:'Grill',kind:'fnb',item:'fnb'},{id:'proshop',name:'Pro shop',kind:'proshop',item:'proshop'}];
+  if(!Array.isArray(p.outlets)||!p.outlets.length) p.outlets=(typeof isNonprofit==='function'&&isNonprofit())?[{id:'sales',name:'Event sales',kind:'proshop',item:'other',dept:'club'}]:[{id:'grill',name:'Grill',kind:'fnb',item:'fnb'},{id:'proshop',name:'Pro shop',kind:'proshop',item:'proshop'}];   // a nonprofit's register sells merchandise, tickets and raffle tickets — no restaurant
   p.products=p.products||[]; p.products.forEach(x=>{ if(x.active==null) x.active=true; if(x.cat==null) x.cat=''; });
   return p; }
 const outletOf=id=>posSettings().outlets.find(o=>o.id===id);

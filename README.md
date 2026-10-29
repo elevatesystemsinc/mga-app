@@ -536,6 +536,11 @@ reserve, and pay at the door or at checkout), and the silent auction. They join 
 paddle, and bid; a bid under the minimum raise, or after bidding closes, is refused, and "My bids" tells them when they
 have been outbid. Close bidding from the hub and the high bids go to checkout. The live auction is recorded by paddle as
 the hammer falls, paddle-raise gifts the same way. A raffle sells numbered tickets by paddle and draws with real randomness,
-recording every draw. **Checkout** gathers what each paddle owes (tickets, wins, raffle tickets, gifts), takes the payment,
+recording every draw: lock the list first (a fingerprint of every ticket goes on the record), and a void needs a reason.
+Silent items and live lots can carry a **reserve** the bidders never see. A **cashier link** puts the cashier's table on a phone
+or laptop without the hub login: look up any paddle, record live-auction sales, raffle tickets, gifts and payments, and the
+hub takes it all in. Each event has a **Budget** tab (the plan per stream and the planned expenses against the actual) and the
+Annual budget page carries every event of the year. A nonprofit also has a plain **register** for merchandise and payments, with
+no restaurant setup. **Checkout** gathers what each paddle owes (tickets, wins, raffle tickets, gifts), takes the payment,
 and prints or e-mails the acknowledgement with the fair market value and the deductible portion. The tax ID and the
 thank-you line live under Fundraising, Settings.
