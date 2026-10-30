@@ -917,6 +917,9 @@ groups, printed scorecards — the printed cards include a live-scoring QR that 
   share among its members to the cent. `nassauSegments` gives a field segment its `order` (sides by total, with ties), `nassauSettle`
   reads `st.places`, `nassauPayouts` passes `comp.places` (already published by `potComp`) so the phones' Finish tab and the hub's
   Settle the match agree; `potRulesText` says "split by total score — 60% to 1st, 40% to 2nd". Match play by holes keeps two sides, no places.
+  **The call-out's word for a failed validation is per game** (the Misfits, Oct 30: "say loser with exclamation marks"): `g.failWord`
+  (the designer's "When a skin fails validation, the call-out says"; blank = "Didn’t validate"), published through `gameInfo` →
+  `pub.game.failWord`, read by the hub's `skinsCallout` flash and the phones' `calloutStage`. Set on that day's game only.
 - **Legacy app (retired):** the original Member-Member app used to live on `main` (its history is still in git);
   its `mm_tournament` table is still in Supabase as an archive, to be dropped when that system is deprecated. The
   hub's import / Verify / two-way sync / "Retire current app" code was removed in Oct 2026. Stored documents may still carry `db.legacy`, `t.source` (`kind:'mm-app'`) and

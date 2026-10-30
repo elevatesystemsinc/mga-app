@@ -297,6 +297,7 @@ function vGameDesign(m){
   <div class="card pad" style="display:flex;flex-direction:column;gap:14px"><h2 class="h2">The day</h2>
     <div class="frow2">${field('Name','gdName',d.name,{ph:'e.g. Friday game'})}<div class="frow2">${field('Course','gdCourse',d.course,{type:'select',options:courses.map(c=>[c.id,c.name])})}${field('Tee','gdTee',d.tee||'White',{type:'select',options:((courseById(d.course)||courses[0]||{tees:[]}).tees||[]).map(t=>[t.name,t.name]),hint:'The game default — any group or player can differ'})}</div></div>
     <div class="frow2">${field('Date','gdDate',d.date,{type:'date'})}${field('Tee time','gdTime',d.time||'',{type:'time'})}</div>
+    ${field('When a skin fails validation, the call-out says','gdFail',d.failWord||'',{ph:'Didn’t validate',hint:'This game only. Leave blank for the usual wording; the phones say the same.'})}
     <div class="frow2"><div class="fld"><span class="lbl">Money changes hands</span>${seg('gdWhen',[['after','After the round'],['before','Before the round']],d.payWhen||'after')}<p class="hint">After: the sheet leads with results and the settlement. Before: it leads with who has paid in.</p></div>
       <div class="fld"><span class="lbl">Settlement</span>${seg('gdSettle',[['pot','Pot — everyone puts in, winners pull out'],['net','Net — one figure per player']],d.settle||'pot')}</div>
       <div class="fld"><span class="lbl">Handicaps</span>${seg('gdHcp',[['full','Full — 100% across the board'],['usga','USGA allowances — 95% stroke play, 85% best ball…']],d.hcp||'full')}</div></div>
@@ -316,7 +317,7 @@ function vGameDesign(m){
   const rerender=()=>render();
   $('gdBack').onclick=$('gdCancel').onclick=()=>{ if(!confirm('Leave without saving?')) return; GD=null; view.gdesign=null; render(); };
   const del=$('gdDelete'); if(del) del.onclick=()=>{ const g=gamesData().find(x=>x.id===GD.id); if(!g) return; if(!confirm(`Delete ${gameTitle(g)} on ${shortDate(g.date)}? Its scoring event, scores and money record go with it.`)) return; deleteGame(g); GD=null; view.gdesign=null; view.gameId=null; persist(); render(); toast('Game deleted'); };
-  const readAll=()=>{ d.name=fv('gdName'); d.course=fv('gdCourse'); d.tee=fv('gdTee')||d.tee||'White'; d.date=fv('gdDate'); d.time=fv('gdTime'); d.notes=fv('gdNotes'); d.rules=fv('gdRules'); d.payWhen=$('gdWhen').dataset.val; d.settle=$('gdSettle').dataset.val; d.hcp=$('gdHcp').dataset.val;
+  const readAll=()=>{ d.name=fv('gdName'); d.course=fv('gdCourse'); d.tee=fv('gdTee')||d.tee||'White'; d.date=fv('gdDate'); d.time=fv('gdTime'); d.notes=fv('gdNotes'); d.rules=fv('gdRules'); d.payWhen=$('gdWhen').dataset.val; d.settle=$('gdSettle').dataset.val; d.hcp=$('gdHcp').dataset.val; d.failWord=fv('gdFail').trim();
     for(const pot of d.pots){ const v=id=>fv(id+'_'+pot.id); pot.name=v('gdN')||pot.name; if(pot.kind!=='manual') pot.entry=n0(v('gdE'));
       const NP=$('gdNP3_'+pot.id); if(NP) pot.rules.noPar3=NP.checked;
       if(pot.kind==='format'){ const pf=potEngine(pot).format; if(POINT_FORMATS.includes(pf)&&$('gdPt_'+pot.id+'_0')){ const t=readPoints(document,'gdPt_'+pot.id,pf); pot.rules.points=t?{[pf]:t}:{}; } }
@@ -585,7 +586,7 @@ function potComp(g,pot){
 function gameComps(ev){ const g=gamesData().find(x=>x.id===ev.gameId); if(!g) return []; return g.pots.filter(p=>p.kind==='format'||p.kind==='skins').map(p=>potComp(g,p)); }
 /* the rest of what the Finish tab needs to show who's owed what: how the game settles, extras in, the hand-tallied pots */
 function gameInfo(ev){ const g=gamesData().find(x=>x.id===ev.gameId); if(!g) return null;
-  return {payWhen:g.payWhen||'after',settle:g.settle||'pot',extras:Object.fromEntries(g.players.filter(p=>p.gpid&&n0(p.extraIn)).map(p=>[p.gpid,n0(p.extraIn)])),
+  return {payWhen:g.payWhen||'after',settle:g.settle||'pot',failWord:g.failWord||'',extras:Object.fromEntries(g.players.filter(p=>p.gpid&&n0(p.extraIn)).map(p=>[p.gpid,n0(p.extraIn)])),
     others:g.pots.filter(p=>p.kind==='dots'||p.kind==='manual').map(p=>({id:p.id,name:p.name,kind:p.kind,entry:n0(p.entry),players:potPlayers(g,p).map(x=>x.gpid).filter(Boolean)}))}; }
 /* the public event cut down to one competition: its players, its format, its teams */
 function potPub(g,pot){ const ev=gameEvent(g); if(!ev) return null; return compPub(publicEvent(ev),potComp(g,pot)); }
@@ -724,7 +725,7 @@ function skinsCallout(g,pot){
   const close=()=>{ if(i>=order.length&&!pot.calledOut){ pot.calledOut=true; persist(); } if(document.fullscreenElement) document.exitFullscreen().catch(()=>{}); ov.remove(); document.removeEventListener('keydown',key); render(); };
   const paint=()=>{ const shown=order.slice(0,i).map(h=>lineFor(h,i)); const done=i>=order.length&&!flash;
     ov.innerHTML=`<div class="rf-top"><img src="${typeof crestSrc==='function'?crestSrc():'flagstick-crest-light.svg'}" alt=""><div><div class="rf-k">${esc(orgName())} · ${esc(gameTitle(g))}</div><div class="rf-h">${esc(pot.name)} — from the cards</div></div><button class="rf-x" id="skClose" aria-label="Close">✕</button></div>
-      ${flash?`<div class="rf-stage sk-flash ${flash.ok?'ok':'bad'}"><div class="sk-flash-h">Hole ${flash.w.hole} · ${esc(flash.w.name)}</div><div class="sk-flash-big">${flash.ok?'Validated':'Didn’t validate'}</div><div class="sk-flash-s">${esc(madeOn(flash.w)||'')}${flash.ok?` — ${esc(vtxt)} or better, the skin stands`:` — needed ${esc(vtxt)}${per?', carried on':', no skin'}`}</div><div class="rf-hint">tap Show hole ${flash.w.checkHole} below — or the space bar</div></div>`
+      ${flash?`<div class="rf-stage sk-flash ${flash.ok?'ok':'bad'}"><div class="sk-flash-h">Hole ${flash.w.hole} · ${esc(flash.w.name)}</div><div class="sk-flash-big">${flash.ok?'Validated':esc(g.failWord||'Didn’t validate')}</div><div class="sk-flash-s">${esc(madeOn(flash.w)||'')}${flash.ok?` — ${esc(vtxt)} or better, the skin stands`:` — needed ${esc(vtxt)}${per?', carried on':', no skin'}`}</div><div class="rf-hint">tap Show hole ${flash.w.checkHole} below — or the space bar</div></div>`
       :`<div class="rf-stage" style="justify-content:flex-start;padding-top:26px"><div class="rf-lbl">${done?'All 18 holes':'Hole by hole · '+skinsRuleText(rules)}</div>
         <div class="sk-list">${shown.map(l=>`<div class="sk-line ${l.cls}"><b>${l.h}</b><div><span>${esc(l.txt)}</span>${l.sub?`<small>${esc(l.sub)}</small>`:''}</div></div>`).join('')}</div>
         ${done?`<div class="rf-sum" style="margin-top:14px"><span>${per?`${r.total} of 18 holes won`:`${r.total} skin${r.total===1?'':'s'}`} · ${gMoney(total)} pot</span><b>${r.total?gMoney(val)+(per?' a hole':' a skin'):'No skins today'}</b><small>${Object.entries(r.per).map(([pid,n])=>{ const p=g.players.find(x=>x.id===pid); return `${p?gpName(p):'—'} ${n}`; }).join(' · ')}${r.pending?' · '+r.pending+' still pending':''}</small></div>`:''}</div>`}
