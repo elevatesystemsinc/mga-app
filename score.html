@@ -735,7 +735,7 @@ function splitShares(amount,holders){ const tot=holders.reduce((a,h)=>a+h.n,0); 
 /* the three bets of each match from the board's rows: `up` is A's lead — holes, or strokes when the match is decided by total score */
 function nassauSegments(rows){
   const out=[];
-  const F=rows.filter(r=>r.field&&r.segs); if(F.length>=2){ const seg=k=>{ const S=F.map(r=>[r,r.segs.find(s=>s.k===k)]).filter(([,s])=>s); if(!S.length) return {done:false,winners:[],up:0,by:0}; const done=S.every(([,s])=>s.done), best=Math.min(...S.map(([,s])=>s.rel)), rest=S.map(([,s])=>s.rel).filter(v=>v>best); return {done,winners:S.filter(([,s])=>s.rel===best).map(([r])=>r),up:done?1:0,by:rest.length?Math.min(...rest)-best:0}; };
+  const F=rows.filter(r=>r.field&&r.segs); if(F.length>=2){ const seg=k=>{ const S=F.map(r=>[r,r.segs.find(s=>s.k===k)]).filter(([,s])=>s); if(!S.length) return {done:false,winners:[],up:0,by:0}; const done=S.every(([,s])=>s.done), best=Math.min(...S.map(([,s])=>s.rel)), rest=S.map(([,s])=>s.rel).filter(v=>v>best); const sorted=S.slice().sort((a,b)=>a[1].rel-b[1].rel); let pos=0; const order=sorted.map(([r,s],i)=>{ if(i===0||s.rel!==sorted[i-1][1].rel) pos=i+1; return {row:r,rel:s.rel,pos}; }); return {done,winners:S.filter(([,s])=>s.rel===best).map(([r])=>r),order,up:done?1:0,by:rest.length?Math.min(...rest)-best:0}; };
     out.push({field:true,sides:F,by:'strokes',front:seg('F'),back:seg('B'),total:seg('18')}); }
   rows.filter(r=>!r.field&&r.holesUp>=0&&r.segs).forEach(A=>{ const B=rows.find(r=>r!==A&&r.opp===A.name&&r.name===A.opp); if(!B||out.some(m=>m.A===B)) return;
     const S=k=>A.segs.find(s=>s.k===k)||{v:0,done:false};
@@ -783,6 +783,9 @@ function nassauSettle(st,M,memberIds){ const pays=new Map(), lines=[], add=(pid,
     if(m.field){ const all=m.sides.flatMap(ids), pool=s*all.length;
       if(!seg.done){ lines.push({label,txt:`${m.sides.length} sides · not finished`,amt:0}); all.forEach(pid=>add(pid,s,label+' · open, stake back')); continue; }
       const W=seg.winners.flatMap(ids); if(W.length>=all.length){ lines.push({label,txt:'Everyone tied — a push',amt:0}); all.forEach(pid=>add(pid,s,label+' · tied')); continue; }
+      const pcts=Array.isArray(st.places)&&st.places.length>1?st.places:null;
+      if(pcts&&seg.order){ const res=splitByFinish(pool,seg.order.map((o,i)=>({id:i,name:o.row.name,pos:o.pos})),pcts); const tiedAt=p=>res.filter(x=>x.pos===p).length>1;
+        res.forEach(x=>{ const o=seg.order[x.id], mem=ids(o.row); if(!mem.length||!(x.amount>0)) return; const cents=Math.round(x.amount*100), each=Math.floor(cents/mem.length); let odd=cents-each*mem.length; lines.push({label:label+' · '+(tiedAt(x.pos)?'T':'')+gOrdinal(x.pos),txt:o.row.name,amt:x.amount}); mem.forEach(pid=>add(pid,(each+(odd-->0?1:0))/100,`${label} · ${gOrdinal(x.pos)}${tiedAt(x.pos)?' (tied)':''}`)); }); continue; }
       const each=Math.round(pool*100/W.length)/100, names=seg.winners.map(r=>r.name).join(' and '), byTxt=seg.winners.length>1?'tied for the low total — share':`by ${seg.by} stroke${seg.by===1?'':'s'}`;
       lines.push({label,txt:`${names} ${byTxt}`,amt:pool}); W.forEach(pid=>add(pid,each,`${label} · ${seg.winners.length>1?'tied low — shared':'won '+byTxt}`)); continue; }
     const a=ids(m.A), b=ids(m.B), pool=s*(a.length+b.length);
@@ -792,7 +795,7 @@ function nassauSettle(st,M,memberIds){ const pays=new Map(), lines=[], add=(pid,
     lines.push({label,txt:`${(seg.up>0?m.A:m.B).name} ${byTxt}`,amt:pool}); W.forEach(pid=>add(pid,each,`${label} · won ${byTxt}`)); }
   return {lines,pays}; }
 function nassauPayouts(pub,comp,rows){
-  const st=Object.assign({front:5,back:5,total:10},comp.nassau||{}), M=nassauSegments(rows);
+  const st=Object.assign({front:5,back:5,total:10},comp.nassau||{}), M=nassauSegments(rows); st.places=(comp.places||[]).slice();
   if(!M.length) return {kind:'nassau',rows:[],total:0,lines:[],note:'no match yet',standings:rows};
   const {lines,pays}=nassauSettle(st,M);
   const out=[...pays.entries()].filter(([,x])=>x.amount>0).map(([pid,x])=>({pid,amount:Math.round(x.amount*100)/100,note:x.notes.join(' · ')}));
@@ -1206,7 +1209,7 @@ window.__canReload=()=>!queue.length;
    page counts, and a reload is tried once per build — if the page that comes back is still the old one, the CDN
    hasn't caught up; wait a while before trying that build again. */
 (function(){
-  const ME='20261029224942', KEY='au_tried', RETRY=10*60*1000; let ready=false, lastCheck=0;
+  const ME='20261030170324', KEY='au_tried', RETRY=10*60*1000; let ready=false, lastCheck=0;
   const typing=()=>{ const a=document.activeElement; return a&&/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)&&a.value&&a.type!=='search'; };
   const safe=()=>!typing()&&(typeof window.__canReload!=='function'||window.__canReload());
   const tried=()=>{ try{ const [b,t]=(sessionStorage.getItem(KEY)||'').split('|'); return b?{build:b,at:+t||0}:null; }catch(_){ return null; } };

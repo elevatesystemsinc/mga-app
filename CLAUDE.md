@@ -910,6 +910,13 @@ groups, printed scorecards — the printed cards include a live-scoring QR that 
   staff login of this club) gates it; the Edge Function `admin-users` already allows a tenant's staff to create / invite / set_password
   for its own logins. The Logins page's staff card and Settings → Users's Logins card carry **New login**; a user row with an e-mail and
   no login shows *Create login* prefilled. On a nonprofit, a login created with a name also lands on the Users list.
+  **A waltz pays places (Oct 30; and the stakes bug):** the designer's "18 worth $" box shared its element id with Number of teams
+  (`gdNT_`), so saving a waltz wrote the team count into the 18 stake and the entry — the stake box is `gdN18_` now. A Nassau played as
+  **total score** carries a **Pays** editor (`paysEditor(d,pot,true,{auto:[100],…})`): no places = the lowest team takes each bet (as
+  before); places (e.g. 60/40) split each bet's pool — every player's stake — among the teams by total, tied teams sharing, each team's
+  share among its members to the cent. `nassauSegments` gives a field segment its `order` (sides by total, with ties), `nassauSettle`
+  reads `st.places`, `nassauPayouts` passes `comp.places` (already published by `potComp`) so the phones' Finish tab and the hub's
+  Settle the match agree; `potRulesText` says "split by total score — 60% to 1st, 40% to 2nd". Match play by holes keeps two sides, no places.
 - **Legacy app (retired):** the original Member-Member app used to live on `main` (its history is still in git);
   its `mm_tournament` table is still in Supabase as an archive, to be dropped when that system is deprecated. The
   hub's import / Verify / two-way sync / "Retire current app" code was removed in Oct 2026. Stored documents may still carry `db.legacy`, `t.source` (`kind:'mm-app'`) and
