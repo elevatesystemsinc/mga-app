@@ -21,6 +21,14 @@ management, member billing and point of sale are the coming tier, switched on pe
 app.flagstickhub.com. A club's **staff** logins see the whole club and invite **board** logins for each association from
 the club hub's Logins page; a board login sees its own organization only. See `docs/tenancy.md`.
 
+## Player registration
+A tournament's Field tab has **Player registration**: open it and share the link (`register.html?k=…`). The page carries the
+organization's own crest, the date, course and schedule, the entry fee, the format in plain words with the points table, the handicap
+allowance and the partner differential cap, how many places pay and how, the rule sheet (Tournament details → Rule sheet) and who is
+already in. A member finds their own name, adds their partners, or ticks **Need help finding a 2nd / 3rd player** and the golf shop pairs
+them — every spot is a name or that box before Enter lights up, nobody can be entered twice. Entries become teams in the field on their
+own (open spots show as *Shop pairing*). Close registration when the field is full; Turn off drops the page.
+
 ## Surveys
 
 Every hub has a **Surveys** page. Build a survey in sections (Thursday nights, weekend tournaments, membership…) with 0–10

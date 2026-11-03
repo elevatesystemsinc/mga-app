@@ -57,6 +57,7 @@ src/
   raffle.js            50/50 Drawing tab, drawing screen, official record PDF
   payouts.js           Calcutta payouts math (calcPayouts, ties) + Results / Payouts sub-tabs
   surveys.js           Surveys: anonymous member surveys (sections → questions, public link, results, CSV)
+  signup.js            Player registration: a tournament's public sign-up page (the Field tab's card, the published copy, entries → the field)
   billcore.js          the member statement PDF page (statementPage), shared by the hub and the member portal            [shared]
   billing.js           Member accounts & billing (module 'billing', club hub, staff only): classes, the monthly run, tax/service,
                        minimums, finance charges, aging, statements, GL export, Stripe Connect, the mail function
@@ -73,11 +74,12 @@ src/
   score_src.html       live scoring   (markers /*GOLFCORE*/ /*AUTOUPDATE*/)
   gamecast_src.html    GameCast: follow a game live, read-only, no group ID (markers /*GOLFCORE*/ /*AUTOUPDATE*/)
   survey_src.html      public survey page (marker /*AUTOUPDATE*/ only)
+  register_src.html    player registration page: the tournament in full, find your name, add partners or ask the shop (marker /*AUTOUPDATE*/ only)
   member_src.html      the member portal: sign in by e-mail link, balance, statements, pay online, autopay (markers /*PDFFONTS*/ /*BILLCORE*/ /*AUTOUPDATE*/)
   pos_src.html         a register station on the floor: PIN lock, tables and tabs, the check, send to the kitchen, pay, receipt (markers /*PDFFONTS*/ /*BILLCORE*/ /*POSCORE*/ /*AUTOUPDATE*/)
   expo_src.html        a kitchen expo screen: the rail of fired courses for one prep station, bump / recall (marker /*AUTOUPDATE*/)
   clock_src.html       a time clock kiosk: PIN pad → clock in / out for one department (marker /*AUTOUPDATE*/)
-build.sh               → index.html, cashier.html, checkin.html, score.html, gamecast.html, survey.html, member.html, pos.html, expo.html, clock.html, version.json (repo root)
+build.sh               → index.html, cashier.html, checkin.html, score.html, gamecast.html, survey.html, register.html, member.html, pos.html, expo.html, clock.html, version.json (repo root)
 ```
 `index.html` = `head.html` + one `<script>` of the modules **in the order listed in `build.sh`** + `boot();`.
 Everything shares one global scope (no modules/imports) — later files may call earlier files' functions, and
@@ -101,6 +103,7 @@ python3 tests/test_tenants.py # tenants, the portal, staff / board logins and sc
 python3 tests/test_survey.py  # a survey from the template → public link → anonymous answers → results, against the fake
 python3 tests/test_finish.py  # a game wrapped up from the phones (close → skins → draw → payouts) and taken into the hub, against the fake
 python3 tests/test_billing.py # the Club-management tier against the fake: accounts, the billing engine, statements + e-mail, the member portal, POS, bookings
+python3 tests/test_signup.py  # player registration against the fake: open the page, enter alone / with partners / ask the shop, no blanks, no doubles, into the field
 git add -A && git commit && git push origin main  # Render deploys main to app.wcccmga.org
 ```
 Tests need `pip install playwright && playwright install chromium` and `cd tests && npm i xlsx@0.18.5`.
@@ -431,6 +434,7 @@ Tournament = { id, name, season, days, startDate, field:[{id,memberId,team,paid,
 | `mga_hub` (tenant, id, data jsonb) | one row per organization per tenant: `club`, `mga`, `lga`, `smga`, `<group id>`. The rows `main` (the old MGA Hub's) and `sync:mga` are history, no code reads them. `hub-setup.sql`, `hub-fix-permissions.sql` |
 | `calcutta_share` (tid, token, name, doc, version) + RPC `calcutta_get(p_token)`, `calcutta_put(p_token,p_doc,p_version)` | token links for people without the board login: the **cashier** page (tid = tournament id) and the **registration/check-in** page (tid = tournament id + `:checkin`). `calcutta_put` is version-checked (conflict → retry). `calcutta-setup.sql` |
 | `golf_events` (+ `wrap`), `golf_scores` + RPC `golf_event`, `golf_join`, `golf_submit`, `golf_wrap`, `hub_key_wrap` | public live scoring (`golf-setup.sql`) and the Finish tab's wrap-up (`wrap-setup.sql`). `public.org` names the owning organization. |
+| `signup_share` (tid, tenant, org, token, status, doc), `signup_entries` (id, tenant, org, tid, players, need, answers, note, at) + RPC `signup_get(p_token)`, `signup_submit(p_token,p_players,p_need,p_answers,p_note)`, `hub_key_signup`, `hub_key_signup_entries` | player registration (`signup-setup.sql`): the share row is what the page shows (names only); an entry is a team the hub takes into the field and clears. |
 | `survey_share` (sid, tenant, org, token, status, doc), `survey_responses` (id, tenant, org, sid, answers, day) + RPC `survey_get(p_token)`, `survey_submit(p_token,p_answers)`, `hub_key_survey`, `hub_key_survey_results` | surveys (`survey-setup.sql`): the share row is what the public page shows; a response is answers + the **day** only — no user, e-mail, IP or device, ever. |
 | `acct_items`, `acct_statements` + `can_staff(p_tenant)` | member accounts & billing (`billing-setup.sql`): the club's ledger, staff only. |
 | `member_users`, `tenants.stripe_account/stripe_status` + RPC `member_me(p_tenant)`, `member_autopay_off(p_tenant)` | the member portal and online payments (`member-setup.sql`); Edge Functions `mail`, `stripe`, `stripe-webhook`. |
@@ -553,6 +557,28 @@ Don't weaken any of this (no `Math.random` for picks, no silent redraws, no edit
 ### Check-in (`checkin.js`, `ckcore.js`, `checkin.html`)
 Alphabetical, searchable (own name first; partner only if nobody matches; number = team). Registration link for
 the two people at the table. The user wants this **simple** — don't add features to it unasked.
+
+### Player registration (`signup.js`, `register_src.html` → `register.html?k=TOKEN`, `signup-setup.sql`, `tests/test_signup.py`)
+The owner, Nov 2026: "a good player registration page… search the players, add myself, as well as add team members, require all three
+entries to be filled… or themselves and another partner but have a checkbox for need help finding a third… branded with the MGA crest,
+the tournament details and rule sheet, the amount of spots getting paid out… fully transparent on how the tournament operates."
+The Field tab's **Player registration** card (`signupCard` / `wireSignupCard`) opens it: `t.reg = {token, status open|closed, openedAt}`
+(the tournament's status becomes Open for signups), the link is `register.html?k=TOKEN`, Close registration keeps the page up but takes no
+entries, Turn off drops the row. `signupPub(t)` is what the page shows — **names only**, never e-mail / GHIN / index: the details (date,
+venue, schedule, entry fee, skins fee, team size), every round through `sgRound` (format in words from `formatSummary`, net / gross, how
+many balls count, the points table when it is a points format, the handicap allowance `sgAllowText` from `pctFor(allowKey)`, no-pops), the
+differential cap, **`t.placesPaid`** / **`t.payoutNote`** / **`t.rules`** (one rule per line; Tournament details → Places paid, How it pays,
+Rule sheet; the Overview shows them), the field questions, the **pool** (`signupPool`: the organization's members, the directory for a club
+tournament, never the inactive), `taken` (member ids in the field), the `teams` (names, open spots) and `brand` (`brandLogo()` — the
+organization's own logo, else the club's; the MGA row carries its crest as `db.brand`). `signupSync(t)` runs on every tournament render:
+`signupPublishIfChanged` republishes when the copy would differ (`SG_SIG`), `loadSignups` (10 s throttle) reads `signup_entries` and
+`absorbSignups` makes each entry a team: `{memberId, team, paid:false, skins:false, answers, reg:{id, at, need, note}}`, someone already
+in the field is skipped, the entries are deleted once in; the Field tab shows **Shop pairing** on a short team's open spots. The page
+(`register_src.html`): the hero, How it's played, Payouts, Rules, Who's in (field + pending entries), then **Enter** — one slot per team
+spot (You, Player 2…): search the pool (two letters, people already entered or on this team greyed), or for spots after the first tick
+**Need help finding a 2nd / 3rd player — the golf shop will pair me**; the Enter button waits until every spot is a person or asked for;
+field questions yes / no per player; a note for the shop. `signup_submit` enforces the same (size, `need` = size − players, pool, no
+doubles, not already entered — in the field or pending) and a closed page. The fake emulates all four functions.
 
 ### Surveys (`surveys.js`, `survey_src.html` → `survey.html?k=TOKEN`, `survey-setup.sql`)
 Any organization's hub (and the club) has **Surveys**: `db.surveys = [{id, title, intro, status:'draft'|'open'|'closed', token,

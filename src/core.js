@@ -62,7 +62,8 @@ function newTournament(o){
     dayItems:[[],[],[]].slice(0,3),income:[],perPlayer:[],lines:[],
     actuals:{entryFees:0,skins:0,skinsPaid:0},schedule:[],decisions:[],notes:'',source:null,
     features:Object.assign({meals:false,sponsors:false,budget:true,checklist:false,calcutta:false,raffle:false},o.features||{}),   // which optional tabs this tournament uses
-    hcpDiff:+o.hcpDiff||0};   // partner handicap differential cap (0 = off): the higher index is pulled down to low + cap
+    hcpDiff:+o.hcpDiff||0,   // partner handicap differential cap (0 = off): the higher index is pulled down to low + cap
+    placesPaid:0,payoutNote:'',rules:''};   // the payouts and the rule sheet, shown on the registration page
 }
 function normalize(d,meta){
   if(!d||typeof d!=='object') return emptyOrg(meta);

@@ -381,7 +381,48 @@ class FakeDB:
             if not isinstance(ans,dict) or not ans: return json.dumps({'data':None,'error':{'message':'Nothing to send','code':'P0001'}})
             self._rows('survey_responses').append({'id':str(uuid.uuid4()),'tenant':r.get('tenant','wccc'),'org':r['org'],'sid':r['sid'],'answers':copy.deepcopy(ans),'day':datetime.date.today().isoformat()})
             return json.dumps({'data':True,'error':None})
+        # signup-setup.sql: the registration page's two functions
+        if fn=='signup_get':
+            r=next((r for r in self._rows('signup_share') if r.get('token') and r['token']==a.get('p_token')),None)
+            if not r: return json.dumps({'data':None,'error':None})
+            ents=[{'players':copy.deepcopy(e['players']),'need':e['need']} for e in sorted(self._rows('signup_entries'),key=lambda e:e['at']) if e['tid']==r['tid'] and e.get('tenant','wccc')==r.get('tenant','wccc')]
+            return json.dumps({'data':{'tid':r['tid'],'status':r.get('status','open'),'doc':copy.deepcopy(r['doc']),'entries':ents},'error':None})
+        if fn=='signup_submit':
+            perr=lambda m:json.dumps({'data':None,'error':{'message':m,'code':'P0001'}})
+            r=next((r for r in self._rows('signup_share') if r.get('token') and r['token']==a.get('p_token')),None)
+            if not r: return perr('Invalid link')
+            if r.get('status')!='open': return perr('closed')
+            size=max(1,int((r['doc'] or {}).get('teamSize') or 1)); pl=a.get('p_players')
+            if not isinstance(pl,list): return perr('Nothing to send')
+            if len(pl)<1 or len(pl)>size: return perr('A team is %d players'%size)
+            if int(a.get('p_need') or 0)!=size-len(pl): return perr('Every spot needs a player or a request for one')
+            pool={p['id'] for p in (r['doc'].get('pool') or [])}; taken=set(r['doc'].get('taken') or []); seen=set()
+            pend={ep.get('memberId') for e in self._rows('signup_entries') if e['tid']==r['tid'] for ep in e['players']}
+            for p in pl:
+                mid=(p or {}).get('memberId')
+                if not mid or mid not in pool: return perr('not eligible')
+                if mid in seen: return perr('Same player twice')
+                seen.add(mid)
+                if mid in taken or mid in pend: return perr('already entered: '+(p.get('name') or mid))
+            e={'id':str(uuid.uuid4()),'tenant':r.get('tenant','wccc'),'org':r['org'],'tid':r['tid'],'players':copy.deepcopy(pl),'need':int(a.get('p_need') or 0),'answers':copy.deepcopy(a.get('p_answers') or {}),'note':(a.get('p_note') or '')[:400],'at':datetime.datetime.utcnow().isoformat()+'Z'}
+            self._rows('signup_entries').append(e); return json.dumps({'data':{'ok':True,'id':e['id']},'error':None})
         org=self._key_org(a.get('p_key')); tn=self._key_tenant(a.get('p_key'))
+        if fn=='hub_key_signup':
+            if org is None: return err('invalid key')
+            rows=self._rows('signup_share')
+            if a.get('p_doc') is None:
+                rows[:]=[r for r in rows if not(r['tid']==a['p_tid'] and r['org']==org)]; rr=self._rows('signup_entries'); rr[:]=[r for r in rr if not(r['tid']==a['p_tid'] and r['org']==org)]; return json.dumps({'data':True,'error':None})
+            old=next((r for r in rows if r['tid']==a['p_tid']),None)
+            if old and old['org']!=org: return err('not allowed')
+            row={'tid':a['p_tid'],'tenant':tn,'org':org,'token':a.get('p_token'),'status':a.get('p_status') or 'open','doc':copy.deepcopy(a['p_doc'])}
+            if old: old.update(row)
+            else: rows.append(row)
+            return json.dumps({'data':True,'error':None})
+        if fn=='hub_key_signup_entries':
+            if org is None: return err('invalid key')
+            rr=self._rows('signup_entries'); clear=set(a.get('p_clear') or [])
+            if clear: rr[:]=[r for r in rr if not(r['tid']==a['p_tid'] and r['org']==org and r['id'] in clear)]
+            return json.dumps({'data':[copy.deepcopy(r) for r in sorted(rr,key=lambda e:e['at']) if r['tid']==a['p_tid'] and r['org']==org],'error':None})
         if fn=='hub_key_survey':
             if org is None: return err('invalid key')
             rows=self._rows('survey_share')
@@ -471,7 +512,7 @@ class FakeDB:
             rows=self._rows(t); hits=[r for r in rows if self._col_match(r,a['filters'])]
             if op=='select': return json.dumps({'data':(copy.deepcopy(hits[0]) if hits else None) if a['single'] else copy.deepcopy(hits),'error':None})
             if op=='upsert':
-                row=dict(a['payload']); key=('user_id','tenant') if 'user_id' in row and 'tenant' in row else ('user_id',) if 'user_id' in row else ('slug',) if 'slug' in row else ('sid',) if 'sid' in row else ('fid',) if 'fid' in row and 'doc' in row else ('tenant','org') if 'org' in row and 'id' not in row else ('id',)
+                row=dict(a['payload']); key=('user_id','tenant') if 'user_id' in row and 'tenant' in row else ('user_id',) if 'user_id' in row else ('slug',) if 'slug' in row else ('sid',) if 'sid' in row else ('fid',) if 'fid' in row and 'doc' in row else ('tid',) if 'tid' in row and 'doc' in row else ('tenant','org') if 'org' in row and 'id' not in row else ('id',)
                 old=next((r for r in rows if all(r.get(k)==row.get(k) for k in key)),None)
                 if old: old.update(copy.deepcopy(row))
                 else: row.setdefault('created_at',datetime.datetime.utcnow().isoformat()+'Z'); rows.append(copy.deepcopy(row))
