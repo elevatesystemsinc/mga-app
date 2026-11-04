@@ -13,7 +13,7 @@ function calc(t){ if(!t.calcutta) t.calcutta={lots:[],bidders:[],expenses:[],pay
 const calcTotals=t=>calcTotalsC(calc(t));
 /* link each lot's two players to member records, then pick the captain (lower Handicap Index) unless set by hand */
 function resolveCaptains(t,c){
-  const pool=((t.field||[]).map(p=>memberById(p.memberId)).filter(Boolean)).concat(db.members);
+  const pool=((t.field||[]).map(p=>memberById(p.memberId)).filter(Boolean)).concat(members());
   const byKey=new Map(); for(const m of pool){ const k=nameKey(memberName(m)); if(k&&!byKey.has(k)) byKey.set(k,m); }
   const idx=(given,m)=>{ if(given!=null&&given!=='') return +given; const v=m&&typeof parseIndex==='function'?parseIndex(m.hcp):null; return v==null?null:v; };
   for(const l of c.lots){
@@ -90,7 +90,7 @@ function memberMatches(t,q,limit){
   const lev=(a,b)=>{ const d=Array.from({length:a.length+1},(_,i)=>[i]); for(let j=1;j<=b.length;j++) d[0][j]=j;
     for(let i=1;i<=a.length;i++) for(let j=1;j<=b.length;j++) d[i][j]=Math.min(d[i-1][j]+1,d[i][j-1]+1,d[i-1][j-1]+(a[i-1]===b[j-1]?0:1)); return d[a.length][b.length]; };
   const qt=q.split(' ');
-  return db.members.map(m=>{ const name=tidyName(memberName(m)), n=name.toLowerCase(), toks=n.split(/[\s-]+/);
+  return members().map(m=>{ const name=tidyName(memberName(m)), n=name.toLowerCase(), toks=n.split(/[\s-]+/);
       let sc=0;
       if(n.startsWith(q)) sc=100;
       else if(qt.every(w=>toks.some(x=>x.startsWith(w)))) sc=90;
@@ -321,7 +321,7 @@ function tCalcutta(el,t){
   <div class="actions" style="justify-content:flex-end"><button class="btn" id="ccOrd">${I.down}Download order (Excel)</button><button class="btn" id="ccSheet">${I.down}Bidder sheet (PDF)</button></div>
   <div class="card cc-card cc-lots" style="overflow:hidden"><div class="cardhead"><div><h2 class="h2">Lots</h2><span class="muted">Click a lot to record or change a sale</span></div>
     <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;justify-content:flex-end">${searchBox('ccLQ',view.ccLQ,'Find a lot, player or paddle #')}<div class="seg">${[['all','All'],['open','Unsold']].concat(poolTeams(c).length?[['pool','Pool']]:[]).concat(buyInOf(c).on?[['prebuy','Pre-bought'],['due','Team payment due']]:[]).concat(T2.flights.map(f=>[f,f.replace('Flight ','F')])).map(([k,l])=>`<button class="${view.cclot===k?'on':''}" data-ccf="${esc(k)}">${esc(l)}</button>`).join('')}</div></div></div>
-    <div class="tw"><div class="t" style="min-width:760px"><div class="tr th" style="${lcols}"><span>Lot</span><span>Team</span><span>Flight</span><span class="r">Index</span><span>Bought by</span><span class="r">Price</span><span></span></div>
+    <div class="tw"><div class="t keep" style="min-width:760px"><div class="tr th" style="${lcols}"><span>Lot</span><span>Team</span><span>Flight</span><span class="r">Index</span><span>Bought by</span><span class="r">Price</span><span></span></div>
     ${lots.map(l=>{ const b=bidderById(c,l.bidderId);
       if(l.isPool) return `<div class="tr num click cc-lot" data-cl="__pool" style="${lcols};background:#F6ECCF"><b class="l-n">${l.lot}</b><span class="trunc l-t"><b>The Pool</b> · ${l.count} team${l.count===1?'':'s'} under ${fmt(c.minBid)}</span><span class="muted l-f">Mixed</span><span class="l-i"></span><span class="trunc l-b">${l.price>0?esc(bidderLabel(b)):'<span class="muted">—</span>'}</span><b class="r l-p">${l.price>0?fmt(l.price):''}</b><span class="ib l-e">${I.edit}</span></div>`;
       return `<div class="tr num click cc-lot" data-cl="${l.id}" style="${lcols}${l.pooled?';opacity:.72':''}"><b class="l-n">${l.lot}</b><span class="trunc l-t">${l.fun?'<span style="color:var(--gold)" title="Fun team">★</span> ':''}${esc(teamName(l))}</span><span class="muted l-f">${esc(flightName(l.flight))}</span><span class="r muted l-i">${idxTxt2(l.idx)}</span><span class="trunc l-b">${l.prebuy?`<span class="chip ok">Pre-bought · ${esc(captainName(l))}${(()=>{ const cb=captainBidder(c,l); return cb?' #'+esc(cb.num):''; })()}</span>`:l.pooled?`<span class="chip">In the pool · Lot ${poolLotNum(c)}</span>`:n0(l.price)>0?esc(bidderLabel(b)):'<span class="muted">—</span>'}${(()=>{ const due=teamParts(c,l).filter(p=>!p.pay.paid), bd=due.filter(p=>p.kind==='buyin'), n=teamPlayers(l).length; return (bd.length?` <span class="chip warn" title="${esc(bd.map(p=>p.name).join(', '))} not paid">buy-in due${bd.length<n?' · '+esc(bd.map(p=>p.name.split(' ')[0]).join(', ')):''}</span>`:'')+(()=>{ const pd=due.filter(p=>p.kind==='prebuy'); return pd.length?` <span class="chip warn" title="${esc(pd.map(p=>p.name).join(', '))} not paid">pre-buy due${pd.length<n?' · '+esc(pd.map(p=>p.name.split(' ')[0]).join(', ')):''}</span>`:''; })(); })()}</span><b class="r l-p">${l.prebuy?fmt(teamDue(c,l)):!l.pooled&&n0(l.price)>0?fmt(l.price):''}</b><span class="ib l-e">${I.edit}</span></div>`; }).join('')||`<div class="empty" style="padding:22px"><span>No lots match${view.ccLQ?` “${esc(view.ccLQ)}”`:''}.</span></div>`}
@@ -404,8 +404,11 @@ async function exportCalcutta(t){
 }
 
 /* ============ Cashier link: share this Calcutta with the cashiers' laptops ============ */
-const cashierLink=t=>location.href.split('#')[0].split('?')[0].replace(/[^/]*$/,'')+'cashier.html?k='+encodeURIComponent(calc(t).share.token);
+const cashierLink=t=>SITE_BASE+'cashier.html?k='+encodeURIComponent(calc(t).share.token);
 const newToken=()=>Array.from(crypto.getRandomValues(new Uint8Array(24)),b=>'abcdefghijkmnpqrstuvwxyz23456789'[b%32]).join('');
+/* create, replace or (token null) turn off a shared cashier / check-in row; admin links go through the database function */
+function shareRow(tid,token,name,doc){ return KEYMODE?keyRPC('hub_key_share',{p_tid:tid,p_token:token,p_name:name,p_doc:doc})
+  :token?sb.from('calcutta_share').upsert(trow(Object.assign({tid,token,name,doc,version:1,updated_at:new Date().toISOString()},scopedDB()?{org:ORG_ID}:{}))):tq(sb.from('calcutta_share').update({token:null})).eq('tid',tid); }
 function calcPeople(t){ return (t.field||[]).map(p=>{ const m=memberById(p.memberId); return m?{id:m.id,name:tidyName(memberName(m))}:null; }).filter(Boolean).sort((a,b)=>a.name.localeCompare(b.name)); }
 const SHARE_ST={};
 /* the last cashier copy this device merged with — needed to tell what changed here; kept per device */
@@ -445,7 +448,7 @@ async function startCashierLink(t){
   const c=calc(t); if(!CLOUD||!sessionOK){ toast('The cashier link needs the cloud sign-in'); return; }
   const token=newToken(); c.people=calcPeople(t); c.name=t.name; c._del=c._del||[];
   const doc=calcDoc(c);
-  const {error}=await sb.from('calcutta_share').upsert({tid:t.id,token,name:t.name,doc,version:1,updated_at:new Date().toISOString()});
+  const {error}=await shareRow(t.id,token,t.name,doc);
   if(error){ toast(/relation|does not exist/i.test(error.message)?'Run calcutta-setup.sql in Supabase to turn on cashier links':'Couldn’t create the link: '+error.message); return; }
   c.share={token,created:new Date().toISOString()}; SHARE_ST[t.id]={state:'live',at:new Date().toISOString()}; shareBase.set(t,JSON.parse(JSON.stringify(doc)),1);
   persist(); render(); toast('Cashier link ready');
@@ -454,7 +457,7 @@ function stopCashierLink(t){
   const c=calc(t);
   openDrawer({kicker:t.name+' · Calcutta',title:'Turn off the cashier link?',saveLabel:'Turn it off',
     body:'<p style="margin:0">Anyone with the link loses access right away. Everything they recorded stays in the hub. You can create a new link later — it will have a different address.</p>',
-    save:()=>{ (async()=>{ await calcShareAll(); await sb.from('calcutta_share').update({token:null}).eq('tid',t.id); delete c.share; persist(); render(); toast('Cashier link turned off'); })(); }});
+    save:()=>{ (async()=>{ await calcShareAll(); await shareRow(t.id,null,t.name,null); delete c.share; persist(); render(); toast('Cashier link turned off'); })(); }});
 }
 function editCash(t){
   const c=calc(t), P=calcPayments(c);
@@ -531,8 +534,8 @@ async function exportOrder(t){
    gets an empty Bought by / Price line (the slideshow shows pre-buys; bettors fill it in themselves). */
 function loadJsPDF(){ if(window.jspdf) return Promise.resolve();
   return new Promise((res,rej)=>{ const sc=document.createElement('script'); sc.src='https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js'; sc.onload=()=>res(); sc.onerror=()=>rej(new Error('Couldn’t load the PDF maker — check the connection')); document.head.appendChild(sc); }); }
-async function crestPNG(){ const s=typeof crestSrc==='function'?crestSrc():''; if(s&&s.startsWith('data:')) return s;
-  const r=await fetch(new URL('crest.png',location.href)); const b=await r.blob(); return await new Promise(ok=>{ const fr=new FileReader(); fr.onload=()=>ok(fr.result); fr.readAsDataURL(b); }); }
+async function crestPNG(){ const bl=typeof brandLogo==='function'?brandLogo():null; if(bl) return bl; const s=typeof crestSrc==='function'?crestSrc():''; if(s&&s.startsWith('data:')) return s;
+  const r=await fetch(CREST_URL); const b=await r.blob(); return await new Promise(ok=>{ const fr=new FileReader(); fr.onload=()=>ok(fr.result); fr.readAsDataURL(b); }); }
 async function downloadBidSheet(t){
   const c=calc(t);
   try{ await loadJsPDF(); }catch(e){ toast(e.message); return; }
@@ -553,8 +556,7 @@ async function downloadBidSheet(t){
     const y=32, h=compact?46:76;
     doc.setFillColor(...GOLD); doc.roundedRect(L,y,CW,h,8,8,'F');
     doc.setFillColor(...NAVY); doc.roundedRect(L,y,CW,h-4,8,8,'F'); doc.rect(L,y+h-12,CW,8,'F');
-    const ch=compact?30:52, cw=ch*914/1180, cx=L+16, cy=y+(h-4-ch)/2;
-    if(crest) doc.addImage(crest,'PNG',cx,cy,cw,ch);
+    const ch=compact?30:52, cx=L+16, cy=y+(h-4-ch)/2, cw=crest?drawCrest(doc,crest,cx,cy,ch):ch*850/1024;
     const tx=cx+cw+14;
     font('PublicSansXB','normal',compact?6:6.6,GOLDL); doc.text(kicker,tx,y+(compact?17:22),{charSpace:1.25});
     font('Cormorant','bold',compact?16:25,[255,255,255]); doc.text(title,tx,y+(compact?35:48));

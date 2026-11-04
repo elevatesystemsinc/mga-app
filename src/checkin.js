@@ -49,7 +49,7 @@ function tCheckin(el,t){
 }
 /* ---------- registration link ---------- */
 const CKI_ST={};
-const checkinLink=t=>location.href.split('#')[0].split('?')[0].replace(/[^/]*$/,'')+'checkin.html?k='+encodeURIComponent(t.checkinShare.token);
+const checkinLink=t=>SITE_BASE+'checkin.html?k='+encodeURIComponent(t.checkinShare.token);
 const ckBase={ get(t){ try{ return JSON.parse(localStorage.getItem('mga_ckibase_'+t.id)||'null'); }catch(_){ return null; } }, set(t,doc){ try{ localStorage.setItem('mga_ckibase_'+t.id,JSON.stringify(doc)); }catch(_){} } };
 function ckDocFromField(t){ const prev=ckBase.get(t), um=new Map(((prev&&prev.players)||[]).map(p=>[p.id,p]));
   const doc={name:t.name,players:ckPlayers(t).map(r=>{ const o={id:r.id,last:r.last,first:r.first,partner:r.partner,team:r.team,par3:r.par3,in:!!r.p.checkin,at:r.p.checkin?r.p.checkin.at:''}; const b=um.get(r.id); if(b&&b.u) o.u=b.u; return o; })};
@@ -76,13 +76,13 @@ const _ckAfter=window.afterPersist; window.afterPersist=function(){ if(typeof _c
 async function startCheckinLink(t){
   if(!CLOUD||!sessionOK){ toast('The registration link needs the cloud sign-in'); return; }
   const token=newToken(); const doc=ckDocFromField(t);
-  const {error}=await sb.from('calcutta_share').upsert({tid:t.id+':checkin',token,name:t.name+' · Check-in',doc,version:1,updated_at:new Date().toISOString()});
+  const {error}=await shareRow(t.id+':checkin',token,t.name+' · Check-in',doc);
   if(error){ toast(/relation|does not exist/i.test(error.message)?'Run calcutta-setup.sql in Supabase to turn on shared links':'Couldn’t create the link: '+error.message); return; }
   t.checkinShare={token,created:new Date().toISOString()}; ckBase.set(t,doc); CKI_ST[t.id]={state:'live',at:new Date().toISOString()}; persist(); render(); toast('Registration link ready'); }
 function stopCheckinLink(t){
   openDrawer({kicker:t.name+' · Check-in',title:'Turn off the registration link?',saveLabel:'Turn it off',
     body:'<p style="margin:0">Anyone with the link loses access right away. Every check-in stays in the hub.</p>',
-    save:()=>{ (async()=>{ await ckShareAll(); await sb.from('calcutta_share').update({token:null}).eq('tid',t.id+':checkin'); delete t.checkinShare; persist(); render(); toast('Registration link turned off'); })(); }}); }
+    save:()=>{ (async()=>{ await ckShareAll(); await shareRow(t.id+':checkin',null,t.name+' · Check-in',null); delete t.checkinShare; persist(); render(); toast('Registration link turned off'); })(); }}); }
 function ckLinkCard(t){
   if(!t.checkinShare) return `<div class="card pad" style="display:flex;gap:14px 24px;align-items:center;flex-wrap:wrap"><div class="cell2" style="flex:1 1 340px"><span class="lbl">Registration link</span><b>Let the registration table check players in from a phone or tablet</b><small class="muted">A private link — no board password. Check-ins there show up here within seconds, and yours show up for them.${!CLOUD||!sessionOK?' Needs the cloud sign-in.':''}</small></div><button class="btn pri" id="ciShare"${!CLOUD||!sessionOK?' disabled':''}>Create registration link</button></div>`;
   const s=CKI_ST[t.id]||{}, link=checkinLink(t);
