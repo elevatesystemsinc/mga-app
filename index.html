@@ -3595,14 +3595,15 @@ function settleUp(rows){
    A group on the scoring page can run its own game on top of the event: `side` = {game:'wolf', stakes:{small,large},
    order:[player ids in tee order], scoring:'net'|'gross', holes:{[h]:{wolf?, pick: partner id | 'lone', mult 1|2|3, stakes?}},
    bigLou: undefined (not asked) | null (declined) | {stakes:{small,large}|null}, setBy}.
-   Wolf: the wolf rotates with the tee order; after the drives the wolf sets the bet for the hole (1x, 2x, 3x or an
-   amount of its own) and takes a partner or goes alone; the lower best ball wins the hole, a tie is a push. Money is net zero on every hole: each player
+   Wolf: the wolf rotates with the tee order; after the drives the wolf takes a partner or goes alone for 1x, 2x or 3x;
+   the lower best ball wins the hole, a tie is a push. The dollar amount only changes on the Big Lou holes, where the Big
+   Lou names it before anyone hits (`holes[h].stakes`). Money is net zero on every hole: each player
    on the larger side pays or collects `stakes.large` (× the multiplier), the smaller side shares that total — the
    owner's 6-4 wolf (two against three: $6 each and $4 each, $12 a side); a lone wolf against three takes the three
    $4s, $16 against four, double that at 2x. Big Lou: from the 16th hole of the round the player most down is the
    wolf, hole by hole, with its own bet if the cart wants one. Handicaps are the player's full course handicap.
    The same functions settle it on the phones and in the hub. */
-const SIDE_GAMES=[{id:'wolf',name:'Wolf',min:3,max:6,desc:'The wolf rotates with the tee order. After the drives the wolf sets the bet for the hole — 1x, 2x, 3x or an amount — and picks a partner, or goes it alone. Lower best ball wins the hole; a tie is a push.'}];
+const SIDE_GAMES=[{id:'wolf',name:'Wolf',min:3,max:6,desc:'The wolf rotates with the tee order. After the drives the wolf picks a partner — or goes it alone for 1x, 2x or 3x. Lower best ball wins the hole; a tie is a push.'}];
 const sideGame=id=>SIDE_GAMES.find(x=>x.id===id)||SIDE_GAMES[0];
 const BIG_LOU_FROM=15;   // play-order index: the 16th hole of the round
 /* what one hole is worth to each player of a small side (nS) and a large side (nL): net zero whatever the split */
@@ -3610,7 +3611,8 @@ function wolfAmounts(nS,nL,stakes,mult){ const st=stakes||{}, m=Math.max(1,Math.
   if(!nS||!nL) return {small:0,large:0,pot:0};
   const pot=nL*large, small=Math.abs(nS*small0-pot)<0.005?small0:Math.round(pot/nS*100)/100; return {small,large,pot:Math.round(pot*100)/100}; }
 const bigLouOn=(side,g,h)=>!!(side&&side.bigLou)&&playOrder(g.startHole).indexOf(h)>=BIG_LOU_FROM;
-const holeStakes=(side,g,h)=>{ const hh=(side.holes||{})[h]; if(hh&&hh.stakes&&(+hh.stakes.small||+hh.stakes.large)) return hh.stakes; return bigLouOn(side,g,h)&&side.bigLou.stakes?side.bigLou.stakes:(side.stakes||{}); };
+/* the stakes on a hole: the game's, except on a Big Lou hole, where the Big Lou's own amount for that hole counts, else the last one named */
+const holeStakes=(side,g,h)=>{ if(!bigLouOn(side,g,h)) return side.stakes||{}; const po=playOrder(g.startHole), i=po.indexOf(h); for(let k=i;k>=BIG_LOU_FROM;k--){ const hh=(side.holes||{})[po[k]]; if(hh&&hh.stakes&&(+hh.stakes.small||+hh.stakes.large)) return hh.stakes; } return (side.bigLou&&side.bigLou.stakes)||side.stakes||{}; };
 /* the wolf on a hole: the override on the hole; on a Big Lou hole the player most down so far (ties: earlier in the
    tee order); else the tee order rotating from the group's first hole. `net` = the money before this hole. */
 function wolfOn(side,g,h,net){ const hh=(side.holes||{})[h]; if(hh&&hh.wolf) return hh.wolf; const order=(side.order||[]).filter(id=>(g.players||[]).some(p=>p.id===id)); if(!order.length) return null;
@@ -9366,7 +9368,7 @@ function wireSignupCard(t){
    page counts, and a reload is tried once per build — if the page that comes back is still the old one, the CDN
    hasn't caught up; wait a while before trying that build again. */
 (function(){
-  const ME='20261104163716', KEY='au_tried', RETRY=10*60*1000; let ready=false, lastCheck=0;
+  const ME='20261104164147', KEY='au_tried', RETRY=10*60*1000; let ready=false, lastCheck=0;
   const typing=()=>{ const a=document.activeElement; return a&&/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)&&a.value&&a.type!=='search'; };
   const safe=()=>!typing()&&(typeof window.__canReload!=='function'||window.__canReload());
   const tried=()=>{ try{ const [b,t]=(sessionStorage.getItem(KEY)||'').split('|'); return b?{build:b,at:+t||0}:null; }catch(_){ return null; } };
