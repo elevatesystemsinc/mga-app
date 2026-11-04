@@ -21,6 +21,13 @@ management, member billing and point of sale are the coming tier, switched on pe
 app.flagstickhub.com. A club's **staff** logins see the whole club and invite **board** logins for each association from
 the club hub's Logins page; a board login sees its own organization only. See `docs/tenancy.md`.
 
+## A side game in your cart (Wolf)
+On the scoring page, once your group has joined, the hole screen asks whether you are playing a game in your cart. **Set up** takes who
+you are, Wolf, net or gross, the money per hole for the smaller and the larger side (a 6-4 wolf: two against three is $6 and $4 each,
+$12 a side; a lone wolf against three plays for $12) and the tee order. Every hole then names the wolf, takes the pick — a partner or
+**Lone wolf** — and settles the hole from the scores you are already entering, net zero every time; a tie is a push. The **Wolf** tab is
+the ledger. Every phone in the cart sees the same thing, and the hub's game page shows each cart's money.
+
 ## Player registration
 A tournament's Field tab has **Player registration**: open it and share the link (`register.html?k=…`). The page carries the
 organization's own crest, the date, course and schedule, the entry fee, the format in plain words with the points table, the handicap

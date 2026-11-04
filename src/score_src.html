@@ -120,12 +120,28 @@ h1{font-family:var(--serif);font-weight:700;color:var(--navy);font-size:32px;mar
 .dslot.rolling{color:var(--goldl);opacity:.85} .dslot.won{background:rgba(216,183,95,.16);border-color:var(--goldl)} .dslot.empty{opacity:0}
 .dsum{display:grid;grid-template-columns:80px minmax(0,1fr);gap:10px;padding:8px 0;border-bottom:1px solid rgba(255,255,255,.12);font-size:15px} .dsum span{color:var(--goldl);font-weight:700} .dsum b{font-weight:600}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
+/* the side game inside the group */
+.sgbar{background:var(--navy);color:#fff;padding:12px 14px;display:flex;flex-direction:column;gap:8px}
+.sgbar .k{font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--goldl);font-weight:800;display:flex;justify-content:space-between;align-items:center}
+.sgbar .k button{background:none;border:none;color:#C9CFD2;font-size:12px;text-decoration:underline;padding:0;letter-spacing:0;text-transform:none;font-weight:500}
+.sgbar .who{font-family:var(--serif);font-size:22px;line-height:1.05} .sgbar .who b{color:var(--goldl)}
+.sgbar .chg{background:none;border:none;color:#C9CFD2;font-family:var(--sans);font-size:12px;text-decoration:underline;padding:0;margin-left:8px;vertical-align:middle}
+.sgp{display:flex;gap:8px;flex-wrap:wrap} .sgp button{height:40px;padding:0 14px;border-radius:999px;border:1.5px solid rgba(255,255,255,.35);background:transparent;color:#fff;font-weight:700;font-size:14px} .sgp button.lone{border-color:var(--goldl);color:var(--goldl)} .sgp button.on{background:var(--goldl);border-color:var(--goldl);color:var(--navy)}
+.sgres{display:flex;justify-content:space-between;align-items:center;gap:10px;font-size:14px} .sgres b{font-size:15px} .sgres .up{color:#9FD8B3} .sgres .dn{color:#F2A9A0}
+.sgtot{display:flex;gap:6px 14px;flex-wrap:wrap;font-size:13px;color:#C9CFD2} .sgtot b{color:#fff} .sgtot b.up{color:#9FD8B3} .sgtot b.dn{color:#F2A9A0}
+.sgask{display:flex;gap:10px;align-items:center;justify-content:space-between;background:#fff;border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin-bottom:12px;font-size:14px} .sgask .btn{height:40px;font-size:13px;padding:0 14px}
+.sgrow{display:grid;grid-template-columns:40px minmax(0,1fr) 90px;gap:8px;align-items:center;padding:10px 16px;border-top:1px solid var(--line);font-size:14px} .sgrow.h{font-size:12px;font-weight:700;color:var(--muted);background:var(--ivory);border-top:none}
+.sgrow .r{text-align:right;font-weight:700} .sgrow .up{color:var(--pos)} .sgrow .dn{color:var(--neg)}
+.sgset label{display:block;font-size:13px;font-weight:700;color:var(--muted);margin:14px 0 6px} .sgset .names{display:flex;flex-wrap:wrap;gap:8px} .sgset .names button{height:42px;padding:0 16px;border-radius:999px;border:1.5px solid #CFC6AE;background:#fff;font-weight:700;font-size:15px} .sgset .names button.on{background:var(--navy);border-color:var(--navy);color:#fff}
+.sgset .money{display:grid;grid-template-columns:1fr 1fr;gap:10px} .sgset .money input{width:100%;height:48px;border:1.5px solid #CFC6AE;border-radius:10px;padding:0 12px;font-size:20px;font-weight:700;text-align:center;background:#fff} .sgset .money small{display:block;font-size:12px;color:var(--muted);margin-top:4px;text-align:center}
+.sgset .ord{display:flex;flex-direction:column;gap:6px} .sgset .ord div{display:flex;align-items:center;gap:10px;background:var(--ivory);border:1px solid var(--line);border-radius:10px;padding:8px 10px;font-weight:600} .sgset .ord div span{flex:1} .sgset .ord button{width:36px;height:36px;border-radius:8px;border:1px solid #CFC6AE;background:#fff;font-size:16px}
+.sgset .prev{background:var(--ivory);border:1px solid var(--line);border-radius:10px;padding:10px 12px;font-size:13.5px;margin-top:10px} .sgset .prev div{display:flex;justify-content:space-between;gap:10px;padding:2px 0}
 </style>
 </head>
 <body>
 <header class="top"><img src="flagstick-crest-light.svg" alt="Flagstick"><div class="t"><b id="evName">Live Scoring</b><small id="evSub">Walnut Creek Country Club</small></div><span class="pill" id="sync" hidden></span></header>
 <main id="main"><div class="card pad"><p class="muted">Loading…</p></div></main>
-<nav class="tabbar" id="tabs" hidden aria-label="Scoring"><button data-t="score">Score</button><button data-t="board">Leaderboard</button><button data-t="card">Scorecard</button><button data-t="finish" id="tabFinish" hidden>Finish</button></nav>
+<nav class="tabbar" id="tabs" hidden aria-label="Scoring"><button data-t="score">Score</button><button data-t="board">Leaderboard</button><button data-t="card">Scorecard</button><button data-t="side" id="tabSide" hidden>Side game</button><button data-t="finish" id="tabFinish" hidden>Finish</button></nav>
 <script>
 /*GOLFCORE*/
 
@@ -137,6 +153,9 @@ if(BIG) document.body.classList.add('big');
 let pub=null, wrap=null, scores={}, groupId=null, code='', tab=BIG?'board':'score', holeIdx=0, lbFlight=qs.get('flight')||'', lbSort=null, lbView=qs.get('players')?'players':'teams', lbComp=null;
 const KEY='mga_score_'+SLUG, QKEY='mga_scoreq_'+SLUG;
 let queue=[]; try{ queue=JSON.parse(localStorage.getItem(QKEY)||'[]'); }catch(_){}
+/* the group's own side game (golf_side, side-setup.sql): one row per group, compare-and-swap on v; ME = who holds this phone */
+let side=null, sideV=0, sideAt=0, sideBusy=false, ME=''; const MEKEY='mga_me_'+SLUG, NOSIDE='mga_noside_'+SLUG;
+const sideOK=()=>{ const g=group(); if(!g||BIG) return false; const n=(g.players||[]).length; return n>=3&&n<=6&&!eventFormats(pub).some(f=>(FORMATS[f]||{}).entry==='team'); };
 const saveQ=()=>{ try{ localStorage.setItem(QKEY,JSON.stringify(queue)); }catch(_){} };
 const group=()=>pub&&pub.groups.find(g=>g.id===groupId);
 function setSync(){ const s=$('sync'); if(!groupId&&!BIG){ s.hidden=true; return; } s.hidden=false;
@@ -150,6 +169,15 @@ async function loadScores(){
   for(const q of queue){ (m[q.p]=m[q.p]||{}); if(q.s) m[q.p][q.h]=q.s; else delete m[q.p][q.h]; } // local edits win until they're saved
   scores=m;
 }
+async function loadSide(quiet){ if(!code||!pub) return; sideAt=Date.now();
+  const {data,error}=await sb.rpc('golf_side_get',{p_event:pub.id,p_code:code}); if(error||!data) return;
+  const was=JSON.stringify(side)+sideV; side=data.data||null; sideV=+data.v||0;
+  if(!quiet&&JSON.stringify(side)+sideV!==was&&(tab==='score'||tab==='side')&&!typing()) render(); }
+async function putSide(data){ if(sideBusy) return false; sideBusy=true;
+  try{ const {data:r,error}=await sb.rpc('golf_side_put',{p_event:pub.id,p_code:code,p_data:data,p_rev:sideV});
+    if(error){ if(/conflict/i.test(error.message)){ await loadSide(); alert('Another phone in your group just changed this — take a look and tap again.'); render(); } else alert('Couldn’t save that — check your signal and try again.'); return false; }
+    side=r.data||null; sideV=+r.v||0; return true; }
+  finally{ sideBusy=false; } }
 /* the event itself (groups, tees, handicaps, competitions) is re-read every 30 s and whenever the page comes back
    into view, so a mid-round change in the hub — an index corrected, a player moved, a competition added — reaches
    every phone and board without a reload */
@@ -172,6 +200,7 @@ async function refresh(){
   const changed=await loadEvent(); if(changed==='error'||changed==='none') return;
   if(BIG||tab==='board'||tab==='finish'){ await loadScores(); if(!document.querySelector('.ov')) render(); }
   else if(changed&&!typing()) render();
+  if(code&&side&&(tab==='score'||tab==='side')) loadSide();
 }
 async function boot(){
   if(!SLUG) return fail('This link is missing its event. Ask the committee for the scoring link.');
@@ -185,7 +214,10 @@ async function boot(){
     const r=p.eventType==='DELETE'?p.old:p.new; if(!r) return; if(queue.some(q=>q.p===r.player_id&&q.h===r.hole)) return;
     scores[r.player_id]=scores[r.player_id]||{}; if(p.eventType==='DELETE') delete scores[r.player_id][r.hole]; else scores[r.player_id][r.hole]=r.strokes;
     if(tab!=='score') render(); }).subscribe();
+  sb.channel('sd-'+pub.id).on('postgres_changes',{event:'*',schema:'public',table:'golf_side',filter:'event_id=eq.'+pub.id},p=>{ const r=p.new||p.old; if(r&&group()&&r.group_id===groupId&&!sideBusy) loadSide(); }).subscribe();
   setInterval(refresh,30000); setInterval(()=>{ if(tab==='finish'&&!BIG) refresh(); },10000);
+  setInterval(()=>{ if(code&&!BIG&&(tab==='score'||tab==='side')&&Date.now()-sideAt>9000&&!typing()) loadSide(); },10000);
+  try{ ME=localStorage.getItem(MEKEY)||''; }catch(_){}
   if(BIG) setInterval(()=>{ const fl=(pub&&pub.flights)||[]; if(fl.length<2||qs.get('flight')) return; lbFlight=fl[(fl.indexOf(lbFlight)+1)%fl.length]; render(); },12000);   // the wall screen walks through the flights, 12 s each; ?flight=A pins one document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='visible') refresh(); });
   const saved=(()=>{ try{ return JSON.parse(localStorage.getItem(KEY)||'null'); }catch(_){ return null; } })();
   const qg=(qs.get('g')||'').trim();
@@ -200,7 +232,7 @@ async function join(c,silent){
   groupId=data; code=c; try{ localStorage.setItem(KEY,JSON.stringify({code:c})); }catch(_){}
   const g=group(), order=playOrder(g.startHole);
   const firstOpen=order.findIndex(h=>g.players.some(p=>!(scores[p.id]||{})[h]));
-  holeIdx=firstOpen<0?17:firstOpen; tab='score'; return true;
+  holeIdx=firstOpen<0?17:firstOpen; tab='score'; side=null; sideV=0; await loadSide(true); return true;
 }
 /* scores save instantly on screen and queue for the server; the queue survives a dead zone or a closed tab */
 function setStroke(pid,hole,val){
@@ -222,11 +254,13 @@ addEventListener('online',flush); setInterval(flush,15000);
 
 function render(){
   setSync(); const tb=$('tabs'); tb.hidden=BIG||!groupId; $('tabFinish').hidden=!isGame();
+  const ts=$('tabSide'); ts.hidden=!(groupId&&sideOK()); ts.textContent=side?sideGame(side.game).name:'Side game';
   tb.querySelectorAll('button').forEach(b=>{ b.classList.toggle('on',b.dataset.t===tab); b.onclick=()=>{ tab=b.dataset.t; if(tab==='board'||tab==='finish') loadScores().then(render); render(); window.scrollTo(0,0); }; });
   if(BIG||tab==='board'&&groupId) return renderBoard();
   if(!groupId) return renderJoin();
   if(tab==='card') return renderCard();
   if(tab==='finish'&&isGame()) return renderFinish();
+  if(tab==='side'&&sideOK()) return side?renderSide():renderSideSetup();
   renderHole();
 }
 function renderJoin(){
@@ -253,8 +287,10 @@ function renderHole(){
     if(unit==='points'||unit==='holes'){ const me=leaderboard(pub,scores,{}).find(x=>x.id===r.id); return me&&me.n?(unit==='points'?(me.quota!=null?ptsTxt(me)+' vs quota · '+me.ptsRaw+' pts':me.pts+' pts'):(me.holesUp>0?'+':'')+me.holesUp)+' thru '+me.n:'Not started'; }
     if(unit==='match'){ const me=matchBoard(pub,scores,{}).find(x=>(x.members||[]).includes(r.id)); return me&&me.n?me.status:'Match not started'; }
     const tot=Object.entries(scores[r.id]||{}).filter(([hh])=>(FORMATS[holeFormat(pub,+hh)]||{}).entry!=='team'); const rel=tot.reduce((a,[hh,v])=>a+v-(c.par[r.p.set||'M']||c.par.M)[hh-1],0); return tot.length?toParTxt(rel)+' thru '+tot.length:'Not started'; };
+  const noSide=(()=>{ try{ return localStorage.getItem(NOSIDE)===groupId; }catch(_){ return false; } })();
   $('main').innerHTML=`${!live?`<div class="banner">${pub.status==='final'?'Scoring is closed — scores can no longer be changed.':'Scoring hasn’t opened yet. Scores will save once the committee opens it.'}</div>`:''}
-  <div class="card" style="overflow:hidden">
+  ${!side&&sideOK()&&!noSide?`<div class="sgask"><span>Playing a game in your cart? <b>Wolf</b> and the money, hole by hole.</span><span style="display:flex;gap:6px"><button class="btn pri" id="sgGo">Set up</button><button class="btn" id="sgNo" aria-label="No side game">✕</button></span></div>`:''}
+  <div class="card" style="overflow:hidden">${side&&sideOK()?sideStrip(g,c,h):''}
    <div class="pad" style="padding-bottom:12px"><div class="holehead"><button class="nav" id="prev" aria-label="Previous hole"${holeIdx===0?' disabled':''}>‹</button>
      <div style="text-align:center"><div class="n">Hole ${h}</div><div class="meta">Par <b>${par(p0)}</b>${teeYds?' · '+esc(teeYds)+' yds':''} · Hcp ${hcpH(p0)}</div></div>
      <button class="nav" id="next" aria-label="Next hole"${holeIdx===17?' disabled':''}>›</button></div>
@@ -284,6 +320,72 @@ function renderHole(){
     if(holeIdx===17){ tab='card'; render(); } else { holeIdx++; renderHole(); } window.scrollTo(0,0); };
   document.querySelectorAll('.strip [data-go]').forEach(b=>b.onclick=()=>{ if(+b.dataset.go>holeIdx) parUp(); holeIdx=+b.dataset.go; renderHole(); });
   $('leave').onclick=()=>{ if(queue.length&&!confirm('Some scores haven’t reached the server yet. Switch anyway? They’ll keep trying in the background.')) return; groupId=null; code=''; localStorage.removeItem(KEY); render(); };
+  const sg=$('sgGo'); if(sg) sg.onclick=()=>{ tab='side'; render(); window.scrollTo(0,0); };
+  const sn=$('sgNo'); if(sn) sn.onclick=()=>{ try{ localStorage.setItem(NOSIDE,groupId); }catch(_){} renderHole(); };
+  if(side&&sideOK()) wireSideStrip(g,c,h);
+}
+/* ---------- the side game: the strip on the hole, the set-up, the ledger ---------- */
+const sMoney=v=>(v<0?'−':v>0?'+':'')+'$'+Math.abs(v).toLocaleString('en-US',{minimumFractionDigits:Math.abs(v)%1?2:0,maximumFractionDigits:2});
+const fn1=n=>String(n||'').split(' ')[0];
+function sideStrip(g,c,h){ const x=sideHole(pub,c,g,h,scores,side), nm=id=>fn1((g.players.find(p=>p.id===id)||{}).name), L=sideLedger(pub,g,scores,side);
+  const wolfName=x.wolf?nm(x.wolf):'—', me=ME&&g.players.some(p=>p.id===ME)?ME:'';
+  let body;
+  if(!x.wolf) body='<div class="muted" style="color:#C9CFD2">No wolf set for this hole.</div>';
+  else if(!x.pick) body=`<div class="sgp">${g.players.filter(p=>p.id!==x.wolf).map(p=>`<button data-pick="${esc(p.id)}">${esc(fn1(p.name))}</button>`).join('')}<button class="lone" data-pick="lone">Lone wolf</button></div>`;
+  else { const S=x.sides?x.sides.S.map(nm).join(' & '):'', Lt=x.sides?x.sides.L.map(nm).join(' & '):'';
+    const res=x.pending?'<span class="muted" style="color:#C9CFD2">waiting for the scores</span>':x.winner==='push'?'<b>Push</b>':`<b>${x.winner==='S'?(x.pick==='lone'?'Lone wolf wins':'Wolf side wins'):'The others win'}</b> <span class="${x.winner==='S'?'up':'dn'}">${sMoney(x.money[x.wolf]||0)} wolf${x.pick!=='lone'?' side':''}</span>`;
+    body=`<div class="sgres"><span>${esc(S)} <span style="color:#C9CFD2">v</span> ${esc(Lt)}${x.best&&!x.pending?` <span style="color:#C9CFD2">· ${x.best.S} v ${x.best.L}${side.scoring==='gross'?'':' net'}</span>`:''}</span><span>${res}</span></div>`; }
+  return `<div class="sgbar"><div class="k"><span>${esc(sideGame(side.game).name)} · hole ${h}</span><button id="sgTab">Ledger</button></div>
+    <div class="who">Wolf: <b>${esc(wolfName)}</b>${me===x.wolf?' <span style="font-size:13px;color:#C9CFD2">(you)</span>':''}${x.pick?` <button class="chg" id="sgUndo">change</button>`:''}</div>
+    ${body}
+    <div class="sgtot">${L.rows.map(r=>`<span>${esc(fn1(r.name))} <b class="${r.net>0?'up':r.net<0?'dn':''}">${sMoney(r.net)}</b></span>`).join('')}</div></div>`; }
+function wireSideStrip(g,c,h){
+  document.querySelectorAll('[data-pick]').forEach(b=>b.onclick=async()=>{ const d=JSON.parse(JSON.stringify(side)); d.holes=d.holes||{}; d.holes[h]=Object.assign({},d.holes[h]||{},{pick:b.dataset.pick,at:new Date().toISOString(),by:ME||code}); if(await putSide(d)) renderHole(); });
+  const u=$('sgUndo'); if(u) u.onclick=async()=>{ const d=JSON.parse(JSON.stringify(side)); d.holes=d.holes||{}; if(d.holes[h]) delete d.holes[h].pick; if(await putSide(d)) renderHole(); };
+  const t=$('sgTab'); if(t) t.onclick=()=>{ tab='side'; render(); window.scrollTo(0,0); };
+}
+function renderSideSetup(){
+  const g=group(), G=sideGame('wolf'), cur=side||{}, n=g.players.length;
+  const st={small:cur.stakes?cur.stakes.small:6,large:cur.stakes?cur.stakes.large:4}; let order=(cur.order||[]).filter(id=>g.players.some(p=>p.id===id)); g.players.forEach(p=>{ if(!order.includes(p.id)) order.push(p.id); });
+  let scoring=cur.scoring||'net', me=ME&&g.players.some(p=>p.id===ME)?ME:'';
+  const preview=()=>{ const lines=[]; for(let nS=1;nS<=Math.floor(n/2);nS++){ const a=wolfAmounts(nS,n-nS,st); lines.push(`<div><span>${nS===1?'Lone wolf':'Wolf + partner'} v ${n-nS}</span><b>${nS===1?'wolf':'each'} $${a.small} · each $${a.large} · $${a.pot} a side</b></div>`); } return lines.join(''); };
+  $('main').innerHTML=`<div class="card pad sgset"><h1 style="margin:0">Set up a side game</h1><p class="muted" style="margin:6px 0 0">${esc(G.name)} — ${esc(G.desc)} Net zero every hole: the money per hole is settled between the two sides.</p>
+    <label>Who are you?</label><div class="names" id="sgMe">${g.players.map(p=>`<button data-me="${esc(p.id)}" class="${me===p.id?'on':''}">${esc(p.name)}</button>`).join('')}</div>
+    <label>Game</label><div class="names"><button class="on">Wolf</button></div>
+    <label>Scored on</label><div class="names" id="sgSc"><button data-sc="net" class="${scoring==='net'?'on':''}">Net (full handicaps)</button><button data-sc="gross" class="${scoring==='gross'?'on':''}">Gross</button></div>
+    <label>Money per hole</label><div class="money"><div><input id="sgSmall" type="number" inputmode="decimal" min="0" step="1" value="${st.small}"><small>each player on the smaller side</small></div><div><input id="sgLarge" type="number" inputmode="decimal" min="0" step="1" value="${st.large}"><small>each player on the larger side</small></div></div>
+    <div class="prev" id="sgPrev">${preview()}</div>
+    <label>Tee order — the wolf rotates down this list from your first hole</label><div class="ord" id="sgOrd"></div>
+    <p style="display:flex;gap:10px;margin:22px 0 0"><button class="btn pri wide" id="sgStart" style="flex:2">${side?'Save changes':'Start the wolf'}</button>${side?`<button class="btn" id="sgEnd" style="flex:1">End it</button>`:`<button class="btn" id="sgBack" style="flex:1">Back</button>`}</p></div>`;
+  const nm=id=>(g.players.find(p=>p.id===id)||{}).name||'';
+  const paintOrd=()=>{ $('sgOrd').innerHTML=order.map((id,i)=>`<div><span>${i+1}. ${esc(nm(id))}</span><button data-up="${i}" aria-label="Move up"${i===0?' disabled':''}>▲</button><button data-dn="${i}" aria-label="Move down"${i===order.length-1?' disabled':''}>▼</button></div>`).join('');
+    document.querySelectorAll('[data-up]').forEach(b=>b.onclick=()=>{ const i=+b.dataset.up; [order[i-1],order[i]]=[order[i],order[i-1]]; paintOrd(); });
+    document.querySelectorAll('[data-dn]').forEach(b=>b.onclick=()=>{ const i=+b.dataset.dn; [order[i+1],order[i]]=[order[i],order[i+1]]; paintOrd(); }); };
+  paintOrd();
+  document.querySelectorAll('[data-me]').forEach(b=>b.onclick=()=>{ me=b.dataset.me; document.querySelectorAll('[data-me]').forEach(x=>x.classList.toggle('on',x===b)); });
+  document.querySelectorAll('[data-sc]').forEach(b=>b.onclick=()=>{ scoring=b.dataset.sc; document.querySelectorAll('[data-sc]').forEach(x=>x.classList.toggle('on',x===b)); });
+  const upd=()=>{ st.small=Math.max(0,+$('sgSmall').value||0); st.large=Math.max(0,+$('sgLarge').value||0); $('sgPrev').innerHTML=preview(); }; $('sgSmall').oninput=upd; $('sgLarge').oninput=upd;
+  $('sgStart').onclick=async()=>{ upd(); if(!me){ alert('Tap your own name first.'); return; } if(!st.large&&!st.small){ alert('Put some money on it.'); return; }
+    ME=me; try{ localStorage.setItem(MEKEY,me); }catch(_){}
+    const d=Object.assign({},side||{},{game:'wolf',stakes:{small:st.small,large:st.large},order:order.slice(),scoring,holes:(side&&side.holes)||{},setBy:(side&&side.setBy)||me,at:(side&&side.at)||new Date().toISOString()});
+    if(await putSide(d)){ try{ localStorage.removeItem(NOSIDE); }catch(_){} tab='score'; render(); window.scrollTo(0,0); } };
+  const bk=$('sgBack'); if(bk) bk.onclick=()=>{ tab='score'; render(); };
+  const en=$('sgEnd'); if(en) en.onclick=async()=>{ if(!confirm('End the side game for your group? The picks and the money go with it.')) return; if(await putSide(null)){ tab='score'; render(); } };
+}
+let sideEdit=false;
+function renderSide(){
+  if(sideEdit){ sideEdit=false; return renderSideSetup(); }
+  const g=group(), c=pub.courses[g.course], L=sideLedger(pub,g,scores,side), nm=id=>fn1((g.players.find(p=>p.id===id)||{}).name), po=playOrder(g.startHole);
+  const a=(nS)=>wolfAmounts(nS,g.players.length-nS,side.stakes);
+  $('main').innerHTML=`<div class="card" style="overflow:hidden"><div class="pad" style="padding-bottom:10px"><h1 style="margin:0">${esc(sideGame(side.game).name)}</h1><p class="muted" style="margin:6px 0 0;font-size:13.5px">Group ${esc(code)} · ${side.scoring==='gross'?'gross':'net, full handicaps'} · $${a(1).large} a player on the big side${g.players.length>=4?`, $${a(2).small} each as a pair`:''}, the lone wolf plays for $${a(1).pot} · net zero every hole</p></div>
+    <div class="sgrow h"><span></span><span>Player</span><span class="r">Money</span></div>
+    ${L.rows.map(r=>`<div class="sgrow"><span class="muted">${r.id===ME?'you':''}</span><b>${esc(r.name)}</b><span class="r ${r.net>0?'up':r.net<0?'dn':''}">${sMoney(r.net)}</span></div>`).join('')}
+    <div class="pad" style="display:flex;gap:10px;padding-top:12px"><button class="btn" id="sgEdit" style="flex:1">Stakes & order</button><button class="btn pri" id="sgScore" style="flex:1">Back to scoring</button></div></div>
+    <div class="card" style="overflow:hidden;margin-top:14px"><div class="sgrow h" style="grid-template-columns:40px minmax(0,1fr) 110px"><span>Hole</span><span>Wolf · pick · result</span><span class="r">Wolf side</span></div>
+    ${po.map(h=>{ const x=L.holes.find(y=>y.h===h); const pick=x.pick?(x.pick==='lone'?'alone':'+ '+nm(x.pick)):''; const res=!x.pick?'<span class="muted">—</span>':x.pending?'<span class="muted">waiting for scores</span>':x.winner==='push'?'push':x.winner==='S'?'won':'lost';
+      return `<div class="sgrow" style="grid-template-columns:40px minmax(0,1fr) 110px"><span class="muted">${h}</span><span><b>${esc(nm(x.wolf))}</b>${pick?' '+esc(pick):''} <span class="muted">· ${res}</span></span><span class="r ${x.winner==='S'?'up':x.winner==='L'?'dn':''}">${x.pick&&!x.pending&&x.winner!=='push'?sMoney(x.money[x.wolf]||0):''}</span></div>`; }).join('')}</div>
+    <p class="muted" style="text-align:center;font-size:12.5px;margin:14px 0 0">${L.played} of 18 holes settled · tap a hole on the Score tab to pick a partner or change the wolf's call.</p>`;
+  $('sgEdit').onclick=()=>{ sideEdit=true; renderSide(); }; $('sgScore').onclick=()=>{ tab='score'; render(); };
 }
 function renderCard(){
   const g=group(), order=playOrder(g.startHole);
@@ -476,7 +578,7 @@ function calloutStage(comp){
       if(w.status==='won') return {h,txt:name,sub:worth+(validating&&w.checkHole!=null?` · held — ${vtxt} on hole ${w.checkHole}`:''),cls:'won'};
       if(w.status==='void') return {h,txt:name,sub:`lost — missed ${vtxt} on hole ${w.checkHole}${per?', carried on':', no skin'}`,cls:'void'};
       return {h,txt:name,sub:`waiting on hole ${w.checkHole}`,cls:'pending'}; }
-    return {h,txt:L.who.length>1?`${L.who.map(x=>first(x.name)).join(', ')} tied at ${L.low}`:`${L.who[0].name} low, but not outright`,sub:per?'carries over':'no skin',cls:'muted'}; };
+    return {h,txt:L.who.length>1?`${L.who.map(x=>fn1(x.name)).join(', ')} tied at ${L.low}`:`${L.who[0].name} low, but not outright`,sub:per?'carries over':'no skin',cls:'muted'}; };
   const ov=document.createElement('div'); ov.className='ov'; document.body.appendChild(ov);
   const close=async()=>{ const done=i>=order.length; ov.remove(); if(done&&!((wrap&&wrap.callouts)||{})[comp.id]) await wrapCall('callout',{comp:comp.id}); render(); };
   const paint=()=>{ const done=i>=order.length&&!flash;

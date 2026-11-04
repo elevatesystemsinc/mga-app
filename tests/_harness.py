@@ -306,6 +306,22 @@ class FakeDB:
             else: return json.dumps({'data':None,'error':{'message':'Unknown action','code':'P0001'}})
             w['v']=cur+1; e['wrap']=w; self.writes['wrap:'+e['id']]+=1
             return json.dumps({'data':copy.deepcopy(w),'error':None})
+        if fn in ('golf_side_get','golf_side_put'):
+            e=next((r for r in self._rows('golf_events') if r['id']==a.get('p_event')),None)
+            who=str(a.get('p_code','')).strip().upper(); gid=(e or {}).get('codes',{}).get(who)
+            if not gid: return json.dumps({'data':None,'error':{'message':'Unknown group ID','code':'P0001'}})
+            rows=self._rows('golf_side'); r=next((x for x in rows if x['event_id']==e['id'] and x['group_id']==gid),None)
+            if fn=='golf_side_get':
+                return json.dumps({'data':{'group':gid,'data':copy.deepcopy(r['data']) if r else None,'v':r['v'] if r else 0},'error':None})
+            cur=r['v'] if r else 0
+            if cur!=int(a.get('p_rev') or 0): return json.dumps({'data':None,'error':{'message':'conflict','code':'P0001'}})
+            if a.get('p_data') is None:
+                rows[:]=[x for x in rows if x is not r]; return json.dumps({'data':{'group':gid,'data':None,'v':0},'error':None})
+            nv=cur+1; row={'event_id':e['id'],'group_id':gid,'tenant':e.get('tenant','wccc'),'data':copy.deepcopy(a['p_data']),'v':nv,'by':who,'updated_at':datetime.datetime.utcnow().isoformat()+'Z'}
+            if r: r.update(row)
+            else: rows.append(row)
+            self.writes['side:'+gid]+=1
+            return json.dumps({'data':{'group':gid,'data':copy.deepcopy(a['p_data']),'v':nv},'error':None})
         if fn=='golf_join':
             r=next((r for r in self._rows('golf_events') if str(r.get('slug','')).lower()==str(a.get('p_slug','')).strip().lower()),None)
             return json.dumps({'data':(r or {}).get('codes',{}).get(str(a.get('p_code','')).upper()),'error':None})

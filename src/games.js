@@ -386,12 +386,13 @@ function vGame(m,g){
     <div class="actions"><button class="btn sm" id="gmCopy">Copy link</button><a class="btn sm" href="${esc(link)}&view=board" target="_blank" rel="noopener">Leaderboard screen</a><a class="btn sm" href="${esc(gamecastLink(ev))}" target="_blank" rel="noopener" title="Follow along live — the course, every group’s hole, the feed, the board; no group ID needed">GameCast</a><button class="btn sm" id="gmGroups">Groups</button></div>
     <div class="mini">${ev.groups.map(grp=>`<div class="mr" style="grid-template-columns:minmax(0,1fr) auto"><div class="cell2"><b>Group ${esc(grp.code)}</b><small>${esc(grp.players.map(p=>p.name.split(' ')[0]).join(', '))}${grp.teeTime?' · '+fmtTime(grp.teeTime):grp.startHole>1?' · hole '+grp.startHole:''}</small></div><button class="btn sm" data-gsheet="${grp.id}">Enter scores</button></div>`).join('')||'<div class="mr"><span class="muted">Groups appear as players are added.</span></div>'}</div>
     <p class="hint">Everyone plays their own ball; every competition is scored from those cards. Enter scores here for anyone who doesn’t use the page.</p></div>`;
+  const sideCard=typeof sideGamesCard==='function'?sideGamesCard(ev):'';
   const first=after?[...pots.map(potCard),settleCard]:[grid,...pots.map(potCard),settleCard];
   m.innerHTML=`<div class="crumb"><button id="gmBack">Games</button><span class="muted">/</span><span class="muted">${esc(gameTitle(g))}</span></div>
   <div class="phead"><div><h1 class="h1">${esc(gameTitle(g))}</h1><div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap"><span class="chip navy">${esc(gameWhen(g))}</span><span class="chip">${esc(courseById(g.course)?.name||'Course TBD')}</span>${pots.map(p=>`<span class="chip gold">${esc(p.name)} ${gMoney(p.entry)}</span>`).join('')}<span class="chip">${after?'paid after the round':'paid before the round'} · ${g.settle==='net'?'net':'pot'}</span>${g.status==='settled'?'<span class="chip navy">Settled</span>':''}${live?'<span class="chip ok">● Live scoring</span>':''}</div></div>
     <div class="actions"><button class="btn" id="gmDesign">${I.edit}Design</button></div></div>
   <div class="grid g4">${kpi('Players',String(g.players.length),mo.unpaid?`<span class="neg">${mo.unpaid} still owe</span>`:g.players.length?'all paid in':'add who’s playing')}${kpi('In the pots',gMoney(mo.total),pots.map(p=>`${esc(p.name)} ${gMoney(potTotal(g,p))}`).join(' · ')||'no competitions')}${kpi('Paid out',gMoney(mo.paid),`${sum(g.pots,p=>p.payouts.length)} payout${sum(g.pots,p=>p.payouts.length)===1?'':'s'}`)}${kpi(mo.left>0.004?'Still to pay out':mo.left<-0.004?'Paid out over the pots':'Balance',gMoney(Math.abs(mo.left)),mo.left>0.004?'allocate it below':mo.left<-0.004?'check the payouts':'pots fully paid out',mo.left<-0.004?'neg':mo.left>0.004?'':'pos')}</div>
-  ${after?first.join('')+grid:first.join('')}${gameGroupsCard(g,ev)}${liveCard}
+  ${after?first.join('')+grid:first.join('')}${gameGroupsCard(g,ev)}${liveCard}${sideCard}
   ${g.notes?`<div class="card pad"><span class="lbl">Notes</span><p style="margin:6px 0 0;white-space:pre-wrap">${esc(g.notes)}</p></div>`:''}`;
   $('gmBack').onclick=()=>{ view.gameId=null; render(); }; $('gmDesign').onclick=()=>designGame(g);
   $('gmAdd').onclick=()=>addGamePlayers(g); $('gmAllPaid').onclick=()=>{ g.players.forEach(p=>p.paid=true); persist(); render(); toast('Everyone marked paid'); };
@@ -800,6 +801,17 @@ function openScoring(g){ const ev=ensureGameEvent(g); ev.status='live'; wrapRese
    with the event (golf_event) whenever a game page renders and takes anything new into the game — once, by wrap.v —
    then persists and republishes, so the hub, the ledger and every phone end up with the same teams and payouts. */
 const WRAP_AT={};
+/* the groups' own side games (golf_side, side-setup.sql): read-only here — the cart runs its wolf on the phones */
+const SIDE={}, SIDE_AT={};
+function sideLoad(ev){ if(!CLOUD||!sessionOK||KEYMODE||!ev) return; const now=Date.now(); if(SIDE_AT[ev.id]&&now-SIDE_AT[ev.id]<10000) return; SIDE_AT[ev.id]=now;
+  tq(sb.from('golf_side').select('group_id,data,v,updated_at')).eq('event_id',ev.id).then(r=>{ if(r.error) return; const rows=(r.data||[]).filter(x=>x.data); const sig=JSON.stringify(rows); if(sig===(SIDE[ev.id]&&SIDE[ev.id].sig)) return; SIDE[ev.id]={sig,rows}; if(view.page==='game'||view.gameId) render(); }); }
+function sideGamesCard(ev){ if(!ev||KEYMODE) return ''; sideLoad(ev); const rows=(SIDE[ev.id]||{}).rows||[]; if(!rows.length) return '';
+  const pub=publicEvent(ev), scores=golfScores[ev.id]||{};
+  return `<div class="card pad" style="display:flex;flex-direction:column;gap:12px"><h2 class="h2">Side games in the carts</h2>
+    ${rows.map(r=>{ const grp=pub.groups.find(x=>x.id===r.group_id), eg=(ev.groups||[]).find(x=>x.id===r.group_id)||{}; if(!grp) return ''; const sd=r.data, L=sideLedger(pub,grp,scores,sd), a=wolfAmounts(1,grp.players.length-1,sd.stakes), b=wolfAmounts(2,grp.players.length-2,sd.stakes);
+      return `<div class="mini"><div class="mr" style="grid-template-columns:minmax(0,1fr)"><div class="cell2"><b>Group ${esc(eg.code||grp.label||'')} · ${esc(sideGame(sd.game).name)}</b><small>${sd.scoring==='gross'?'gross':'net'} · $${a.large} a player on the big side, the lone wolf for $${a.pot}${grp.players.length>=4?`, $${b.small} each as a pair`:''} · ${L.played} of 18 holes settled</small></div></div>
+        ${L.rows.map(x=>`<div class="mr num" style="grid-template-columns:minmax(0,1fr) 90px"><span>${esc(x.name)}</span><b class="r ${netCls(x.net)}">${gSigned(x.net)}</b></div>`).join('')}</div>`; }).join('')}
+    <p class="hint" style="margin:0">The players set this up on the scoring page themselves and keep their own picks; the money here is what their cards say.</p></div>`; }
 function wrapSync(g,ev){ if(!CLOUD||!sessionOK||!ev) return; const now=Date.now(); if(WRAP_AT[ev.id]&&now-WRAP_AT[ev.id]<8000) return; WRAP_AT[ev.id]=now;
   sb.rpc('golf_event',Object.assign({p_slug:ev.slug.toLowerCase()},typeof TENANT!=='undefined'&&TENANT?{p_tenant:TENANT}:{})).then(r=>{ const w=r&&r.data&&r.data.wrap; if(r.error||!w||!w.v||(g.wrapV||0)>=w.v) return;
     absorbWrap(g,ev,w); persist(); if(!drawerOpen()&&view.gameId===g.id) render(); },()=>{}); }

@@ -104,6 +104,7 @@ python3 tests/test_survey.py  # a survey from the template → public link → a
 python3 tests/test_finish.py  # a game wrapped up from the phones (close → skins → draw → payouts) and taken into the hub, against the fake
 python3 tests/test_billing.py # the Club-management tier against the fake: accounts, the billing engine, statements + e-mail, the member portal, POS, bookings
 python3 tests/test_signup.py  # player registration against the fake: open the page, enter alone / with partners / ask the shop, no blanks, no doubles, into the field
+python3 tests/test_wolf.py    # a cart's wolf on the scoring page against the fake: set-up, picks, money net zero, two phones, a stale phone, the hub card
 git add -A && git commit && git push origin main  # Render deploys main to app.wcccmga.org
 ```
 Tests need `pip install playwright && playwright install chromium` and `cd tests && npm i xlsx@0.18.5`.
@@ -415,6 +416,21 @@ Tournament = { id, name, season, days, startDate, field:[{id,memberId,team,paid,
     tagged "Club"): the designer's picker and the game page's Add players both use it, and adding someone to a game does
     **not** make them a member of the group (the owner, Oct 2026: membership is what will gate sign-ups through a
     registration link when that is built; manual adds and game creation pull from the entire directory).
+  - **Side games inside one group — the cart's wolf** (`side-setup.sql`, golfcore `SIDE_GAMES` / `wolfAmounts` / `wolfOn` / `sideHole` /
+    `sideLedger`, score_src.html from `loadSide` down, games.js `sideLoad` / `sideGamesCard`, `tests/test_wolf.py`; the owner, Nov 4:
+    "intra-group games… when the first person logs in to keep scoring, it has you select who you are and then set wolf… set denominations…
+    a 6-4 wolf… net zero on every hole"): one row per group per event in `golf_side` (`golf_side_get(event, code)` / `golf_side_put(event,
+    code, data, rev)`, compare-and-swap on `v`, anyone holding the group ID; realtime + a 10 s poll on the phones). `side = {game:'wolf',
+    stakes:{small,large}, order:[player ids], scoring:'net'|'gross', holes:{[h]:{pick: partner id|'lone', wolf?}}, setBy}`. The hole screen
+    asks once ("Playing a game in your cart?" → Set up, or ✕ remembered per group) when the group is 3–6 own-ball players; **Set up**: who
+    are you (`ME`, localStorage `mga_me_<slug>`), Wolf, net / gross, the two amounts with a preview per configuration, the tee order (▲▼).
+    The **strip** on every hole names the wolf (`wolfOn`: the override on the hole, else the order rotating from the group's first hole),
+    takes the pick (a partner or Lone wolf; *change* undoes it), shows the sides' best balls and the result once every score is in, and the
+    running money; the **Wolf** tab is the ledger (per player, per hole; Stakes & order; End it). Money (`wolfAmounts`): each player on the
+    larger side pays or collects `stakes.large`, the smaller side shares that total (6-4 with 2 v 3 = $6 / $4; a lone wolf v 3 takes $12,
+    v 4 $16) — net zero on every hole; a tie is a push. Handicaps are the player's full course handicap (`ch`). The hub's game page shows
+    **Side games in the carts** (read-only, `golf_side` rows + the same math; not on an admin link). Only Wolf for now; `SIDE_GAMES` is
+    the catalog to grow.
   - **Game sheet PDF** (`gameSheetPDF(g,{strokes,returnDoc})`): the band (date · course · tee · players · all in), THE GAME as a
     card — each competition with its rules in words (`potRulesText`) and its entry, the total as a navy strip — the **house
     rules** typed in the designer (`g.rules`, one per line, printed as bullets) and teams when known on **page 1**; the
@@ -434,6 +450,7 @@ Tournament = { id, name, season, days, startDate, field:[{id,memberId,team,paid,
 | `mga_hub` (tenant, id, data jsonb) | one row per organization per tenant: `club`, `mga`, `lga`, `smga`, `<group id>`. The rows `main` (the old MGA Hub's) and `sync:mga` are history, no code reads them. `hub-setup.sql`, `hub-fix-permissions.sql` |
 | `calcutta_share` (tid, token, name, doc, version) + RPC `calcutta_get(p_token)`, `calcutta_put(p_token,p_doc,p_version)` | token links for people without the board login: the **cashier** page (tid = tournament id) and the **registration/check-in** page (tid = tournament id + `:checkin`). `calcutta_put` is version-checked (conflict → retry). `calcutta-setup.sql` |
 | `golf_events` (+ `wrap`), `golf_scores` + RPC `golf_event`, `golf_join`, `golf_submit`, `golf_wrap`, `hub_key_wrap` | public live scoring (`golf-setup.sql`) and the Finish tab's wrap-up (`wrap-setup.sql`). `public.org` names the owning organization. |
+| `golf_side` (event_id, group_id, tenant, data, v, by) + RPC `golf_side_get(event, code)`, `golf_side_put(event, code, data, rev)` | a group's own side game on the scoring page (`side-setup.sql`): the cart's wolf, CAS on `v`, the hub reads it. |
 | `signup_share` (tid, tenant, org, token, status, doc), `signup_entries` (id, tenant, org, tid, players, need, answers, note, at) + RPC `signup_get(p_token)`, `signup_submit(p_token,p_players,p_need,p_answers,p_note)`, `hub_key_signup`, `hub_key_signup_entries` | player registration (`signup-setup.sql`): the share row is what the page shows (names only); an entry is a team the hub takes into the field and clears. |
 | `survey_share` (sid, tenant, org, token, status, doc), `survey_responses` (id, tenant, org, sid, answers, day) + RPC `survey_get(p_token)`, `survey_submit(p_token,p_answers)`, `hub_key_survey`, `hub_key_survey_results` | surveys (`survey-setup.sql`): the share row is what the public page shows; a response is answers + the **day** only — no user, e-mail, IP or device, ever. |
 | `acct_items`, `acct_statements` + `can_staff(p_tenant)` | member accounts & billing (`billing-setup.sql`): the club's ledger, staff only. |
