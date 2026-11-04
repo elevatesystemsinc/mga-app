@@ -89,6 +89,12 @@ async def main():
     await A.click('#sgLouYes'); await A.wait_for_function("()=>!!side.bigLou")
     st=await A.evaluate("()=>document.querySelector('.sgbar').innerText")
     check('Big Lou on, but Cy and Di are tied at −20: no Big Lou yet, a draw is offered','BIG LOU' in st.upper() and 'Big Lou is tied' in st and 'Cy & Di' in st and 'Big Lou:' not in st and not await A.evaluate("()=>!!document.getElementById('sgBS')"),st)
+    check('…or the cart taps who it is',await A.evaluate("()=>document.querySelectorAll('[data-lou]').length===2"))
+    await A.click('[data-lou="p4"]'); await A.wait_for_function("()=>side.holes[16]&&side.holes[16].wolf==='p4'&&side.holes[16].chosen")
+    st=await A.evaluate("()=>document.querySelector('.sgbar').innerText")
+    check('chosen by hand: Di is Big Lou, marked chosen from both, with a change link','Big Lou: Di' in st and '(chosen from Cy & Di)' in st and await A.evaluate("()=>!!document.getElementById('sgRelou')"),st)
+    await A.click('#sgRelou'); await A.wait_for_function("()=>!side.holes[16].wolf&&!side.holes[16].chosen")
+    check('change: back to the tie',await A.evaluate("()=>/Big Lou is tied/.test(document.querySelector('.sgbar').innerText)"))
     await A.click('#sgDraw'); await A.wait_for_function("()=>side.holes[16]&&side.holes[16].wolf&&side.holes[16].draw",timeout=10000)
     W=await A.evaluate("()=>side.holes[16].wolf"); P='p4' if W=='p3' else 'p3'; WN='Cy' if W=='p3' else 'Di'
     st=await A.evaluate("()=>({t:document.querySelector('.sgbar').innerText, s:document.getElementById('sgBS').value, l:document.getElementById('sgBL').value, d:side.holes[16].draw})")

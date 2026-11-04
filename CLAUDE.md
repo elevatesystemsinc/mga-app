@@ -435,7 +435,8 @@ Tournament = { id, name, season, days, startDate, field:[{id,memberId,team,paid,
     No (`null`); from then the wolf on each hole is the player most down before it (`wolfOn` with the running `net`; "Big Lou: Cy (most
     down)"); **a tie for most down is a draw** (`louTied` → the strip's "Big Lou is tied — Cy & Di… Draw who's Big Lou", `secureInt`, a short
     spin through the names, then `holes[h].wolf` + `holes[h].draw = {from, at, by}` so every phone lands on the same Big Lou; "(drawn from Cy
-    & Di)"; no bet or pick until it is drawn), **and the Big Lou names the dollar amount on each of those holes before anyone hits** — the owner: "Big
+    & Di)" — or the cart taps a tied name, `holes[h].chosen = {from, at, by}`, "(chosen from…)"; *change* on the who line clears either and
+    goes back to the tie; no bet or pick until it is settled), **and the Big Lou names the dollar amount on each of those holes before anyone hits** — the owner: "Big
     Lou is the only time the dollar amount changes" — two boxes on the strip (`holes[h].stakes`, prefilled with the last amount named, the game's
     stakes on 16; `holeStakes()` = that hole's amount, else the last named Big Lou amount, else the game's; a regular hole never has them), then
     the pick as usual (a lone Big Lou's 1x / 2x / 3x multiplies the named amount); `sideLedger` runs the holes in play order for that. Handicaps are the player's full course handicap (`ch`). The hub's game page shows **Side games in the carts**

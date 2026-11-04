@@ -655,7 +655,7 @@ function wolfOn(side,g,h,net){ const hh=(side.holes||{})[h]; if(hh&&hh.wolf) ret
 /* one hole of the wolf: who is on which side, each side's best ball, who won, and the money per player */
 function sideHole(pub,c,g,h,scores,side,wolf){
   const players=g.players||[], hh=(side.holes||{})[h]||{}, pick=hh.pick||null, mult=Math.max(1,Math.min(3,+hh.mult||1));
-  const out={h,wolf:wolf||null,pick,mult,stakes:holeStakes(side,g,h),own:!!(hh.stakes&&(+hh.stakes.small||+hh.stakes.large)),bigLou:bigLouOn(side,g,h),draw:hh.draw||null,tie:[],sides:null,best:null,winner:null,money:{},pending:true};
+  const out={h,wolf:wolf||null,pick,mult,stakes:holeStakes(side,g,h),own:!!(hh.stakes&&(+hh.stakes.small||+hh.stakes.large)),bigLou:bigLouOn(side,g,h),draw:hh.draw||null,chosen:hh.chosen||null,tie:[],sides:null,best:null,winner:null,money:{},pending:true};
   if(!wolf||!pick) return out;
   const S=[wolf].concat(pick!=='lone'&&players.some(p=>p.id===pick)?[pick]:[]), L=players.map(p=>p.id).filter(id=>!S.includes(id));
   out.sides={S,L}; if(!L.length) return out;
