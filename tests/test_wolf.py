@@ -1,7 +1,8 @@
 """A side game inside one group on the scoring page, against the fake database. Run: python3 tests/test_wolf.py
 A cart of five sets up a 6-4 wolf from a phone (who am I, the stakes, the tee order); the wolf picks a partner or goes
-alone; the money settles from the scores hole by hole, net zero every hole; a second phone in the cart sees it; a
-stale phone is told to look again; the hub's game page shows the cart's ledger from the same math."""
+alone for 1x, 2x or 3x; the money settles from the scores hole by hole, net zero every hole; a second phone in the cart
+picks up the same wolf and only has to say who it is; a stale phone is told to look again; at the 16th hole the cart
+is asked about Big Lou (the player most down is the wolf, with its own bet); the hub's game page shows the ledger."""
 import asyncio,sys,json,copy
 from playwright.async_api import async_playwright
 from _harness import FakeDB,cloud,page
@@ -29,7 +30,7 @@ async def main():
     check('phone A: the hole screen asks about a side game',await A.evaluate("()=>/Playing a game in your cart/.test(document.body.innerText)&&document.getElementById('tabSide').textContent==='Side game'"))
     await A.click('#sgGo'); await A.wait_for_selector('#sgStart')
     txt=await A.evaluate("()=>document.body.innerText")
-    check('set-up: who am I, Wolf, net/gross, the money, the tee order, the preview per configuration',all(x in txt for x in ['Who are you?','Wolf','Net (full handicaps)','each player on the smaller side','each player on the larger side','Tee order','Wolf + partner v 3','each $6 · each $4 · $12 a side','Lone wolf v 4','wolf $16 · each $4 · $16 a side','1. Ann Able','5. Ed Eng']),txt[:400])
+    check('set-up: who am I, Wolf, net/gross, the money, the tee order, the preview per configuration, 2x/3x, Big Lou',all(x in txt for x in ['Who are you?','Wolf','Net (full handicaps)','each player on the smaller side','each player on the larger side','Tee order','Wolf + partner v 3','each $6 · each $4 · $12 a side','Lone wolf v 4','wolf $16 · each $4 · $16 a side','Lone wolf 2x / 3x','$32 / $48','Big Lou','1. Ann Able','5. Ed Eng']),txt[:400])
     await A.click('#sgStart')   # without a name
     check('set-up refuses without "who are you"',await A.evaluate("()=>!!document.getElementById('sgStart')&&!side"))
     await A.click('[data-me="p1"]')
@@ -38,7 +39,7 @@ async def main():
     rows=fdb._rows('golf_side')
     check('the wolf is on: one row for the group, v 1, the stakes, the order, who set it',len(rows)==1 and rows[0]['group_id']=='g1' and rows[0]['v']==1 and rows[0]['data']['stakes']=={'small':6,'large':4} and rows[0]['data']['order']==['p2','p1','p3','p4','p5'] and rows[0]['data']['setBy']=='p1' and rows[0]['data']['scoring']=='net',json.dumps(rows[0]['data']))
     st=await A.evaluate("()=>({strip:document.querySelector('.sgbar').innerText, tab:document.getElementById('tabSide').textContent, me:localStorage.getItem('mga_me_wolf-day')})")
-    check('hole 1: the strip names the wolf from the tee order (Bo), offers the partners and Lone wolf; the tab reads Wolf',st['strip'].startswith('WOLF · HOLE 1') and 'Wolf: Bo' in st['strip'] and all(n in st['strip'] for n in ['Ann','Cy','Di','Ed','Lone wolf']) and st['tab']=='Wolf' and st['me']=='p1',st['strip'])
+    check('hole 1: the strip names the wolf from the tee order (Bo), offers the partners and Lone wolf; the tab reads Wolf',st['strip'].startswith('WOLF · HOLE 1') and 'Wolf: Bo' in st['strip'] and all(n in st['strip'] for n in ['Ann','Cy','Di','Ed','Lone wolf']) and 'Who are you' not in st['strip'] and st['tab']=='Wolf' and st['me']=='p1',st['strip'])
     # --- 2. the pick, then the scores: wolf + partner win → +6 each, −4 each
     await A.click('[data-pick="p1"]'); await A.wait_for_function("()=>side.holes&&side.holes[1]&&side.holes[1].pick==='p1'")
     st=await A.evaluate("()=>document.querySelector('.sgbar').innerText")
@@ -47,19 +48,22 @@ async def main():
     st=await A.evaluate("()=>document.querySelector('.sgbar').innerText")
     check('hole 1 settles: wolf side wins, +$6 the wolf side; totals Bo +6, Ann +6, Cy −4, Di −4, Ed −4','Wolf side wins' in st and '+$6' in st and 'Cy −$4' in st and 'Ed −$4' in st and 'Ann +$6' in st,st)
     await A.wait_for_function("()=>queue.length===0")
-    # --- 3. phone B in the same cart sees it; on hole 2 the wolf (Ann) goes alone → wolf $16, the others −$4
+    # --- 3. phone B joins the same cart: the same wolf, it only has to say who it is; on hole 2 the wolf (Ann) goes alone for 1x
     N=await b.new_context(viewport={'width':390,'height':844}); await cloud(N,fdb,no_session=True)
     B=await N.new_page(); berr=[]; B.on('pageerror',lambda e:berr.append(str(e))); B.on('dialog',lambda d:asyncio.ensure_future(d.accept()))
     await B.goto(page('score.html')+'?e=wolf-day'); await B.wait_for_function("()=>!!pub")
     await B.fill('#code','ABC12'); await B.click('#joinBtn'); await B.wait_for_function("()=>!!groupId&&!!side")
-    st=await B.evaluate("()=>({h:holeIdx, strip:document.querySelector('.sgbar').innerText})")
-    check('phone B: joins on hole 2 with the wolf already on, Ann is the wolf, totals carried',st['h']==1 and 'HOLE 2' in st['strip'] and 'Wolf: Ann' in st['strip'] and 'Bo +$6' in st['strip'],st['strip'])
-    await B.click('[data-pick="lone"]'); await B.wait_for_function("()=>side.holes[2]&&side.holes[2].pick==='lone'")
+    st=await B.evaluate("()=>({h:holeIdx, strip:document.querySelector('.sgbar').innerText, ask:!!document.getElementById('sgGo')})")
+    check('phone B: no second set-up — the same wolf, hole 2, Ann is the wolf, totals carried, asked who it is',st['h']==1 and not st['ask'] and 'HOLE 2' in st['strip'] and 'Wolf: Ann' in st['strip'] and 'Bo +$6' in st['strip'] and 'Who are you?' in st['strip'],st['strip'])
+    await B.click('[data-iam="p2"]'); await B.wait_for_function("()=>ME==='p2'&&!/Who are you/.test(document.querySelector('.sgbar').innerText)")
+    await B.click('#sgLone'); await B.wait_for_selector('[data-lone="1"]')
+    st=await B.evaluate("()=>document.querySelector('.sgbar').innerText")
+    check('lone wolf asks 1x / 2x / 3x with the money',all(x in st for x in ['1x · wolf $16, each $4','2x · wolf $32, each $8','3x · wolf $48, each $12']),st)
+    await B.click('[data-lone="1"]'); await B.wait_for_function("()=>side.holes[2]&&side.holes[2].pick==='lone'&&side.holes[2].mult===1")
     await B.evaluate("()=>{ setStroke('p1',2,3); setStroke('p2',2,4); setStroke('p3',2,4); setStroke('p4',2,4); setStroke('p5',2,4); renderHole(); }")
     st=await B.evaluate("()=>document.querySelector('.sgbar').innerText")
-    check('lone wolf wins hole 2: +$16 to Ann, −$4 each; totals Ann +22, Bo +2, the others −8','Lone wolf wins' in st and '+$16' in st and 'Ann +$22' in st and 'Bo +$2' in st and 'Cy −$8' in st,st)
+    check('lone wolf wins hole 2 at 1x: +$16 to Ann, −$4 each; totals Ann +22, Bo +2, the others −8','Lone wolf wins' in st and '+$16' in st and 'Ann +$22' in st and 'Bo +$2' in st and 'Cy −$8' in st,st)
     await B.wait_for_function("()=>queue.length===0")
-    # phone A catches up on its poll
     await A.evaluate("async()=>{ await loadScores(); await loadSide(); holeIdx=1; renderHole(); }")
     st=await A.evaluate("()=>document.querySelector('.sgbar').innerText")
     check('phone A sees B\'s call and the money',('Lone wolf wins' in st) and 'Ann +$22' in st,st)
@@ -71,17 +75,38 @@ async def main():
     v=fdb._rows('golf_side')[0]['v']
     await B.evaluate("()=>{ sideV=sideV-1; holeIdx=3; renderHole(); }"); await B.click('[data-pick="p5"]'); await B.wait_for_timeout(500)
     check('a stale phone cannot overwrite: the row is untouched and the phone reloaded it',fdb._rows('golf_side')[0]['v']==v and 'pick' not in (fdb._rows('golf_side')[0]['data']['holes'].get('4') or {}) and await B.evaluate("()=>sideV")==v)
-    # --- 5. the ledger tab, and a changed call
+    # --- 5. hole 5: Ed alone for 3x → +$48, −$12 each
+    await A.evaluate("async()=>{ await loadSide(); holeIdx=4; renderHole(); }"); await A.click('#sgLone'); await A.click('[data-lone="3"]'); await A.wait_for_function("()=>side.holes[5]&&side.holes[5].mult===3")
+    await A.evaluate("()=>{ setStroke('p5',5,3); ['p1','p2','p3','p4'].forEach(id=>setStroke(id,5,4)); renderHole(); }")
+    st=await A.evaluate("()=>document.querySelector('.sgbar').innerText")
+    check('3x lone wolf: Ed +$48, −$12 each; totals Ann +10, Bo −10, Cy −20, Di −20, Ed +40','×3' in st and '+$48' in st and 'Ann +$10' in st and 'Bo −$10' in st and 'Cy −$20' in st and 'Ed +$40' in st,st)
+    await A.wait_for_function("()=>queue.length===0")
+    # --- 6. the 16th hole asks about Big Lou; the player most down is the wolf, with a new bet
+    await A.evaluate("()=>{ holeIdx=15; renderHole(); }")
+    st=await A.evaluate("()=>document.querySelector('.sgbar').innerText")
+    check('hole 16 asks about Big Lou','Big Lou from here?' in st and 'wolf on 16, 17 and 18' in st,st)
+    await A.click('#sgLouYes'); await A.wait_for_selector('#sgLouGo'); await A.fill('#sgLS','12'); await A.fill('#sgLL','8'); await A.click('#sgLouGo')
+    await A.wait_for_function("()=>side.bigLou&&side.bigLou.stakes&&side.bigLou.stakes.large===8")
+    st=await A.evaluate("()=>document.querySelector('.sgbar').innerText")
+    check('Big Lou on: Cy (most down, first in the order of the two at −20) is the wolf on 16','BIG LOU' in st.upper() and 'Wolf: Cy' in st and '(most down)' in st,st)
+    await A.click('[data-pick="p4"]'); await A.wait_for_function("()=>side.holes[16]&&side.holes[16].pick==='p4'")
+    await A.evaluate("()=>{ setStroke('p3',16,3); ['p1','p2','p4','p5'].forEach(id=>setStroke(id,16,4)); renderHole(); }")
+    st=await A.evaluate("()=>document.querySelector('.sgbar').innerText")
+    check('hole 16 at the Big Lou bet 12/8: Cy & Di +$12 each, the others −$8; Ann +2, Bo −18, Cy −8, Di −8, Ed +32','+$12' in st and 'Ann +$2' in st and 'Bo −$18' in st and 'Cy −$8' in st and 'Ed +$32' in st,st)
+    await A.evaluate("()=>{ holeIdx=16; renderHole(); }")
+    st=await A.evaluate("()=>document.querySelector('.sgbar').innerText")
+    check('hole 17: the wolf moves to Bo, now the most down','Wolf: Bo' in st and '(most down)' in st,st)
+    # --- 7. the ledger tab
     await A.evaluate("()=>{ tab='side'; render(); }")
     txt=await A.evaluate("()=>document.body.innerText")
-    check('ledger: per player and per hole, net zero',all(x in txt for x in ['Ann Able','+$22','Bo Baker','+$2','Cy Cole','−$8','3 of 18 holes settled','Bo + Ann','Ann alone','Cy + Di','push']) and abs(sum(r['net'] for r in (await A.evaluate("()=>sideLedger(pub,group(),scores,side).rows"))))<0.001,txt[:300])
+    check('ledger: per player and per hole, multipliers and Big Lou marked, net zero',all(x in txt for x in ['Ann Able','+$2','Bo Baker','−$18','Ed Eng','+$32','5 of 18 holes settled','Bo + Ann','Ann alone','Ed alone ×3','BIG LOU','Cy + Di','push','Big Lou from hole 16 at $12 / $8','(2x $32, 3x $48)']) and abs(sum(r['net'] for r in (await A.evaluate("()=>sideLedger(pub,group(),scores,side).rows"))))<0.001,repr(txt[:1500]))
     await A.evaluate("()=>{ tab='score'; holeIdx=0; render(); }"); await A.click('#sgUndo'); await A.wait_for_function("()=>!side.holes[1].pick")
-    check('the wolf\'s call on a hole can be changed',await A.evaluate("()=>!!document.querySelector('[data-pick=\"lone\"]')"))
+    check('the wolf\'s call on a hole can be changed',await A.evaluate("()=>!!document.getElementById('sgLone')"))
     await A.click('[data-pick="p1"]'); await A.wait_for_function("()=>side.holes[1].pick==='p1'")
-    # --- 6. the hub's game page shows the cart's ledger from the same math
+    # --- 8. the hub's game page shows the cart's ledger from the same math
     r=await hub.evaluate("""()=>{ const sd=%s; SIDE['ev1']={sig:'x',rows:[{group_id:'g1',data:sd}]}; golfScores['ev1']=%s; const h=sideGamesCard(window.EV); const d=document.createElement('div'); d.innerHTML=h; return d.innerText; }""" % (json.dumps(fdb._rows('golf_side')[0]['data']),json.dumps({pid:{int(h):s for h,s in v.items()} for pid,v in (await A.evaluate("()=>scores")).items()})))
-    check('hub card: Side games in the carts, the stakes line, the money per player',all(x in r for x in ['Side games in the carts','Group ABC12 · Wolf','$4 a player on the big side','lone wolf for $16','$6 each as a pair','Ann Able','+$22','Ed Eng','−$8','3 of 18 holes settled']),r[:300])
-    # --- 7. end it
+    check('hub card: Side games in the carts, the stakes line, the money per player',all(x in r for x in ['Side games in the carts','Group ABC12 · Wolf','$4 a player on the big side','lone wolf for $16','$6 each as a pair','Ann Able','+$2','Ed Eng','+$32','5 of 18 holes settled']),repr(r[:600]))
+    # --- 9. end it
     await A.evaluate("()=>{ tab='side'; render(); }"); await A.click('#sgEdit'); await A.wait_for_selector('#sgEnd'); await A.click('#sgEnd'); await A.wait_for_function("()=>!side&&tab==='score'")
     check('ended: the row is gone, the hole screen asks again',len(fdb._rows('golf_side'))==0 and await A.evaluate("()=>!!document.getElementById('sgGo')"))
     check('no script errors (hub / phones)',not errs and not aerr and not berr,json.dumps(errs+aerr+berr))

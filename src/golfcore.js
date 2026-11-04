@@ -622,25 +622,34 @@ function settleUp(rows){
 /* every event player by id */
 /* ---------- Side games inside one group (the cart's own money game, Nov 2026) ----------
    A group on the scoring page can run its own game on top of the event: `side` = {game:'wolf', stakes:{small,large},
-   order:[player ids in tee order], scoring:'net'|'gross', holes:{[h]:{wolf, pick: partner id | 'lone'}}, setBy}.
-   Wolf: the wolf rotates with the tee order; after the drives the wolf takes a partner or goes alone; the lower best
-   ball wins the hole, a tie is a push. Money is net zero on every hole: each player on the larger side pays or
-   collects `stakes.large`, the smaller side shares that total — the owner's 6-4 wolf (two against three: $6 each
-   and $4 each, $12 a side); a lone wolf against three takes the three $4s. Handicaps are the player's full course
-   handicap. The same functions settle it on the phones and in the hub. */
-const SIDE_GAMES=[{id:'wolf',name:'Wolf',min:3,max:6,desc:'The wolf rotates with the tee order. After the drives the wolf picks a partner — or goes it alone. Lower best ball wins the hole; a tie is a push.'}];
+   order:[player ids in tee order], scoring:'net'|'gross', holes:{[h]:{wolf?, pick: partner id | 'lone', mult 1|2|3}},
+   bigLou: undefined (not asked) | null (declined) | {stakes:{small,large}|null}, setBy}.
+   Wolf: the wolf rotates with the tee order; after the drives the wolf takes a partner or goes alone — alone for 1x,
+   2x or 3x the bet; the lower best ball wins the hole, a tie is a push. Money is net zero on every hole: each player
+   on the larger side pays or collects `stakes.large` (× the multiplier), the smaller side shares that total — the
+   owner's 6-4 wolf (two against three: $6 each and $4 each, $12 a side); a lone wolf against three takes the three
+   $4s, $16 against four, double that at 2x. Big Lou: from the 16th hole of the round the player most down is the
+   wolf, hole by hole, with its own bet if the cart wants one. Handicaps are the player's full course handicap.
+   The same functions settle it on the phones and in the hub. */
+const SIDE_GAMES=[{id:'wolf',name:'Wolf',min:3,max:6,desc:'The wolf rotates with the tee order. After the drives the wolf picks a partner — or goes it alone for 1x, 2x or 3x. Lower best ball wins the hole; a tie is a push.'}];
 const sideGame=id=>SIDE_GAMES.find(x=>x.id===id)||SIDE_GAMES[0];
+const BIG_LOU_FROM=15;   // play-order index: the 16th hole of the round
 /* what one hole is worth to each player of a small side (nS) and a large side (nL): net zero whatever the split */
-function wolfAmounts(nS,nL,stakes){ const st=stakes||{}; const large=Math.max(0,+st.large||0), small0=Math.max(0,+st.small||0);
+function wolfAmounts(nS,nL,stakes,mult){ const st=stakes||{}, m=Math.max(1,Math.min(3,+mult||1)); const large=Math.max(0,+st.large||0)*m, small0=Math.max(0,+st.small||0)*m;
   if(!nS||!nL) return {small:0,large:0,pot:0};
   const pot=nL*large, small=Math.abs(nS*small0-pot)<0.005?small0:Math.round(pot/nS*100)/100; return {small,large,pot:Math.round(pot*100)/100}; }
-/* the wolf on a hole: the override on the hole, else the tee order rotating from the group's first hole */
-function wolfOn(side,g,h){ const hh=(side.holes||{})[h]; if(hh&&hh.wolf) return hh.wolf; const order=(side.order||[]).filter(id=>(g.players||[]).some(p=>p.id===id)); if(!order.length) return null;
-  const po=playOrder(g.startHole), i=Math.max(0,po.indexOf(h)); return order[i%order.length]; }
+const bigLouOn=(side,g,h)=>!!(side&&side.bigLou)&&playOrder(g.startHole).indexOf(h)>=BIG_LOU_FROM;
+const holeStakes=(side,g,h)=>bigLouOn(side,g,h)&&side.bigLou.stakes?side.bigLou.stakes:(side.stakes||{});
+/* the wolf on a hole: the override on the hole; on a Big Lou hole the player most down so far (ties: earlier in the
+   tee order); else the tee order rotating from the group's first hole. `net` = the money before this hole. */
+function wolfOn(side,g,h,net){ const hh=(side.holes||{})[h]; if(hh&&hh.wolf) return hh.wolf; const order=(side.order||[]).filter(id=>(g.players||[]).some(p=>p.id===id)); if(!order.length) return null;
+  const po=playOrder(g.startHole), i=Math.max(0,po.indexOf(h));
+  if(bigLouOn(side,g,h)&&net){ let best=null; order.forEach(id=>{ const v=net[id]||0; if(best===null||v<(net[best]||0)) best=id; }); return best; }
+  return order[i%order.length]; }
 /* one hole of the wolf: who is on which side, each side's best ball, who won, and the money per player */
-function sideHole(pub,c,g,h,scores,side){
-  const players=g.players||[], wolf=wolfOn(side,g,h), hh=(side.holes||{})[h]||{}, pick=hh.pick||null;
-  const out={h,wolf,pick,sides:null,best:null,winner:null,money:{},pending:true};
+function sideHole(pub,c,g,h,scores,side,wolf){
+  const players=g.players||[], hh=(side.holes||{})[h]||{}, pick=hh.pick||null, mult=pick==='lone'?Math.max(1,Math.min(3,+hh.mult||1)):1;
+  const out={h,wolf:wolf||null,pick,mult,bigLou:bigLouOn(side,g,h),sides:null,best:null,winner:null,money:{},pending:true};
   if(!wolf||!pick) return out;
   const S=[wolf].concat(pick!=='lone'&&players.some(p=>p.id===pick)?[pick]:[]), L=players.map(p=>p.id).filter(id=>!S.includes(id));
   out.sides={S,L}; if(!L.length) return out;
@@ -648,14 +657,14 @@ function sideHole(pub,c,g,h,scores,side){
   const bestOf=ids=>{ const vs=ids.map(val); if(vs.some(v=>v==null)) return null; return Math.min(...vs); };
   const bS=bestOf(S), bL=bestOf(L); out.best={S:bS,L:bL}; if(bS==null||bL==null) return out;
   out.pending=false; out.winner=bS<bL?'S':bL<bS?'L':'push';
-  if(out.winner!=='push'){ const a=wolfAmounts(S.length,L.length,side.stakes); const sgn=out.winner==='S'?1:-1;
+  if(out.winner!=='push'){ const a=wolfAmounts(S.length,L.length,holeStakes(side,g,h),mult); const sgn=out.winner==='S'?1:-1;
     S.forEach(id=>{ out.money[id]=Math.round(sgn*a.small*100)/100; }); L.forEach(id=>{ out.money[id]=Math.round(-sgn*a.large*100)/100; }); }
   return out; }
-/* the group's ledger over the round: per player, and every hole in play order */
+/* the group's ledger over the round: per player, and every hole in play order (the wolf of a Big Lou hole depends on the money before it) */
 function sideLedger(pub,g,scores,side){ const c=(pub.courses||{})[g.course]||Object.values(pub.courses||{})[0]||null, po=playOrder(g.startHole);
-  const holes=po.map(h=>sideHole(pub,c,g,h,scores,side)); const net={}; (g.players||[]).forEach(p=>{ net[p.id]=0; });
-  holes.forEach(x=>{ for(const id in x.money) net[id]=Math.round(((net[id]||0)+x.money[id])*100)/100; });
-  const rows=(g.players||[]).map(p=>({id:p.id,name:p.name,net:net[p.id]||0})); return {rows,holes,played:holes.filter(x=>!x.pending).length}; }
+  const net={}; (g.players||[]).forEach(p=>{ net[p.id]=0; }); const holes=[];
+  po.forEach(h=>{ const x=sideHole(pub,c,g,h,scores,side,wolfOn(side,g,h,net)); x.before=Object.assign({},net); holes.push(x); for(const id in x.money) net[id]=Math.round(((net[id]||0)+x.money[id])*100)/100; });
+  const rows=(g.players||[]).map(p=>({id:p.id,name:p.name,net:net[p.id]||0})); return {rows,holes,played:holes.filter(x=>!x.pending).length,net}; }
 function pubNames(pub){ const m={}; for(const g of pub.groups||[]) for(const p of g.players||[]) m[p.id]=p.name; for(const p of pub.pool||[]) m[p.id]=p.name; return m; }
 /* The computed payout of one published competition from the cards, by its own rules (entry × players in = the pot;
    `places` or the usual split; a team Nassau segment by segment; skins pot ÷ skins won or per hole). Returns
