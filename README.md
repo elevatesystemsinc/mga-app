@@ -25,7 +25,7 @@ the club hub's Logins page; a board login sees its own organization only. See `d
 On the scoring page, once your group has joined, the hole screen asks whether you are playing a game in your cart. **Set up** takes who
 you are, Wolf, net or gross, the money per hole for the smaller and the larger side (a 6-4 wolf: two against three is $6 and $4 each,
 $12 a side; a lone wolf against three plays for $12) and the tee order. Every hole then names the wolf, takes the pick — a partner or
-**Lone wolf** for 1x, 2x or 3x — and settles the hole from the scores you are already entering, net zero every time; a tie is a push.
+**Lone wolf** — at the bet the wolf sets for that hole, 1x, 2x, 3x or an amount of its own — and settles the hole from the scores you are already entering, net zero every time; a tie is a push.
 At the 16th hole the cart is asked about **Big Lou**: from there the player most down is the wolf, with the same bet or a new one. The
 **Wolf** tab is the ledger. Every phone in the cart sees the same wolf — a second phone only says who it is — and the hub's game page
 shows each cart's money.

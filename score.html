@@ -767,16 +767,16 @@ function settleUp(rows){
 /* every event player by id */
 /* ---------- Side games inside one group (the cart's own money game, Nov 2026) ----------
    A group on the scoring page can run its own game on top of the event: `side` = {game:'wolf', stakes:{small,large},
-   order:[player ids in tee order], scoring:'net'|'gross', holes:{[h]:{wolf?, pick: partner id | 'lone', mult 1|2|3}},
+   order:[player ids in tee order], scoring:'net'|'gross', holes:{[h]:{wolf?, pick: partner id | 'lone', mult 1|2|3, stakes?}},
    bigLou: undefined (not asked) | null (declined) | {stakes:{small,large}|null}, setBy}.
-   Wolf: the wolf rotates with the tee order; after the drives the wolf takes a partner or goes alone — alone for 1x,
-   2x or 3x the bet; the lower best ball wins the hole, a tie is a push. Money is net zero on every hole: each player
+   Wolf: the wolf rotates with the tee order; after the drives the wolf sets the bet for the hole (1x, 2x, 3x or an
+   amount of its own) and takes a partner or goes alone; the lower best ball wins the hole, a tie is a push. Money is net zero on every hole: each player
    on the larger side pays or collects `stakes.large` (× the multiplier), the smaller side shares that total — the
    owner's 6-4 wolf (two against three: $6 each and $4 each, $12 a side); a lone wolf against three takes the three
    $4s, $16 against four, double that at 2x. Big Lou: from the 16th hole of the round the player most down is the
    wolf, hole by hole, with its own bet if the cart wants one. Handicaps are the player's full course handicap.
    The same functions settle it on the phones and in the hub. */
-const SIDE_GAMES=[{id:'wolf',name:'Wolf',min:3,max:6,desc:'The wolf rotates with the tee order. After the drives the wolf picks a partner — or goes it alone for 1x, 2x or 3x. Lower best ball wins the hole; a tie is a push.'}];
+const SIDE_GAMES=[{id:'wolf',name:'Wolf',min:3,max:6,desc:'The wolf rotates with the tee order. After the drives the wolf sets the bet for the hole — 1x, 2x, 3x or an amount — and picks a partner, or goes it alone. Lower best ball wins the hole; a tie is a push.'}];
 const sideGame=id=>SIDE_GAMES.find(x=>x.id===id)||SIDE_GAMES[0];
 const BIG_LOU_FROM=15;   // play-order index: the 16th hole of the round
 /* what one hole is worth to each player of a small side (nS) and a large side (nL): net zero whatever the split */
@@ -784,7 +784,7 @@ function wolfAmounts(nS,nL,stakes,mult){ const st=stakes||{}, m=Math.max(1,Math.
   if(!nS||!nL) return {small:0,large:0,pot:0};
   const pot=nL*large, small=Math.abs(nS*small0-pot)<0.005?small0:Math.round(pot/nS*100)/100; return {small,large,pot:Math.round(pot*100)/100}; }
 const bigLouOn=(side,g,h)=>!!(side&&side.bigLou)&&playOrder(g.startHole).indexOf(h)>=BIG_LOU_FROM;
-const holeStakes=(side,g,h)=>bigLouOn(side,g,h)&&side.bigLou.stakes?side.bigLou.stakes:(side.stakes||{});
+const holeStakes=(side,g,h)=>{ const hh=(side.holes||{})[h]; if(hh&&hh.stakes&&(+hh.stakes.small||+hh.stakes.large)) return hh.stakes; return bigLouOn(side,g,h)&&side.bigLou.stakes?side.bigLou.stakes:(side.stakes||{}); };
 /* the wolf on a hole: the override on the hole; on a Big Lou hole the player most down so far (ties: earlier in the
    tee order); else the tee order rotating from the group's first hole. `net` = the money before this hole. */
 function wolfOn(side,g,h,net){ const hh=(side.holes||{})[h]; if(hh&&hh.wolf) return hh.wolf; const order=(side.order||[]).filter(id=>(g.players||[]).some(p=>p.id===id)); if(!order.length) return null;
@@ -793,8 +793,8 @@ function wolfOn(side,g,h,net){ const hh=(side.holes||{})[h]; if(hh&&hh.wolf) ret
   return order[i%order.length]; }
 /* one hole of the wolf: who is on which side, each side's best ball, who won, and the money per player */
 function sideHole(pub,c,g,h,scores,side,wolf){
-  const players=g.players||[], hh=(side.holes||{})[h]||{}, pick=hh.pick||null, mult=pick==='lone'?Math.max(1,Math.min(3,+hh.mult||1)):1;
-  const out={h,wolf:wolf||null,pick,mult,bigLou:bigLouOn(side,g,h),sides:null,best:null,winner:null,money:{},pending:true};
+  const players=g.players||[], hh=(side.holes||{})[h]||{}, pick=hh.pick||null, mult=Math.max(1,Math.min(3,+hh.mult||1));
+  const out={h,wolf:wolf||null,pick,mult,stakes:holeStakes(side,g,h),own:!!(hh.stakes&&(+hh.stakes.small||+hh.stakes.large)),bigLou:bigLouOn(side,g,h),sides:null,best:null,winner:null,money:{},pending:true};
   if(!wolf||!pick) return out;
   const S=[wolf].concat(pick!=='lone'&&players.some(p=>p.id===pick)?[pick]:[]), L=players.map(p=>p.id).filter(id=>!S.includes(id));
   out.sides={S,L}; if(!L.length) return out;
@@ -1056,45 +1056,49 @@ function renderHole(){
 /* ---------- the side game: the strip on the hole, the set-up, the ledger ---------- */
 const sMoney=v=>(v<0?'−':v>0?'+':'')+'$'+Math.abs(v).toLocaleString('en-US',{minimumFractionDigits:Math.abs(v)%1?2:0,maximumFractionDigits:2});
 const fn1=n=>String(n||'').split(' ')[0];
-const sgUI={h:null,lone:false,lou:false};
+const sgUI={h:null,bet:1,own:false,lou:false};
 const sgInp=(id,v)=>`<input id="${id}" type="number" inputmode="decimal" min="0" value="${v}" style="width:70px;height:40px;border-radius:10px;border:1.5px solid rgba(255,255,255,.4);background:transparent;color:#fff;font-weight:700;font-size:16px;text-align:center">`;
-function sideStrip(g,c,h){ if(sgUI.h!==h){ sgUI.h=h; sgUI.lone=false; sgUI.lou=false; }
+function sideStrip(g,c,h){ if(sgUI.h!==h){ sgUI.h=h; sgUI.bet=1; sgUI.own=false; sgUI.lou=false; }
   const L=sideLedger(pub,g,scores,side), x=L.holes.find(y=>y.h===h), nm=id=>fn1((g.players.find(p=>p.id===id)||{}).name);
   const wolfName=x.wolf?nm(x.wolf):'—', me=ME&&g.players.some(p=>p.id===ME)?ME:'', st=holeStakes(side,g,h), n=g.players.length;
   const po=playOrder(g.startHole), askLou=po.indexOf(h)===BIG_LOU_FROM&&side.bigLou===undefined, over=(side.holes||{})[h]&&(side.holes||{})[h].wolf;
+  const betLine=(stk,m)=>{ const a1=wolfAmounts(1,n-1,stk,m), a2=n>=4?wolfAmounts(2,n-2,stk,m):null; return `${a2?`partner: $${a2.small} / $${a2.large} each · `:''}alone: wolf $${a1.pot}, each $${a1.large}`; };
   let body;
   if(askLou){ body=sgUI.lou?`<div class="sgres" style="flex-wrap:wrap"><span>The bet from here — each player on the smaller side / the larger side</span></div><div class="sgp" style="align-items:center">${sgInp('sgLS',+side.stakes.small||0)}<span>/</span>${sgInp('sgLL',+side.stakes.large||0)}<button class="on" id="sgLouGo">Play Big Lou</button><button id="sgLouBack">Back</button></div>`
       :`<div class="sgres"><span><b>Big Lou from here?</b> The player most down is the wolf on ${po[15]}, ${po[16]} and ${po[17]} — same bet or a new one.</span></div><div class="sgp"><button class="on" id="sgLouYes">Yes, Big Lou</button><button id="sgLouNo">No, keep the order</button></div>`; }
   else if(!x.wolf) body='<div class="muted" style="color:#C9CFD2">No wolf set for this hole.</div>';
-  else if(!x.pick){ body=sgUI.lone?`<div class="sgres"><span>${esc(wolfName)} alone — for how much?</span></div><div class="sgp">${[1,2,3].map(m=>{ const a=wolfAmounts(1,n-1,st,m); return `<button class="lone" data-lone="${m}">${m}x · wolf $${a.pot}, each $${a.large}</button>`; }).join('')}<button id="sgLoneBack">Back</button></div>`
-      :`<div class="sgp">${g.players.filter(p=>p.id!==x.wolf).map(p=>`<button data-pick="${esc(p.id)}">${esc(fn1(p.name))}</button>`).join('')}<button class="lone" id="sgLone">Lone wolf</button></div>`; }
+  else if(!x.pick){ body=`<div class="sgres" style="flex-wrap:wrap"><span style="font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--goldl);font-weight:800">The bet</span></div>
+      <div class="sgp" style="align-items:center">${[1,2,3].map(m=>`<button data-bet="${m}" class="${!sgUI.own&&sgUI.bet===m?'on':''}">${m}x</button>`).join('')}<button data-bet="x" class="${sgUI.own?'on':''}">Other</button>${sgUI.own?`${sgInp('sgBS',+st.small||0)}<span>/</span>${sgInp('sgBL',+st.large||0)}`:''}</div>
+      <div class="sgres" style="font-size:13px;color:#C9CFD2"><span id="sgBetLine">${betLine(st,sgUI.own?1:sgUI.bet)}</span></div>
+      <div class="sgp">${g.players.filter(p=>p.id!==x.wolf).map(p=>`<button data-pick="${esc(p.id)}">${esc(fn1(p.name))}</button>`).join('')}<button class="lone" data-pick="lone">Lone wolf</button></div>`; }
   else { const S=x.sides?x.sides.S.map(nm).join(' & '):'', Lt=x.sides?x.sides.L.map(nm).join(' & '):'';
     const res=x.pending?'<span class="muted" style="color:#C9CFD2">waiting for the scores</span>':x.winner==='push'?'<b>Push</b>':`<b>${x.winner==='S'?(x.pick==='lone'?'Lone wolf wins':'Wolf side wins'):'The others win'}</b> <span class="${x.winner==='S'?'up':'dn'}">${sMoney(x.money[x.wolf]||0)} wolf${x.pick!=='lone'?' side':''}</span>`;
-    body=`<div class="sgres"><span>${esc(S)}${x.pick==='lone'&&x.mult>1?` <span style="color:var(--goldl)">×${x.mult}</span>`:''} <span style="color:#C9CFD2">v</span> ${esc(Lt)}${x.best&&!x.pending?` <span style="color:#C9CFD2">· ${x.best.S} v ${x.best.L}${side.scoring==='gross'?'':' net'}</span>`:''}</span><span>${res}</span></div>`; }
+    const bet=x.mult>1?` <span style="color:var(--goldl)">×${x.mult}</span>`:x.own?` <span style="color:var(--goldl)">$${+x.stakes.small||0} / $${+x.stakes.large||0}</span>`:'';
+    body=`<div class="sgres"><span>${esc(S)}${bet} <span style="color:#C9CFD2">v</span> ${esc(Lt)}${x.best&&!x.pending?` <span style="color:#C9CFD2">· ${x.best.S} v ${x.best.L}${side.scoring==='gross'?'':' net'}</span>`:''}</span><span>${res}</span></div>`; }
   return `<div class="sgbar"><div class="k"><span>${esc(sideGame(side.game).name)}${x.bigLou?' · Big Lou':''} · hole ${h}</span><button id="sgTab">Ledger</button></div>
     ${me?'':`<div class="sgres" style="flex-wrap:wrap"><span>Who are you?</span></div><div class="sgp">${g.players.map(p=>`<button data-iam="${esc(p.id)}">${esc(fn1(p.name))}</button>`).join('')}</div>`}
     ${askLou?'':`<div class="who">Wolf: <b>${esc(wolfName)}</b>${me===x.wolf?' <span style="font-size:13px;color:#C9CFD2">(you)</span>':''}${x.bigLou&&!over?' <span style="font-size:13px;color:#C9CFD2">(most down)</span>':''}${x.pick?` <button class="chg" id="sgUndo">change</button>`:''}</div>`}
     ${body}
     <div class="sgtot">${L.rows.map(r=>`<span>${esc(fn1(r.name))} <b class="${r.net>0?'up':r.net<0?'dn':''}">${sMoney(r.net)}</b></span>`).join('')}</div></div>`; }
 function wireSideStrip(g,c,h){
-  const save=async(mut)=>{ const d=JSON.parse(JSON.stringify(side)); mut(d); if(await putSide(d)){ sgUI.lone=false; sgUI.lou=false; renderHole(); } };
-  document.querySelectorAll('[data-pick]').forEach(b=>b.onclick=()=>save(d=>{ d.holes=d.holes||{}; d.holes[h]=Object.assign({},d.holes[h]||{},{pick:b.dataset.pick,mult:1,at:new Date().toISOString(),by:ME||code}); }));
-  document.querySelectorAll('[data-lone]').forEach(b=>b.onclick=()=>save(d=>{ d.holes=d.holes||{}; d.holes[h]=Object.assign({},d.holes[h]||{},{pick:'lone',mult:+b.dataset.lone,at:new Date().toISOString(),by:ME||code}); }));
+  const save=async(mut)=>{ const d=JSON.parse(JSON.stringify(side)); mut(d); if(await putSide(d)){ sgUI.bet=1; sgUI.own=false; sgUI.lou=false; renderHole(); } };
+  const betOf=()=>{ if(!sgUI.own) return {mult:sgUI.bet,stakes:null}; const sm=Math.max(0,+($('sgBS')||{}).value||0), la=Math.max(0,+($('sgBL')||{}).value||0); return {mult:1,stakes:(sm||la)?{small:sm,large:la}:null}; };
+  document.querySelectorAll('[data-pick]').forEach(b=>b.onclick=()=>{ const bet=betOf(); save(d=>{ d.holes=d.holes||{}; const hh=Object.assign({},d.holes[h]||{},{pick:b.dataset.pick,mult:bet.mult,at:new Date().toISOString(),by:ME||code}); if(bet.stakes) hh.stakes=bet.stakes; else delete hh.stakes; d.holes[h]=hh; }); });
+  document.querySelectorAll('[data-bet]').forEach(b=>b.onclick=()=>{ if(b.dataset.bet==='x'){ sgUI.own=true; } else { sgUI.own=false; sgUI.bet=+b.dataset.bet; } renderHole(); });
+  const bs=$('sgBS'), bl=$('sgBL'); if(bs&&bl){ const upd=()=>{ const n=g.players.length, stk={small:+bs.value||0,large:+bl.value||0}, a1=wolfAmounts(1,n-1,stk,1), a2=n>=4?wolfAmounts(2,n-2,stk,1):null; $('sgBetLine').textContent=`${a2?`partner: $${a2.small} / $${a2.large} each · `:''}alone: wolf $${a1.pot}, each $${a1.large}`; }; bs.oninput=upd; bl.oninput=upd; bs.focus(); }
   document.querySelectorAll('[data-iam]').forEach(b=>b.onclick=()=>{ ME=b.dataset.iam; try{ localStorage.setItem(MEKEY,ME); }catch(_){} renderHole(); });
-  const ln=$('sgLone'); if(ln) ln.onclick=()=>{ sgUI.lone=true; renderHole(); };
-  const lb=$('sgLoneBack'); if(lb) lb.onclick=()=>{ sgUI.lone=false; renderHole(); };
   const ly=$('sgLouYes'); if(ly) ly.onclick=()=>{ sgUI.lou=true; renderHole(); };
   const lk=$('sgLouBack'); if(lk) lk.onclick=()=>{ sgUI.lou=false; renderHole(); };
   const lg=$('sgLouGo'); if(lg) lg.onclick=()=>{ const sm=Math.max(0,+$('sgLS').value||0), la=Math.max(0,+$('sgLL').value||0); save(d=>{ d.bigLou={stakes:(sm===(+d.stakes.small||0)&&la===(+d.stakes.large||0))?null:{small:sm,large:la},at:new Date().toISOString(),by:ME||code}; }); };
   const lo=$('sgLouNo'); if(lo) lo.onclick=()=>save(d=>{ d.bigLou=null; });
-  const u=$('sgUndo'); if(u) u.onclick=()=>save(d=>{ d.holes=d.holes||{}; if(d.holes[h]){ delete d.holes[h].pick; delete d.holes[h].mult; } });
+  const u=$('sgUndo'); if(u) u.onclick=()=>save(d=>{ d.holes=d.holes||{}; if(d.holes[h]){ delete d.holes[h].pick; delete d.holes[h].mult; delete d.holes[h].stakes; } });
   const t=$('sgTab'); if(t) t.onclick=()=>{ tab='side'; render(); window.scrollTo(0,0); };
 }
 function renderSideSetup(){
   const g=group(), G=sideGame('wolf'), cur=side||{}, n=g.players.length;
   const st={small:cur.stakes?cur.stakes.small:6,large:cur.stakes?cur.stakes.large:4}; let order=(cur.order||[]).filter(id=>g.players.some(p=>p.id===id)); g.players.forEach(p=>{ if(!order.includes(p.id)) order.push(p.id); });
   let scoring=cur.scoring||'net', me=ME&&g.players.some(p=>p.id===ME)?ME:'';
-  const preview=()=>{ const lines=[]; for(let nS=1;nS<=Math.floor(n/2);nS++){ const a=wolfAmounts(nS,n-nS,st); lines.push(`<div><span>${nS===1?'Lone wolf':'Wolf + partner'} v ${n-nS}</span><b>${nS===1?'wolf':'each'} $${a.small} · each $${a.large} · $${a.pot} a side</b></div>`); } lines.push(`<div><span>Lone wolf 2x / 3x</span><b>$${wolfAmounts(1,n-1,st,2).pot} / $${wolfAmounts(1,n-1,st,3).pot}</b></div>`); lines.push(`<div><span>Hole 16</span><b>the cart is asked about Big Lou</b></div>`); return lines.join(''); };
+  const preview=()=>{ const lines=[]; for(let nS=1;nS<=Math.floor(n/2);nS++){ const a=wolfAmounts(nS,n-nS,st); lines.push(`<div><span>${nS===1?'Lone wolf':'Wolf + partner'} v ${n-nS}</span><b>${nS===1?'wolf':'each'} $${a.small} · each $${a.large} · $${a.pot} a side</b></div>`); } lines.push(`<div><span>Every hole</span><b>the wolf sets the bet: 1x, 2x, 3x or an amount</b></div>`); lines.push(`<div><span>Lone wolf 2x / 3x</span><b>$${wolfAmounts(1,n-1,st,2).pot} / $${wolfAmounts(1,n-1,st,3).pot}</b></div>`); lines.push(`<div><span>Hole 16</span><b>the cart is asked about Big Lou</b></div>`); return lines.join(''); };
   $('main').innerHTML=`<div class="card pad sgset"><h1 style="margin:0">Set up a side game</h1><p class="muted" style="margin:6px 0 0">${esc(G.name)} — ${esc(G.desc)} Net zero every hole: the money per hole is settled between the two sides.</p>
     <label>Who are you?</label><div class="names" id="sgMe">${g.players.map(p=>`<button data-me="${esc(p.id)}" class="${me===p.id?'on':''}">${esc(p.name)}</button>`).join('')}</div>
     <label>Game</label><div class="names"><button class="on">Wolf</button></div>
@@ -1128,7 +1132,7 @@ function renderSide(){
     ${L.rows.map(r=>`<div class="sgrow"><span class="muted">${r.id===ME?'you':''}</span><b>${esc(r.name)}</b><span class="r ${r.net>0?'up':r.net<0?'dn':''}">${sMoney(r.net)}</span></div>`).join('')}
     <div class="pad" style="display:flex;gap:10px;padding-top:12px"><button class="btn" id="sgEdit" style="flex:1">Stakes & order</button><button class="btn pri" id="sgScore" style="flex:1">Back to scoring</button></div></div>
     <div class="card" style="overflow:hidden;margin-top:14px"><div class="sgrow h" style="grid-template-columns:40px minmax(0,1fr) 110px"><span>Hole</span><span>Wolf · pick · result</span><span class="r">Wolf side</span></div>
-    ${po.map(h=>{ const x=L.holes.find(y=>y.h===h); const pick=x.pick?(x.pick==='lone'?'alone'+(x.mult>1?' ×'+x.mult:''):'+ '+nm(x.pick)):''; const res=!x.pick?'<span class="muted">—</span>':x.pending?'<span class="muted">waiting for scores</span>':x.winner==='push'?'push':x.winner==='S'?'won':'lost';
+    ${po.map(h=>{ const x=L.holes.find(y=>y.h===h); const pick=x.pick?(x.pick==='lone'?'alone':'+ '+nm(x.pick))+(x.mult>1?' ×'+x.mult:'')+(x.own?` at $${+x.stakes.small||0} / $${+x.stakes.large||0}`:''):''; const res=!x.pick?'<span class="muted">—</span>':x.pending?'<span class="muted">waiting for scores</span>':x.winner==='push'?'push':x.winner==='S'?'won':'lost';
       return `<div class="sgrow" style="grid-template-columns:40px minmax(0,1fr) 110px"><span class="muted">${h}</span><span>${x.bigLou?'<span class="muted" style="font-size:11px;letter-spacing:.08em">BIG LOU </span>':''}<b>${esc(nm(x.wolf))}</b>${pick?' '+esc(pick):''} <span class="muted">· ${res}</span></span><span class="r ${x.winner==='S'?'up':x.winner==='L'?'dn':''}">${x.pick&&!x.pending&&x.winner!=='push'?sMoney(x.money[x.wolf]||0):''}</span></div>`; }).join('')}</div>
     <p class="muted" style="text-align:center;font-size:12.5px;margin:14px 0 0">${L.played} of 18 holes settled · tap a hole on the Score tab to pick a partner or change the wolf's call.</p>`;
   $('sgEdit').onclick=()=>{ sideEdit=true; renderSide(); }; $('sgScore').onclick=()=>{ tab='score'; render(); };
@@ -1373,7 +1377,7 @@ window.__canReload=()=>!queue.length;
    page counts, and a reload is tried once per build — if the page that comes back is still the old one, the CDN
    hasn't caught up; wait a while before trying that build again. */
 (function(){
-  const ME='20261104162431', KEY='au_tried', RETRY=10*60*1000; let ready=false, lastCheck=0;
+  const ME='20261104163716', KEY='au_tried', RETRY=10*60*1000; let ready=false, lastCheck=0;
   const typing=()=>{ const a=document.activeElement; return a&&/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)&&a.value&&a.type!=='search'; };
   const safe=()=>!typing()&&(typeof window.__canReload!=='function'||window.__canReload());
   const tried=()=>{ try{ const [b,t]=(sessionStorage.getItem(KEY)||'').split('|'); return b?{build:b,at:+t||0}:null; }catch(_){ return null; } };
