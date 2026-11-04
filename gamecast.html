@@ -720,16 +720,20 @@ function wolfAmounts(nS,nL,stakes,mult){ const st=stakes||{}, m=Math.max(1,Math.
 const bigLouOn=(side,g,h)=>!!(side&&side.bigLou)&&playOrder(g.startHole).indexOf(h)>=BIG_LOU_FROM;
 /* the stakes on a hole: the game's, except on a Big Lou hole, where the Big Lou's own amount for that hole counts, else the last one named */
 const holeStakes=(side,g,h)=>{ if(!bigLouOn(side,g,h)) return side.stakes||{}; const po=playOrder(g.startHole), i=po.indexOf(h); for(let k=i;k>=BIG_LOU_FROM;k--){ const hh=(side.holes||{})[po[k]]; if(hh&&hh.stakes&&(+hh.stakes.small||+hh.stakes.large)) return hh.stakes; } return (side.bigLou&&side.bigLou.stakes)||side.stakes||{}; };
-/* the wolf on a hole: the override on the hole; on a Big Lou hole the player most down so far (ties: earlier in the
-   tee order); else the tee order rotating from the group's first hole. `net` = the money before this hole. */
+/* on a Big Lou hole: everyone tied for most down before it (one id = the Big Lou; more = a draw is needed) */
+function louTied(side,g,h,net){ const order=(side.order||[]).filter(id=>(g.players||[]).some(p=>p.id===id)); if(!order.length) return [];
+  const low=Math.min(...order.map(id=>(net||{})[id]||0)); return order.filter(id=>Math.abs(((net||{})[id]||0)-low)<0.005); }
+/* the wolf on a hole: the override on the hole (a Big Lou drawn from a tie lands here too); on a Big Lou hole the player
+   most down so far — nobody while two or more are tied, until the draw; else the tee order rotating from the group's
+   first hole. `net` = the money before this hole. */
 function wolfOn(side,g,h,net){ const hh=(side.holes||{})[h]; if(hh&&hh.wolf) return hh.wolf; const order=(side.order||[]).filter(id=>(g.players||[]).some(p=>p.id===id)); if(!order.length) return null;
   const po=playOrder(g.startHole), i=Math.max(0,po.indexOf(h));
-  if(bigLouOn(side,g,h)&&net){ let best=null; order.forEach(id=>{ const v=net[id]||0; if(best===null||v<(net[best]||0)) best=id; }); return best; }
+  if(bigLouOn(side,g,h)&&net){ const t=louTied(side,g,h,net); return t.length===1?t[0]:null; }
   return order[i%order.length]; }
 /* one hole of the wolf: who is on which side, each side's best ball, who won, and the money per player */
 function sideHole(pub,c,g,h,scores,side,wolf){
   const players=g.players||[], hh=(side.holes||{})[h]||{}, pick=hh.pick||null, mult=Math.max(1,Math.min(3,+hh.mult||1));
-  const out={h,wolf:wolf||null,pick,mult,stakes:holeStakes(side,g,h),own:!!(hh.stakes&&(+hh.stakes.small||+hh.stakes.large)),bigLou:bigLouOn(side,g,h),sides:null,best:null,winner:null,money:{},pending:true};
+  const out={h,wolf:wolf||null,pick,mult,stakes:holeStakes(side,g,h),own:!!(hh.stakes&&(+hh.stakes.small||+hh.stakes.large)),bigLou:bigLouOn(side,g,h),draw:hh.draw||null,tie:[],sides:null,best:null,winner:null,money:{},pending:true};
   if(!wolf||!pick) return out;
   const S=[wolf].concat(pick!=='lone'&&players.some(p=>p.id===pick)?[pick]:[]), L=players.map(p=>p.id).filter(id=>!S.includes(id));
   out.sides={S,L}; if(!L.length) return out;
@@ -743,7 +747,7 @@ function sideHole(pub,c,g,h,scores,side,wolf){
 /* the group's ledger over the round: per player, and every hole in play order (the wolf of a Big Lou hole depends on the money before it) */
 function sideLedger(pub,g,scores,side){ const c=(pub.courses||{})[g.course]||Object.values(pub.courses||{})[0]||null, po=playOrder(g.startHole);
   const net={}; (g.players||[]).forEach(p=>{ net[p.id]=0; }); const holes=[];
-  po.forEach(h=>{ const x=sideHole(pub,c,g,h,scores,side,wolfOn(side,g,h,net)); x.before=Object.assign({},net); holes.push(x); for(const id in x.money) net[id]=Math.round(((net[id]||0)+x.money[id])*100)/100; });
+  po.forEach(h=>{ const x=sideHole(pub,c,g,h,scores,side,wolfOn(side,g,h,net)); x.before=Object.assign({},net); if(x.bigLou&&!x.wolf) x.tie=louTied(side,g,h,net); holes.push(x); for(const id in x.money) net[id]=Math.round(((net[id]||0)+x.money[id])*100)/100; });
   const rows=(g.players||[]).map(p=>({id:p.id,name:p.name,net:net[p.id]||0})); return {rows,holes,played:holes.filter(x=>!x.pending).length,net}; }
 function pubNames(pub){ const m={}; for(const g of pub.groups||[]) for(const p of g.players||[]) m[p.id]=p.name; for(const p of pub.pool||[]) m[p.id]=p.name; return m; }
 /* The computed payout of one published competition from the cards, by its own rules (entry × players in = the pot;
@@ -966,7 +970,7 @@ window.__canReload=()=>true;
    page counts, and a reload is tried once per build — if the page that comes back is still the old one, the CDN
    hasn't caught up; wait a while before trying that build again. */
 (function(){
-  const ME='20261104165851', KEY='au_tried', RETRY=10*60*1000; let ready=false, lastCheck=0;
+  const ME='20261104185251', KEY='au_tried', RETRY=10*60*1000; let ready=false, lastCheck=0;
   const typing=()=>{ const a=document.activeElement; return a&&/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)&&a.value&&a.type!=='search'; };
   const safe=()=>!typing()&&(typeof window.__canReload!=='function'||window.__canReload());
   const tried=()=>{ try{ const [b,t]=(sessionStorage.getItem(KEY)||'').split('|'); return b?{build:b,at:+t||0}:null; }catch(_){ return null; } };
