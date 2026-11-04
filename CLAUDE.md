@@ -425,12 +425,17 @@ Tournament = { id, name, season, days, startDate, field:[{id,memberId,team,paid,
     asks once ("Playing a game in your cart?" → Set up, or ✕ remembered per group) when the group is 3–6 own-ball players; **Set up**: who
     are you (`ME`, localStorage `mga_me_<slug>`), Wolf, net / gross, the two amounts with a preview per configuration, the tee order (▲▼).
     The **strip** on every hole names the wolf (`wolfOn`: the override on the hole, else the order rotating from the group's first hole),
-    takes the pick (a partner or Lone wolf; *change* undoes it), shows the sides' best balls and the result once every score is in, and the
-    running money; the **Wolf** tab is the ledger (per player, per hole; Stakes & order; End it). Money (`wolfAmounts`): each player on the
-    larger side pays or collects `stakes.large`, the smaller side shares that total (6-4 with 2 v 3 = $6 / $4; a lone wolf v 3 takes $12,
-    v 4 $16) — net zero on every hole; a tie is a push. Handicaps are the player's full course handicap (`ch`). The hub's game page shows
-    **Side games in the carts** (read-only, `golf_side` rows + the same math; not on an admin link). Only Wolf for now; `SIDE_GAMES` is
-    the catalog to grow.
+    takes the pick (a partner, or **Lone wolf → 1x / 2x / 3x**, `holes[h].mult`; *change* undoes it), shows the sides' best balls and the result
+    once every score is in, and the running money; the **Wolf** tab is the ledger (per player, per hole; Stakes & order; End it). **A second
+    phone in the cart picks up the same wolf** (one row per group; `join` loads it, no second set-up) and is only asked who it is (the strip's
+    "Who are you?" when `ME` is empty on that phone). Money (`wolfAmounts(nS,nL,stakes,mult)`): each player on the larger side pays or collects
+    `stakes.large` × mult, the smaller side shares that total (6-4 with 2 v 3 = $6 / $4; a lone wolf v 4 takes $16 at 1x, $32 at 2x, $48 at
+    3x — "it always goes by the small denomination": the others each pay the $4) — net zero on every hole; a tie is a push. **Big Lou** (the
+    owner, Nov 4): at the 16th hole of the round (`BIG_LOU_FROM` = play-order index 15) the strip asks once — Yes with the same bet or a new one
+    (`side.bigLou = {stakes|null}`), or No (`null`); from then the wolf on each hole is the player most down before it (`wolfOn` with the running
+    `net`, ties to the earlier tee order; "(most down)"), who picks a partner or goes alone as usual, at `holeStakes()`; `sideLedger` runs the
+    holes in play order for that. Handicaps are the player's full course handicap (`ch`). The hub's game page shows **Side games in the carts**
+    (read-only, `golf_side` rows + the same math; not on an admin link). Only Wolf for now; `SIDE_GAMES` is the catalog to grow.
   - **Game sheet PDF** (`gameSheetPDF(g,{strokes,returnDoc})`): the band (date · course · tee · players · all in), THE GAME as a
     card — each competition with its rules in words (`potRulesText`) and its entry, the total as a navy strip — the **house
     rules** typed in the designer (`g.rules`, one per line, printed as bullets) and teams when known on **page 1**; the
