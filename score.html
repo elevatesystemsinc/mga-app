@@ -793,12 +793,18 @@ const SIDE_GAMES=[{id:'wolf',name:'Wolf',min:3,max:6,desc:'The wolf rotates with
    step the bets move in ($5); on every hole the banker names the range for that hole (`holes[h].range`, inside the allowable
    one) — until then the last range named carries, and the game's own at the start. The banker on a hole: the override, else
    (bank 'winner') the outright winner of the last settled hole — the bank stays put on a tie — starting from the first in the
-   order; or the order rotating. A bet not named is the bottom of the range. Money: each of the others wins or loses their own
-   bet against the banker; the banker's line is minus the sum — net zero every hole. */
+   order; or the order rotating. Two or more beating the banker and tying for low leave the bank *tied* (`x.lowTie`): the next
+   hole has no banker until the cart draws for it (`holes[h].banker` + `holes[h].draw`, the Big Lou draw) or taps who takes it
+   (`holes[h].chosen`); the banker tying for low keeps the bank. A bet not named is the bottom of the range. Money: each of the
+   others wins or loses their own bet against the banker; the banker's line is minus the sum — net zero every hole. */
 function bankerOn(side,g,h,holes){ const hh=(side.holes||{})[h]; if(hh&&hh.banker) return hh.banker; const order=(side.order||[]).filter(id=>(g.players||[]).some(p=>p.id===id)); if(!order.length) return null;
   const po=playOrder(g.startHole), i=Math.max(0,po.indexOf(h)); if(side.bank==='order') return order[i%order.length];
-  for(let k=i-1;k>=0;k--){ const x=(holes||[]).find(y=>y.h===po[k]); if(!x||!x.banker) continue; return x.pending?x.banker:(x.low||x.banker); }
+  for(let k=i-1;k>=0;k--){ const x=(holes||[]).find(y=>y.h===po[k]); if(!x||!x.banker) continue; if(x.pending) return x.banker; if(x.low) return x.low; if(x.lowTie&&x.lowTie.length>1) return null; return x.banker; }
   return order[0]; }
+/* the players tied for the bank on a hole (two or more beat the last banker and tied for low, and no one has drawn or chosen yet) */
+function bankerTie(side,g,h,holes){ const hh=(side.holes||{})[h]; if(hh&&hh.banker) return []; const po=playOrder(g.startHole), i=Math.max(0,po.indexOf(h));
+  for(let k=i-1;k>=0;k--){ const x=(holes||[]).find(y=>y.h===po[k]); if(!x||!x.banker) continue; if(x.pending||x.low) return []; return (x.lowTie||[]).slice(); }
+  return []; }
 /* the range in force on a hole: the banker's for that hole, else the last one named before it in play order, else the game's starting range */
 function bankerRange(side,g,h){ const st=side.stakes||{}, lo=Math.max(0,+st.min||0), hi=Math.max(lo,+st.max||lo), clamp=r=>{ const a=Math.min(hi,Math.max(lo,+r.min||lo)), b=Math.min(hi,Math.max(a,+r.max||a)); return {min:a,max:b}; };
   const po=playOrder(g.startHole), i=Math.max(0,po.indexOf(h)); for(let k=i;k>=0;k--){ const hh=(side.holes||{})[po[k]]; if(hh&&hh.range&&(+hh.range.min||+hh.range.max)) return Object.assign(clamp(hh.range),{own:k===i,by:hh.rangeBy||''}); }
@@ -814,7 +820,7 @@ const sideVal=(pub,c,g,h,scores,side,id)=>{ const p=(g.players||[]).find(x=>x.id
 function bankerHole(pub,c,g,h,scores,side,banker){
   const players=g.players||[], hh=(side.holes||{})[h]||{}, range=bankerRange(side,g,h), steps=bankerSteps(range,(side.stakes||{}).step), min=range.min, max=range.max;
   const others=players.map(p=>p.id).filter(id=>id!==banker), bets={}; others.forEach(id=>{ const b=hh.bets&&hh.bets[id]!=null?+hh.bets[id]:min; bets[id]=Math.round(Math.min(max,Math.max(min,isFinite(b)?b:min))*100)/100; });
-  const out={h,banker:banker||null,range,steps,bets,named:!!(hh.bets&&Object.keys(hh.bets).length),matches:[],money:{},pending:true,low:null,vals:{}};
+  const out={h,banker:banker||null,range,steps,bets,named:!!(hh.bets&&Object.keys(hh.bets).length),matches:[],money:{},pending:true,low:null,lowTie:null,tie:[],draw:hh.draw||null,chosen:hh.chosen||null,vals:{}};
   if(!banker||!others.length) return out;
   const vals={}; players.forEach(p=>{ vals[p.id]=sideVal(pub,c,g,h,scores,side,p.id); }); out.vals=vals; if(players.some(p=>vals[p.id]==null)) return out;
   out.pending=false; let bank=0;
@@ -822,6 +828,7 @@ function bankerHole(pub,c,g,h,scores,side,banker){
   out.birdie=out.matches.some(m=>m.birdie);
   out.money[banker]=Math.round(bank*100)/100;
   const lo=Math.min(...players.map(p=>vals[p.id])), lows=players.filter(p=>vals[p.id]===lo); out.low=lows.length===1?lows[0].id:null;
+  if(lows.length>1&&!lows.some(p=>p.id===banker)) out.lowTie=lows.map(p=>p.id);
   return out; }
 /* Round robin: side = {game:'robin', scoring, stakes:{hole}, seg:3|6, points:'ball'|'both', pairs:[[[a,b],[c,d]],…] (one
    entry per segment in play order, drawn), holes:{}}. `robinDraw(ids,seg)` makes the schedule for four players: the three
@@ -902,7 +909,7 @@ function sideHole(pub,c,g,h,scores,side,wolf){
 /* the group's ledger over the round: per player, and every hole in play order (the wolf of a Big Lou hole depends on the money before it) */
 function sideLedger(pub,g,scores,side){ const c=(pub.courses||{})[g.course]||Object.values(pub.courses||{})[0]||null, po=playOrder(g.startHole);
   const net={}; (g.players||[]).forEach(p=>{ net[p.id]=0; }); const holes=[];
-  po.forEach(h=>{ let x; if(side.game==='banker') x=bankerHole(pub,c,g,h,scores,side,bankerOn(side,g,h,holes)); else if(side.game==='robin') x=robinHole(pub,c,g,h,scores,side); else if(side.game==='flip') x=flipHole(pub,c,g,h,scores,side); else { x=sideHole(pub,c,g,h,scores,side,wolfOn(side,g,h,net)); if(x.bigLou&&!x.wolf) x.tie=louTied(side,g,h,net); }
+  po.forEach(h=>{ let x; if(side.game==='banker'){ const bk=bankerOn(side,g,h,holes); x=bankerHole(pub,c,g,h,scores,side,bk); if(!bk) x.tie=bankerTie(side,g,h,holes); } else if(side.game==='robin') x=robinHole(pub,c,g,h,scores,side); else if(side.game==='flip') x=flipHole(pub,c,g,h,scores,side); else { x=sideHole(pub,c,g,h,scores,side,wolfOn(side,g,h,net)); if(x.bigLou&&!x.wolf) x.tie=louTied(side,g,h,net); }
     x.before=Object.assign({},net); holes.push(x); for(const id in x.money) net[id]=Math.round(((net[id]||0)+x.money[id])*100)/100; });
   const rows=(g.players||[]).map(p=>({id:p.id,name:p.name,net:net[p.id]||0})); return {rows,holes,played:holes.filter(x=>!x.pending).length,net}; }
 function pubNames(pub){ const m={}; for(const g of pub.groups||[]) for(const p of g.players||[]) m[p.id]=p.name; for(const p of pub.pool||[]) m[p.id]=p.name; return m; }
@@ -1216,7 +1223,8 @@ function bankerStrip(g,c,h){
   const L=sideLedger(pub,g,scores,side), x=L.holes.find(y=>y.h===h), nm=id=>fn1((g.players.find(p=>p.id===id)||{}).name), me=ME&&g.players.some(p=>p.id===ME)?ME:'';
   const st=side.stakes||{}, lo=Math.max(0,+st.min||0), hi=Math.max(lo,+st.max||lo), over=!!((side.holes||{})[h]&&(side.holes||{})[h].banker), r=x.range, steps=x.steps||[];
   let body;
-  if(!x.banker) body='<div class="muted" style="color:#C9CFD2">No banker set for this hole.</div>';
+  if(!x.banker&&x.tie.length>1) body=`<div class="sgres"><span><b>The bank is tied</b> — ${esc(x.tie.map(nm).join(' & '))} ${x.tie.length>2?'all':'both'} beat the banker with the same score. Draw for it, or tap who takes it.</span></div><div class="sgp"><button class="on" id="sgBankDraw">Draw who banks</button>${x.tie.map(id=>`<button data-bankpick="${esc(id)}">${esc(nm(id))}</button>`).join('')}</div>`;
+  else if(!x.banker) body='<div class="muted" style="color:#C9CFD2">No banker set for this hole.</div>';
   else if(sgUI.bank) body=`<div class="sgres"><span>Who banks hole ${h}?</span></div><div class="sgp">${g.players.map(p=>`<button data-bank="${esc(p.id)}" class="${p.id===x.banker?'on':''}">${esc(fn1(p.name))}</button>`).join('')}<button id="sgBankBack">Back</button></div>`;
   else { const rows=x.matches.length?x.matches:Object.keys(x.bets).map(id=>({id,bet:x.bets[id],res:null,amt:0}));
     const rangeRow=(r.own&&!sgUI.range)?`<div class="sgres"><span><span style="font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--goldl);font-weight:800">The range</span> $${r.min} to $${r.max}${r.by?` <span style="font-size:12px;color:#C9CFD2">named by ${esc(nm(r.by)||r.by)}</span>`:''}<button class="chg" id="sgRangeChg">change</button></span></div>`
@@ -1226,7 +1234,7 @@ function bankerStrip(g,c,h){
       +`<div class="sgres"><span>Banker ${esc(nm(x.banker))}</span>${x.pending?'<span class="muted" style="color:#C9CFD2">waiting for the scores</span>':`<b class="${(x.money[x.banker]||0)>0?'up':(x.money[x.banker]||0)<0?'dn':''}">${sMoney(x.money[x.banker]||0)}</b>`}</div>`; }
   return `<div class="sgbar"><div class="k"><span>Banker · hole ${h}</span><button id="sgTab">Ledger</button></div>
     ${me?'':sgWhoAmI(g)}
-    <div class="who">Banker: <b id="sgWho">${esc(x.banker?nm(x.banker):'—')}</b>${me===x.banker?' <span style="font-size:13px;color:#C9CFD2">(you)</span>':''}${x.banker&&!over?` <span style="font-size:13px;color:#C9CFD2">(${side.bank==='order'?'tee order':playOrder(g.startHole).indexOf(h)===0?'first up':'took the bank'})</span>`:over?' <span style="font-size:13px;color:#C9CFD2">(chosen)</span>':''}${sgUI.bank?'':' <button class="chg" id="sgBankChg">change</button>'}</div>
+    ${!x.banker&&x.tie.length>1?'':`<div class="who">Banker: <b id="sgWho">${esc(x.banker?nm(x.banker):'—')}</b>${me===x.banker?' <span style="font-size:13px;color:#C9CFD2">(you)</span>':''}${x.banker&&!over?` <span style="font-size:13px;color:#C9CFD2">(${side.bank==='order'?'tee order':playOrder(g.startHole).indexOf(h)===0?'first up':'took the bank'})</span>`:over&&x.draw?` <span style="font-size:13px;color:#C9CFD2">(drawn from ${esc((x.draw.from||[]).map(nm).join(' & '))})</span>`:over&&x.chosen?` <span style="font-size:13px;color:#C9CFD2">(chosen from ${esc((x.chosen.from||[]).map(nm).join(' & '))})</span>`:over?' <span style="font-size:13px;color:#C9CFD2">(chosen)</span>':''}${sgUI.bank?'':' <button class="chg" id="sgBankChg">change</button>'}</div>`}
     ${body}
     ${sgTotals(L)}</div>`; }
 function wireBankerStrip(g,c,h){
@@ -1238,7 +1246,14 @@ function wireBankerStrip(g,c,h){
     sgUI.range=false; sgSave(dd=>{ dd.holes=dd.holes||{}; const hh=Object.assign({},dd.holes[h]||{},{range:{min:a,max:b},rangeBy:ME||code}); if(hh.bets) for(const id in hh.bets){ if(hh.bets[id]<a||hh.bets[id]>b) delete hh.bets[id]; } dd.holes[h]=hh; }); };
   const rc=$('sgRangeChg'); if(rc) rc.onclick=()=>{ sgUI.range=true; renderHole(); }; const rb=$('sgRangeBack'); if(rb) rb.onclick=()=>{ sgUI.range=false; renderHole(); };
   const bc=$('sgBankChg'); if(bc) bc.onclick=()=>{ sgUI.bank=true; renderHole(); }; const bb=$('sgBankBack'); if(bb) bb.onclick=()=>{ sgUI.bank=false; renderHole(); };
-  document.querySelectorAll('[data-bank]').forEach(b=>b.onclick=()=>sgSave(d=>{ d.holes=d.holes||{}; d.holes[h]=Object.assign({},d.holes[h]||{},{banker:b.dataset.bank,bankBy:ME||code}); }));
+  document.querySelectorAll('[data-bank]').forEach(b=>b.onclick=()=>sgSave(d=>{ d.holes=d.holes||{}; d.holes[h]=Object.assign({},d.holes[h]||{},{banker:b.dataset.bank,bankBy:ME||code}); delete d.holes[h].draw; delete d.holes[h].chosen; }));
+  // the bank is tied: the cart taps who takes it, or draws for it — a short spin through the tied names, the pick saved so every phone agrees
+  document.querySelectorAll('[data-bankpick]').forEach(b=>b.onclick=()=>{ const L=sideLedger(pub,g,scores,side), x=L.holes.find(y=>y.h===h); const tie=(x&&x.tie)||[]; sgSave(d=>{ d.holes=d.holes||{}; d.holes[h]=Object.assign({},d.holes[h]||{},{banker:b.dataset.bankpick,chosen:{from:tie.slice(),at:new Date().toISOString(),by:ME||code}}); delete d.holes[h].draw; }); });
+  const bd=$('sgBankDraw'); if(bd) bd.onclick=async()=>{ const L=sideLedger(pub,g,scores,side), x=L.holes.find(y=>y.h===h); const tie=(x&&x.tie)||[]; if(tie.length<2) return;
+    const pick=tie[secureInt(tie.length)], nm=id=>fn1((g.players.find(p=>p.id===id)||{}).name); bd.disabled=true;
+    const spin=document.createElement('div'); spin.className='who'; spin.innerHTML='Banker: <b></b>'; bd.closest('.sgbar').insertBefore(spin,bd.closest('.sgp')); const el=spin.querySelector('b'); let k=0;
+    await new Promise(res=>{ const iv=setInterval(()=>{ el.textContent=nm(tie[k%tie.length]); k++; if(k>=14){ clearInterval(iv); el.textContent=nm(pick); setTimeout(res,500); } },110); });
+    sgSave(d=>{ d.holes=d.holes||{}; d.holes[h]=Object.assign({},d.holes[h]||{},{banker:pick,draw:{from:tie.slice(),at:new Date().toISOString(),by:ME||code}}); delete d.holes[h].chosen; }); };
   const t=$('sgTab'); if(t) t.onclick=()=>{ tab='side'; render(); window.scrollTo(0,0); }; }
 /* Flip: a coin per player on the tee (Heads / Tails), then the sides, the result and the money */
 function flipStrip(g,c,h){
@@ -1411,7 +1426,7 @@ function renderBankerLedger(){
   $('main').innerHTML=sgLedgerTop('Banker',`Group ${esc(code)} · ${side.scoring==='gross'?'gross':'net, full handicaps'} · the banker names the range on every tee, inside $${+st.min||0} to $${+st.max||0}${(+st.step||1)>1?', bets in $'+(+st.step)+' steps':''} · the bank ${side.bank==='order'?'rotates with the tee order':'goes to the hole\'s winner'}${side.birdies&&side.birdies!=='off'?' · '+side.birdies+' birdies double':''} · net zero every hole`,L)+
     `<div class="card" style="overflow:hidden;margin-top:14px"><div class="sgrow h" style="grid-template-columns:40px minmax(0,1fr) 90px"><span>Hole</span><span>Banker · range · the bets · result</span><span class="r">Banker</span></div>
     ${po.map(h=>{ const x=L.holes.find(y=>y.h===h); const bets=Object.keys(x.bets).map(id=>{ const m=x.matches.find(z=>z.id===id); return `${esc(nm(id))} $${x.bets[id]}${m&&!x.pending?(m.res==='push'?' <span class="muted">push</span>':` <span class="${m.res==='P'?'up':'dn'}">${sMoney(x.money[id]||0)}</span>`):''}`; }).join(' · ');
-      return `<div class="sgrow" style="grid-template-columns:40px minmax(0,1fr) 90px"><span class="muted">${h}</span><span><b>${esc(x.banker?nm(x.banker):'—')}</b> <span class="muted">$${x.range.min}–$${x.range.max}${x.range.own?'':' (carried)'} ·</span> ${bets}${x.pending?' <span class="muted">· waiting for scores</span>':''}</span><span class="r ${(x.money[x.banker]||0)>0?'up':(x.money[x.banker]||0)<0?'dn':''}">${!x.pending&&x.banker?sMoney(x.money[x.banker]||0):''}</span></div>`; }).join('')}</div>
+      return `<div class="sgrow" style="grid-template-columns:40px minmax(0,1fr) 90px"><span class="muted">${h}</span><span><b>${esc(x.banker?nm(x.banker):x.tie.length>1?x.tie.map(nm).join(' / ')+' — tied, draw for it':'—')}</b>${x.draw?' <span class="muted">(drawn)</span>':x.chosen?' <span class="muted">(chosen)</span>':''} <span class="muted">$${x.range.min}–$${x.range.max}${x.range.own?'':' (carried)'} ·</span> ${bets}${x.pending?' <span class="muted">· waiting for scores</span>':''}</span><span class="r ${(x.money[x.banker]||0)>0?'up':(x.money[x.banker]||0)<0?'dn':''}">${!x.pending&&x.banker?sMoney(x.money[x.banker]||0):''}</span></div>`; }).join('')}</div>
     <p class="muted" style="text-align:center;font-size:12.5px;margin:14px 0 0">${L.played} of 18 holes settled · the range and the bets are set on the Score tab, hole by hole.</p>`;
   wireLedger(); }
 function renderFlipLedger(){
@@ -1673,7 +1688,7 @@ window.__canReload=()=>!queue.length;
    page counts, and a reload is tried once per build — if the page that comes back is still the old one, the CDN
    hasn't caught up; wait a while before trying that build again. */
 (function(){
-  const ME='20261107153716', KEY='au_tried', RETRY=10*60*1000; let ready=false, lastCheck=0;
+  const ME='20261107154756', KEY='au_tried', RETRY=10*60*1000; let ready=false, lastCheck=0;
   const typing=()=>{ const a=document.activeElement; return a&&/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)&&a.value&&a.type!=='search'; };
   const safe=()=>!typing()&&(typeof window.__canReload!=='function'||window.__canReload());
   const tried=()=>{ try{ const [b,t]=(sessionStorage.getItem(KEY)||'').split('|'); return b?{build:b,at:+t||0}:null; }catch(_){ return null; } };

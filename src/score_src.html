@@ -399,7 +399,8 @@ function bankerStrip(g,c,h){
   const L=sideLedger(pub,g,scores,side), x=L.holes.find(y=>y.h===h), nm=id=>fn1((g.players.find(p=>p.id===id)||{}).name), me=ME&&g.players.some(p=>p.id===ME)?ME:'';
   const st=side.stakes||{}, lo=Math.max(0,+st.min||0), hi=Math.max(lo,+st.max||lo), over=!!((side.holes||{})[h]&&(side.holes||{})[h].banker), r=x.range, steps=x.steps||[];
   let body;
-  if(!x.banker) body='<div class="muted" style="color:#C9CFD2">No banker set for this hole.</div>';
+  if(!x.banker&&x.tie.length>1) body=`<div class="sgres"><span><b>The bank is tied</b> — ${esc(x.tie.map(nm).join(' & '))} ${x.tie.length>2?'all':'both'} beat the banker with the same score. Draw for it, or tap who takes it.</span></div><div class="sgp"><button class="on" id="sgBankDraw">Draw who banks</button>${x.tie.map(id=>`<button data-bankpick="${esc(id)}">${esc(nm(id))}</button>`).join('')}</div>`;
+  else if(!x.banker) body='<div class="muted" style="color:#C9CFD2">No banker set for this hole.</div>';
   else if(sgUI.bank) body=`<div class="sgres"><span>Who banks hole ${h}?</span></div><div class="sgp">${g.players.map(p=>`<button data-bank="${esc(p.id)}" class="${p.id===x.banker?'on':''}">${esc(fn1(p.name))}</button>`).join('')}<button id="sgBankBack">Back</button></div>`;
   else { const rows=x.matches.length?x.matches:Object.keys(x.bets).map(id=>({id,bet:x.bets[id],res:null,amt:0}));
     const rangeRow=(r.own&&!sgUI.range)?`<div class="sgres"><span><span style="font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--goldl);font-weight:800">The range</span> $${r.min} to $${r.max}${r.by?` <span style="font-size:12px;color:#C9CFD2">named by ${esc(nm(r.by)||r.by)}</span>`:''}<button class="chg" id="sgRangeChg">change</button></span></div>`
@@ -409,7 +410,7 @@ function bankerStrip(g,c,h){
       +`<div class="sgres"><span>Banker ${esc(nm(x.banker))}</span>${x.pending?'<span class="muted" style="color:#C9CFD2">waiting for the scores</span>':`<b class="${(x.money[x.banker]||0)>0?'up':(x.money[x.banker]||0)<0?'dn':''}">${sMoney(x.money[x.banker]||0)}</b>`}</div>`; }
   return `<div class="sgbar"><div class="k"><span>Banker · hole ${h}</span><button id="sgTab">Ledger</button></div>
     ${me?'':sgWhoAmI(g)}
-    <div class="who">Banker: <b id="sgWho">${esc(x.banker?nm(x.banker):'—')}</b>${me===x.banker?' <span style="font-size:13px;color:#C9CFD2">(you)</span>':''}${x.banker&&!over?` <span style="font-size:13px;color:#C9CFD2">(${side.bank==='order'?'tee order':playOrder(g.startHole).indexOf(h)===0?'first up':'took the bank'})</span>`:over?' <span style="font-size:13px;color:#C9CFD2">(chosen)</span>':''}${sgUI.bank?'':' <button class="chg" id="sgBankChg">change</button>'}</div>
+    ${!x.banker&&x.tie.length>1?'':`<div class="who">Banker: <b id="sgWho">${esc(x.banker?nm(x.banker):'—')}</b>${me===x.banker?' <span style="font-size:13px;color:#C9CFD2">(you)</span>':''}${x.banker&&!over?` <span style="font-size:13px;color:#C9CFD2">(${side.bank==='order'?'tee order':playOrder(g.startHole).indexOf(h)===0?'first up':'took the bank'})</span>`:over&&x.draw?` <span style="font-size:13px;color:#C9CFD2">(drawn from ${esc((x.draw.from||[]).map(nm).join(' & '))})</span>`:over&&x.chosen?` <span style="font-size:13px;color:#C9CFD2">(chosen from ${esc((x.chosen.from||[]).map(nm).join(' & '))})</span>`:over?' <span style="font-size:13px;color:#C9CFD2">(chosen)</span>':''}${sgUI.bank?'':' <button class="chg" id="sgBankChg">change</button>'}</div>`}
     ${body}
     ${sgTotals(L)}</div>`; }
 function wireBankerStrip(g,c,h){
@@ -421,7 +422,14 @@ function wireBankerStrip(g,c,h){
     sgUI.range=false; sgSave(dd=>{ dd.holes=dd.holes||{}; const hh=Object.assign({},dd.holes[h]||{},{range:{min:a,max:b},rangeBy:ME||code}); if(hh.bets) for(const id in hh.bets){ if(hh.bets[id]<a||hh.bets[id]>b) delete hh.bets[id]; } dd.holes[h]=hh; }); };
   const rc=$('sgRangeChg'); if(rc) rc.onclick=()=>{ sgUI.range=true; renderHole(); }; const rb=$('sgRangeBack'); if(rb) rb.onclick=()=>{ sgUI.range=false; renderHole(); };
   const bc=$('sgBankChg'); if(bc) bc.onclick=()=>{ sgUI.bank=true; renderHole(); }; const bb=$('sgBankBack'); if(bb) bb.onclick=()=>{ sgUI.bank=false; renderHole(); };
-  document.querySelectorAll('[data-bank]').forEach(b=>b.onclick=()=>sgSave(d=>{ d.holes=d.holes||{}; d.holes[h]=Object.assign({},d.holes[h]||{},{banker:b.dataset.bank,bankBy:ME||code}); }));
+  document.querySelectorAll('[data-bank]').forEach(b=>b.onclick=()=>sgSave(d=>{ d.holes=d.holes||{}; d.holes[h]=Object.assign({},d.holes[h]||{},{banker:b.dataset.bank,bankBy:ME||code}); delete d.holes[h].draw; delete d.holes[h].chosen; }));
+  // the bank is tied: the cart taps who takes it, or draws for it — a short spin through the tied names, the pick saved so every phone agrees
+  document.querySelectorAll('[data-bankpick]').forEach(b=>b.onclick=()=>{ const L=sideLedger(pub,g,scores,side), x=L.holes.find(y=>y.h===h); const tie=(x&&x.tie)||[]; sgSave(d=>{ d.holes=d.holes||{}; d.holes[h]=Object.assign({},d.holes[h]||{},{banker:b.dataset.bankpick,chosen:{from:tie.slice(),at:new Date().toISOString(),by:ME||code}}); delete d.holes[h].draw; }); });
+  const bd=$('sgBankDraw'); if(bd) bd.onclick=async()=>{ const L=sideLedger(pub,g,scores,side), x=L.holes.find(y=>y.h===h); const tie=(x&&x.tie)||[]; if(tie.length<2) return;
+    const pick=tie[secureInt(tie.length)], nm=id=>fn1((g.players.find(p=>p.id===id)||{}).name); bd.disabled=true;
+    const spin=document.createElement('div'); spin.className='who'; spin.innerHTML='Banker: <b></b>'; bd.closest('.sgbar').insertBefore(spin,bd.closest('.sgp')); const el=spin.querySelector('b'); let k=0;
+    await new Promise(res=>{ const iv=setInterval(()=>{ el.textContent=nm(tie[k%tie.length]); k++; if(k>=14){ clearInterval(iv); el.textContent=nm(pick); setTimeout(res,500); } },110); });
+    sgSave(d=>{ d.holes=d.holes||{}; d.holes[h]=Object.assign({},d.holes[h]||{},{banker:pick,draw:{from:tie.slice(),at:new Date().toISOString(),by:ME||code}}); delete d.holes[h].chosen; }); };
   const t=$('sgTab'); if(t) t.onclick=()=>{ tab='side'; render(); window.scrollTo(0,0); }; }
 /* Flip: a coin per player on the tee (Heads / Tails), then the sides, the result and the money */
 function flipStrip(g,c,h){
@@ -594,7 +602,7 @@ function renderBankerLedger(){
   $('main').innerHTML=sgLedgerTop('Banker',`Group ${esc(code)} · ${side.scoring==='gross'?'gross':'net, full handicaps'} · the banker names the range on every tee, inside $${+st.min||0} to $${+st.max||0}${(+st.step||1)>1?', bets in $'+(+st.step)+' steps':''} · the bank ${side.bank==='order'?'rotates with the tee order':'goes to the hole\'s winner'}${side.birdies&&side.birdies!=='off'?' · '+side.birdies+' birdies double':''} · net zero every hole`,L)+
     `<div class="card" style="overflow:hidden;margin-top:14px"><div class="sgrow h" style="grid-template-columns:40px minmax(0,1fr) 90px"><span>Hole</span><span>Banker · range · the bets · result</span><span class="r">Banker</span></div>
     ${po.map(h=>{ const x=L.holes.find(y=>y.h===h); const bets=Object.keys(x.bets).map(id=>{ const m=x.matches.find(z=>z.id===id); return `${esc(nm(id))} $${x.bets[id]}${m&&!x.pending?(m.res==='push'?' <span class="muted">push</span>':` <span class="${m.res==='P'?'up':'dn'}">${sMoney(x.money[id]||0)}</span>`):''}`; }).join(' · ');
-      return `<div class="sgrow" style="grid-template-columns:40px minmax(0,1fr) 90px"><span class="muted">${h}</span><span><b>${esc(x.banker?nm(x.banker):'—')}</b> <span class="muted">$${x.range.min}–$${x.range.max}${x.range.own?'':' (carried)'} ·</span> ${bets}${x.pending?' <span class="muted">· waiting for scores</span>':''}</span><span class="r ${(x.money[x.banker]||0)>0?'up':(x.money[x.banker]||0)<0?'dn':''}">${!x.pending&&x.banker?sMoney(x.money[x.banker]||0):''}</span></div>`; }).join('')}</div>
+      return `<div class="sgrow" style="grid-template-columns:40px minmax(0,1fr) 90px"><span class="muted">${h}</span><span><b>${esc(x.banker?nm(x.banker):x.tie.length>1?x.tie.map(nm).join(' / ')+' — tied, draw for it':'—')}</b>${x.draw?' <span class="muted">(drawn)</span>':x.chosen?' <span class="muted">(chosen)</span>':''} <span class="muted">$${x.range.min}–$${x.range.max}${x.range.own?'':' (carried)'} ·</span> ${bets}${x.pending?' <span class="muted">· waiting for scores</span>':''}</span><span class="r ${(x.money[x.banker]||0)>0?'up':(x.money[x.banker]||0)<0?'dn':''}">${!x.pending&&x.banker?sMoney(x.money[x.banker]||0):''}</span></div>`; }).join('')}</div>
     <p class="muted" style="text-align:center;font-size:12.5px;margin:14px 0 0">${L.played} of 18 holes settled · the range and the bets are set on the Score tab, hole by hole.</p>`;
   wireLedger(); }
 function renderFlipLedger(){

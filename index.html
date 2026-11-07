@@ -3612,12 +3612,18 @@ const SIDE_GAMES=[{id:'wolf',name:'Wolf',min:3,max:6,desc:'The wolf rotates with
    step the bets move in ($5); on every hole the banker names the range for that hole (`holes[h].range`, inside the allowable
    one) — until then the last range named carries, and the game's own at the start. The banker on a hole: the override, else
    (bank 'winner') the outright winner of the last settled hole — the bank stays put on a tie — starting from the first in the
-   order; or the order rotating. A bet not named is the bottom of the range. Money: each of the others wins or loses their own
-   bet against the banker; the banker's line is minus the sum — net zero every hole. */
+   order; or the order rotating. Two or more beating the banker and tying for low leave the bank *tied* (`x.lowTie`): the next
+   hole has no banker until the cart draws for it (`holes[h].banker` + `holes[h].draw`, the Big Lou draw) or taps who takes it
+   (`holes[h].chosen`); the banker tying for low keeps the bank. A bet not named is the bottom of the range. Money: each of the
+   others wins or loses their own bet against the banker; the banker's line is minus the sum — net zero every hole. */
 function bankerOn(side,g,h,holes){ const hh=(side.holes||{})[h]; if(hh&&hh.banker) return hh.banker; const order=(side.order||[]).filter(id=>(g.players||[]).some(p=>p.id===id)); if(!order.length) return null;
   const po=playOrder(g.startHole), i=Math.max(0,po.indexOf(h)); if(side.bank==='order') return order[i%order.length];
-  for(let k=i-1;k>=0;k--){ const x=(holes||[]).find(y=>y.h===po[k]); if(!x||!x.banker) continue; return x.pending?x.banker:(x.low||x.banker); }
+  for(let k=i-1;k>=0;k--){ const x=(holes||[]).find(y=>y.h===po[k]); if(!x||!x.banker) continue; if(x.pending) return x.banker; if(x.low) return x.low; if(x.lowTie&&x.lowTie.length>1) return null; return x.banker; }
   return order[0]; }
+/* the players tied for the bank on a hole (two or more beat the last banker and tied for low, and no one has drawn or chosen yet) */
+function bankerTie(side,g,h,holes){ const hh=(side.holes||{})[h]; if(hh&&hh.banker) return []; const po=playOrder(g.startHole), i=Math.max(0,po.indexOf(h));
+  for(let k=i-1;k>=0;k--){ const x=(holes||[]).find(y=>y.h===po[k]); if(!x||!x.banker) continue; if(x.pending||x.low) return []; return (x.lowTie||[]).slice(); }
+  return []; }
 /* the range in force on a hole: the banker's for that hole, else the last one named before it in play order, else the game's starting range */
 function bankerRange(side,g,h){ const st=side.stakes||{}, lo=Math.max(0,+st.min||0), hi=Math.max(lo,+st.max||lo), clamp=r=>{ const a=Math.min(hi,Math.max(lo,+r.min||lo)), b=Math.min(hi,Math.max(a,+r.max||a)); return {min:a,max:b}; };
   const po=playOrder(g.startHole), i=Math.max(0,po.indexOf(h)); for(let k=i;k>=0;k--){ const hh=(side.holes||{})[po[k]]; if(hh&&hh.range&&(+hh.range.min||+hh.range.max)) return Object.assign(clamp(hh.range),{own:k===i,by:hh.rangeBy||''}); }
@@ -3633,7 +3639,7 @@ const sideVal=(pub,c,g,h,scores,side,id)=>{ const p=(g.players||[]).find(x=>x.id
 function bankerHole(pub,c,g,h,scores,side,banker){
   const players=g.players||[], hh=(side.holes||{})[h]||{}, range=bankerRange(side,g,h), steps=bankerSteps(range,(side.stakes||{}).step), min=range.min, max=range.max;
   const others=players.map(p=>p.id).filter(id=>id!==banker), bets={}; others.forEach(id=>{ const b=hh.bets&&hh.bets[id]!=null?+hh.bets[id]:min; bets[id]=Math.round(Math.min(max,Math.max(min,isFinite(b)?b:min))*100)/100; });
-  const out={h,banker:banker||null,range,steps,bets,named:!!(hh.bets&&Object.keys(hh.bets).length),matches:[],money:{},pending:true,low:null,vals:{}};
+  const out={h,banker:banker||null,range,steps,bets,named:!!(hh.bets&&Object.keys(hh.bets).length),matches:[],money:{},pending:true,low:null,lowTie:null,tie:[],draw:hh.draw||null,chosen:hh.chosen||null,vals:{}};
   if(!banker||!others.length) return out;
   const vals={}; players.forEach(p=>{ vals[p.id]=sideVal(pub,c,g,h,scores,side,p.id); }); out.vals=vals; if(players.some(p=>vals[p.id]==null)) return out;
   out.pending=false; let bank=0;
@@ -3641,6 +3647,7 @@ function bankerHole(pub,c,g,h,scores,side,banker){
   out.birdie=out.matches.some(m=>m.birdie);
   out.money[banker]=Math.round(bank*100)/100;
   const lo=Math.min(...players.map(p=>vals[p.id])), lows=players.filter(p=>vals[p.id]===lo); out.low=lows.length===1?lows[0].id:null;
+  if(lows.length>1&&!lows.some(p=>p.id===banker)) out.lowTie=lows.map(p=>p.id);
   return out; }
 /* Round robin: side = {game:'robin', scoring, stakes:{hole}, seg:3|6, points:'ball'|'both', pairs:[[[a,b],[c,d]],…] (one
    entry per segment in play order, drawn), holes:{}}. `robinDraw(ids,seg)` makes the schedule for four players: the three
@@ -3721,7 +3728,7 @@ function sideHole(pub,c,g,h,scores,side,wolf){
 /* the group's ledger over the round: per player, and every hole in play order (the wolf of a Big Lou hole depends on the money before it) */
 function sideLedger(pub,g,scores,side){ const c=(pub.courses||{})[g.course]||Object.values(pub.courses||{})[0]||null, po=playOrder(g.startHole);
   const net={}; (g.players||[]).forEach(p=>{ net[p.id]=0; }); const holes=[];
-  po.forEach(h=>{ let x; if(side.game==='banker') x=bankerHole(pub,c,g,h,scores,side,bankerOn(side,g,h,holes)); else if(side.game==='robin') x=robinHole(pub,c,g,h,scores,side); else if(side.game==='flip') x=flipHole(pub,c,g,h,scores,side); else { x=sideHole(pub,c,g,h,scores,side,wolfOn(side,g,h,net)); if(x.bigLou&&!x.wolf) x.tie=louTied(side,g,h,net); }
+  po.forEach(h=>{ let x; if(side.game==='banker'){ const bk=bankerOn(side,g,h,holes); x=bankerHole(pub,c,g,h,scores,side,bk); if(!bk) x.tie=bankerTie(side,g,h,holes); } else if(side.game==='robin') x=robinHole(pub,c,g,h,scores,side); else if(side.game==='flip') x=flipHole(pub,c,g,h,scores,side); else { x=sideHole(pub,c,g,h,scores,side,wolfOn(side,g,h,net)); if(x.bigLou&&!x.wolf) x.tie=louTied(side,g,h,net); }
     x.before=Object.assign({},net); holes.push(x); for(const id in x.money) net[id]=Math.round(((net[id]||0)+x.money[id])*100)/100; });
   const rows=(g.players||[]).map(p=>({id:p.id,name:p.name,net:net[p.id]||0})); return {rows,holes,played:holes.filter(x=>!x.pending).length,net}; }
 function pubNames(pub){ const m={}; for(const g of pub.groups||[]) for(const p of g.players||[]) m[p.id]=p.name; for(const p of pub.pool||[]) m[p.id]=p.name; return m; }
@@ -9460,7 +9467,7 @@ function wireSignupCard(t){
    page counts, and a reload is tried once per build — if the page that comes back is still the old one, the CDN
    hasn't caught up; wait a while before trying that build again. */
 (function(){
-  const ME='20261107153716', KEY='au_tried', RETRY=10*60*1000; let ready=false, lastCheck=0;
+  const ME='20261107154756', KEY='au_tried', RETRY=10*60*1000; let ready=false, lastCheck=0;
   const typing=()=>{ const a=document.activeElement; return a&&/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)&&a.value&&a.type!=='search'; };
   const safe=()=>!typing()&&(typeof window.__canReload!=='function'||window.__canReload());
   const tried=()=>{ try{ const [b,t]=(sessionStorage.getItem(KEY)||'').split('|'); return b?{build:b,at:+t||0}:null; }catch(_){ return null; } };

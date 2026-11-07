@@ -451,8 +451,12 @@ Tournament = { id, name, season, days, startDate, field:[{id,memberId,team,paid,
     for the hole's range (two boxes + Set, prefilled with the range in force; refused outside the allowable one), `bankerRange` = the
     hole's own, else the last one named before it in play order (the ledger marks it "(carried)"), else `start`; `bankerSteps` lists
     the bets inside it (the bottom, then every multiple of the step) and the − / + walk that list; unnamed = the bottom. No doubling
-    (the owner did not want it). The banker's line is minus the sum, net zero; the hole's outright winner takes the bank (a tie leaves
-    it; `x.low`), or the order rotates; *change* lets the cart choose the banker by hand (`holes[h].banker`). **Flip** (`flipHole`,
+    (the owner did not want it). The banker's line is minus the sum, net zero; the hole's outright winner takes the bank (the banker tying for low
+    keeps it; `x.low`), or the order rotates; *change* lets the cart choose the banker by hand (`holes[h].banker`). **Two or more
+    beating the banker and tying for low leave the bank tied** (`x.lowTie`, `bankerTie`; the owner, Nov 7: "the same random draw feature
+    that Wolf has to decide Big Lou"): the next hole has no banker and no bets until the strip's **Draw who banks** (`secureInt`, the
+    short spin, `holes[h].banker` + `holes[h].draw={from,at,by}` so every phone agrees — "(drawn from Ann & Bo)") or a tap on a tied
+    name (`holes[h].chosen`); the ledger reads "tied, draw for it" until then. **Flip** (`flipHole`,
     `flipStrip` / `renderFlipSetup` / `renderFlipLedger`, 3–6 players): `side = {game:'flip', stakes:{hole}, holes:{[h]:{flip:{[id]:'H'|'T'}}}}`
     — a Heads / Tails chip per player on the strip (pending until every coin is called), heads v tails best ball whatever the split,
     the larger side each pay or collect the stake and the smaller side shares it (`wolfAmounts` with the same figure both sides; 1 v 3

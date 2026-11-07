@@ -27,7 +27,8 @@ you are, the game, net or gross, and whether birdies double the hole (gross bird
 and plays each of the others one-on-one. On every tee the banker names the range for the hole, inside the game's allowable range ($1 to
 $100 by default, bets in $5 steps), and each of the others steps their bet through the amounts in it on the strip (a bet nobody names is
 the bottom of the range); the hole settles from the scores, net zero; win the hole outright and the bank is yours (or let it rotate with
-the tee order), or tap *change* to hand it to someone. **Flip**: call each player's coin on the tee — heads play heads, tails play tails,
+the tee order), or tap *change* to hand it to someone; if two players beat the banker with the same score the bank is tied, and the
+next tee draws for it on the phone (or the cart taps who takes it). **Flip**: call each player's coin on the tee — heads play heads, tails play tails,
 best ball, whatever the split (the smaller side shares the larger side's stakes); every coin the same and it is everyone for themselves,
 low ball takes the stake from each, one tie all tie. **Round robin** (four players): two against two, best ball — and the low total too if you like, each worth the stake — with
 partners drawn on the phone and switched every 6 holes (every pairing once) or every 3 (every pairing twice, never the same partners
