@@ -959,8 +959,10 @@ async function gameSheetPDF(g,opt){
     if(!potTeamsKnown(pot)){ section(pot.name+' — teams'); font('PublicSans','normal',9.4,MUTED); doc.text(by==='after'?'Partners are drawn after the round.':'Teams to be announced.',L,y); y+=22; continue; }
     const byTeam={}; evPlayers(ev).forEach(({p})=>{ const t=pot.teams[p.id]; if(t) (byTeam[t]=byTeam[t]||[]).push(p); });
     section(pot.name+' — teams',pot.draw?'Drawn '+new Date(pot.draw.at).toLocaleString():'');
-    const keys=Object.keys(byTeam).sort((a,b)=>+a.slice(1)-+b.slice(1)), colW=(R2-L-14)/2; let col=0, top=y;
-    keys.forEach((k,i)=>{ const x=L+col*(colW+14); if(col===0){ need(18); top=y; } font('PublicSans','bold',9.4,GOLDDK); doc.text('Team '+k.slice(1),x,top+(col?0:0)); font('PublicSans','normal',9.4,INK); doc.text(doc.splitTextToSize(byTeam[k].map(p=>p.name).join(' & '),colW-50)[0],x+48,top); if(col===1||i===keys.length-1){ y=top+15; } col=1-col; });
+    // pairs sit two to a row; bigger teams get the full width, and a long team wraps onto more lines instead of being cut off
+    const keys=Object.keys(byTeam).sort((a,b)=>+a.slice(1)-+b.slice(1)), size=Math.max(...keys.map(k=>byTeam[k].length)), nCols=size>2?1:2, colW=(R2-L-14*(nCols-1))/nCols; let col=0, top=y, rowH=0;
+    keys.forEach((k,i)=>{ const x=L+col*(colW+14), lines=doc.splitTextToSize(byTeam[k].map(p=>p.name).join(' & '),colW-50); if(col===0){ need(lines.length*12.5+6); top=y; rowH=0; } rowH=Math.max(rowH,lines.length*12.5);
+      font('PublicSans','bold',9.4,GOLDDK); doc.text('Team '+k.slice(1),x,top); font('PublicSans','normal',9.4,INK); doc.text(lines,x+48,top); if(col===nCols-1||i===keys.length-1){ y=top+rowH+3; } col=(col+1)%nCols; });
     y+=10; }
   // ---- page 2: the groups, laid out to fit one page however big the game is (2 or 3 columns, rows shrink to fit)
   doc.addPage(); page(); y=44;
