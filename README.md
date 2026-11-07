@@ -36,7 +36,7 @@ best ball, whatever the split (the smaller side shares the larger side's stakes)
 low ball takes the stake from each, one tie all tie. **Round robin** (four players): two against two, best ball — and the low total too if you like, each worth the stake — with
 partners drawn on the phone and switched every 6 holes (every pairing once) or every 3 (every pairing twice, never the same partners
 twice running); **Draw again** if the cart wants another shuffle. Paid per hole, or each robin is a match: the pair ahead on holes at
-the end of the stretch takes the denomination, all square is a push (a birdie hole counts two when birdies double). **Wolf**: net or gross, the money per hole for the smaller and the larger side (a 6-4 wolf: two against three is $6 and $4 each,
+the end of the stretch takes the denomination, all square is a push (a birdie hole counts two when birdies double). In a four-man cart Wolf and Hammer name one figure ($5 a player, two against two; a lone wolf plays the three of them for $15). **Wolf**: net or gross, the money per hole for the smaller and the larger side (a 6-4 wolf: two against three is $6 and $4 each,
 $12 a side; a lone wolf against three plays for $12) and the tee order. Every hole then names the wolf, takes the pick — a partner or
 **Lone wolf** for 1x, 2x or 3x — and settles the hole from the scores you are already entering, net zero every time; a tie is a push.
 At the 16th hole the cart is asked about **Big Lou**: from there the player most down is the wolf and names the dollar amount on each hole before anyone hits — the only time the amount changes. A tie for most down is drawn at random on the phone, or the cart taps who it is. The

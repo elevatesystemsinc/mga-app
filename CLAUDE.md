@@ -445,7 +445,11 @@ Tournament = { id, name, season, days, startDate, field:[{id,memberId,team,paid,
     (read-only, `golf_side` rows + the same math; not on an admin link). `SIDE_GAMES` is the catalog; the set-up's **Game** chips
     switch between them (a chip is disabled outside the game's `min`–`max` players) and `sgStart` saves the row, dropping the
     other game's `holes`. **Carts of 3 to 5** (the owner, Nov 7: "don't allow six-person in those games yet… there's some machinery
-    we have to think about"): Wolf, Hammer, Banker and Flip take 3–5 (`sideOK()` too), the robin exactly 4. **Hammer** (`sideHole`
+    we have to think about"): Wolf, Hammer, Banker and Flip take 3–5 (`sideOK()` too), the robin exactly 4. **An even cart names one figure** (the owner: "if it's a four-man group… it's going to be $5 hammer or $10 hammer… if someone
+    wolfs in four-man wolf… that person is playing for $15 while everyone else is playing for $5"): the wolf / hammer set-up shows one
+    Money box when `n % 2 === 0` and stores it as both `stakes.small` and `stakes.large` (`wolfAmounts` then gives 2 v 2 that figure each
+    and a lone wolf three times it); the Big Lou boxes, the strip's chip, the hammer's worth, the ledger and the hub card all read "$5
+    each" / "$5 a player" when the two figures are equal. Odd carts keep the two boxes (the 6-4 wolf). **Hammer** (`sideHole`
     with `side.game==='hammer'`, `hammerBlock` on the strip, `tests/test_hammer.py`; the owner: "the exact same machinery as wolf,
     except hammer doubles the bet… once a team hammers, the other team holds the hammer… if someone declines the hammer, they
     forfeit the hole at its current bet"): Wolf's set-up, pick, lone wolf 1x / 2x / 3x, Big Lou and money, plus `holes[h].hammers =

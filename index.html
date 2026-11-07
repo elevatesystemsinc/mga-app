@@ -5396,7 +5396,7 @@ function sideGamesCard(ev){ if(!ev||KEYMODE) return ''; sideLoad(ev); const rows
       const line=sd.game==='banker'?`the banker names the range on every tee inside $${+st.min||0}–$${+st.max||0}, the bank ${sd.bank==='order'?'rotates with the tee order':'to the hole’s winner'}`
         :sd.game==='flip'?`heads v tails for $${+st.hole||0} a player on the larger side, all the same coin and the low ball takes $${+st.hole||0} from each`
         :sd.game==='robin'?`${sd.pay==='match'?`each ${+sd.seg||6}-hole robin a match for $${+st.hole||0}`:`$${+st.hole||0} a hole`} on the best ball${sd.points==='both'?' and the low total':''}, partners drawn and switched every ${+sd.seg||6} holes`
-        :(()=>{ const a=wolfAmounts(1,grp.players.length-1,st), b=wolfAmounts(2,grp.players.length-2,st); return `$${a.large} a player on the big side, the lone wolf for $${a.pot}${grp.players.length>=4?`, $${b.small} each as a pair`:''}${sd.game==='hammer'?', the hammer doubles the hole':''}`; })();
+        :(()=>{ const a=wolfAmounts(1,grp.players.length-1,st), b=wolfAmounts(2,grp.players.length-2,st); return `${grp.players.length%2===0?`$${a.large} a player`:`$${a.large} a player on the big side${grp.players.length>=4?`, $${b.small} each as a pair`:''}`}, the lone wolf for $${a.pot}${sd.game==='hammer'?', the hammer doubles the hole':''}`; })();
       return `<div class="mini"><div class="mr" style="grid-template-columns:minmax(0,1fr)"><div class="cell2"><b>Group ${esc(eg.code||grp.label||'')} · ${esc(sideGame(sd.game).name)}</b><small>${sd.scoring==='gross'?'gross':'net'} · ${line}${sd.birdies&&sd.birdies!=='off'?' · '+sd.birdies+' birdies double, eagles triple':''} · ${L.played} of 18 holes settled</small></div></div>
         ${L.rows.map(x=>`<div class="mr num" style="grid-template-columns:minmax(0,1fr) 90px"><span>${esc(x.name)}</span><b class="r ${netCls(x.net)}">${gSigned(x.net)}</b></div>`).join('')}</div>`; }).join('')}
     <p class="hint" style="margin:0">The players set this up on the scoring page themselves and keep their own picks; the money here is what their cards say.</p></div>`; }
@@ -9493,7 +9493,7 @@ function wireSignupCard(t){
    page counts, and a reload is tried once per build — if the page that comes back is still the old one, the CDN
    hasn't caught up; wait a while before trying that build again. */
 (function(){
-  const ME='20261107162018', KEY='au_tried', RETRY=10*60*1000; let ready=false, lastCheck=0;
+  const ME='20261107162315', KEY='au_tried', RETRY=10*60*1000; let ready=false, lastCheck=0;
   const typing=()=>{ const a=document.activeElement; return a&&/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)&&a.value&&a.type!=='search'; };
   const safe=()=>!typing()&&(typeof window.__canReload!=='function'||window.__canReload());
   const tried=()=>{ try{ const [b,t]=(sessionStorage.getItem(KEY)||'').split('|'); return b?{build:b,at:+t||0}:null; }catch(_){ return null; } };
