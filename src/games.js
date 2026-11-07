@@ -809,10 +809,11 @@ function sideGamesCard(ev){ if(!ev||KEYMODE) return ''; sideLoad(ev); const rows
   const pub=publicEvent(ev), scores=golfScores[ev.id]||{};
   return `<div class="card pad" style="display:flex;flex-direction:column;gap:12px"><h2 class="h2">Side games in the carts</h2>
     ${rows.map(r=>{ const grp=pub.groups.find(x=>x.id===r.group_id), eg=(ev.groups||[]).find(x=>x.id===r.group_id)||{}; if(!grp) return ''; const sd=r.data, L=sideLedger(pub,grp,scores,sd), st=sd.stakes||{};
-      const line=sd.game==='banker'?`bets of $${+st.min||0} to $${+st.max||0}, the banker may double, the bank ${sd.bank==='order'?'rotates with the tee order':'to the hole’s winner'}`
+      const line=sd.game==='banker'?`the banker names the range on every tee inside $${+st.min||0}–$${+st.max||0}, the bank ${sd.bank==='order'?'rotates with the tee order':'to the hole’s winner'}`
+        :sd.game==='flip'?`heads v tails for $${+st.hole||0} a player on the larger side, all the same coin and the low ball takes $${+st.hole||0} from each`
         :sd.game==='robin'?`$${+st.hole||0} a hole on the best ball${sd.points==='both'?' and the low total':''}, partners drawn and switched every ${+sd.seg||6} holes`
         :(()=>{ const a=wolfAmounts(1,grp.players.length-1,st), b=wolfAmounts(2,grp.players.length-2,st); return `$${a.large} a player on the big side, the lone wolf for $${a.pot}${grp.players.length>=4?`, $${b.small} each as a pair`:''}`; })();
-      return `<div class="mini"><div class="mr" style="grid-template-columns:minmax(0,1fr)"><div class="cell2"><b>Group ${esc(eg.code||grp.label||'')} · ${esc(sideGame(sd.game).name)}</b><small>${sd.scoring==='gross'?'gross':'net'} · ${line} · ${L.played} of 18 holes settled</small></div></div>
+      return `<div class="mini"><div class="mr" style="grid-template-columns:minmax(0,1fr)"><div class="cell2"><b>Group ${esc(eg.code||grp.label||'')} · ${esc(sideGame(sd.game).name)}</b><small>${sd.scoring==='gross'?'gross':'net'} · ${line}${sd.birdies&&sd.birdies!=='off'?' · '+sd.birdies+' birdies double':''} · ${L.played} of 18 holes settled</small></div></div>
         ${L.rows.map(x=>`<div class="mr num" style="grid-template-columns:minmax(0,1fr) 90px"><span>${esc(x.name)}</span><b class="r ${netCls(x.net)}">${gSigned(x.net)}</b></div>`).join('')}</div>`; }).join('')}
     <p class="hint" style="margin:0">The players set this up on the scoring page themselves and keep their own picks; the money here is what their cards say.</p></div>`; }
 function wrapSync(g,ev){ if(!CLOUD||!sessionOK||!ev) return; const now=Date.now(); if(WRAP_AT[ev.id]&&now-WRAP_AT[ev.id]<8000) return; WRAP_AT[ev.id]=now;

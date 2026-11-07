@@ -105,7 +105,7 @@ python3 tests/test_finish.py  # a game wrapped up from the phones (close → ski
 python3 tests/test_billing.py # the Club-management tier against the fake: accounts, the billing engine, statements + e-mail, the member portal, POS, bookings
 python3 tests/test_signup.py  # player registration against the fake: open the page, enter alone / with partners / ask the shop, no blanks, no doubles, into the field
 python3 tests/test_wolf.py    # a cart's wolf on the scoring page against the fake: set-up, picks, money net zero, two phones, a stale phone, the hub card
-python3 tests/test_sidegames.py # Banker and the round robin in a cart: bets, the double, the bank passing, the partner draw with no repeats, the hub card
+python3 tests/test_sidegames.py # Banker, Flip and the round robin in a cart: the range and the bets, the bank passing, coins and birdies, the partner draw with no repeats, the hub card
 git add -A && git commit && git push origin main  # Render deploys main to app.wcccmga.org
 ```
 Tests need `pip install playwright && playwright install chromium` and `cd tests && npm i xlsx@0.18.5`.
@@ -444,11 +444,23 @@ Tournament = { id, name, season, days, startDate, field:[{id,memberId,team,paid,
     (read-only, `golf_side` rows + the same math; not on an admin link). `SIDE_GAMES` is the catalog; the set-up's **Game** chips
     switch between them (a chip is disabled outside the game's `min`–`max` players) and `sgStart` saves the row, dropping the
     other game's `holes`. **Banker** (Nov 7, `bankerOn` / `bankerHole`, `bankerStrip` / `renderBankerSetup` / `renderBankerLedger`):
-    `side = {game:'banker', stakes:{min,max}, bank:'winner'|'order', order, holes:{[h]:{banker?, bets:{[id]:amt}, double}}}` —
-    one player banks the hole and plays each of the others one-on-one for the bet that player names (− / + on the strip within
-    min–max; unnamed = the minimum); **Double it** doubles every bet; the banker's line is minus the sum, net zero; the hole's
-    outright winner takes the bank (a tie leaves it; `x.low`), or the order rotates; *change* lets the cart choose the banker by hand
-    (`holes[h].banker`). **Round robin** (`robinDraw` / `robinPairs` / `robinHole`, four players only): `side = {game:'robin',
+    `side = {game:'banker', stakes:{min,max,step,start:{min,max}}, bank:'winner'|'order', order, holes:{[h]:{banker?, range:{min,max},
+    rangeBy, bets:{[id]:amt}}}}` — one player banks the hole and plays each of the others one-on-one. **The banker names the range on
+    every tee** (the owner, Nov 7: "the banker gets to set his range… I would have an allowable range of $1 to $100… $5 increments is
+    typical"): `stakes.min/max` is the allowable range, `step` the increment, `start` the first hole's range; the strip asks the banker
+    for the hole's range (two boxes + Set, prefilled with the range in force; refused outside the allowable one), `bankerRange` = the
+    hole's own, else the last one named before it in play order (the ledger marks it "(carried)"), else `start`; `bankerSteps` lists
+    the bets inside it (the bottom, then every multiple of the step) and the − / + walk that list; unnamed = the bottom. No doubling
+    (the owner did not want it). The banker's line is minus the sum, net zero; the hole's outright winner takes the bank (a tie leaves
+    it; `x.low`), or the order rotates; *change* lets the cart choose the banker by hand (`holes[h].banker`). **Flip** (`flipHole`,
+    `flipStrip` / `renderFlipSetup` / `renderFlipLedger`, 3–6 players): `side = {game:'flip', stakes:{hole}, holes:{[h]:{flip:{[id]:'H'|'T'}}}}`
+    — a Heads / Tails chip per player on the strip (pending until every coin is called), heads v tails best ball whatever the split,
+    the larger side each pay or collect the stake and the smaller side shares it (`wolfAmounts` with the same figure both sides; 1 v 3
+    plays for three stakes); every coin the same = everyone for themselves, the low ball takes the stake from each of the others, a tie
+    for low is "one tie, all tie". **Birdies double** on every side game (`side.birdies` 'off' | 'gross' | 'net', the set-up's Birdies
+    chips; `sideBirdie` / `sideBirdieOn` in golfcore): when the ball that won the hole was a birdie — gross, or net to par — the hole's
+    money doubles (Banker: per match, the winner's birdie); the strips say "birdie ×2". Every side game is scored net or gross
+    (`side.scoring`). **Round robin** (`robinDraw` / `robinPairs` / `robinHole`, four players only): `side = {game:'robin',
     stakes:{hole}, seg:3|6, points:'ball'|'both', pairs:[[[a,b],[c,d]],…], drawnAt}` — two against two, best ball (and the low total
     when `points` is 'both', each worth the stake), partners drawn at set-up with `secureInt`: the three pairings in a random order
     per cycle, every pairing once in a 6-hole robin and twice in a 3-hole one, never the same partners in two consecutive segments
