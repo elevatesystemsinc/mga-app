@@ -469,7 +469,11 @@ Tournament = { id, name, season, days, startDate, field:[{id,memberId,team,paid,
     when `points` is 'both', each worth the stake), partners drawn at set-up with `secureInt`: the three pairings in a random order
     per cycle, every pairing once in a 6-hole robin and twice in a 3-hole one, never the same partners in two consecutive segments
     (the owner: "partners should not overlap… only… in a 3-hole Robbins"); **Draw again** re-draws; the strip names the pairing for
-    the stretch and when partners switch. `tests/test_sidegames.py` runs both on two phones and the hub against the fake.
+    the stretch and when partners switch. **Paid per hole or each robin a match** (`side.pay` 'hole' | 'match'; the owner, Nov 7: "we
+    typically play those three holes as matches… maybe give people the option"): per hole the winning pair collect the stake on every
+    hole; as a match (`robinMatches`) each stretch counts holes won — a hole won with a birdie counts two when birdies double — and the
+    pair ahead at the end takes the denomination from the other pair, all square a push; `x.match = {k, tally, toPlay, last, done,
+    result}` on every hole, the money on the stretch's last hole; the strip shows "The match · Ann & Bo 1 up · 1 to play". `tests/test_sidegames.py` runs both on two phones and the hub against the fake.
   - **Game sheet PDF** (`gameSheetPDF(g,{strokes,returnDoc})`): the band (date · course · tee · players · all in), THE GAME as a
     card — each competition with its rules in words (`potRulesText`) and its entry, the total as a navy strip — the **house
     rules** typed in the designer (`g.rules`, one per line, printed as bullets) and teams when known on **page 1**; the

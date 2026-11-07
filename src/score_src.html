@@ -453,10 +453,13 @@ const robinSpan=(side,g,h)=>{ const po=playOrder(g.startHole), seg=+side.seg||6,
 function robinStrip(g,c,h){
   const L=sideLedger(pub,g,scores,side), x=L.holes.find(y=>y.h===h), nm=id=>fn1((g.players.find(p=>p.id===id)||{}).name), me=ME&&g.players.some(p=>p.id===ME)?ME:'';
   const names=x.pairs?x.pairs.map(pr=>pr.map(nm).join(' & ')):null, [a,b,nxt,more]=robinSpan(side,g,h);
-  const amt=x.winner!=null&&x.winner!=='push'?Math.abs(x.money[x.pairs[x.winner][0]]||0):0;
+  const match=side.pay==='match', amt=!match&&x.winner!=null&&x.winner!=='push'?Math.abs(x.money[x.pairs[x.winner][0]]||0):0;
+  const mt=x.match, mline=match&&mt&&names?(()=>{ const [t0,t1]=mt.tally, lead=t0>t1?0:t1>t0?1:null, by=Math.abs(t0-t1); const stand=lead==null?'All square':`${esc(names[lead])} ${by} up`;
+      return mt.done?`<div class="sgres"><span><b>The match</b> · ${t0}–${t1}</span><span>${mt.result==='push'?'<b>Halved</b> — a push':`<b>${esc(names[mt.result])} win</b> <span class="up">+$${mt.stake} each</span>`}</span></div>`
+        :`<div class="sgres"><span><b>The match</b> · ${stand}${mt.toPlay?` <span style="color:#C9CFD2">· ${mt.toPlay} to play</span>`:''}</span><span style="color:#C9CFD2">$${mt.stake} on it</span></div>`; })():'';
   const body=!names?'<div class="muted" style="color:#C9CFD2">Partners not drawn yet — Stakes & partners on the Ledger tab.</div>'
-    :x.pending?`<div class="sgres"><span style="color:#C9CFD2">Best ball${x.both?' and low total':''}, $${x.stake} a hole</span><span class="muted" style="color:#C9CFD2">waiting for the scores</span></div>`
-    :`<div class="sgres"><span>Best ball <b>${x.best[0]} v ${x.best[1]}</b>${x.both?` · total <b>${x.total[0]} v ${x.total[1]}</b>`:''}${side.scoring==='gross'?'':' <span style="color:#C9CFD2">net</span>'}</span><span>${x.winner==='push'?'<b>Push</b>':`<b>${esc(names[x.winner])}</b>${x.birdie?' <span style="color:var(--goldl);font-weight:700">birdie ×2</span>':''} <span class="up">+$${amt} each</span>`}</span></div>`;
+    :x.pending?`<div class="sgres"><span style="color:#C9CFD2">Best ball${x.both?' and low total':''}, $${x.stake} ${match?'a match':'a hole'}</span><span class="muted" style="color:#C9CFD2">waiting for the scores</span></div>`+mline
+    :`<div class="sgres"><span>Best ball <b>${x.best[0]} v ${x.best[1]}</b>${x.both?` · total <b>${x.total[0]} v ${x.total[1]}</b>`:''}${side.scoring==='gross'?'':' <span style="color:#C9CFD2">net</span>'}</span><span>${x.winner==='push'?'<b>Push</b>':`<b>${esc(names[x.winner])}</b>${x.birdie?' <span style="color:var(--goldl);font-weight:700">birdie ×2</span>':''} ${match?`<span style="color:#C9CFD2">take the hole${x.birdie?' — two':''}</span>`:`<span class="up">+$${amt} each</span>`}`}</span></div>`+mline;
   return `<div class="sgbar"><div class="k"><span>Round robin · hole ${h} · holes ${a}–${b}</span><button id="sgTab">Ledger</button></div>
     ${me?'':sgWhoAmI(g)}
     ${names?`<div class="who"><b>${esc(names[0])}</b> <span style="font-size:16px;color:#C9CFD2">v</span> <b>${esc(names[1])}</b>${more?` <span style="font-size:13px;color:#C9CFD2">(new partners on ${nxt})</span>`:''}</div>`:''}
@@ -505,7 +508,7 @@ function renderBankerSetup(){
   sgEndBtn(); }
 function renderRobinSetup(){
   const g=group(), G=sideGame('robin'), cur=side&&side.game==='robin'?side:{}, n=g.players.length;
-  let seg=+(sgUI.seg||cur.seg)||6, points=cur.points||'ball', scoring=cur.scoring||'net', birdies=cur.birdies||'off', me=ME&&g.players.some(p=>p.id===ME)?ME:'', stake=cur.stakes?+cur.stakes.hole:2;
+  let seg=+(sgUI.seg||cur.seg)||6, points=cur.points||'ball', pay=cur.pay||'hole', scoring=cur.scoring||'net', birdies=cur.birdies||'off', me=ME&&g.players.some(p=>p.id===ME)?ME:'', stake=cur.stakes?+cur.stakes.hole:2;
   const ids=g.players.map(p=>p.id); if(!sgUI.pairs){ sgUI.pairs=(cur.pairs&&cur.seg===seg&&cur.pairs.every(pr=>pr.flat().every(id=>ids.includes(id))))?cur.pairs:robinDraw(ids,seg); }
   const nm=id=>fn1((g.players.find(p=>p.id===id)||{}).name), po=playOrder(g.startHole);
   const sched=()=>sgUI.pairs.map((pr,k)=>`<div><span>Holes ${po[k*seg]}–${po[Math.min(17,k*seg+seg-1)]}</span><b>${esc(pr[0].map(nm).join(' & '))} v ${esc(pr[1].map(nm).join(' & '))}</b></div>`).join('');
@@ -515,7 +518,8 @@ function renderRobinSetup(){
     <label>Scored on</label><div class="names" id="sgSc"><button data-sc="net" class="${scoring==='net'?'on':''}">Net (full handicaps)</button><button data-sc="gross" class="${scoring==='gross'?'on':''}">Gross</button></div>
     <label>Birdies</label><div class="names" id="sgBd"><button data-bd="off" class="${birdies==='off'?'on':''}">No bonus</button><button data-bd="gross" class="${birdies==='gross'?'on':''}">Gross birdies double</button><button data-bd="net" class="${birdies==='net'?'on':''}">Net birdies double</button></div>
     <label>Switch partners every</label><div class="names" id="sgSeg"><button data-seg="6" class="${seg===6?'on':''}">6 holes <small style="font-weight:500">(every pairing once)</small></button><button data-seg="3" class="${seg===3?'on':''}">3 holes <small style="font-weight:500">(every pairing twice)</small></button></div>
-    <label>What a hole is worth</label><div class="money"><div><input id="sgStake" type="number" inputmode="decimal" min="0" step="1" value="${stake}"><small>each player of the winning pair, from each of the losing pair</small></div></div>
+    <label>Paid</label><div class="names" id="sgPay"><button data-pay="hole" class="${pay==='hole'?'on':''}">Per hole</button><button data-pay="match" class="${pay==='match'?'on':''}">Each robin is a match</button></div>
+    <label id="sgStakeLbl">${pay==='match'?'What a robin is worth':'What a hole is worth'}</label><div class="money"><div><input id="sgStake" type="number" inputmode="decimal" min="0" step="1" value="${stake}"><small id="sgStakeNote">${pay==='match'?'each player of the pair ahead after the stretch, from each of the other pair; all square is a push':'each player of the winning pair, from each of the losing pair'}</small></div></div>
     <label>Ways to win the hole</label><div class="names" id="sgPts"><button data-pts="ball" class="${points==='ball'?'on':''}">Best ball</button><button data-pts="both" class="${points==='both'?'on':''}">Best ball + low total <small style="font-weight:500">(each worth the stake)</small></button></div>
     <label>Partners — drawn, nobody twice in a row</label><div class="prev" id="sgSched">${sched()}</div><p style="margin:8px 0 0"><button class="btn" id="sgRedraw" style="height:40px">Draw again</button></p>
     <p style="display:flex;gap:10px;margin:22px 0 0"><button class="btn pri wide" id="sgStart" style="flex:2">${side&&side.game==='robin'?'Save changes':'Start the round robin'}</button>${side?`<button class="btn" id="sgEnd" style="flex:1">End it</button>`:`<button class="btn" id="sgBack" style="flex:1">Back</button>`}</p></div>`;
@@ -524,11 +528,12 @@ function renderRobinSetup(){
   document.querySelectorAll('[data-sc]').forEach(b=>b.onclick=()=>{ scoring=b.dataset.sc; document.querySelectorAll('[data-sc]').forEach(x=>x.classList.toggle('on',x===b)); });
   document.querySelectorAll('[data-bd]').forEach(b=>b.onclick=()=>{ birdies=b.dataset.bd; document.querySelectorAll('[data-bd]').forEach(x=>x.classList.toggle('on',x===b)); });
   document.querySelectorAll('[data-pts]').forEach(b=>b.onclick=()=>{ points=b.dataset.pts; document.querySelectorAll('[data-pts]').forEach(x=>x.classList.toggle('on',x===b)); });
+  document.querySelectorAll('[data-pay]').forEach(b=>b.onclick=()=>{ pay=b.dataset.pay; document.querySelectorAll('[data-pay]').forEach(x=>x.classList.toggle('on',x===b)); $('sgStakeLbl').textContent=pay==='match'?'What a robin is worth':'What a hole is worth'; $('sgStakeNote').textContent=pay==='match'?'each player of the pair ahead after the stretch, from each of the other pair; all square is a push':'each player of the winning pair, from each of the losing pair'; });
   document.querySelectorAll('[data-seg]').forEach(b=>b.onclick=()=>{ sgUI.seg=+b.dataset.seg; sgUI.pairs=robinDraw(ids,sgUI.seg); renderRobinSetup(); });
   $('sgRedraw').onclick=()=>{ sgUI.pairs=robinDraw(ids,seg); $('sgSched').innerHTML=sched(); };
   $('sgStart').onclick=()=>{ stake=Math.max(0,+$('sgStake').value||0); if(!me){ alert('Tap your own name first.'); return; } if(!stake){ alert('Put some money on it.'); return; }
     const changed=!(cur.pairs&&JSON.stringify(cur.pairs)===JSON.stringify(sgUI.pairs));
-    sgStart(me,{game:'robin',stakes:{hole:stake},seg,points,scoring,birdies,pairs:sgUI.pairs,drawnAt:changed?new Date().toISOString():(cur.drawnAt||new Date().toISOString()),drawnBy:changed?(me||code):(cur.drawnBy||me)}); };
+    sgStart(me,{game:'robin',stakes:{hole:stake},seg,points,pay,scoring,birdies,pairs:sgUI.pairs,drawnAt:changed?new Date().toISOString():(cur.drawnAt||new Date().toISOString()),drawnBy:changed?(me||code):(cur.drawnBy||me)}); };
   sgEndBtn(); }
 function renderFlipSetup(){
   const g=group(), G=sideGame('flip'), cur=side&&side.game==='flip'?side:{}, n=g.players.length;
@@ -617,11 +622,14 @@ function renderFlipLedger(){
   wireLedger(); }
 function renderRobinLedger(){
   const g=group(), L=sideLedger(pub,g,scores,side), nm=id=>fn1((g.players.find(p=>p.id===id)||{}).name), po=playOrder(g.startHole), st=side.stakes||{};
-  $('main').innerHTML=sgLedgerTop('Round robin',`Group ${esc(code)} · ${side.scoring==='gross'?'gross':'net, full handicaps'} · $${+st.hole||0} a hole on the best ball${side.points==='both'?' and $'+(+st.hole||0)+' on the low total':''} · partners switch every ${+side.seg||6} holes${side.drawnAt?' · drawn '+new Date(side.drawnAt).toLocaleTimeString([],{hour:'numeric',minute:'2-digit'}):''}${side.birdies&&side.birdies!=='off'?' · '+side.birdies+' birdies double':''} · net zero every hole`,L)+
+  const match=side.pay==='match';
+  $('main').innerHTML=sgLedgerTop('Round robin',`Group ${esc(code)} · ${side.scoring==='gross'?'gross':'net, full handicaps'} · ${match?`each ${+side.seg||6}-hole robin a match for $${+st.hole||0}, best ball${side.points==='both'?' and low total':''} by holes${side.birdies&&side.birdies!=='off'?', a birdie hole counts two':''}`:`$${+st.hole||0} a hole on the best ball${side.points==='both'?' and $'+(+st.hole||0)+' on the low total':''}`} · partners switch every ${+side.seg||6} holes${side.drawnAt?' · drawn '+new Date(side.drawnAt).toLocaleTimeString([],{hour:'numeric',minute:'2-digit'}):''}${side.birdies&&side.birdies!=='off'?' · '+side.birdies+' birdies double':''} · net zero every hole`,L)+
     `<div class="card" style="overflow:hidden;margin-top:14px"><div class="sgrow h" style="grid-template-columns:40px minmax(0,1fr) 90px"><span>Hole</span><span>Partners · result</span><span class="r">Winners</span></div>
-    ${po.map(h=>{ const x=L.holes.find(y=>y.h===h); const names=x.pairs?x.pairs.map(pr=>pr.map(nm).join(' & ')):['—','—']; const amt=x.winner!=null&&x.winner!=='push'?Math.abs(x.money[x.pairs[x.winner][0]]||0):0;
-      const res=!x.pairs?'':x.pending?'<span class="muted">waiting for scores</span>':x.winner==='push'?'push':`<b>${esc(names[x.winner])}</b> win`;
-      return `<div class="sgrow" style="grid-template-columns:40px minmax(0,1fr) 90px"><span class="muted">${h}</span><span>${esc(names[0])} <span class="muted">v</span> ${esc(names[1])}${res?' <span class="muted">·</span> '+res:''}${!x.pending&&x.best?` <span class="muted">(${x.best[0]} v ${x.best[1]}${x.both?', total '+x.total[0]+' v '+x.total[1]:''})</span>`:''}</span><span class="r ${amt?'up':''}">${amt?'+$'+amt+' each':''}</span></div>`; }).join('')}</div>
+    ${po.map(h=>{ const x=L.holes.find(y=>y.h===h); const names=x.pairs?x.pairs.map(pr=>pr.map(nm).join(' & ')):['—','—']; const amt=x.winner!=null&&x.winner!=='push'&&!match?Math.abs(x.money[x.pairs[x.winner][0]]||0):0, mt=x.match;
+      const res=!x.pairs?'':x.pending?'<span class="muted">waiting for scores</span>':x.winner==='push'?'push':`<b>${esc(names[x.winner])}</b> ${match?'take the hole':'win'}${x.birdie?' <span class="muted">(birdie ×2)</span>':''}`;
+      const mres=match&&mt&&mt.last&&x.pairs?(mt.done?`<div class="muted" style="font-size:12px">match ${mt.tally[0]}–${mt.tally[1]} · ${mt.result==='push'?'halved':esc(names[mt.result])+' win'}</div>`:`<div class="muted" style="font-size:12px">match ${mt.tally[0]}–${mt.tally[1]} so far</div>`):'';
+      const right=match?(mt&&mt.last&&mt.done&&mt.result!=='push'?'+$'+mt.stake+' each':''):(amt?'+$'+amt+' each':'');
+      return `<div class="sgrow" style="grid-template-columns:40px minmax(0,1fr) 90px"><span class="muted">${h}</span><span>${esc(names[0])} <span class="muted">v</span> ${esc(names[1])}${res?' <span class="muted">·</span> '+res:''}${!x.pending&&x.best?` <span class="muted">(${x.best[0]} v ${x.best[1]}${x.both?', total '+x.total[0]+' v '+x.total[1]:''})</span>`:''}${mres}</span><span class="r ${right?'up':''}">${right}</span></div>`; }).join('')}</div>
     <p class="muted" style="text-align:center;font-size:12.5px;margin:14px 0 0">${L.played} of 18 holes settled · partners are drawn once; Stakes & partners can draw again.</p>`;
   wireLedger(); }
 function renderCard(){

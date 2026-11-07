@@ -709,17 +709,26 @@ const robinSeg=(side,g,h)=>{ const seg=+side.seg||6, i=Math.max(0,playOrder(g.st
 const robinPairs=(side,g,h)=>{ const ps=side.pairs||[]; if(!ps.length) return null; return ps[robinSeg(side,g,h)%ps.length]||null; };
 function robinHole(pub,c,g,h,scores,side){
   const players=g.players||[], pairs=robinPairs(side,g,h), st=side.stakes||{}, stake=Math.max(0,+st.hole||0), both=side.points==='both', seg=robinSeg(side,g,h);
-  const out={h,seg,pairs,stake,both,best:null,total:null,ball:null,low:null,winner:null,money:{},pending:true};
+  const out={h,seg,pairs,stake,both,best:null,total:null,ball:null,low:null,winner:null,score:[0,0],money:{},pending:true,match:null};
   if(!pairs||pairs.some(pr=>pr.some(id=>!players.some(p=>p.id===id)))) return out;
   const vals={}; players.forEach(p=>{ vals[p.id]=sideVal(pub,c,g,h,scores,side,p.id); }); if(pairs.flat().some(id=>vals[id]==null)) return out;
   out.pending=false; const bb=pairs.map(pr=>Math.min(...pr.map(id=>vals[id]))), tt=pairs.map(pr=>pr.reduce((a,id)=>a+vals[id],0)); out.best=bb; out.total=tt;
   const cmp=(a,b)=>a[0]<a[1]?0:a[1]<a[0]?1:null; out.ball=cmp(bb); out.low=both?cmp(tt):null;
-  const units=[out.ball].concat(both?[out.low]:[]); const score=[0,0]; units.forEach(w=>{ if(w!=null) score[w]++; });
+  const units=[out.ball].concat(both?[out.low]:[]); const score=[0,0]; units.forEach(w=>{ if(w!=null) score[w]++; }); out.score=score;
   out.winner=score[0]>score[1]?0:score[1]>score[0]?1:'push';
-  if(score[0]!==score[1]){ const w=score[0]>score[1]?0:1; out.birdie=sideBirdieOn(pub,c,g,h,scores,side,pairs[w],vals,bb[w]); const amt=Math.round(Math.abs(score[0]-score[1])*stake*(out.birdie?2:1)*100)/100; pairs[w].forEach(id=>{ out.money[id]=amt; }); pairs[1-w].forEach(id=>{ out.money[id]=-amt; }); }
-  else if(both&&score[0]===1){ // one unit each way: the money still moves on each, so show both lines as a push overall
-    out.winner='push'; }
+  if(score[0]!==score[1]){ const w=score[0]>score[1]?0:1; out.birdie=sideBirdieOn(pub,c,g,h,scores,side,pairs[w],vals,bb[w]);
+    // paid per hole: the money moves now; each robin a match: the hole is a point (two with a birdie) and the money waits for the end of the stretch
+    if(side.pay!=='match'){ const amt=Math.round(Math.abs(score[0]-score[1])*stake*(out.birdie?2:1)*100)/100; pairs[w].forEach(id=>{ out.money[id]=amt; }); pairs[1-w].forEach(id=>{ out.money[id]=-amt; }); } }
   return out; }
+/* each robin a match (`side.pay==='match'`): over a stretch the pairs count holes won — a hole won with a birdie counts two when birdies
+   double — and the pair ahead at the end takes the denomination from the other pair; all square is a push. Written onto the holes
+   of the stretch as `match = {k, tally:[a,b] (through this hole), toPlay, last, done, result: 0|1|'push'|null}`; the money on the last hole. */
+function robinMatches(side,g,holes){ const seg=+side.seg||6, stake=Math.max(0,+((side.stakes||{}).hole)||0);
+  for(let k=0;k*seg<18;k++){ const hs=holes.slice(k*seg,k*seg+seg), tally=[0,0]; let settled=0;
+    hs.forEach((x,i)=>{ if(!x.pending&&x.pairs){ settled++; if(x.winner!=='push'){ const w=x.winner; tally[w]+=Math.abs(x.score[0]-x.score[1])*(x.birdie?2:1); } }
+      const done=settled===hs.length&&hs.every(y=>y.pairs); const result=done?(tally[0]>tally[1]?0:tally[1]>tally[0]?1:'push'):null;
+      x.match={k,tally:tally.slice(),toPlay:hs.length-i-1,last:i===hs.length-1,done,result,stake}; });
+    const last=hs[hs.length-1]; if(last&&last.match.done&&last.match.result!=='push'&&last.pairs){ const w=last.match.result; last.pairs[w].forEach(id=>{ last.money[id]=stake; }); last.pairs[1-w].forEach(id=>{ last.money[id]=-stake; }); } } }
 const sideGame=id=>SIDE_GAMES.find(x=>x.id===id)||SIDE_GAMES[0];
 const BIG_LOU_FROM=15;   // play-order index: the 16th hole of the round
 /* what one hole is worth to each player of a small side (nS) and a large side (nL): net zero whatever the split */
@@ -757,8 +766,10 @@ function sideHole(pub,c,g,h,scores,side,wolf){
 /* the group's ledger over the round: per player, and every hole in play order (the wolf of a Big Lou hole depends on the money before it) */
 function sideLedger(pub,g,scores,side){ const c=(pub.courses||{})[g.course]||Object.values(pub.courses||{})[0]||null, po=playOrder(g.startHole);
   const net={}; (g.players||[]).forEach(p=>{ net[p.id]=0; }); const holes=[];
-  po.forEach(h=>{ let x; if(side.game==='banker'){ const bk=bankerOn(side,g,h,holes); x=bankerHole(pub,c,g,h,scores,side,bk); if(!bk) x.tie=bankerTie(side,g,h,holes); } else if(side.game==='robin') x=robinHole(pub,c,g,h,scores,side); else if(side.game==='flip') x=flipHole(pub,c,g,h,scores,side); else { x=sideHole(pub,c,g,h,scores,side,wolfOn(side,g,h,net)); if(x.bigLou&&!x.wolf) x.tie=louTied(side,g,h,net); }
-    x.before=Object.assign({},net); holes.push(x); for(const id in x.money) net[id]=Math.round(((net[id]||0)+x.money[id])*100)/100; });
+  po.forEach(h=>{ let x; if(side.game==='banker'){ const bk=bankerOn(side,g,h,holes); x=bankerHole(pub,c,g,h,scores,side,bk); if(!bk) x.tie=bankerTie(side,g,h,holes); } else if(side.game==='robin'){ x=robinHole(pub,c,g,h,scores,side); } else if(side.game==='flip') x=flipHole(pub,c,g,h,scores,side); else { x=sideHole(pub,c,g,h,scores,side,wolfOn(side,g,h,net)); if(x.bigLou&&!x.wolf) x.tie=louTied(side,g,h,net); }
+    holes.push(x); });
+  if(side.game==='robin'&&side.pay==='match') robinMatches(side,g,holes);
+  holes.forEach(x=>{ x.before=Object.assign({},net); for(const id in x.money) net[id]=Math.round(((net[id]||0)+x.money[id])*100)/100; });
   const rows=(g.players||[]).map(p=>({id:p.id,name:p.name,net:net[p.id]||0})); return {rows,holes,played:holes.filter(x=>!x.pending).length,net}; }
 function pubNames(pub){ const m={}; for(const g of pub.groups||[]) for(const p of g.players||[]) m[p.id]=p.name; for(const p of pub.pool||[]) m[p.id]=p.name; return m; }
 /* The computed payout of one published competition from the cards, by its own rules (entry × players in = the pot;
