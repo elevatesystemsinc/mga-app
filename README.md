@@ -21,9 +21,12 @@ management, member billing and point of sale are the coming tier, switched on pe
 app.flagstickhub.com. A club's **staff** logins see the whole club and invite **board** logins for each association from
 the club hub's Logins page; a board login sees its own organization only. See `docs/tenancy.md`.
 
-## A side game in your cart (Wolf, Banker, Flip, Round robin)
-On the scoring page, once your group has joined, the hole screen asks whether you are playing a game in your cart. **Set up** takes who
-you are, the game, net or gross, and whether birdies double the hole (gross birdies or net birdies). **Banker**: one player banks the hole
+## A side game in your cart (Wolf, Hammer, Banker, Flip, Round robin)
+On the scoring page, once your group of three to five has joined, the hole screen asks whether you are playing a game in your cart.
+**Set up** takes who you are, the game, net or gross, and whether birdies double the hole (gross birdies or net birdies; an eagle
+triples, and the losing side's own birdie shaves the layer off). **Hammer** is Wolf with a hammer: once the sides are set either side
+can throw it; accept it and the hole doubles and the hammer passes to you; hammered back, it doubles again; decline it and your side
+forfeits the hole at the bet before it (the winners' birdie still counts unless you birdied too). **Banker**: one player banks the hole
 and plays each of the others one-on-one. On every tee the banker names the range for the hole, inside the game's allowable range ($1 to
 $100 by default, bets in $5 steps), and each of the others steps their bet through the amounts in it on the strip (a bet nobody names is
 the bottom of the range); the hole settles from the scores, net zero; win the hole outright and the bank is yours (or let it rotate with

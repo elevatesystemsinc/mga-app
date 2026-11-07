@@ -106,6 +106,7 @@ python3 tests/test_billing.py # the Club-management tier against the fake: accou
 python3 tests/test_signup.py  # player registration against the fake: open the page, enter alone / with partners / ask the shop, no blanks, no doubles, into the field
 python3 tests/test_wolf.py    # a cart's wolf on the scoring page against the fake: set-up, picks, money net zero, two phones, a stale phone, the hub card
 python3 tests/test_sidegames.py # Banker, Flip and the round robin in a cart: the range and the bets, the bank passing, coins and birdies, the partner draw with no repeats, the hub card
+python3 tests/test_hammer.py  # Hammer in a cart: thrown, accepted (×2, the hammer passes), hammered back (×4), declined (a forfeit at the bet before it), the shaved birdie, eagles triple, 3–5 players
 git add -A && git commit && git push origin main  # Render deploys main to app.wcccmga.org
 ```
 Tests need `pip install playwright && playwright install chromium` and `cd tests && npm i xlsx@0.18.5`.
@@ -443,7 +444,19 @@ Tournament = { id, name, season, days, startDate, field:[{id,memberId,team,paid,
     the pick as usual (a lone Big Lou's 1x / 2x / 3x multiplies the named amount); `sideLedger` runs the holes in play order for that. Handicaps are the player's full course handicap (`ch`). The hub's game page shows **Side games in the carts**
     (read-only, `golf_side` rows + the same math; not on an admin link). `SIDE_GAMES` is the catalog; the set-up's **Game** chips
     switch between them (a chip is disabled outside the game's `min`–`max` players) and `sgStart` saves the row, dropping the
-    other game's `holes`. **Banker** (Nov 7, `bankerOn` / `bankerHole`, `bankerStrip` / `renderBankerSetup` / `renderBankerLedger`):
+    other game's `holes`. **Carts of 3 to 5** (the owner, Nov 7: "don't allow six-person in those games yet… there's some machinery
+    we have to think about"): Wolf, Hammer, Banker and Flip take 3–5 (`sideOK()` too), the robin exactly 4. **Hammer** (`sideHole`
+    with `side.game==='hammer'`, `hammerBlock` on the strip, `tests/test_hammer.py`; the owner: "the exact same machinery as wolf,
+    except hammer doubles the bet… once a team hammers, the other team holds the hammer… if someone declines the hammer, they
+    forfeit the hole at its current bet"): Wolf's set-up, pick, lone wolf 1x / 2x / 3x, Big Lou and money, plus `holes[h].hammers =
+    [{by:'S'|'L', who, at, resp:null|'accept'|'decline', respBy, respAt}]` — once the sides are set either side may throw (`x.holder`
+    'either'); an accepted hammer doubles the hole (`x.hx`) and passes the hammer to the side that accepted; a thrown one unanswered
+    (`x.hammerOpen`) holds the hole's money; a declined one ends the hole (`x.forfeit = {by, to, at}`): the side that declined
+    forfeits it to the hammering side at the bet before that hammer, the scores still decide the birdie layer, and *undo* takes the
+    last hammer back. **Birdies double, eagles triple, and a layer is shaved** (`sideLevel` 0 / 1 / 2, `sideBonus(win, lose) →
+    {mult, txt}` = 1 + max(0, the winning ball's level − the losing side's best ball's level), used by every side game; the owner:
+    "if the other team runs in a birdie, but then we also run in a birdie, we shave the birdies double aspect"): a birdie against a
+    par ×2, an eagle ×3, an eagle against a birdie ×2, a birdie against a birdie nothing; in a robin match a hole counts 1 + that. **Banker** (Nov 7, `bankerOn` / `bankerHole`, `bankerStrip` / `renderBankerSetup` / `renderBankerLedger`):
     `side = {game:'banker', stakes:{min,max,step,start:{min,max}}, bank:'winner'|'order', order, holes:{[h]:{banker?, range:{min,max},
     rangeBy, bets:{[id]:amt}}}}` — one player banks the hole and plays each of the others one-on-one. **The banker names the range on
     every tee** (the owner, Nov 7: "the banker gets to set his range… I would have an allowable range of $1 to $100… $5 increments is
@@ -462,8 +475,8 @@ Tournament = { id, name, season, days, startDate, field:[{id,memberId,team,paid,
     the larger side each pay or collect the stake and the smaller side shares it (`wolfAmounts` with the same figure both sides; 1 v 3
     plays for three stakes); every coin the same = everyone for themselves, the low ball takes the stake from each of the others, a tie
     for low is "one tie, all tie". **Birdies double** on every side game (`side.birdies` 'off' | 'gross' | 'net', the set-up's Birdies
-    chips; `sideBirdie` / `sideBirdieOn` in golfcore): when the ball that won the hole was a birdie — gross, or net to par — the hole's
-    money doubles (Banker: per match, the winner's birdie); the strips say "birdie ×2". Every side game is scored net or gross
+    chips; `sideLevel` / `sideBonus` in golfcore, above): when the ball that won the hole was a birdie — gross, or net to par — the hole's
+    money doubles, an eagle triples, less the losing side's own layer (Banker: per match); the strips say "birdie ×2" / "eagle ×3". Every side game is scored net or gross
     (`side.scoring`). **Round robin** (`robinDraw` / `robinPairs` / `robinHole`, four players only): `side = {game:'robin',
     stakes:{hole}, seg:3|6, points:'ball'|'both', pairs:[[[a,b],[c,d]],…], drawnAt}` — two against two, best ball (and the low total
     when `points` is 'both', each worth the stake), partners drawn at set-up with `secureInt`: the three pairings in a random order

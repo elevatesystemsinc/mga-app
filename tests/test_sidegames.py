@@ -29,10 +29,10 @@ async def main():
     A=await M.new_page(); aerr=[]; A.on('pageerror',lambda e:aerr.append(str(e))); A.on('dialog',lambda d:asyncio.ensure_future(d.accept()))
     await A.goto(page('score.html')+'?e=bank-day'); await A.wait_for_function("()=>!!pub")
     await A.fill('#code','BNK12'); await A.click('#joinBtn'); await A.wait_for_function("()=>!!groupId&&!!document.getElementById('sgGo')")
-    check('the hole screen names the four games',await A.evaluate("()=>/Wolf, Banker, Flip or a round robin/.test(document.body.innerText)"))
+    check('the hole screen names the five games',await A.evaluate("()=>/Wolf, Hammer, Banker, Flip or a round robin/.test(document.body.innerText)"))
     await A.click('#sgGo'); await A.wait_for_selector('#sgStart')
     chips=await A.evaluate("()=>[...document.querySelectorAll('[data-game]')].map(b=>[b.dataset.game,b.disabled,b.classList.contains('on')])")
-    check('set-up: Wolf, Banker, Round robin and Flip on offer, Wolf on, the robin allowed for four',chips==[['wolf',False,True],['banker',False,False],['robin',False,False],['flip',False,False]],chips)
+    check('set-up: Wolf, Hammer, Banker, Round robin and Flip on offer, Wolf on, the robin allowed for four',chips==[['wolf',False,True],['hammer',False,False],['banker',False,False],['robin',False,False],['flip',False,False]],chips)
     check('every game has net / gross and the birdie switch',await A.evaluate("()=>!!document.querySelector('[data-sc=\"gross\"]')&&[...document.querySelectorAll('[data-bd]')].map(b=>b.dataset.bd).join()==='off,gross,net'"))
     # --- 1. Banker: Ann banks first; the game allows $1–$100 in $5 steps, starting at $5–$20; the bank to the winner
     await A.click('[data-game="banker"]'); await A.wait_for_selector('#sgMin')
