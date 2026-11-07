@@ -919,9 +919,9 @@ function sideHole(pub,c,g,h,scores,side,wolf){
 function sideLedger(pub,g,scores,side){ const c=(pub.courses||{})[g.course]||Object.values(pub.courses||{})[0]||null, po=playOrder(g.startHole);
   const net={}; (g.players||[]).forEach(p=>{ net[p.id]=0; }); const holes=[];
   po.forEach(h=>{ let x; if(side.game==='banker'){ const bk=bankerOn(side,g,h,holes); x=bankerHole(pub,c,g,h,scores,side,bk); if(!bk) x.tie=bankerTie(side,g,h,holes); } else if(side.game==='robin'){ x=robinHole(pub,c,g,h,scores,side); } else if(side.game==='flip') x=flipHole(pub,c,g,h,scores,side); else { x=sideHole(pub,c,g,h,scores,side,wolfOn(side,g,h,net)); if(x.bigLou&&!x.wolf) x.tie=louTied(side,g,h,net); }
-    holes.push(x); });
-  if(side.game==='robin'&&side.pay==='match') robinMatches(side,g,holes);
-  holes.forEach(x=>{ x.before=Object.assign({},net); for(const id in x.money) net[id]=Math.round(((net[id]||0)+x.money[id])*100)/100; });
+    holes.push(x); if(side.game!=='robin'){ x.before=Object.assign({},net); for(const id in x.money) net[id]=Math.round(((net[id]||0)+x.money[id])*100)/100; } });
+  // the robin's money can wait for the end of a stretch, so its running total is summed once every hole is known (the wolf's Big Lou needs it hole by hole)
+  if(side.game==='robin'){ if(side.pay==='match') robinMatches(side,g,holes); holes.forEach(x=>{ x.before=Object.assign({},net); for(const id in x.money) net[id]=Math.round(((net[id]||0)+x.money[id])*100)/100; }); }
   const rows=(g.players||[]).map(p=>({id:p.id,name:p.name,net:net[p.id]||0})); return {rows,holes,played:holes.filter(x=>!x.pending).length,net}; }
 function pubNames(pub){ const m={}; for(const g of pub.groups||[]) for(const p of g.players||[]) m[p.id]=p.name; for(const p of pub.pool||[]) m[p.id]=p.name; return m; }
 /* The computed payout of one published competition from the cards, by its own rules (entry × players in = the pot;
@@ -1707,7 +1707,7 @@ window.__canReload=()=>!queue.length;
    page counts, and a reload is tried once per build — if the page that comes back is still the old one, the CDN
    hasn't caught up; wait a while before trying that build again. */
 (function(){
-  const ME='20261107155359', KEY='au_tried', RETRY=10*60*1000; let ready=false, lastCheck=0;
+  const ME='20261107155537', KEY='au_tried', RETRY=10*60*1000; let ready=false, lastCheck=0;
   const typing=()=>{ const a=document.activeElement; return a&&/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)&&a.value&&a.type!=='search'; };
   const safe=()=>!typing()&&(typeof window.__canReload!=='function'||window.__canReload());
   const tried=()=>{ try{ const [b,t]=(sessionStorage.getItem(KEY)||'').split('|'); return b?{build:b,at:+t||0}:null; }catch(_){ return null; } };
