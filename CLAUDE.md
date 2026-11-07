@@ -670,6 +670,12 @@ and the text answers; the one-response-per-phone mark is a localStorage flag the
 both golf sections; comment boxes per section and on key questions). Answer keys: `qid`, `qid:c` (comment), `sec:<id>`.
 `SV_R` (responses) is device-local. `tests/test_survey.py` covers template → link → answers → results → close → delete.
 
+**A name on any leaderboard opens the full scorecard** (the owner, Nov 7): the phone board (`data-card` → `showCardFor`), the hub's
+event Leaderboard tab (`data-lbg` → `viewCard`), the game page's standings (`data-vc`), the dashboard's Leaderboard card (`data-dbcard`,
+a document-level delegate in golf.js → `viewCard`), a round's cell in a tournament's Results table (`data-rcard` in rounds.js; the
+results carry `groupId` / `pid` per round) and GameCast's board (`data-card` → `showCard`: the group's card in a `.ovl` overlay with the
+player highlighted, Close or tap outside; not on the TV view). `tests/test_score.py` taps a GameCast row.
+
 ### GameCast (`gamecast_src.html` → `gamecast.html?e=<slug>`, `&view=tv` for the bar screen, `&follow=<player id>`)
 A spectator page, **read-only**: it reads the same `golf_event` + `golf_scores` (+ realtime) the scoring page reads and never
 writes — built so it cannot disturb a game in progress (the owner, Oct 2026: "don't build it where it messes with the live

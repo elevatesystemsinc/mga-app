@@ -87,6 +87,9 @@ async def main():
       return {pos:pos.map(x=>[x.label,x.thru,x.cur]), markers, feedN:feed.length, feed:feed.slice(0,3), lb:[...document.querySelectorAll('.lb.num')].length, hp:hp.slice(0,80), hasBirdie:feed.some(t=>/birdie/i.test(t)), writes:Object.keys(window).filter(k=>/wrap|submit/.test(k)).length}; }""")
     # Ann/Bo (group 1 off 1) have holes 1–9 → on 10; Cy (group 2 off 2) has 1–9 too, so in play order 2…9 are done and 10 is next (thru 8); Cy's 4s on the par 5s were birdies
     check('gamecast: groups on the right holes, a feed, a board, a hole story',r['pos']==[['Group 1',9,10],['Group 2',8,10]] and sorted(r['markers'])==['10:1','10:2'] and r['feedN']>=1 and r['hasBirdie'] and r['lb']>=3 and r['hp'].startswith('Hole 2'),json.dumps(r))
+    # a tap on a board row opens that player's full scorecard over the page; Close drops it
+    r=await gc.evaluate("""()=>{ const row=document.querySelector('.lb.num[data-card]'); if(!row) return {row:false}; row.click(); const ov=document.getElementById('cardOv'); const sc=ov&&ov.querySelector('table'); const name=ov&&ov.querySelector('h2').textContent; const rows=ov?ov.querySelectorAll('table tr').length:0; document.getElementById('cardClose').click(); return {row:true, had:!!sc, name, rows, gone:!document.getElementById('cardOv')}; }""")
+    check('gamecast: tap a name on the board → the full scorecard, Close drops it',r.get('row') and r.get('had') and r.get('rows',0)>=4 and r.get('gone'),json.dumps(r))
     check('no script errors',not errs and not tverr and not pherr and not scerr and not gcerr,json.dumps(errs+tverr+pherr+scerr+gcerr))
     await b.close()
   print('ALL OK' if not bad else f'{bad} FAILED'); sys.exit(1 if bad else 0)

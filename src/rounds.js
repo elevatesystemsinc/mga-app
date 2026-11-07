@@ -37,7 +37,7 @@ function tRounds(el,t){
   if(view.rflight&&!flights.includes(view.rflight)) view.rflight='';
   const shown=view.rflight?R.list.filter(u=>u.flight===view.rflight):R.list;
   const cols=`grid-template-columns:48px minmax(0,1.8fr) 60px repeat(${R.rounds.length},88px) 96px`;
-  const cell=(u,r)=>{ const x=u.rounds[r.id]; if(!x||!x.n) return '<span class="r muted">—</span>'; return `<span class="r">${esc(x.txt)}${x.complete?'':`<br><small class="muted">thru ${esc(x.thru)}</small>`}</span>`; };
+  const cell=(u,r)=>{ const x=u.rounds[r.id]; if(!x||!x.n) return '<span class="r muted">—</span>'; return `<span class="r"${x.groupId?` data-rcard="${r.id}|${esc(x.groupId)}|${esc(x.pid)}" title="Open the scorecard" style="cursor:pointer;text-decoration:underline dotted"`:''}>${esc(x.txt)}${x.complete?'':`<br><small class="muted">thru ${esc(x.thru)}</small>`}</span>`; };
   el.innerHTML=`<div class="card" style="overflow:hidden"><div class="cardhead"><div><h2 class="h2">Rounds</h2><span class="muted">${t.days} day${t.days>1?'s':''} · ${t.teamSize>1?t.teamSize+'-player teams':'individual'} · the field’s ${t.field.length} players</span></div>
       <div class="actions">${rs.length?'':`<button class="btn" id="rndSuggest">Suggest rounds</button>`}<button class="btn" id="rndAdd">${I.plus}Add round</button>${missing.length?`<button class="btn pri" id="rndBuild"${t.field.length?'':' disabled'}>Create scoring event${missing.length>1?'s':''} (${missing.length})</button>`:''}</div></div>
     ${rs.length?`<div class="tw"><div class="t" style="min-width:680px">${rs.map(r=>rrow(r)+act(r)).join('')}</div></div>`:`<div class="empty"><b>No rounds yet</b><span>Declare each day’s format — for example Saturday front nine scramble / back nine shamble, Sunday best ball — each gets a live scoring event the moment it exists. Results below total the rounds.</span></div>`}
@@ -52,6 +52,7 @@ function tRounds(el,t){
   const sg=$('rndSuggest'); if(sg) sg.onclick=()=>{ t.rounds=defaultRounds(t); persist(); render(); toast(`${t.rounds.length} round${t.rounds.length>1?'s':''} suggested — adjust the formats, then create the events`); };
   $('rndAdd').onclick=()=>editRound(t,null); const bd=$('rndBuild'); if(bd) bd.onclick=()=>createRoundEvents(t);
   el.querySelectorAll('[data-rnd]').forEach(x=>x.onclick=()=>editRound(t,tournamentRounds(t).find(r=>r.id===x.dataset.rnd)));
+  el.querySelectorAll('[data-rcard]').forEach(c=>c.onclick=e=>{ e.stopPropagation(); const [rid,gid,pid]=c.dataset.rcard.split('|'); const ev=roundEvent(tournamentRounds(t).find(r=>r.id===rid)); const grp=ev&&(ev.groups||[]).find(g=>g.id===gid); if(ev&&grp) viewCard(ev,grp,pid); });
   el.querySelectorAll('[data-rgo]').forEach(b=>b.onclick=e=>{ e.stopPropagation(); view.geid=roundEvent(tournamentRounds(t).find(r=>r.id===b.dataset.rgo)).id; view.getab='groups'; go('golf'); loadScores(GEV()); });
   el.querySelectorAll('[data-raf]').forEach(b=>b.onclick=e=>{ e.stopPropagation(); const ev=roundEvent(tournamentRounds(t).find(r=>r.id===b.dataset.raf)); applyFlights(t,ev); golfSave(ev); render(); toast('Flights applied'); });
   el.querySelectorAll('[data-rbh]').forEach(b=>b.onclick=e=>{ e.stopPropagation(); const ev=roundEvent(tournamentRounds(t).find(r=>r.id===b.dataset.rbh)); if(!ev.flights.count){ if(t.flights&&t.flights.count){ applyFlights(t,ev); golfSave(ev); } else { toast('Set the tournament’s flights first'); return; } } view.geid=ev.id; buildGroupsFromFlights(ev); });
@@ -142,7 +143,7 @@ function tournamentResults(t,basis){
     const rows=eventBoard(pub,scoresFor(ev),{sort:basis}), pl=new Map(evPlayers(ev).map(x=>[x.p.id,x.p]));
     rows.forEach(row=>{ const key=row.team?row.id:((pl.get(row.id)||{}).memberId||row.id); let u=units.get(key); if(!u){ u={key,name:row.name,flight:row.flight||'',isTeam:!!row.team,rounds:{}}; units.set(key,u); } if(row.flight&&!u.flight) u.flight=row.flight;
       const val=unit==='strokes'?(basis==='net'&&row.netToPar!=null?row.netToPar:row.toPar):unit==='points'?row.pts:unit==='holes'?row.holesUp:row.pts;
-      u.rounds[r.id]={unit,val,n:row.n,thru:row.thru,complete:row.thru==='F'||!!row.over,gross:row.gross,net:row.net,txt:unit==='strokes'?toParTxt(val):unit==='match'?row.status:((unit==='holes'&&val>0?'+':'')+val)}; }); });
+      u.rounds[r.id]={unit,val,n:row.n,thru:row.thru,complete:row.thru==='F'||!!row.over,gross:row.gross,net:row.net,groupId:row.groupId||'',pid:row.team?((row.members||[])[0]||''):row.id,txt:unit==='strokes'?toParTxt(val):unit==='match'?row.status:((unit==='holes'&&val>0?'+':'')+val)}; }); });
   const unit=kinds.length?(new Set(kinds).size>1?'mixed':kinds[0]):'', mixed=unit==='mixed';
   const list=[...units.values()].map(u=>{ const played=rs.filter(r=>u.rounds[r.id]&&u.rounds[r.id].n>0); const total=played.reduce((a,r)=>a+u.rounds[r.id].val,0);
     return Object.assign(u,{played:played.length,total,complete:played.length===rs.length&&played.every(r=>u.rounds[r.id].complete),totalTxt:unit==='strokes'?toParTxt(total):unit==='holes'&&total>0?'+'+total:String(total)}); }).filter(u=>u.played);

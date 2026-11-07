@@ -333,10 +333,11 @@ function liveBoardCard(){
   const ev=evs[0], net=ev.scoring==='net', lb=eventBoard(publicEvent(ev),scoresFor(ev),{sort:ev.scoring}).filter(r=>r.n).slice(0,8);
   if(!golfScores[ev.id]&&CLOUD&&sessionOK) setTimeout(()=>loadScores(ev),0);
   return `<div class="card pad" style="display:flex;flex-direction:column;gap:10px"><div style="display:flex;justify-content:space-between;align-items:center"><h2 class="h2">Leaderboard</h2><span class="chip ok">● Live</span></div><span class="muted" style="font-size:13px">${esc(ev.name)} · ${evTeam(ev)?evSummary(ev).toLowerCase()+', ':''}${net?'net':'gross'}</span>
-    ${lb.length?lb.map(r=>`<div class="num" style="display:grid;grid-template-columns:34px minmax(0,1fr) 36px 42px;gap:8px;font-size:13.5px;align-items:center"><b>${r.posTxt}</b><span class="trunc">${esc(r.name)}</span><span class="muted r">${r.thru}</span><b class="r">${toParTxt(net&&r.netToPar!=null?r.netToPar:r.toPar)}</b></div>`).join(''):'<span class="muted">No scores yet.</span>'}
+    ${lb.length?lb.map(r=>`<div class="num" data-dbcard="${ev.id}|${esc(r.groupId||'')}|${esc(r.team?(r.members||[])[0]:r.id)}" title="Open the scorecard" style="display:grid;grid-template-columns:34px minmax(0,1fr) 36px 42px;gap:8px;font-size:13.5px;align-items:center;cursor:pointer"><b>${r.posTxt}</b><span class="trunc">${esc(r.name)}</span><span class="muted r">${r.thru}</span><b class="r">${toParTxt(net&&r.netToPar!=null?r.netToPar:r.toPar)}</b></div>`).join(''):'<span class="muted">No scores yet.</span>'}
     <button class="btn sm" data-golfev="${ev.id}">Full leaderboard</button></div>`;
 }
-document.addEventListener('click',e=>{ const b=e.target.closest('[data-golfev]'); if(b){ view.geid=b.dataset.golfev; view.getab='board'; go('golf'); loadScores(GEV()); } });
+document.addEventListener('click',e=>{ const b=e.target.closest('[data-golfev]'); if(b){ view.geid=b.dataset.golfev; view.getab='board'; go('golf'); loadScores(GEV()); return; }
+  const c=e.target.closest('[data-dbcard]'); if(c){ const [eid,gid,pid]=c.dataset.dbcard.split('|'); const ev=golfData().events.find(x=>x.id===eid), grp=ev&&(ev.groups||[]).find(g=>g.id===gid); if(ev&&grp) viewCard(ev,grp,pid); } });
 
 /* ---------- Flights: evenly filled by handicap ---------- */
 const FLIGHT_NAMES='ABCDEFGHIJ'.split('');
