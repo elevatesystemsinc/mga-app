@@ -801,15 +801,18 @@ function openScoring(g){ const ev=ensureGameEvent(g); ev.status='live'; wrapRese
    with the event (golf_event) whenever a game page renders and takes anything new into the game — once, by wrap.v —
    then persists and republishes, so the hub, the ledger and every phone end up with the same teams and payouts. */
 const WRAP_AT={};
-/* the groups' own side games (golf_side, side-setup.sql): read-only here — the cart runs its wolf on the phones */
+/* the groups' own side games (golf_side, side-setup.sql): read-only here — the cart runs its wolf, banker or round robin on the phones */
 const SIDE={}, SIDE_AT={};
 function sideLoad(ev){ if(!CLOUD||!sessionOK||KEYMODE||!ev) return; const now=Date.now(); if(SIDE_AT[ev.id]&&now-SIDE_AT[ev.id]<10000) return; SIDE_AT[ev.id]=now;
   tq(sb.from('golf_side').select('group_id,data,v,updated_at')).eq('event_id',ev.id).then(r=>{ if(r.error) return; const rows=(r.data||[]).filter(x=>x.data); const sig=JSON.stringify(rows); if(sig===(SIDE[ev.id]&&SIDE[ev.id].sig)) return; SIDE[ev.id]={sig,rows}; if(view.page==='game'||view.gameId) render(); }); }
 function sideGamesCard(ev){ if(!ev||KEYMODE) return ''; sideLoad(ev); const rows=(SIDE[ev.id]||{}).rows||[]; if(!rows.length) return '';
   const pub=publicEvent(ev), scores=golfScores[ev.id]||{};
   return `<div class="card pad" style="display:flex;flex-direction:column;gap:12px"><h2 class="h2">Side games in the carts</h2>
-    ${rows.map(r=>{ const grp=pub.groups.find(x=>x.id===r.group_id), eg=(ev.groups||[]).find(x=>x.id===r.group_id)||{}; if(!grp) return ''; const sd=r.data, L=sideLedger(pub,grp,scores,sd), a=wolfAmounts(1,grp.players.length-1,sd.stakes), b=wolfAmounts(2,grp.players.length-2,sd.stakes);
-      return `<div class="mini"><div class="mr" style="grid-template-columns:minmax(0,1fr)"><div class="cell2"><b>Group ${esc(eg.code||grp.label||'')} · ${esc(sideGame(sd.game).name)}</b><small>${sd.scoring==='gross'?'gross':'net'} · $${a.large} a player on the big side, the lone wolf for $${a.pot}${grp.players.length>=4?`, $${b.small} each as a pair`:''} · ${L.played} of 18 holes settled</small></div></div>
+    ${rows.map(r=>{ const grp=pub.groups.find(x=>x.id===r.group_id), eg=(ev.groups||[]).find(x=>x.id===r.group_id)||{}; if(!grp) return ''; const sd=r.data, L=sideLedger(pub,grp,scores,sd), st=sd.stakes||{};
+      const line=sd.game==='banker'?`bets of $${+st.min||0} to $${+st.max||0}, the banker may double, the bank ${sd.bank==='order'?'rotates with the tee order':'to the hole’s winner'}`
+        :sd.game==='robin'?`$${+st.hole||0} a hole on the best ball${sd.points==='both'?' and the low total':''}, partners drawn and switched every ${+sd.seg||6} holes`
+        :(()=>{ const a=wolfAmounts(1,grp.players.length-1,st), b=wolfAmounts(2,grp.players.length-2,st); return `$${a.large} a player on the big side, the lone wolf for $${a.pot}${grp.players.length>=4?`, $${b.small} each as a pair`:''}`; })();
+      return `<div class="mini"><div class="mr" style="grid-template-columns:minmax(0,1fr)"><div class="cell2"><b>Group ${esc(eg.code||grp.label||'')} · ${esc(sideGame(sd.game).name)}</b><small>${sd.scoring==='gross'?'gross':'net'} · ${line} · ${L.played} of 18 holes settled</small></div></div>
         ${L.rows.map(x=>`<div class="mr num" style="grid-template-columns:minmax(0,1fr) 90px"><span>${esc(x.name)}</span><b class="r ${netCls(x.net)}">${gSigned(x.net)}</b></div>`).join('')}</div>`; }).join('')}
     <p class="hint" style="margin:0">The players set this up on the scoring page themselves and keep their own picks; the money here is what their cards say.</p></div>`; }
 function wrapSync(g,ev){ if(!CLOUD||!sessionOK||!ev) return; const now=Date.now(); if(WRAP_AT[ev.id]&&now-WRAP_AT[ev.id]<8000) return; WRAP_AT[ev.id]=now;

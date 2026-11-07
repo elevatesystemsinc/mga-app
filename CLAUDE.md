@@ -105,6 +105,7 @@ python3 tests/test_finish.py  # a game wrapped up from the phones (close → ski
 python3 tests/test_billing.py # the Club-management tier against the fake: accounts, the billing engine, statements + e-mail, the member portal, POS, bookings
 python3 tests/test_signup.py  # player registration against the fake: open the page, enter alone / with partners / ask the shop, no blanks, no doubles, into the field
 python3 tests/test_wolf.py    # a cart's wolf on the scoring page against the fake: set-up, picks, money net zero, two phones, a stale phone, the hub card
+python3 tests/test_sidegames.py # Banker and the round robin in a cart: bets, the double, the bank passing, the partner draw with no repeats, the hub card
 git add -A && git commit && git push origin main  # Render deploys main to app.wcccmga.org
 ```
 Tests need `pip install playwright && playwright install chromium` and `cd tests && npm i xlsx@0.18.5`.
@@ -440,7 +441,19 @@ Tournament = { id, name, season, days, startDate, field:[{id,memberId,team,paid,
     Lou is the only time the dollar amount changes" — two boxes on the strip (`holes[h].stakes`, prefilled with the last amount named, the game's
     stakes on 16; `holeStakes()` = that hole's amount, else the last named Big Lou amount, else the game's; a regular hole never has them), then
     the pick as usual (a lone Big Lou's 1x / 2x / 3x multiplies the named amount); `sideLedger` runs the holes in play order for that. Handicaps are the player's full course handicap (`ch`). The hub's game page shows **Side games in the carts**
-    (read-only, `golf_side` rows + the same math; not on an admin link). Only Wolf for now; `SIDE_GAMES` is the catalog to grow.
+    (read-only, `golf_side` rows + the same math; not on an admin link). `SIDE_GAMES` is the catalog; the set-up's **Game** chips
+    switch between them (a chip is disabled outside the game's `min`–`max` players) and `sgStart` saves the row, dropping the
+    other game's `holes`. **Banker** (Nov 7, `bankerOn` / `bankerHole`, `bankerStrip` / `renderBankerSetup` / `renderBankerLedger`):
+    `side = {game:'banker', stakes:{min,max}, bank:'winner'|'order', order, holes:{[h]:{banker?, bets:{[id]:amt}, double}}}` —
+    one player banks the hole and plays each of the others one-on-one for the bet that player names (− / + on the strip within
+    min–max; unnamed = the minimum); **Double it** doubles every bet; the banker's line is minus the sum, net zero; the hole's
+    outright winner takes the bank (a tie leaves it; `x.low`), or the order rotates; *change* lets the cart choose the banker by hand
+    (`holes[h].banker`). **Round robin** (`robinDraw` / `robinPairs` / `robinHole`, four players only): `side = {game:'robin',
+    stakes:{hole}, seg:3|6, points:'ball'|'both', pairs:[[[a,b],[c,d]],…], drawnAt}` — two against two, best ball (and the low total
+    when `points` is 'both', each worth the stake), partners drawn at set-up with `secureInt`: the three pairings in a random order
+    per cycle, every pairing once in a 6-hole robin and twice in a 3-hole one, never the same partners in two consecutive segments
+    (the owner: "partners should not overlap… only… in a 3-hole Robbins"); **Draw again** re-draws; the strip names the pairing for
+    the stretch and when partners switch. `tests/test_sidegames.py` runs both on two phones and the hub against the fake.
   - **Game sheet PDF** (`gameSheetPDF(g,{strokes,returnDoc})`): the band (date · course · tee · players · all in), THE GAME as a
     card — each competition with its rules in words (`potRulesText`) and its entry, the total as a navy strip — the **house
     rules** typed in the designer (`g.rules`, one per line, printed as bullets) and teams when known on **page 1**; the
