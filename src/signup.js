@@ -50,7 +50,7 @@ function absorbSignups(t,rows){ const qs=t.fieldQuestions||[], taken=new Set(t.f
     ids.push(e.id); if(any) changed=true; });
   return {changed,ids}; }
 async function loadSignups(t){ if(!t.reg||!sgCloud()||SG_BUSY[t.id]) return; SG_BUSY[t.id]=true; SG_AT[t.id]=Date.now();
-  try{ const r=KEYMODE?await keyRPC('hub_key_signup_entries',{p_tid:t.id,p_clear:null}):await tq(sb.from('signup_entries').select('*')).eq('tid',t.id);
+  try{ const r=KEYMODE?await keyRPC('hub_key_signup_entries',{p_tid:t.id,p_clear:null}):await selectAll(tq(sb.from('signup_entries').select('*')).eq('tid',t.id));
     if(r.error){ SG_ST[t.id]={state:'error',msg:r.error.message}; return; }
     const rows=r.data||[]; if(!rows.length){ if(!SG_ST[t.id]||SG_ST[t.id].state!=='error') SG_ST[t.id]={state:'live',at:Date.now()}; return; }
     const {changed,ids}=absorbSignups(t,rows);

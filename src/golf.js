@@ -106,7 +106,7 @@ function deleteEventRow(id){ return KEYMODE?keyRPC('hub_key_golf_delete',{p_id:i
 function scoresFor(ev){ return CLOUD&&sessionOK?(golfScores[ev.id]||{}):(golfData().localScores[ev.id]||{}); }
 async function loadScores(ev){
   if(!CLOUD||!sessionOK) return;
-  const {data,error}=await sb.from('golf_scores').select('player_id,hole,strokes').eq('event_id',ev.id);
+  const {data,error}=await selectAll(sb.from('golf_scores').select('player_id,hole,strokes').eq('event_id',ev.id));
   if(error) return;
   const m={}; for(const r of data||[]) (m[r.player_id]=m[r.player_id]||{})[r.hole]=r.strokes; golfScores[ev.id]=m;
   if(!golfSub){ golfSub=sb.channel('golf-scores').on('postgres_changes',{event:'*',schema:'public',table:'golf_scores'},p=>{
@@ -368,28 +368,31 @@ function flightPlan(ev){ const F=ev.flights||{}; F.plan=F.plan||{};
   F.courseOf=Object.fromEntries((F.names||[]).map(n=>[n,F.plan[n].course])); return F.plan; }
 const fmtTime=t=>{ const [h,m]=String(t||'').split(':').map(Number); if(!isFinite(h)) return t||''; const ap=h>=12?'PM':'AM'; return ((h%12)||12)+':'+String(m||0).padStart(2,'0')+' '+ap; };
 const addMin=(t,min)=>{ const [h,m]=String(t).split(':').map(Number); const x=(h*60+(m||0)+min)%1440; return String(Math.floor(x/60)).padStart(2,'0')+':'+String(x%60).padStart(2,'0'); };
+/* the club's courses, in order — the first two take a split field; a course's short name labels its groups */
+const courseIds=()=>golfData().courses.map(c=>c.id);
+const courseShort=cid=>{ const c=courseById(cid); return c?c.name.replace(/\s+(Golf\s+)?Course$/i,''):String(cid||''); };
 function buildFlightGroups(ev,plan,per,mode,start,startOf){
-  const groups=[];
+  const groups=[], CIDS=courseIds(), c1=ev.defaultCourse||CIDS[0]||'oak', c2=CIDS.find(x=>x!==c1)||c1;
   plan.flights.forEach(f=>{ for(let i=0;i<f.units.length;i+=per){ const us=f.units.slice(i,i+per);
     groups.push({flight:f.name,units:us,sum:us.reduce((a,u)=>a+u.val,0)}); } });
   // courses: whole flights go to one course, filling Oak first up to half the groups
   const byFlight=plan.flights.map(f=>({name:f.name,n:groups.filter(x=>x.flight===f.name).length}));
-  const courseOf={}; if(mode&&typeof mode==='object'){ byFlight.forEach(f=>{ courseOf[f.name]=mode[f.name]||'oak'; }); } else if(mode==='split'){ const half=groups.length/2; let acc=0; byFlight.forEach(f=>{ courseOf[f.name]=acc<half&&(acc+f.n<=half+f.n/2)?'oak':'pecan'; if(courseOf[f.name]==='oak') acc+=f.n; }); }
+  const courseOf={}; if(mode&&typeof mode==='object'){ byFlight.forEach(f=>{ courseOf[f.name]=mode[f.name]||c1; }); } else if(mode==='split'){ const half=groups.length/2; let acc=0; byFlight.forEach(f=>{ courseOf[f.name]=acc<half&&(acc+f.n<=half+f.n/2)?c1:c2; if(courseOf[f.name]===c1) acc+=f.n; }); }
   else byFlight.forEach(f=>{ courseOf[f.name]=mode; });
   const out=[];
   // tee-time flights: groups off the tee in order of combined handicap
   if(startOf) for(const f of plan.flights){ const sp=startOf[f.name]; if(!sp||sp.start!=='tee') continue;
     groups.filter(x=>x.flight===f.name).sort((a,b)=>a.sum-b.sum).forEach((x,i)=>{ const cid=courseOf[f.name], tt=addMin(sp.first||'08:30',i*(+sp.gap||8));
-      out.push({id:uid(),code:newCode({groups:out}),course:cid,startHole:+sp.hole||1,teeTime:tt,flight:x.flight,label:`${cid==='oak'?'Oak':'Pecan'} ${fmtTime(tt)} · Flight ${x.flight}`,
+      out.push({id:uid(),code:newCode({groups:out}),course:cid,startHole:+sp.hole||1,teeTime:tt,flight:x.flight,label:`${courseShort(cid)} ${fmtTime(tt)} · Flight ${x.flight}`,
         players:x.units.flatMap(u=>u.members.map(m=>({...m.p,flight:x.flight})))}); }); }
-  for(const cid of ['oak','pecan']){
+  for(const cid of [...new Set(Object.values(courseOf))]){
     const gs=groups.filter(x=>courseOf[x.flight]===cid&&!(startOf&&startOf[x.flight]&&startOf[x.flight].start==='tee')).sort((a,b)=>a.sum-b.sum);
     const c=courseById(cid); const par5=c?c.par.M.map((p,i)=>p>=5?i+1:0).filter(Boolean):[];
     gs.forEach((x,i)=>{ let hole=1, tag='';
       const st=startOf&&startOf[x.flight]?'shotgun':start;
       if(st==='shotgun'){ if(i<18) hole=i+1; else { const j=i-18; hole=par5.length?par5[j%par5.length]:(j%18)+1; tag=' B'; } }
       out.push({id:uid(),code:newCode({groups:out}),course:cid,startHole:hole,flight:x.flight,
-        label:`${cid==='oak'?'Oak':'Pecan'} ${st==='shotgun'?hole+tag:'#'+(i+1)} · Flight ${x.flight}`,
+        label:`${courseShort(cid)} ${st==='shotgun'?hole+tag:'#'+(i+1)} · Flight ${x.flight}`,
         players:x.units.flatMap(u=>u.members.map(m=>({...m.p,flight:x.flight})))}); });
   }
   out.courseOf=courseOf; return out;
@@ -590,14 +593,15 @@ function buildGroupsFromField(ev){
   const units=[], seen=new Map(); all.forEach(({p})=>{ const k=p.team||('p'+p.id); if(!seen.has(k)){ seen.set(k,[]); units.push(seen.get(k)); } seen.get(k).push(p); });
   openDrawer({kicker:ev.name+' · Groups',title:'Build groups from the field',saveLabel:'Build groups',
     body:`<p style="margin:0">${all.length} players${units.some(u=>u.length>1)?` in ${units.length} teams — teams stay together`:''}. No flights are set, so groups follow field order.</p>`+
-      pair(field('Players per group','bgN',Math.max(2,Math.min(6,teamSizeOf(ev)>=3?teamSizeOf(ev):4)),{type:'select',options:[[2,'2'],[3,'3'],[4,'4'],[5,'5'],[6,'6']]}),field('Courses','bgC','split',{type:'select',options:[['oak','All on Oak'],['pecan','All on Pecan'],['split','Split between Oak and Pecan']]}))+
+      pair(field('Players per group','bgN',Math.max(2,Math.min(6,teamSizeOf(ev)>=3?teamSizeOf(ev):4)),{type:'select',options:[[2,'2'],[3,'3'],[4,'4'],[5,'5'],[6,'6']]}),field('Courses','bgC',golfData().courses.length>1?'split':(golfData().courses[0]||{}).id,{type:'select',options:golfData().courses.map(c=>[c.id,'All on '+courseShort(c.id)]).concat(golfData().courses.length>1?[['split',`Split between ${courseShort(golfData().courses[0].id)} and ${courseShort(golfData().courses[1].id)}`]]:[])}))+
       field('Start','bgS','shotgun',{type:'select',options:[['shotgun','Shotgun — groups spread across holes 1–18'],['one','Everyone off hole 1']]})+groupsConfirmNote(ev),
     save:()=>{ const size=+fv('bgN'), mode=fv('bgC'), start=fv('bgS'); const groups=[]; let cur=[];
       for(const u of units){ if(cur.length&&cur.length+u.length>size){ groups.push(cur); cur=[]; } cur=cur.concat(u); } if(cur.length) groups.push(cur);
       const half=Math.ceil(groups.length/2); const out=[];
-      groups.forEach((ps,i)=>{ const course=mode==='split'?(i<half?'oak':'pecan'):mode; const idx=mode==='split'?(i<half?i:i-half):i;
+      const CIDS=courseIds(), c1=ev.defaultCourse||CIDS[0]||'oak', c2=CIDS.find(x=>x!==c1)||c1;
+      groups.forEach((ps,i)=>{ const course=mode==='split'?(i<half?c1:c2):mode; const idx=mode==='split'?(i<half?i:i-half):i;
         const startHole=start==='shotgun'?(idx%18)+1:1; const dbl=start==='shotgun'&&idx>=18?' B':'';
-        out.push({id:uid(),code:newCode({groups:out}),label:`${course==='oak'?'Oak':'Pecan'} ${start==='shotgun'?startHole+dbl:'#'+(i+1)}`,course,startHole,players:ps.map(p=>({...p}))}); });
+        out.push({id:uid(),code:newCode({groups:out}),label:`${courseShort(course)} ${start==='shotgun'?startHole+dbl:'#'+(i+1)}`,course,startHole,players:ps.map(p=>({...p}))}); });
       ev.groups=out; ev.pool=[]; golfSave(ev); toast(`${ev.groups.length} groups built`); }});
 }
 

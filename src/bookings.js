@@ -33,7 +33,7 @@ const hhmm=n=>String(Math.floor(n/60)).padStart(2,'0')+':'+String(n%60).padStart
 const t12=t=>{ const n=mins(t), h=Math.floor(n/60), m=n%60; return `${((h+11)%12)+1}:${String(m).padStart(2,'0')} ${h<12?'am':'pm'}`; };
 function slotsOf(f){ const out=[]; for(let n=mins(f.open); n<mins(f.close); n+=f.slot) out.push(hhmm(n)); return out; }
 async function bkLoad(force){ if(BK.loading) return PENDING; if(BK.rows&&!force) return; BK.loading=true;
-  try{ if(!acctCloud()){ try{ BK.rows=JSON.parse(localStorage.getItem(bkKey())||'[]'); }catch(_){ BK.rows=[]; } } else { const r=await tq(sb.from('bookings').select('*')); BK.rows=r.error?[]:(r.data||[]); } BK.at=Date.now(); } finally{ BK.loading=false; } }
+  try{ if(!acctCloud()){ try{ BK.rows=JSON.parse(localStorage.getItem(bkKey())||'[]'); }catch(_){ BK.rows=[]; } } else { const r=await selectAll(tq(sb.from('bookings').select('*'))); BK.rows=r.error?[]:(r.data||[]); } BK.at=Date.now(); } finally{ BK.loading=false; } }
 function bkLocalWrite(){ if(!acctCloud()){ try{ localStorage.setItem(bkKey(),JSON.stringify(BK.rows||[])); }catch(_){} } }
 const bkLive=(fid,date)=>(BK.rows||[]).filter(b=>b.facility===fid&&b.date===date&&b.status!=='cancelled');
 const bkName=b=>b.member_id?memberName(personById(b.member_id)||{})||b.name||'Member':b.name||'Guest';

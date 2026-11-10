@@ -182,7 +182,7 @@ function setTournamentFlights(t,count){
   const old=t.flights||{}; t.flights={count:k,names,of,basis:'index',unit:(t.teamSize||1)>1?'team':'player',perGroup:per,groupSize:per*(t.teamSize||1),plan:old.plan||{},setAt:new Date().toISOString()}; tFlightPlan(t);
   return {units,missing:units.filter(u=>u.val==null)};
 }
-function tFlightPlan(t){ const F=t.flights; F.plan=F.plan||{}; (F.names||[]).forEach((n,i)=>{ const p=F.plan[n]=F.plan[n]||{}; if(!p.course) p.course=i<Math.ceil(F.names.length/2)?'oak':'pecan'; if(!p.start) p.start='shotgun'; if(!p.first) p.first='08:30'; if(p.gap==null) p.gap=8; if(!p.hole) p.hole=1; }); return F.plan; }
+function tFlightPlan(t){ const F=t.flights; F.plan=F.plan||{}; (F.names||[]).forEach((n,i)=>{ const p=F.plan[n]=F.plan[n]||{}; if(!p.course){ const C=golfData().courses.map(c=>c.id); p.course=i<Math.ceil(F.names.length/2)?(C[0]||'oak'):(C[1]||C[0]||'pecan'); } if(!p.start) p.start='shotgun'; if(!p.first) p.first='08:30'; if(p.gap==null) p.gap=8; if(!p.hole) p.hole=1; }); return F.plan; }
 /* push the tournament's flights onto a round's event: names, plan, perGroup and each player's flight */
 function applyFlights(t,ev){ const F=t.flights; if(!F||!F.count) return; const plan=tFlightPlan(t), ts=t.teamSize||1;
   ev.flights={count:F.count,names:F.names.slice(),basis:'index',unit:F.unit,groupSize:F.groupSize,perGroup:F.perGroup,courseOf:Object.fromEntries(F.names.map(n=>[n,plan[n].course])),plan:clone(plan)};

@@ -28,7 +28,7 @@ async function dropSurveyCloud(s){ if(!svCloud()) return;
 const SV_AT={};                     // when each survey's responses were last fetched
 async function loadResponses(s){ if(!CLOUD) return SV_R[s.id]=SV_R[s.id]||[]; if(!svCloud()) return SV_R[s.id]||null;   // before the sign-in has settled: not loaded yet, not "none"
   SV_AT[s.id]=Date.now();
-  const r=KEYMODE?await keyRPC('hub_key_survey_results',{p_sid:s.id}):await tq(sb.from('survey_responses').select('answers,day')).eq('sid',s.id);
+  const r=KEYMODE?await keyRPC('hub_key_survey_results',{p_sid:s.id}):await selectAll(tq(sb.from('survey_responses').select('answers,day')).eq('sid',s.id));
   if(r.error){ toast('Could not load responses: '+r.error.message); return SV_R[s.id]=SV_R[s.id]||[]; }
   SV_R[s.id]=(r.data||[]).map(x=>({answers:x.answers||{},day:x.day||''})); return SV_R[s.id]; }
 const newSection=(title)=>({id:uid(),title:title||'New section',intro:'',comments:true,questions:[]});

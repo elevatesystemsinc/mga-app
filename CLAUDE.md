@@ -222,6 +222,10 @@ Tournament = { id, name, season, days, startDate, field:[{id,memberId,team,paid,
   (`vEvents`, `CLUB.events = [{id, name, dept ('club' | a department), date, end, start, finish, where, descr, public}]`,
   `eventDrawer`): the Boo Bash, movie night at the pool; public ones reach the member portal (`member_me` → `events`, the
   "What's on" card).
+- **Supabase answers 1000 rows a request.** Every loader that reads a whole table goes through `selectAll(q)` (core.js; a copy
+  rides autoupdate.js for the public pages): it pages a built query with `.range()` until a short page comes back. A season
+  of `acct_items`, the register's tickets or a 72-player round's `golf_scores` all run past 1000 — without it the hub showed
+  the oldest thousand and nothing else (found seeding the Bushwood demo, Nov 2026). Use it for any new table read.
 - **Table caches and the session** (STN stations, BK bookings, BLK blocks, ST clock, POS tickets, ACCT ledger, MAILS): every
   loader reads localStorage until `acctCloud()` is true, and `boot()` renders the remembered page **before** the session is
   established — so a hub restored onto Settings → Food & beverage used to cache an empty local list and never list the
@@ -1029,6 +1033,11 @@ groups, printed scorecards — the printed cards include a live-scoring QR that 
   **The call-out's word for a failed validation is per game** (the Misfits, Oct 30: "say loser with exclamation marks"): `g.failWord`
   (the designer's "When a skin fails validation, the call-out says"; blank = "Didn’t validate"), published through `gameInfo` →
   `pub.game.failWord`, read by the hub's `skinsCallout` flash and the phones' `calloutStage`. Set on that day's game only.
+- **The demo tenant (Nov 2026):** `bushwood.flagstickhub.com` — Bushwood Country Club, a private club seeded with six months of
+  activity across every module for presentations (`tools/demo/`: the generator runs inside the hub in local mode, the loader
+  goes through the REST API as the demo staff login). Re-seed it from there rather than by hand. Found while seeding: group
+  building hardcoded the Oak and Pecan course ids (`buildFlightGroups` / `buildGroupsFromField` / `tFlightPlan` now use the
+  club's own course list and names) and the 1000-row cap above.
 - **Legacy app (retired):** the original Member-Member app used to live on `main` (its history is still in git);
   its `mm_tournament` table is still in Supabase as an archive, to be dropped when that system is deprecated. The
   hub's import / Verify / two-way sync / "Retire current app" code was removed in Oct 2026. Stored documents may still carry `db.legacy`, `t.source` (`kind:'mm-app'`) and

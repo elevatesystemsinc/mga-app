@@ -176,7 +176,7 @@ function setSync(){ const s=$('sync'); if(!groupId&&!BIG){ s.hidden=true; return
 function fail(msg){ $('main').innerHTML=`<div class="card pad"><h1>Live scoring</h1><p class="muted" style="margin-top:10px">${msg}</p></div>`; }
 
 async function loadScores(){
-  const {data,error}=await sb.from('golf_scores').select('player_id,hole,strokes').eq('event_id',pub.id);
+  const {data,error}=await selectAll(sb.from('golf_scores').select('player_id,hole,strokes').eq('event_id',pub.id));
   if(error) return; const m={}; for(const r of data||[]) (m[r.player_id]=m[r.player_id]||{})[r.hole]=r.strokes;
   for(const q of queue){ (m[q.p]=m[q.p]||{}); if(q.s) m[q.p][q.h]=q.s; else delete m[q.p][q.h]; } // local edits win until they're saved
   scores=m;

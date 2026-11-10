@@ -306,6 +306,9 @@ const tenantStatus=()=>TENANT_INFO&&TENANT_INFO.status||'active';
 /* tenant filter / tenant column on row queries (no-ops until tenants-setup.sql has run) */
 const tq=q=>TENANCY&&TENANT?q.eq('tenant',TENANT):q;
 const trow=o=>TENANCY&&TENANT?Object.assign({tenant:TENANT},o):o;
+/* Supabase answers at most 1000 rows a request; a season of accounts, tickets or a big field's scores runs past that.
+   selectAll(q) pages a built query with .range() until a short page comes back — the same {data,error} shape. */
+async function selectAll(q,page){ page=page||1000; const out=[]; for(let i=0;;i+=page){ const r=await q.range(i,i+page-1); if(r.error) return r; const rows=r.data||[]; out.push(...rows); if(rows.length<page) break; } return {data:out,error:null}; }
 /* the tenant row is remembered per host so the first paint already knows the client's kind and modules — without it the rail
    flashed the full club management set before tenant_lookup answered (the owner, Oct 29). The lookup still runs and wins. */
 const TENANT_CACHE_KEY=()=>'fs_tenant_'+String(TENANT_HINT||'');

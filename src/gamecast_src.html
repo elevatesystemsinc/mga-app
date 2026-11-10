@@ -102,7 +102,7 @@ async function loadEvent(){ const {data,error}=await sb.rpc('golf_event',evArgs(
   if(changed){ const name=String(pub.name||'').replace(/\s·\s[A-Z][a-z]{2} \d{1,2}(, \d{4})?$/,''); $('evName').innerHTML=`<em>GameCast</em>${esc(name)}`;
     $('evSub').textContent=[pub.club,pub.date&&new Date(pub.date+'T12:00').toLocaleDateString('en-US',{weekday:'long',month:'short',day:'numeric'})].filter(Boolean).join(' · '); document.title=name+' · GameCast'; }
   return changed; }
-async function loadScores(){ const {data,error}=await sb.from('golf_scores').select('player_id,hole,strokes,updated_at').eq('event_id',pub.id); if(error) return;
+async function loadScores(){ const {data,error}=await selectAll(sb.from('golf_scores').select('player_id,hole,strokes,updated_at').eq('event_id',pub.id)); if(error) return;
   const m={}; stamps=[]; for(const r of data||[]){ (m[r.player_id]=m[r.player_id]||{})[r.hole]=r.strokes; stamps.push({p:r.player_id,h:r.hole,s:r.strokes,at:r.updated_at||''}); } scores=m; stamps.sort((a,b)=>String(a.at).localeCompare(String(b.at))); }
 function setSync(){ const s=$('sync'); s.hidden=false; s.className='pill'+(pub.status==='live'?'':' off'); s.textContent=pub.status==='live'?'● Live':pub.status==='final'?'Final':'Not open'; }
 

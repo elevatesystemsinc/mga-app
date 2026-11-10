@@ -17,3 +17,7 @@
   document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='visible') check(); });
   window.__build=ME;
 })();
+
+/* Supabase answers at most 1000 rows a request; selectAll(q) pages a built query with .range() until a short page comes
+   back — the same {data,error} shape. core.js defines the same helper for the hub; this copy serves the public pages. */
+if(typeof selectAll!=='function'){ window.selectAll=async function(q,page){ page=page||1000; const out=[]; for(let i=0;;i+=page){ const r=await q.range(i,i+page-1); if(r.error) return r; const rows=r.data||[]; out.push(...rows); if(rows.length<page) break; } return {data:out,error:null}; }; }

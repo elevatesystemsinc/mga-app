@@ -15,7 +15,7 @@ const outletOf=id=>posSettings().outlets.find(o=>o.id===id);
 const productOf=id=>posSettings().products.find(x=>x.id===id);
 async function posLoad(force){ if(POS.loading) return PENDING; if(POS.tickets&&!force) return; POS.loading=true;
   try{ if(!acctCloud()){ try{ POS.tickets=JSON.parse(localStorage.getItem(posKey())||'[]'); }catch(_){ POS.tickets=[]; } }
-    else { const r=await tq(sb.from('pos_tickets').select('*')); POS.tickets=r.error?[]:(r.data||[]); } POS.at=Date.now(); }
+    else { const r=await selectAll(tq(sb.from('pos_tickets').select('*'))); POS.tickets=r.error?[]:(r.data||[]); } POS.at=Date.now(); }
   finally{ POS.loading=false; } }
 function posLocalWrite(){ if(!acctCloud()){ try{ localStorage.setItem(posKey(),JSON.stringify(POS.tickets||[])); }catch(_){} } }
 /* the money on a ticket: service charge on lines marked for it, tax on taxable lines (and their service charge), the tip on top */
@@ -267,7 +267,7 @@ const DAYS={rows:null,loading:false}; CACHE_RESETS.push(()=>{ if(!DAYS.loading) 
 const daysKey=()=>`fs_days_${(typeof TENANT!=='undefined'&&TENANT)||'local'}`;
 async function daysLoad(force){ if(DAYS.loading) return PENDING; if(DAYS.rows&&!force) return; DAYS.loading=true;
   try{ if(!acctCloud()){ try{ DAYS.rows=JSON.parse(localStorage.getItem(daysKey())||'[]'); }catch(_){ DAYS.rows=[]; } }
-    else { const r=await tq(sb.from('pos_days').select('*').gte('day',isoPlus(todayISO(),-120))); DAYS.rows=r.error?[]:(r.data||[]); } }
+    else { const r=await selectAll(tq(sb.from('pos_days').select('*').gte('day',isoPlus(todayISO(),-120)))); DAYS.rows=r.error?[]:(r.data||[]); } }
   finally{ DAYS.loading=false; } }
 function daysLocalWrite(){ if(!acctCloud()){ try{ localStorage.setItem(daysKey(),JSON.stringify(DAYS.rows||[])); }catch(_){} } }
 const ticketDay=t=>t.day||String(t.closed_at||t.created_at||'').slice(0,10);

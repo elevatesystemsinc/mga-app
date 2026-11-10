@@ -32,7 +32,7 @@ const clockHours=r=>Math.max(0,(new Date(r.out_at||Date.now())-new Date(r.in_at)
 /* ---- the time clock rows ---- */
 const clkKey=()=>'fs_clock_'+((typeof TENANT!=='undefined'&&TENANT)||'local');
 async function clockLoad(force){ if(ST.loading) return PENDING; if(ST.clock&&!force) return; ST.loading=true;
-  try{ if(!acctCloud()){ try{ ST.clock=JSON.parse(localStorage.getItem(clkKey())||'[]'); }catch(_){ ST.clock=[]; } } else { const r=await tq(sb.from('staff_clock').select('*').gte('in_at',new Date(Date.now()-45*864e5).toISOString())); ST.clock=r.error?[]:(r.data||[]); } ST.at=Date.now(); } finally{ ST.loading=false; } }
+  try{ if(!acctCloud()){ try{ ST.clock=JSON.parse(localStorage.getItem(clkKey())||'[]'); }catch(_){ ST.clock=[]; } } else { const r=await selectAll(tq(sb.from('staff_clock').select('*').gte('in_at',new Date(Date.now()-45*864e5).toISOString()))); ST.clock=r.error?[]:(r.data||[]); } ST.at=Date.now(); } finally{ ST.loading=false; } }
 async function clockFix(row,patch){ if(acctCloud()){ const {error}=await sb.from('staff_clock').update(patch).eq('id',row.id); if(error){ toast(error.message); return false; } } Object.assign(row,patch); if(!acctCloud()){ try{ localStorage.setItem(clkKey(),JSON.stringify(ST.clock)); }catch(_){} } return true; }
 /* ---- the page: a department's people, their week, who is on the clock ---- */
 function vStaff(m){ if(!staffOn()){ go('dash'); return; } if(STN.rows==null){ if(!STN.loading) stnLoad().then(()=>render()); } if(ST.clock==null){ if(!ST.loading) clockLoad().then(()=>render()); } else if(acctCloud()&&Date.now()-ST.at>30000&&!ST.loading) clockLoad(true).then(()=>{ if(view.page==='staff') render(); });

@@ -21,9 +21,9 @@ async function acctLoad(force){
   if(ACCT.loading) return PENDING; if(ACCT.items&&!force) return; ACCT.loading=true; ACCT.err='';
   try{
     if(!acctCloud()){ const L=acctLocalRead(); ACCT.items=L.items; ACCT.stmts=L.stmts; }
-    else { const a=await tq(sb.from('acct_items').select('*')); const b=await tq(sb.from('acct_statements').select('*'));
+    else { const a=await selectAll(tq(sb.from('acct_items').select('*'))); const b=await selectAll(tq(sb.from('acct_statements').select('*')));
       if(a.error) throw a.error; if(b.error) throw b.error; ACCT.items=a.data||[]; ACCT.stmts=b.data||[];
-      const u=await tq(sb.from('member_users').select('*')); ACCT.users=u.error?[]:(u.data||[]); }
+      const u=await selectAll(tq(sb.from('member_users').select('*'))); ACCT.users=u.error?[]:(u.data||[]); }
     ACCT.at=Date.now();
   }catch(e){ ACCT.err=/relation|does not exist|schema cache/i.test(e.message||'')?'Run billing-setup.sql in Supabase to turn on member accounts.':(e.message||'Couldn’t load the accounts'); ACCT.items=ACCT.items||[]; ACCT.stmts=ACCT.stmts||[]; }
   ACCT.loading=false;

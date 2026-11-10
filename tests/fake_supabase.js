@@ -4,8 +4,8 @@
   const call=(op,args)=>window.__fdb(JSON.stringify({op,args})).then(r=>JSON.parse(r));
   class Q{ constructor(t){ this.t=t; this.op='select'; this.filters=[]; this.single=false; this.payload=null; }
     select(){ return this; } update(o){ this.op='update'; this.payload=o; return this; } upsert(o){ this.op='upsert'; this.payload=o; return this; } insert(o){ this.op='insert'; this.payload=o; return this; } delete(){ this.op='delete'; return this; }
-    eq(k,v){ this.filters.push(['eq',k,v]); return this; } gte(k,v){ this.filters.push(['gte',k,v]); return this; } is(k,v){ this.filters.push(['is',k,v]); return this; } order(){ return this; } maybeSingle(){ this.single=true; return this; } single(){ this.single=true; return this; }
-    then(ok,bad){ return call(this.op,{table:this.t,payload:this.payload,filters:this.filters,single:this.single}).then(ok,bad); } }
+    eq(k,v){ this.filters.push(['eq',k,v]); return this; } gte(k,v){ this.filters.push(['gte',k,v]); return this; } is(k,v){ this.filters.push(['is',k,v]); return this; } order(){ return this; } range(a,b){ this.rng=[a,b]; return this; } maybeSingle(){ this.single=true; return this; } single(){ this.single=true; return this; }
+    then(ok,bad){ const rng=this.rng; return call(this.op,{table:this.t,payload:this.payload,filters:this.filters,single:this.single}).then(r=>{ if(rng&&r&&Array.isArray(r.data)) r={...r,data:r.data.slice(rng[0],rng[1]+1)}; return r; }).then(ok,bad); } }
   window.supabase={createClient(){ return {
     auth:{getSession:async()=>({data:{session:(window.MM_CONFIG||{}).noSession?null:{user:{email:'board@test'}}}}),signInWithPassword:async()=>({error:null}),signOut:async()=>({}),signUp:async({email})=>({data:{user:{id:'u-'+email}},error:null}),updateUser:async()=>({data:{},error:null}),verifyOtp:async()=>({data:{},error:null}),signInWithOtp:async()=>({data:{},error:null}),onAuthStateChange:()=>({data:{subscription:{unsubscribe(){}}}}),resetPasswordForEmail:async()=>({data:{},error:null})},
     functions:{invoke(name,o){ return call('fn',{name,body:(o&&o.body)||{}}); }},

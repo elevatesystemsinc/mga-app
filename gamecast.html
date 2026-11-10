@@ -952,7 +952,7 @@ async function loadEvent(){ const {data,error}=await sb.rpc('golf_event',evArgs(
   if(changed){ const name=String(pub.name||'').replace(/\s·\s[A-Z][a-z]{2} \d{1,2}(, \d{4})?$/,''); $('evName').innerHTML=`<em>GameCast</em>${esc(name)}`;
     $('evSub').textContent=[pub.club,pub.date&&new Date(pub.date+'T12:00').toLocaleDateString('en-US',{weekday:'long',month:'short',day:'numeric'})].filter(Boolean).join(' · '); document.title=name+' · GameCast'; }
   return changed; }
-async function loadScores(){ const {data,error}=await sb.from('golf_scores').select('player_id,hole,strokes,updated_at').eq('event_id',pub.id); if(error) return;
+async function loadScores(){ const {data,error}=await selectAll(sb.from('golf_scores').select('player_id,hole,strokes,updated_at').eq('event_id',pub.id)); if(error) return;
   const m={}; stamps=[]; for(const r of data||[]){ (m[r.player_id]=m[r.player_id]||{})[r.hole]=r.strokes; stamps.push({p:r.player_id,h:r.hole,s:r.strokes,at:r.updated_at||''}); } scores=m; stamps.sort((a,b)=>String(a.at).localeCompare(String(b.at))); }
 function setSync(){ const s=$('sync'); s.hidden=false; s.className='pill'+(pub.status==='live'?'':' off'); s.textContent=pub.status==='live'?'● Live':pub.status==='final'?'Final':'Not open'; }
 
@@ -1092,7 +1092,7 @@ window.__canReload=()=>true;
    page counts, and a reload is tried once per build — if the page that comes back is still the old one, the CDN
    hasn't caught up; wait a while before trying that build again. */
 (function(){
-  const ME='20261107205251', KEY='au_tried', RETRY=10*60*1000; let ready=false, lastCheck=0;
+  const ME='20261110045021', KEY='au_tried', RETRY=10*60*1000; let ready=false, lastCheck=0;
   const typing=()=>{ const a=document.activeElement; return a&&/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)&&a.value&&a.type!=='search'; };
   const safe=()=>!typing()&&(typeof window.__canReload!=='function'||window.__canReload());
   const tried=()=>{ try{ const [b,t]=(sessionStorage.getItem(KEY)||'').split('|'); return b?{build:b,at:+t||0}:null; }catch(_){ return null; } };
@@ -1104,6 +1104,10 @@ window.__canReload=()=>true;
   document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='visible') check(); });
   window.__build=ME;
 })();
+
+/* Supabase answers at most 1000 rows a request; selectAll(q) pages a built query with .range() until a short page comes
+   back — the same {data,error} shape. core.js defines the same helper for the hub; this copy serves the public pages. */
+if(typeof selectAll!=='function'){ window.selectAll=async function(q,page){ page=page||1000; const out=[]; for(let i=0;;i+=page){ const r=await q.range(i,i+page-1); if(r.error) return r; const rows=r.data||[]; out.push(...rows); if(rows.length<page) break; } return {data:out,error:null}; }; }
 
 </script>
 </body>
