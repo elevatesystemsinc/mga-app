@@ -169,11 +169,11 @@ function setPasswordScreen(){
   return new Promise(done=>{
     const card=$('login'), sub=$('loginSub'), em=$('loginEmail'), pw=$('loginPw'), pw2=$('loginPw2'), b=$('loginBtn'), err=$('loginErr');
     const was={sub:sub.textContent,ph:pw.placeholder,btn:b.textContent,em:em.hidden,click:b.onclick,key:pw.onkeydown};
-    sub.textContent='Welcome — choose your password'; em.hidden=true; pw.placeholder='New password (8+ characters)'; pw.value=''; pw2.hidden=false; pw2.value=''; b.textContent='Save password'; err.textContent='';
+    sub.textContent='Welcome — choose your password'; sub.hidden=false; em.hidden=true; pw.placeholder='New password (8+ characters)'; pw.value=''; pw2.hidden=false; pw2.value=''; b.textContent='Save password'; err.textContent='';
     card.classList.add('show'); setTimeout(()=>pw.focus(),80);
     const go=async()=>{ if(pw.value.length<8){ err.textContent='Use at least 8 characters.'; return; } if(pw.value!==pw2.value){ err.textContent='The two passwords differ.'; return; } b.disabled=true;
       const {error}=await sb.auth.updateUser({password:pw.value}); b.disabled=false; if(error){ err.textContent=error.message; return; }
-      sub.textContent=was.sub; pw.placeholder=was.ph; pw.value=''; pw2.hidden=true; b.textContent=was.btn; em.hidden=was.em; b.onclick=was.click; pw.onkeydown=was.key; card.classList.remove('show'); toast('Password saved'); done(); };
+      sub.textContent=was.sub; sub.hidden=!was.sub; pw.placeholder=was.ph; pw.value=''; pw2.hidden=true; b.textContent=was.btn; em.hidden=was.em; b.onclick=was.click; pw.onkeydown=was.key; card.classList.remove('show'); toast('Password saved'); done(); };
     b.onclick=go; pw.onkeydown=e=>{ if(e.key==='Enter') pw2.focus(); }; pw2.onkeydown=e=>{ if(e.key==='Enter') go(); };
   });
 }

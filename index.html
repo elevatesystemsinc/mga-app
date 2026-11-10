@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <script>if(/^https?:/.test(location.protocol))document.write('<base href="/">');</script><!-- the page is served at /, /mga, /lga, … (Render rewrites every path to index.html); relative files always come from the root -->
-<title>Flagstick · Walnut Creek Country Club</title>
+<title>Flagstick</title>
 <link rel="icon" href="favicon.png?v=3">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -476,7 +476,7 @@ textarea.inp{height:auto;min-height:84px;padding:10px 12px;resize:vertical}
   <div class="card">
     <div class="fs light"><img src="flagstick-crest.svg" alt=""><div><b>FLAGSTICK</b><small>GOLF SOFTWARE</small></div></div>
     <p class="club" id="loginClub">Walnut Creek Country Club</p>
-    <p class="muted" style="margin:0" id="loginSub">Board sign-in</p>
+    <p class="muted" style="margin:0" id="loginSub" hidden></p>
     <input class="inp" type="email" id="loginEmail" placeholder="E-mail" autocomplete="username" aria-label="E-mail" hidden>
     <input class="inp" type="password" id="loginPw" placeholder="Password" autocomplete="current-password" aria-label="Password">
     <input class="inp" type="password" id="loginPw2" placeholder="Repeat the new password" autocomplete="new-password" aria-label="Repeat the new password" hidden>
@@ -799,7 +799,8 @@ async function selectAll(q,page){ page=page||1000; const out=[]; for(let i=0;;i+
 /* the tenant row is remembered per host so the first paint already knows the client's kind and modules — without it the rail
    flashed the full club management set before tenant_lookup answered (the owner, Oct 29). The lookup still runs and wins. */
 const TENANT_CACHE_KEY=()=>'fs_tenant_'+String(TENANT_HINT||'');
-function applyTenant(data){ TENANCY=true; if(data&&data.slug){ TENANT=data.slug; TENANT_INFO=data; CLUB_META.name=data.name||CLUB_META.name; if(data.short) CLUB_META.short=data.short; } }
+function applyTenant(data){ TENANCY=true; if(data&&data.slug){ TENANT=data.slug; TENANT_INFO=data; CLUB_META.name=data.name||CLUB_META.name; if(data.short) CLUB_META.short=data.short;
+    if(typeof PORTAL==='undefined'||!PORTAL) document.title=(CLUB_META.name||'Flagstick')+' · Flagstick'; } }   // the tab names the client from the first paint (the sign-in card included); render() refines it once a hub is open
 function seedTenantFromCache(){ if(!CLOUD) return false; try{ const d=JSON.parse(localStorage.getItem(TENANT_CACHE_KEY())||'null'); if(d&&d.slug){ applyTenant(d); return true; } }catch(_){} return false; }
 async function resolveTenant(){
   if(!CLOUD) return;
@@ -2306,11 +2307,11 @@ function setPasswordScreen(){
   return new Promise(done=>{
     const card=$('login'), sub=$('loginSub'), em=$('loginEmail'), pw=$('loginPw'), pw2=$('loginPw2'), b=$('loginBtn'), err=$('loginErr');
     const was={sub:sub.textContent,ph:pw.placeholder,btn:b.textContent,em:em.hidden,click:b.onclick,key:pw.onkeydown};
-    sub.textContent='Welcome — choose your password'; em.hidden=true; pw.placeholder='New password (8+ characters)'; pw.value=''; pw2.hidden=false; pw2.value=''; b.textContent='Save password'; err.textContent='';
+    sub.textContent='Welcome — choose your password'; sub.hidden=false; em.hidden=true; pw.placeholder='New password (8+ characters)'; pw.value=''; pw2.hidden=false; pw2.value=''; b.textContent='Save password'; err.textContent='';
     card.classList.add('show'); setTimeout(()=>pw.focus(),80);
     const go=async()=>{ if(pw.value.length<8){ err.textContent='Use at least 8 characters.'; return; } if(pw.value!==pw2.value){ err.textContent='The two passwords differ.'; return; } b.disabled=true;
       const {error}=await sb.auth.updateUser({password:pw.value}); b.disabled=false; if(error){ err.textContent=error.message; return; }
-      sub.textContent=was.sub; pw.placeholder=was.ph; pw.value=''; pw2.hidden=true; b.textContent=was.btn; em.hidden=was.em; b.onclick=was.click; pw.onkeydown=was.key; card.classList.remove('show'); toast('Password saved'); done(); };
+      sub.textContent=was.sub; sub.hidden=!was.sub; pw.placeholder=was.ph; pw.value=''; pw2.hidden=true; b.textContent=was.btn; em.hidden=was.em; b.onclick=was.click; pw.onkeydown=was.key; card.classList.remove('show'); toast('Password saved'); done(); };
     b.onclick=go; pw.onkeydown=e=>{ if(e.key==='Enter') pw2.focus(); }; pw2.onkeydown=e=>{ if(e.key==='Enter') go(); };
   });
 }
@@ -2350,7 +2351,7 @@ const orgNames=(slug,ids)=>(ids||[]).map(id=>{ const o=orgsOf(slug).find(x=>x.id
 function portalBoot(){
   $('side').classList.add('portal'); $('seasonBox').hidden=true; 
   $('brandName').textContent='Flagstick'; $('brandSub').textContent='Client portal'; $('topName').textContent='Flagstick'; document.title='Portal · Flagstick';
-  const lc=$('loginClub'); if(lc) lc.textContent='Flagstick'; const ls=$('loginSub'); if(ls) ls.textContent='Administrator sign-in';
+  const lc=$('loginClub'); if(lc) lc.textContent='Flagstick'; const ls=$('loginSub'); if(ls){ ls.textContent='Administrator sign-in'; ls.hidden=false; }
   if(!TENANCY){ $('nav').innerHTML=''; $('main').innerHTML=head('Flagstick portal','')+`<div class="banner">The database has not been prepared for tenants yet — run <b>tenants-setup.sql</b> and <b>portal-setup.sql</b> in the Supabase SQL editor, then reload.</div>`; return; }
   if(!sessionOK){ $('nav').innerHTML=''; $('login').classList.add('show'); setTimeout(()=>{ const e=$('loginEmail'); if(e&&!e.value) e.focus(); else $('loginPw').focus(); },100); return; }
   $('btnSignOut').hidden=false; $('who').textContent='Signed in as '+((ACCESS&&ACCESS.email)||'Flagstick admin'); $('who').hidden=false; portalNav(); vPortal($('main')); loadPortal();
@@ -9502,7 +9503,7 @@ function wireSignupCard(t){
    page counts, and a reload is tried once per build — if the page that comes back is still the old one, the CDN
    hasn't caught up; wait a while before trying that build again. */
 (function(){
-  const ME='20261110045021', KEY='au_tried', RETRY=10*60*1000; let ready=false, lastCheck=0;
+  const ME='20261110155913', KEY='au_tried', RETRY=10*60*1000; let ready=false, lastCheck=0;
   const typing=()=>{ const a=document.activeElement; return a&&/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)&&a.value&&a.type!=='search'; };
   const safe=()=>!typing()&&(typeof window.__canReload!=='function'||window.__canReload());
   const tried=()=>{ try{ const [b,t]=(sessionStorage.getItem(KEY)||'').split('|'); return b?{build:b,at:+t||0}:null; }catch(_){ return null; } };

@@ -312,7 +312,8 @@ async function selectAll(q,page){ page=page||1000; const out=[]; for(let i=0;;i+
 /* the tenant row is remembered per host so the first paint already knows the client's kind and modules — without it the rail
    flashed the full club management set before tenant_lookup answered (the owner, Oct 29). The lookup still runs and wins. */
 const TENANT_CACHE_KEY=()=>'fs_tenant_'+String(TENANT_HINT||'');
-function applyTenant(data){ TENANCY=true; if(data&&data.slug){ TENANT=data.slug; TENANT_INFO=data; CLUB_META.name=data.name||CLUB_META.name; if(data.short) CLUB_META.short=data.short; } }
+function applyTenant(data){ TENANCY=true; if(data&&data.slug){ TENANT=data.slug; TENANT_INFO=data; CLUB_META.name=data.name||CLUB_META.name; if(data.short) CLUB_META.short=data.short;
+    if(typeof PORTAL==='undefined'||!PORTAL) document.title=(CLUB_META.name||'Flagstick')+' · Flagstick'; } }   // the tab names the client from the first paint (the sign-in card included); render() refines it once a hub is open
 function seedTenantFromCache(){ if(!CLOUD) return false; try{ const d=JSON.parse(localStorage.getItem(TENANT_CACHE_KEY())||'null'); if(d&&d.slug){ applyTenant(d); return true; } }catch(_){} return false; }
 async function resolveTenant(){
   if(!CLOUD) return;
