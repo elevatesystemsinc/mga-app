@@ -33,6 +33,9 @@ create table if not exists public.courses (
 create index if not exists courses_tenant_idx on public.courses (tenant);
 create index if not exists courses_place_idx on public.courses (country, state, city);
 
+grant select, insert, update, delete on public.courses to authenticated;   -- RLS below decides who may; without the grant PostgREST refuses everyone
+grant select on public.courses to anon;
+grant all on public.courses to service_role;
 alter table public.courses enable row level security;
 drop policy if exists "courses: read" on public.courses;
 create policy "courses: read" on public.courses for select to authenticated
