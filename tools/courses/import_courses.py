@@ -24,12 +24,18 @@ OVERPASS='https://overpass-api.de/api/interpreter'
 AREAS={'dfw':(32.45,-97.60,33.35,-96.35)}   # south, west, north, east
 KEY=os.environ.get('GCA_KEY','')
 
+class DailyLimit(Exception): pass
+CACHE=os.path.join(os.path.dirname(os.path.abspath(__file__)),'.cache')   # fetched API records, so a re-run costs no requests
 def get(url, headers=None, data=None, tries=4):
     for i in range(tries):
         try:
             r=urllib.request.Request(url, data=data, headers=headers or {})
             with urllib.request.urlopen(r, timeout=120) as resp: return json.loads(resp.read().decode())
         except urllib.error.HTTPError as e:
+            body=''
+            try: body=e.read().decode()
+            except Exception: pass
+            if e.code==429 and 'daily' in body.lower(): raise DailyLimit(body.strip())
             if e.code==429: time.sleep(3*(i+1)); continue
             if e.code==404: return None
             raise
@@ -101,9 +107,13 @@ def osm_holes(lat,lon,radius=1800):
 def dist_km(a,b,c,d):
     p=math.pi/180; x=(c-a)*p; y=(d-b)*p*math.cos((a+c)/2*p); return 6371*math.hypot(x,y)
 
+def cached(key, fetch):
+    os.makedirs(CACHE, exist_ok=True); f=os.path.join(CACHE, re.sub(r'[^a-z0-9]+','-',key.lower()).strip('-')[:120]+'.json')
+    if os.path.exists(f): return json.load(open(f))
+    v=fetch(); json.dump(v, open(f,'w')); return v
 def search_name(name):
-    r=gca('/search?search_query='+urllib.parse.quote(name)); return (r or {}).get('courses') or []
-def course(cid): r=gca('/courses/'+cid); return (r or {}).get('course')
+    r=cached('search '+name, lambda: gca('/search?search_query='+urllib.parse.quote(name))); return (r or {}).get('courses') or []
+def course(cid): r=cached('course '+cid, lambda: gca('/courses/'+cid)); return (r or {}).get('course')
 
 def main():
     if len(sys.argv)<3: sys.exit(__doc__)
@@ -112,6 +122,10 @@ def main():
         r=row_from_gca(c, geo)
         if r and r['id'] not in seen: seen.add(r['id']); rows.append(r)
         elif not r: print('skipped (no 18-hole card):',c.get('club_name'),c.get('course_name'),file=sys.stderr)
+    try: run(mode,args,add)
+    except DailyLimit as e: print('GolfCourseAPI daily limit reached ('+str(e)+') — writing what was gathered; run again tomorrow, the cache skips what is done',file=sys.stderr)
+    json.dump(rows, sys.stdout, indent=1); print(file=sys.stdout); print(len(rows),'rows',file=sys.stderr)
+def run(mode,args,add):
     if mode=='ids':
         for cid in args:
             c=course(cid)
@@ -158,5 +172,4 @@ def main():
                 time.sleep(0.3)
             if not kept: print('no match in the box:',name,file=sys.stderr)
     else: sys.exit(__doc__)
-    json.dump(rows, sys.stdout, indent=1); print(file=sys.stdout); print(len(rows),'rows',file=sys.stderr)
 if __name__=='__main__': main()
