@@ -13,6 +13,7 @@ function golfData(){
   if(!db.golf) db.golf={courses:defaultCourses(),events:[],localScores:{}};
   const g=db.golf; g.courses=g.courses&&g.courses.length?g.courses:defaultCourses(); g.events=g.events||[]; g.localScores=g.localScores||{};
   if(g.courses.length===1&&g.courses[0].placeholder&&typeof tenantCourseIds==='function'&&tenantCourseIds().some(id=>libCourse(id))) g.courses=defaultCourses();   // the defaults arrived after the stand-in
+  if(!TENANCY||TENANT==='wccc') for(const c of g.courses){ if(!c.lib&&LEGACY_LIB[c.id]&&libCourse(LEGACY_LIB[c.id])) c.lib=LEGACY_LIB[c.id]; }   // Walnut Creek's 'oak' / 'pecan' documents predate the library
   if((g.ratingsVersion||0)<RATINGS_VERSION){ for(const c of g.courses){ const seed=WCCC_COURSES.find(x=>x.id===c.id); if(!seed) continue;
       c.tees=seed.tees.map(st=>{ const old=c.tees.find(t=>t.name===st.name); return Object.assign({},clone(st),old&&old.yards&&!st.yards?{yards:old.yards}:{}); }); }
     g.ratingsVersion=RATINGS_VERSION; }
@@ -23,6 +24,7 @@ function golfData(){
 /* a course the document knows, else one from the library (an event may name a library course before anyone copied it) */
 const courseById=id=>golfData().courses.find(c=>c.id===id)||(typeof libCourse==='function'&&libCourse(id)?courseFromLib(libCourse(id)):undefined);
 const homeCourseId=()=>(golfData().courses[0]||{}).id||'oak';
+const LEGACY_LIB={oak:'tx-mansfield-walnut-creek-oak',pecan:'tx-mansfield-walnut-creek-pecan'};
 /* the courses a new document starts with: the client's defaults from the library; Walnut Creek's own two without tenancy */
 function defaultCourses(){ const ids=typeof tenantCourseIds==='function'?tenantCourseIds():[]; const fromLib=ids.map(id=>libCourse(id)).filter(Boolean).map(courseFromLib); if(fromLib.length) return fromLib;
   if(!TENANCY||TENANT==='wccc') return clone(WCCC_COURSES);
@@ -44,7 +46,7 @@ function coursePickerInline(anchor,onPick){ let box=anchor.parentElement.querySe
   box.innerHTML=`<div style="display:flex;gap:8px;align-items:center;padding:8px"><input class="inp" placeholder="Search the course library — name, club, city or state" aria-label="Search courses" style="flex:1"><button type="button" class="btn sm" data-cpx>Cancel</button></div><div class="cpl" style="max-height:260px;overflow:auto"></div>`;
   anchor.insertAdjacentElement('afterend',box); box.querySelector('input').oninput=list; box.querySelector('[data-cpx]').onclick=()=>box.remove(); list(); setTimeout(()=>box.querySelector('input').focus(),30); }
 const iAmStaffish=()=>typeof iAmStaff==='function'?iAmStaff():true;
-function searchLibrary(q){ q=String(q||'').trim().toLowerCase(); const have=new Set(golfData().courses.map(c=>c.id)); const rows=libraryCourses().filter(r=>!have.has(r.id));
+function searchLibrary(q){ q=String(q||'').trim().toLowerCase(); const have=new Set(golfData().courses.flatMap(c=>[c.id,c.lib].filter(Boolean))); const rows=libraryCourses().filter(r=>!have.has(r.id));
   const score=r=>{ const s=[r.name,r.club,r.city,r.state].map(x=>String(x||'').toLowerCase()); if(!q) return (r.tenant?0:1)+(r.state==='TX'?0:0.5); const i=s.findIndex(x=>x.includes(q)); return i<0?null:i; };
   return rows.map(r=>({r,k:score(r)})).filter(x=>x.k!=null).sort((a,b)=>a.k-b.k||a.r.name.localeCompare(b.r.name)).map(x=>x.r); }
 /* ---------- the course editor: one drawer for the hub (a club's own course) and the portal (the library) ----------
