@@ -72,7 +72,7 @@ async function ckShareAll(){ if(ckiBusy) return; const ts=db.tournaments.filter(
   try{ for(const t of ts) ch=(await ckShareSync(t))||ch; } finally{ ckiBusy=false; }
   if(ch){ persist(); if(view.page==='tournament'&&view.ttab==='checkin') render(); } }
 setInterval(()=>{ if(document.visibilityState==='visible'&&db&&(db.tournaments||[]).some(t=>t.checkinShare&&t.checkinShare.token)) ckShareAll(); },3500);
-const _ckAfter=window.afterPersist; window.afterPersist=function(){ if(typeof _ckAfter==='function') _ckAfter.apply(this,arguments); if(!ckiBusy&&db.tournaments.some(t=>t.checkinShare&&t.checkinShare.token)) setTimeout(ckShareAll,500); };
+const _ckAfter=window.afterPersist; window.afterPersist=function(){ if(typeof _ckAfter==='function') _ckAfter.apply(this,arguments); if(!ckiBusy&&db&&(db.tournaments||[]).some(t=>t.checkinShare&&t.checkinShare.token)) setTimeout(ckShareAll,500); };
 async function startCheckinLink(t){
   if(!CLOUD||!sessionOK){ toast('The registration link needs the cloud sign-in'); return; }
   const token=newToken(); const doc=ckDocFromField(t);

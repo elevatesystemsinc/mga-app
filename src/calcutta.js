@@ -443,7 +443,7 @@ async function calcShareAll(){
 }
 function calcStampNow(){ for(const t of db.tournaments){ const c=t.calcutta; if(!(c&&c.share&&c.share.token)) continue; const b0=shareBase.get(t); if(b0&&b0.doc) calcStamp(c,b0.doc); } }
 function calcAfterPersist(){ if(calcShareBusy||!CLOUD||!sessionOK) return; if(!db.tournaments.some(t=>t.calcutta&&t.calcutta.share&&t.calcutta.share.token)) return; clearTimeout(calcShareTimer); calcShareTimer=setTimeout(calcShareAll,700); }
-setInterval(()=>{ if(document.visibilityState==='visible'&&!calcShareBusy&&db.tournaments.some(t=>t.calcutta&&t.calcutta.share&&t.calcutta.share.token)) calcShareAll(); },view&&view.ttab==='calcutta'?3000:4000);
+setInterval(()=>{ if(document.visibilityState==='visible'&&!calcShareBusy&&db&&(db.tournaments||[]).some(t=>t.calcutta&&t.calcutta.share&&t.calcutta.share.token)) calcShareAll(); },view&&view.ttab==='calcutta'?3000:4000);
 async function startCashierLink(t){
   const c=calc(t); if(!CLOUD||!sessionOK){ toast('The cashier link needs the cloud sign-in'); return; }
   const token=newToken(); c.people=calcPeople(t); c.name=t.name; c._del=c._del||[];

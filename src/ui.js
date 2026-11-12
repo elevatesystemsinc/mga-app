@@ -408,14 +408,15 @@ function editTournament(t){
     body:field('Name','eName',t.name)+
       `<div class="fld"><span class="lbl">Length</span>${seg('eDays',[[1,'1 day'],[2,'2 days'],[3,'3 days']],t.days)}<p class="hint">Shortening keeps the later days’ items but stops counting them.</p></div>`+
       pair(field('Start date','eStart',t.startDate,{type:'date'}),field('Venue','eVenue',t.venue))+
+      `<div class="fld"><label class="lbl" for="eCourse">Course</label><select class="inp" id="eCourse">${courseOptionsHTML(t.course||homeCourseId())}</select><p class="hint">Where it is played: new rounds and flights start on this course (any flight or group can still differ). <b>Other course…</b> reaches the whole library — a tournament away from home.</p></div>`+
       pair(field('Entry fee per player','eFee',t.entryFee,{type:'number'}),field('Skins / day money per player','eSkins',t.skinsFee,{type:'number'}))+
       field('Budget player count from','eBasis',t.budgetBasis,{type:'select',options:[['planned','Planned count'],['field',`The field (${t.field.length} players now)`]],hint:'Switch to the field once signups close.'})+pair(field('Planned players','ePlayers',t.plannedPlayers,{type:'number'}),field('Players per team','eTeam',t.teamSize,{type:'select',options:[[1,'Individual'],[2,'2-person teams'],[3,'3-person teams'],[4,'4-person teams']]}))+
       pair(field('Status','eStatus',t.status,{type:'select',options:['Planning','Open for signups','Complete']}),field('Sponsorship goal','eGoal',t.goal,{type:'number'}))+
       field('Partner handicap differential cap','eDiff',t.hcpDiff||0,{type:'select',options:[[0,'Off'],[8,'8 strokes'],[10,'10 strokes'],[12,'12 strokes']],hint:'The higher partner’s index is pulled down to the lower index + cap before course handicaps are worked out.'})+
       pair(field('Places paid','ePlaces',t.placesPaid||0,{type:'number',hint:'How many places pay out.'}),field('How it pays','ePayHow',t.payoutNote||'',{ph:'e.g. 1st and 2nd net, per flight'}))+field('Rule sheet','eRules',t.rules||'',{type:'textarea',hint:'One rule per line. The registration page shows these with the format, the handicap rules and the payouts.'})+
       featuresHTML('ef',tFeatures(t))+field('Golf Genius event','eGG',t.ggEvent)+field('Notes','eNotes',t.notes,{type:'textarea'}),
-    wire:r=>wireSeg(r,'eDays'),
-    save:()=>{ Object.assign(t,{name:fv('eName')||t.name,days:+$('eDays').dataset.val||t.days,startDate:fv('eStart'),venue:fv('eVenue'),entryFee:fnum('eFee'),skinsFee:fnum('eSkins'),
+    wire:r=>{ wireSeg(r,'eDays'); wireCourseSelect(r.querySelector('#eCourse')); },
+    save:()=>{ Object.assign(t,{name:fv('eName')||t.name,days:+$('eDays').dataset.val||t.days,startDate:fv('eStart'),venue:fv('eVenue'),course:fv('eCourse')||t.course||'',entryFee:fnum('eFee'),skinsFee:fnum('eSkins'),
       plannedPlayers:fnum('ePlayers'),budgetBasis:fv('eBasis'),teamSize:+fv('eTeam'),status:fv('eStatus'),goal:fnum('eGoal'),ggEvent:fv('eGG'),notes:fv('eNotes'),features:readFeatures('ef'),hcpDiff:+fv('eDiff')||0,placesPaid:fnum('ePlaces'),payoutNote:fv('ePayHow'),rules:fv('eRules')}); toast('Saved'); },
     del:()=>{ if(!confirm(`Delete ${t.name} and everything in it?`)) return false; const i=db.tournaments.indexOf(t), copy=clone(t);
       db.tournaments.splice(i,1); view.page='tournaments'; toast('Tournament deleted',()=>{db.tournaments.splice(i,0,copy);persist();render();}); },delLabel:'Delete tournament'});

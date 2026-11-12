@@ -26,6 +26,7 @@ a `status`, extra `hosts` and the board `login_email` shown on its sign-in card.
 | `golf_scores` | `(event_id, player_id, hole)` | yes (copied from the event) |
 | `calcutta_share` (cashier / check-in links) | `(tenant, tid)`; token unique | yes |
 | `hub_keys` (admin links) | `id`; key hash unique | yes |
+| `courses` (the course library) | `id` (a slug) | `tenant` null = Flagstick's library, set = a club's own course; `tenants.courses` holds a client's defaults |
 | `tenant_users` | `(user_id, tenant)` — which logins open which tenant | — |
 | `flagstick_admins` | `user_id` — Flagstick's own people | — |
 

@@ -222,6 +222,34 @@ Tournament = { id, name, season, days, startDate, field:[{id,memberId,team,paid,
   (`vEvents`, `CLUB.events = [{id, name, dept ('club' | a department), date, end, start, finish, where, descr, public}]`,
   `eventDrawer`): the Boo Bash, movie night at the pool; public ones reach the member portal (`member_me` → `events`, the
   "What's on" card).
+- **The course library** (`courses-setup.sql`, table `courses`; the owner, Nov 2026: "a nav rail item called Courses… our library of
+  courses, the tee boxes… scorecards… each tenant will have a default course or courses… Walnut Creek… pick from either Oak or Pecan,
+  or the library of any other course… Data Center Open… tournaments at different courses"): one row per course, `tenant null` =
+  Flagstick's library (every client reads it, Flagstick writes it in the portal), `tenant` set = a club's own course (its staff add it
+  from Golf → Courses → New course; every organization of that club sees it; the portal can move it into the shared library).
+  `data = {par:{M,W}, hcp:{M,W}, tees:[{name, rating:{M:{cr,slope},W:{…}}, yards|null}]}` is exactly the shape `WCCC_COURSES` carries;
+  `geo` = hole centerlines for GameCast; `verified` = checked against the printed card / the USGA database; `source`. `tenants.courses`
+  = the client's default course ids (`tenant_lookup` returns them; the portal's client record → **Choose courses**). core.js: `LIB`,
+  `loadCourseLibrary()` (with the club document in `startCloud`; the portal loads it too), `libraryCourses()`, `libCourse(id)`,
+  `courseFromLib(row)`, `tenantCourseIds()`. golf.js: **a document keeps a copy of every course it uses** (`golf.courses`, `lib` = the
+  library id, same ids) so events, phones and PDFs never read the table — `defaultCourses()` seeds a new document from the tenant's
+  defaults (Walnut Creek's two without tenancy; a stand-in "Home course" card when a client has no defaults, flagged on the Courses
+  tab), `adoptCourse(row)` copies a library course in, `courseById(id)` falls back to the library, `homeCourseId()` replaces every
+  hardcoded `'oak'`. **Every course `<select>` is `courseOptionsHTML(sel)` + `wireCourseSelect(sel)`**: the document's courses, then
+  **Other course…**, which opens `coursePickerInline` (a search over the library right under the select; a tap adopts the course and
+  selects it) — the game designer, the quick setup, the group editor, the game page's groups card, the flights plan (tournament and
+  event), and **Tournament details → Course** (`t.course`: round events and the flight plan start there — the nonprofit's away
+  tournaments). `courseEditorDrawer(course,{onSave…})` is the one card editor (par / hcp rows with paste-18, tees with ratings and
+  yardages, validation) — the hub saves a club's own course with `saveClubCourse` (a tenant row when staff, else the document), the
+  portal's **Courses** page (`vCourses`, `libraryCourseDrawer`, **Import JSON** → `importCoursesDrawer`) writes the library.
+  `publicEvent` publishes a course's `geo` with its card and GameCast prefers it over the built-in `COURSE_GEO`. **Bulk import**:
+  `tools/courses/import_courses.py` (`GCA_KEY` in the environment — the GolfCourseAPI key is never committed) lists an area's courses
+  from OpenStreetMap, pulls each scorecard (par, handicap, yardage per tee, rating and slope) from GolfCourseAPI and the hole lines from
+  OSM where mapped, and writes rows for the portal's Import JSON; everything imported is **unverified** until someone ticks it. The
+  library started with Walnut Creek's Oak and Pecan (verified, with hole lines), Creighton Farms (verified against the VSGA listing),
+  San Juan Country Club (yardages match the club's site; ratings unverified) and the Bushwood demo's two (owned by that tenant).
+  `tests/test_courses.py` covers defaults → document, the picker, the published card and geometry, the Courses tab, the stand-in, a
+  tournament's course, the portal page, the editor's validation and a client's defaults.
 - **Supabase answers 1000 rows a request.** Every loader that reads a whole table goes through `selectAll(q)` (core.js; a copy
   rides autoupdate.js for the public pages): it pages a built query with `.range()` until a short page comes back. A season
   of `acct_items`, the register's tickets or a 72-player round's `golf_scores` all run past 1000 — without it the hub showed

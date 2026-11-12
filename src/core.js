@@ -308,6 +308,26 @@ const tq=q=>TENANCY&&TENANT?q.eq('tenant',TENANT):q;
 const trow=o=>TENANCY&&TENANT?Object.assign({tenant:TENANT},o):o;
 /* Supabase answers at most 1000 rows a request; a season of accounts, tickets or a big field's scores runs past that.
    selectAll(q) pages a built query with .range() until a short page comes back — the same {data,error} shape. */
+/* ---------- the course library (courses-setup.sql) ----------
+   One table of courses: tenant null = Flagstick's library (every client reads it), tenant set = a club's own course
+   (its staff add it from Golf → Courses; every organization of that club sees it). A document keeps a copy of each
+   course it uses (golf.courses, `lib` = the library id), so events, phones and PDFs never depend on this table. */
+const LIB={courses:null,loading:null};
+async function loadCourseLibrary(force){
+  const inPortal=typeof PORTAL!=='undefined'&&PORTAL&&ACCESS&&ACCESS.admin;   // the portal is signed in without a hub session
+  if(!CLOUD||KEYMODE||!(sessionOK||inPortal)){ LIB.courses=LIB.courses||[]; return LIB.courses; }
+  if(LIB.courses&&!force) return LIB.courses; if(LIB.loading) return LIB.loading;
+  LIB.loading=(async()=>{ try{ const r=await selectAll(sb.from('courses').select('*').eq('status','live')); if(!r.error) LIB.courses=(r.data||[]).filter(c=>!c.tenant||PORTAL||c.tenant===TENANT); else LIB.courses=LIB.courses||[]; }   // RLS already keeps other clubs' own courses out; the filter is belt and braces
+    catch(_){ LIB.courses=LIB.courses||[]; } finally{ LIB.loading=null; } return LIB.courses; })();
+  return LIB.loading;
+}
+const libraryCourses=()=>LIB.courses||[];
+const libCourse=id=>libraryCourses().find(c=>c.id===id)||null;
+const tenantCourseIds=()=>(TENANCY&&TENANT_INFO&&Array.isArray(TENANT_INFO.courses))?TENANT_INFO.courses.filter(Boolean):[];
+/* a library row → the course shape golfcore reads (WCCC_COURSES is the reference) */
+function courseFromLib(row){ const d=row.data||{}; return {id:row.id,lib:row.id,name:row.name,club:row.club||'',city:row.city||'',state:row.state||'',holes:row.holes||18,
+  par:{M:(d.par&&d.par.M)||[],W:(d.par&&d.par.W)||(d.par&&d.par.M)||[]},hcp:{M:(d.hcp&&d.hcp.M)||[],W:(d.hcp&&d.hcp.W)||(d.hcp&&d.hcp.M)||[]},
+  tees:(d.tees||[]).map(t=>Object.assign({name:t.name,rating:t.rating||{},yards:t.yards||null},t.total?{total:t.total}:{})),geo:row.geo||null,verified:!!row.verified}; }
 async function selectAll(q,page){ page=page||1000; const out=[]; for(let i=0;;i+=page){ const r=await q.range(i,i+page-1); if(r.error) return r; const rows=r.data||[]; out.push(...rows); if(rows.length<page) break; } return {data:out,error:null}; }
 /* the tenant row is remembered per host so the first paint already knows the client's kind and modules — without it the rail
    flashed the full club management set before tenant_lookup answered (the owner, Oct 29). The lookup still runs and wins. */
@@ -510,7 +530,7 @@ async function startCloud(){
   try{
     if(KEYMODE&&ORG_ID!==HUBKEY.org){ chooseOrg(HUBKEY.org); return; }       // the link is for one organization only
     if(SCOPED&&ORG_ID==='club'&&SCOPE_ORGS.length){ chooseOrg(SCOPE_ORGS[0]); return; }   // a board login lands on its own hub
-    const club=await loadDoc('club',CLUB_META);
+    const [club]=await Promise.all([loadDoc('club',CLUB_META),loadCourseLibrary()]);
     cloudReady=true; CACHE_RESETS.forEach(f=>{ try{ f(); }catch(_){} });
     if(!club){ setupNeeded=true; CLUB=null; db=null; render(); return; }          // first run: the club hasn't been set up yet
     setupNeeded=false; CLUB=club;

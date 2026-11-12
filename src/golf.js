@@ -6,12 +6,13 @@
    ===================================================================== */
 I.golf=svg('<path d="M12 21V3l7 3.5-7 3.5"/><ellipse cx="12" cy="21" rx="6" ry="1.5"/>');
 NAV.splice(2,0,['golf','Golf',I.golf]);
-view.gtab='events'; view.geid=null; view.getab='groups'; view.gcourse='oak';
+view.gtab='events'; view.geid=null; view.getab='groups'; view.gcourse='';
 
 /* ---------- data ---------- */
 function golfData(){
-  if(!db.golf) db.golf={courses:clone(WCCC_COURSES),events:[],localScores:{}};
-  const g=db.golf; g.courses=g.courses&&g.courses.length?g.courses:clone(WCCC_COURSES); g.events=g.events||[]; g.localScores=g.localScores||{};
+  if(!db.golf) db.golf={courses:defaultCourses(),events:[],localScores:{}};
+  const g=db.golf; g.courses=g.courses&&g.courses.length?g.courses:defaultCourses(); g.events=g.events||[]; g.localScores=g.localScores||{};
+  if(g.courses.length===1&&g.courses[0].placeholder&&typeof tenantCourseIds==='function'&&tenantCourseIds().some(id=>libCourse(id))) g.courses=defaultCourses();   // the defaults arrived after the stand-in
   if((g.ratingsVersion||0)<RATINGS_VERSION){ for(const c of g.courses){ const seed=WCCC_COURSES.find(x=>x.id===c.id); if(!seed) continue;
       c.tees=seed.tees.map(st=>{ const old=c.tees.find(t=>t.name===st.name); return Object.assign({},clone(st),old&&old.yards&&!st.yards?{yards:old.yards}:{}); }); }
     g.ratingsVersion=RATINGS_VERSION; }
@@ -19,7 +20,71 @@ function golfData(){
   for(const e of g.events){ migrateAllow(e); if(!e.scoring) e.scoring='gross'; if(!e.format) e.format='stroke'; e.flights=e.flights||{count:0,names:[]}; e.pool=e.pool||[]; }
   return g;
 }
-const courseById=id=>golfData().courses.find(c=>c.id===id);
+/* a course the document knows, else one from the library (an event may name a library course before anyone copied it) */
+const courseById=id=>golfData().courses.find(c=>c.id===id)||(typeof libCourse==='function'&&libCourse(id)?courseFromLib(libCourse(id)):undefined);
+const homeCourseId=()=>(golfData().courses[0]||{}).id||'oak';
+/* the courses a new document starts with: the client's defaults from the library; Walnut Creek's own two without tenancy */
+function defaultCourses(){ const ids=typeof tenantCourseIds==='function'?tenantCourseIds():[]; const fromLib=ids.map(id=>libCourse(id)).filter(Boolean).map(courseFromLib); if(fromLib.length) return fromLib;
+  if(!TENANCY||TENANT==='wccc') return clone(WCCC_COURSES);
+  return [{id:'home',name:'Home course',club:(CLUB&&CLUB.name)||'',placeholder:true,par:{M:[4,4,3,5,4,4,3,4,5, 4,4,3,5,4,4,3,4,5],W:[4,4,3,5,4,4,3,4,5, 4,4,3,5,4,4,3,4,5]},hcp:{M:[7,3,17,11,1,9,15,5,13, 8,2,16,12,4,10,18,6,14],W:[7,3,17,11,1,9,15,5,13, 8,2,16,12,4,10,18,6,14]},
+    tees:[{name:'White',rating:{M:{cr:70.0,slope:120},W:{cr:75.0,slope:130}},yards:null}]}]; }   // a stand-in until the club picks its course on Golf → Courses
+/* copy a library course into this document (ids stay the library's, so geometry and re-syncs keep working) */
+function adoptCourse(src){ const g=golfData(); let c=g.courses.find(x=>x.id===src.id); if(c) return c; c=clone(src); g.courses=g.courses.filter(x=>!x.placeholder); g.courses.push(c); persist(); return c; }
+/* the one course <select>: the document's courses, then "Other course…" which opens the library picker right under it */
+function courseOptionsHTML(sel){ return golfData().courses.map(c=>`<option value="${esc(c.id)}"${c.id===sel?' selected':''}>${esc(c.name)}${c.club&&c.club!==(CLUB&&CLUB.name)?' · '+esc(c.club):''}</option>`).join('')+(libraryCourses().length||!CLOUD?'<option value="__lib__">Other course…</option>':''); }
+function wireCourseSelect(sel,onPicked){ if(!sel||sel._cw) return; sel._cw=true; let prev=sel.value;
+  sel.addEventListener('change',e=>{ if(sel.value!=='__lib__'){ prev=sel.value; return; } e.stopImmediatePropagation(); sel.value=prev;
+    coursePickerInline(sel,c=>{ sel.innerHTML=courseOptionsHTML(c.id); prev=c.id; if(onPicked) onPicked(c.id); else sel.dispatchEvent(new Event('change',{bubbles:true})); }); },true); }
+/* the inline picker: a search box and the library under the select; a tap copies the course into the document */
+function coursePickerInline(anchor,onPick){ let box=anchor.parentElement.querySelector('.cpick'); if(box) box.remove();
+  box=document.createElement('div'); box.className='cpick mini'; box.style.cssText='position:absolute;left:0;top:100%;margin-top:6px;z-index:40;background:#fff;box-shadow:0 14px 40px rgba(15,42,56,.18);min-width:min(420px,92vw);max-width:560px'; if(getComputedStyle(anchor.parentElement).position==='static') anchor.parentElement.style.position='relative';
+  const list=()=>{ const q=(box.querySelector('input')||{}).value||''; const rows=searchLibrary(q).slice(0,40);
+    box.querySelector('.cpl').innerHTML=rows.length?rows.map(r=>`<button type="button" class="tr click" data-cp="${esc(r.id)}" style="grid-template-columns:minmax(0,1fr) auto;text-align:left;width:100%"><div class="cell2"><b>${esc(r.name)}</b><small>${esc([r.club,[r.city,r.state].filter(Boolean).join(', ')].filter(Boolean).join(' · '))}${r.tenant?' · this club’s':''}</small></div><span class="muted" style="font-size:12px">${(r.data&&r.data.tees||[]).length} tees${r.verified?' · verified':''}</span></button>`).join(''):`<div class="tr"><span class="muted">${q?'Nothing in the library matches.':'The library is empty.'} ${iAmStaffish()?'Add it with <b>New course</b> on Golf → Courses.':''}</span></div>`;
+    box.querySelectorAll('[data-cp]').forEach(b=>b.onclick=()=>{ const row=libCourse(b.dataset.cp); if(!row) return; const c=adoptCourse(courseFromLib(row)); box.remove(); onPick(c); }); };
+  box.innerHTML=`<div style="display:flex;gap:8px;align-items:center;padding:8px"><input class="inp" placeholder="Search the course library — name, club, city or state" aria-label="Search courses" style="flex:1"><button type="button" class="btn sm" data-cpx>Cancel</button></div><div class="cpl" style="max-height:260px;overflow:auto"></div>`;
+  anchor.insertAdjacentElement('afterend',box); box.querySelector('input').oninput=list; box.querySelector('[data-cpx]').onclick=()=>box.remove(); list(); setTimeout(()=>box.querySelector('input').focus(),30); }
+const iAmStaffish=()=>typeof iAmStaff==='function'?iAmStaff():true;
+function searchLibrary(q){ q=String(q||'').trim().toLowerCase(); const have=new Set(golfData().courses.map(c=>c.id)); const rows=libraryCourses().filter(r=>!have.has(r.id));
+  const score=r=>{ const s=[r.name,r.club,r.city,r.state].map(x=>String(x||'').toLowerCase()); if(!q) return (r.tenant?0:1)+(r.state==='TX'?0:0.5); const i=s.findIndex(x=>x.includes(q)); return i<0?null:i; };
+  return rows.map(r=>({r,k:score(r)})).filter(x=>x.k!=null).sort((a,b)=>a.k-b.k||a.r.name.localeCompare(b.r.name)).map(x=>x.r); }
+/* ---------- the course editor: one drawer for the hub (a club's own course) and the portal (the library) ----------
+   course = the document shape; onSave(course) decides where it goes. */
+function courseEditorDrawer(course,opt){ opt=opt||{}; const c=course?clone(course):{id:'',name:'',club:(CLUB&&CLUB.name)||'',city:'',state:'',holes:18,par:{M:Array(18).fill(4),W:[]},hcp:{M:[...Array(18).keys()].map(i=>i+1),W:[]},tees:[{name:'White',rating:{M:{},W:{}},yards:null}]};   // women's rows start blank = the men's
+  c.par=c.par||{M:[],W:[]}; c.hcp=c.hcp||{M:[],W:[]}; c.tees=c.tees||[];
+  const nums=(a,n)=>Array.from({length:n||18},(_,i)=>a&&a[i]!=null?a[i]:'');
+  const rowIn=(k,vals,ph)=>`<div class="tr num" style="grid-template-columns:110px repeat(18,minmax(28px,1fr));gap:3px;min-height:34px"><span style="font-size:12.5px">${k}</span>${vals.map((v,i)=>`<input class="inp r" data-cr="${esc(k)}|${i}" value="${esc(v)}" inputmode="numeric" style="height:30px;padding:0 2px;font-size:12.5px" aria-label="${k} hole ${i+1}" placeholder="${ph||''}">`).join('')}</div>`;
+  const teeRow=(t,i)=>`<div class="card pad" data-tee="${i}" style="display:flex;flex-direction:column;gap:8px;padding:10px 12px"><div style="display:flex;gap:8px;align-items:end;flex-wrap:wrap">${field('Tee','ctN'+i,t.name,{ph:'White'})}${field('Men · rating','ctMC'+i,(t.rating&&t.rating.M&&t.rating.M.cr)||'',{type:'number'})}${field('Men · slope','ctMS'+i,(t.rating&&t.rating.M&&t.rating.M.slope)||'',{type:'number'})}${field('Women · rating','ctWC'+i,(t.rating&&t.rating.W&&t.rating.W.cr)||'',{type:'number'})}${field('Women · slope','ctWS'+i,(t.rating&&t.rating.W&&t.rating.W.slope)||'',{type:'number'})}<button type="button" class="btn sm danger" data-teex="${i}" style="margin-bottom:6px">${I.trash}</button></div>
+      ${field('Yardage, 18 holes','ctY'+i,(t.yards||[]).join(' '),{ph:'525 379 523 … — paste the row from the card, or leave blank',hint:(t.yards&&t.yards.length===18)?G_SUM(t.yards).toLocaleString()+' yards':''})}</div>`;
+  openDrawer({kicker:opt.kicker||'Course',title:course?(course.name||'Course'):'New course',saveLabel:opt.saveLabel||'Save course',wide:'x',
+    body:pair(field('Course name','cName',c.name,{ph:'e.g. Oak Course'}),field('Club or facility','cClub',c.club||'',{ph:'e.g. Walnut Creek Country Club'}))+pair(field('City','cCity',c.city||''),field('State','cState',c.state||'',{ph:'TX'}))+
+      (opt.idField?field('Library id','cId',c.id||'',{ph:'tx-mansfield-walnut-creek-oak',hint:'Letters, numbers and dashes. Fixed once saved.',disabled:!!course}):'')+
+      `<div class="fld"><span class="lbl">The card</span><div class="mini" style="overflow:auto"><div class="t" style="min-width:860px"><div class="tr th num" style="grid-template-columns:110px repeat(18,minmax(28px,1fr));gap:3px;min-height:30px"><span>Hole</span>${[...Array(18).keys()].map(i=>`<span class="r">${i+1}</span>`).join('')}</div>
+        ${rowIn('Par (men)',nums(c.par.M))}${rowIn('Hcp (men)',nums(c.hcp.M))}${rowIn('Par (women)',nums(JSON.stringify(c.par.W)===JSON.stringify(c.par.M)?[]:c.par.W),'')}${rowIn('Hcp (women)',nums(JSON.stringify(c.hcp.W)===JSON.stringify(c.hcp.M)?[]:c.hcp.W),'')}</div></div><p class="hint">Women’s rows may be left blank to follow the men’s. Paste works: copy a row of 18 numbers from a spreadsheet into the first box.</p></div>
+      <div class="fld"><div style="display:flex;justify-content:space-between;align-items:center"><span class="lbl">Tees</span><button type="button" class="btn sm" id="cAddTee">${I.plus}Add tee</button></div><div id="cTees" style="display:flex;flex-direction:column;gap:8px">${c.tees.map(teeRow).join('')}</div></div>
+      ${opt.extra||''}`,
+    wire:r=>{ r.querySelectorAll('[data-cr]').forEach(inp=>inp.addEventListener('paste',e=>{ const txt=(e.clipboardData||window.clipboardData).getData('text'); const parts=txt.trim().split(/[\s,;\t]+/).filter(Boolean); if(parts.length<2) return; e.preventDefault(); const [k,i0]=inp.dataset.cr.split('|'); parts.forEach((v,j)=>{ const el=r.querySelector(`[data-cr="${k}|${+i0+j}"]`); if(el) el.value=v; }); }));
+      const addTee=()=>{ const i=r.querySelectorAll('[data-tee]').length; r.querySelector('#cTees').insertAdjacentHTML('beforeend',teeRow({name:'',rating:{M:{},W:{}},yards:null},i)); wireX(); };
+      const wireX=()=>r.querySelectorAll('[data-teex]').forEach(b=>b.onclick=()=>{ b.closest('[data-tee]').remove(); });
+      r.querySelector('#cAddTee').onclick=addTee; wireX(); },
+    save:()=>{ const read=k=>[...document.querySelectorAll(`[data-cr^="${k}|"]`)].map(i=>i.value.trim()===''?null:+i.value); const pm=read('Par (men)'), hm=read('Hcp (men)'), pw=read('Par (women)'), hw=read('Hcp (women)');
+      const name=fv('cName').trim(); if(!name){ toast('Name the course'); return false; }
+      if(pm.some(v=>!(v>=3&&v<=6))){ toast('Par needs 18 holes of 3–6'); return false; } if(hm.some(v=>!(v>=1&&v<=18))||new Set(hm).size!==18){ toast('Men’s handicap row needs 1–18, each once'); return false; }
+      const W=pw.every(v=>v==null)?pm:pw, HW=hw.every(v=>v==null)?hm:hw; if(W.some(v=>!(v>=3&&v<=6))||HW.some(v=>!(v>=1&&v<=18))){ toast('Women’s rows: par 3–6, handicap 1–18, or blank'); return false; }
+      const tees=[...document.querySelectorAll('[data-tee]')].map(el=>{ const i=el.dataset.tee, num=id=>{ const v=fv(id); return v===''?null:+v; }; const y=fv('ctY'+i).trim().split(/[\s,;]+/).filter(Boolean).map(Number);
+        const t={name:fv('ctN'+i).trim(),rating:{M:{},W:{}},yards:y.length===18&&y.every(v=>v>0)?y:null}; const mc=num('ctMC'+i),ms=num('ctMS'+i),wc=num('ctWC'+i),ws=num('ctWS'+i); if(mc!=null) t.rating.M.cr=mc; if(ms!=null) t.rating.M.slope=ms; if(wc!=null) t.rating.W.cr=wc; if(ws!=null) t.rating.W.slope=ws; return t; }).filter(t=>t.name);
+      if(!tees.length){ toast('Add at least one tee'); return false; } const bad=tees.find(t=>['M','W'].some(s=>(t.rating[s].slope!=null&&(t.rating[s].slope<55||t.rating[s].slope>155))||(t.rating[s].cr!=null&&(t.rating[s].cr<50||t.rating[s].cr>85)))); if(bad){ toast(bad.name+': slope is 55–155, rating 50–85'); return false; }
+      const out=Object.assign({},c,{name,club:fv('cClub').trim(),city:fv('cCity').trim(),state:fv('cState').trim().toUpperCase(),par:{M:pm,W:W},hcp:{M:hm,W:HW},tees,holes:18}); delete out.placeholder;
+      if(opt.idField&&!course){ const id=slugify(fv('cId')||[out.state,out.city,out.club,out.name].filter(Boolean).join(' ')).slice(0,80); if(!id){ toast('Give it an id'); return false; } out.id=id; }
+      if(!out.id) out.id=slugify([out.club,out.name].filter(Boolean).join(' '))||uid();
+      return opt.onSave?opt.onSave(out):undefined; },
+    del:opt.onDelete});
+}
+/* the hub saves a club's own course to the courses table (the whole club sees it) when it can, else into this document */
+async function saveClubCourse(out,existing){ const row={id:out.id,tenant:TENANT,name:out.name,club:out.club||'',city:out.city||'',state:out.state||'',holes:18,data:{par:out.par,hcp:out.hcp,tees:out.tees},source:'club',verified:false,status:'live',updated_at:new Date().toISOString(),updated_by:(ACCESS&&ACCESS.email)||''};
+  if(CLOUD&&sessionOK&&!KEYMODE&&TENANCY&&typeof iAmStaff==='function'&&iAmStaff()){ const r=await sb.from('courses').upsert(row); if(r.error){ toast('Kept in this hub only — '+r.error.message); } else { LIB.courses=(LIB.courses||[]).filter(x=>x.id!==row.id).concat([row]); } }
+  const g=golfData(); const i=g.courses.findIndex(x=>x.id===out.id); const doc=Object.assign({},out,{lib:TENANCY?out.id:undefined}); if(i>=0) Object.assign(g.courses[i],doc); else { g.courses=g.courses.filter(x=>!x.placeholder); g.courses.push(doc); }
+  golfData().events.forEach(e=>{ if(e.groups.some(gr=>gr.course===out.id)) publishEvent(e); }); view.gcourse=out.id; }
+
 /* formats + allowances per event (USGA defaults; an older single allowance carries over to its format) */
 function migrateAllow(e){ if(!e.allow){ e.allow={}; if(e.allowance!=null&&e.allowance!==100&&(e.format==='stroke'||e.format==='bestball')) e.allow[e.format]=+e.allowance; }
   for(const k of Object.keys(e.allow)){ const d=USGA_ALLOW[k]; if(d!=null&&JSON.stringify(d)===JSON.stringify(e.allow[k])) delete e.allow[k]; }   // older events saved every default
@@ -64,11 +129,11 @@ function playerHcp(ev,grp,p){ const c=courseById(grp.course); const e=effIndex(e
   return {idx,raw:e.raw,capped:e.capped,cap:e.cap,ch,ph:phFromCH(ev,ch),missing:idx==null?'index':ch==null?'rating':''}; }
 /* every player in the event: in a group, or on the roster waiting for one */
 function evPlayers(ev){ return ev.groups.flatMap(grp=>grp.players.map(p=>({p,grp}))).concat((ev.pool||[]).map(p=>({p,grp:null}))); }
-function courseFor(ev,p,grp){ if(grp) return grp.course; const F=ev.flights||{}; return (F.courseOf&&F.courseOf[p.flight])||(F.courses&&F.courses!=='split'?F.courses:'')||ev.defaultCourse||'oak'; }
+function courseFor(ev,p,grp){ if(grp) return grp.course; const F=ev.flights||{}; return (F.courseOf&&F.courseOf[p.flight])||(F.courses&&F.courses!=='split'?F.courses:'')||ev.defaultCourse||homeCourseId(); }
 const hcpOf=(ev,p,grp)=>playerHcp(ev,{course:courseFor(ev,p,grp)},p);
 function publicEvent(ev){
   const courses={}; const tt=db.tournaments.find(x=>x.id===ev.tournamentId); const ftm=new Map(tt?tt.field.map(p=>[p.memberId,'T'+(p.team||0)]):[]);
-  for(const g of ev.groups){ if(!courses[g.course]){ const c=courseById(g.course); if(c) courses[g.course]={name:c.name,par:c.par,hcp:c.hcp,tees:Object.fromEntries(c.tees.map(t=>[t.name,t.yards||null]))}; } }
+  for(const g of ev.groups){ if(!courses[g.course]){ const c=courseById(g.course); if(c) courses[g.course]=Object.assign({name:c.name,par:c.par,hcp:c.hcp,tees:Object.fromEntries(c.tees.map(t=>[t.name,t.yards||null]))},c.geo?{geo:c.geo}:{}); } }
   return {slug:ev.slug,name:ev.name,date:ev.date,status:ev.status,club:(CLUB&&CLUB.name)||CLUB_META.name,org:ORG_ID,courses,
     groups:ev.groups.map(g=>({id:g.id,label:g.label||'',course:g.course,startHole:+g.startHole||1,teeTime:g.teeTime||'',players:g.players.map(p=>{ const h=playerHcp(ev,g,p); return {id:p.id,name:p.name,tee:p.tee||ev.defaultTee||'White',set:p.set||'M',ch:h.ch,ph:h.ph,flight:p.flight||'',team:evTeam(ev)?(p.team||ftm.get(p.memberId)||''):''}; })})),
     format:ev.format||'stroke',front:ev.front,back:ev.back,teamSize:ev.teamSize||(isTeamEvent(ev)||ev.format==='match'&&ev.teamSize>=2?2:1),count:ev.count||1,countPattern:ev.countPattern||'',quotaBase:ev.quotaBase||36,cap:ev.cap||'',matchScoring:ev.matchScoring||'holes',matchForm:ev.matchForm||'',matchBy:ev.matchBy||'holes',all918:!!ev.all918,noPar3:!!ev.noPar3,points:ev.points||{},game:ev.game||'',allow:Object.assign({},ev.allow||{}),scoring:ev.scoring||'gross',flights:(ev.flights&&ev.flights.names)||[],
@@ -153,11 +218,16 @@ const shortDate=s=>{ const d=parseD(s); return d?MONTHS[d.getMonth()]+' '+d.getD
 
 /* Courses: scorecards */
 function gCourses(el){
-  const g=golfData(), c=courseById(view.gcourse)||g.courses[0];
+  const g=golfData(), c=g.courses.find(x=>x.id===view.gcourse)||g.courses[0];
+  if(!c){ el.innerHTML='<div class="empty"><b>No courses yet</b><span>Add one from the library or set up your own.</span></div>'; return; }
   const nine=(arr,a,b)=>arr.slice(a,b);
   const rowH=(label,vals,cls='',tot=true)=>`<tr class="${cls}"><th scope="row">${label}</th>${nine(vals,0,9).map(v=>`<td>${v}</td>`).join('')}<td class="st">${tot?G_SUM(nine(vals,0,9)):''}</td>${nine(vals,9,18).map(v=>`<td>${v}</td>`).join('')}<td class="st">${tot?G_SUM(nine(vals,9,18)):''}</td><td class="st">${tot?G_SUM(vals):''}</td></tr>`;
-  el.innerHTML=`<div class="seg">${g.courses.map(x=>`<button class="${x.id===c.id?'on':''}" data-gc="${x.id}">${esc(x.name)}</button>`).join('')}</div>
-  <div class="card" style="overflow:hidden"><div class="cardhead"><div><h2 class="h2">${esc(c.name)}</h2><span class="muted">Men’s par ${G_SUM(c.par.M)} · women’s par ${G_SUM(c.par.W)} · ${c.tees.map(t=>t.name+' '+(t.yards?G_SUM(t.yards):G_SUM(t.total||[])).toLocaleString()).join(' · ')}</span></div></div>
+  const used=g.events.filter(e=>e.groups.some(gr=>gr.course===c.id)).length, own=!!(c.lib&&libCourse(c.lib)&&libCourse(c.lib).tenant), fromLib=!!(c.lib&&libCourse(c.lib)&&!libCourse(c.lib).tenant);
+  el.innerHTML=`<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;justify-content:space-between"><div class="seg">${g.courses.map(x=>`<button class="${x.id===c.id?'on':''}" data-gc="${x.id}">${esc(x.name)}</button>`).join('')}</div>
+    <div class="actions"><button class="btn" id="gcAdd">${I.plus}Add from the library</button><button class="btn pri" id="gcNew">${I.plus}New course</button></div></div>
+  ${c.placeholder?`<div class="banner">This is a stand-in card until the club picks its course: <b>Add from the library</b>, or <b>New course</b> to type the card in.</div>`:''}
+  <div class="card" style="overflow:hidden"><div class="cardhead"><div><h2 class="h2">${esc(c.name)}</h2><span class="muted">${c.club&&c.club!==(CLUB&&CLUB.name)?esc(c.club)+' · ':''}Men’s par ${G_SUM(c.par.M)} · women’s par ${G_SUM(c.par.W)} · ${c.tees.map(t=>t.name+' '+(t.yards?G_SUM(t.yards):G_SUM(t.total||[])).toLocaleString()).join(' · ')}${fromLib?' · from the Flagstick library':own?' · this club’s own':''}</span></div>
+    <div class="actions">${(!fromLib||!CLOUD)?`<button class="btn sm" id="gcEdit">${I.edit}Edit the card</button>`:''}<button class="btn sm${used?'':' danger'}" id="gcRemove" ${used?'disabled title="Used by '+used+' scoring event'+(used>1?'s':'')+'"':''}>${I.trash}Remove from this hub</button></div></div>
    <div class="tw"><table class="scard num"><thead><tr><th scope="col">Hole</th>${[1,2,3,4,5,6,7,8,9].map(h=>`<th scope="col">${h}</th>`).join('')}<th scope="col" class="st">Out</th>${[10,11,12,13,14,15,16,17,18].map(h=>`<th scope="col">${h}</th>`).join('')}<th scope="col" class="st">In</th><th scope="col" class="st">Tot</th></tr></thead><tbody>
    ${c.tees.map(t=>t.yards?rowH(t.name,t.yards,'tee tee-'+t.name.toLowerCase().replace('/','-')):`<tr class="tee"><th scope="row">${esc(t.name)}</th>${'<td class="muted">·</td>'.repeat(9)}<td class="st">${t.total?t.total[0]:''}</td>${'<td class="muted">·</td>'.repeat(9)}<td class="st">${t.total?t.total[1]:''}</td><td class="st">${t.total?G_SUM(t.total):''}</td></tr>`).join('')}
    ${rowH('Par',c.par.M,'par')}${rowH('Men’s hcp',c.hcp.M,'hcp',false)}${rowH('Women’s par',c.par.W,'par2')}${rowH('Women’s hcp',c.hcp.W,'hcp',false)}
@@ -173,6 +243,10 @@ function gCourses(el){
     if(bad){ toast(bad+' value'+(bad>1?'s look':' looks')+' off — slope is 55–155, rating 50–85'); return; }
     persist(); golfData().events.forEach(e=>{ if(e.groups.some(gr=>gr.course===c.id)) publishEvent(e); }); toast('Ratings saved'); render(); };
   el.querySelectorAll('[data-gc]').forEach(b=>b.onclick=()=>{ view.gcourse=b.dataset.gc; render(); });
+  $('gcAdd').onclick=()=>{ const seg=el.querySelector('.seg'); coursePickerInline(seg,cc=>{ view.gcourse=cc.id; render(); toast(cc.name+' added — every event here can pick it now'); }); };
+  $('gcNew').onclick=()=>courseEditorDrawer(null,{kicker:'Golf · Courses',onSave:out=>saveClubCourse(out).then(()=>{ toast('Course saved'); })});
+  const ed=$('gcEdit'); if(ed) ed.onclick=()=>courseEditorDrawer(c,{kicker:'Golf · Courses',onSave:out=>saveClubCourse(out,c).then(()=>{ toast('Course saved'); })});
+  $('gcRemove').onclick=()=>{ if(used) return; if(g.courses.length<=1){ toast('Keep at least one course — add another first'); return; } g.courses=g.courses.filter(x=>x!==c); view.gcourse=g.courses[0].id; persist(); render(); toast(c.name+' removed from this hub'); };
 }
 
 /* Event editor */
@@ -253,8 +327,8 @@ function editGroup(ev,grp){
   const fieldIds=new Set(t?t.field.map(p=>p.memberId):[]);
   const pool=members().sort((a,b)=>(fieldIds.has(b.id)-fieldIds.has(a.id))||memberName(a).localeCompare(memberName(b)));
   const opts=`<option value="">— Add a member —</option>`+(t?`<optgroup label="${esc(t.name)} field">${pool.filter(m=>fieldIds.has(m.id)).map(m=>`<option value="${m.id}">${esc(memberName(m))}${inOther.has(m.id)?' (in another group)':''}</option>`).join('')}</optgroup><optgroup label="All members">`:'')+pool.filter(m=>!t||!fieldIds.has(m.id)).map(m=>`<option value="${m.id}">${esc(memberName(m))}${inOther.has(m.id)?' (in another group)':''}</option>`).join('')+(t?'</optgroup>':'');
-  const tees=c=>(courseById(c)||g.courses[0]).tees.map(x=>x.name);
-  const chTxt=p=>{ const c=courseById(($('ggC')&&$('ggC').value)||grp?.course||'oak'); const idx=parseIndex(p.index!=null&&String(p.index).trim()!==''?p.index:(memberById(p.memberId)||{}).hcp); const ch=c?courseHcp(idx,c,p.tee||ev.defaultTee,p.set||'M'):null; return ch==null?(idx==null?'no index':'no rating'):'CH '+ch; };
+  const tees=c=>(courseById(c)||g.courses[0]).tees.map(x=>x.name); setTimeout(()=>wireCourseSelect($('ggC')),0);
+  const chTxt=p=>{ const c=courseById(($('ggC')&&$('ggC').value)||grp?.course||homeCourseId())||g.courses[0]; const idx=parseIndex(p.index!=null&&String(p.index).trim()!==''?p.index:(memberById(p.memberId)||{}).hcp); const ch=c?courseHcp(idx,c,p.tee||ev.defaultTee,p.set||'M'):null; return ch==null?(idx==null?'no index':'no rating'):'CH '+ch; };
   const rows=()=>players.map((p,i)=>`<div class="mr" style="grid-template-columns:minmax(0,1fr) 64px 84px 66px 64px 28px"><input class="inp" data-pi="${i}" data-k="name" value="${esc(p.name)}" aria-label="Player name"><input class="inp r" data-pi="${i}" data-k="index" value="${esc(p.index!=null&&p.index!==''?p.index:((memberById(p.memberId)||{}).hcp||''))}" placeholder="12.4 / +1.2" aria-label="${esc(p.name)} handicap index" autocomplete="off" autocapitalize="off"><span class="muted" style="font-size:12px" data-ch="${i}">${chTxt(p)}</span><select class="inp" data-pi="${i}" data-k="tee" aria-label="Tee">${tees(fv('ggC')||grp?.course||'oak').map(x=>`<option${x===(p.tee||ev.defaultTee)?' selected':''}>${x}</option>`).join('')}</select><select class="inp" data-pi="${i}" data-k="set" aria-label="Par set"><option value="M"${p.set!=='W'?' selected':''}>Men</option><option value="W"${p.set==='W'?' selected':''}>Women</option></select><button class="ib" type="button" data-pdel="${i}" aria-label="Remove ${esc(p.name)}">${I.x}</button></div>`).join('')||'<div class="mr"><span class="muted">No players yet.</span></div>';
   const rowsHead='<div class="mr h" style="grid-template-columns:minmax(0,1fr) 64px 84px 66px 64px 28px"><span>Player</span><span class="r">Index</span><span>Course hcp</span><span>Tee</span><span>Par</span><span></span></div>';
   const BB=evTeam(ev), fieldTeam=new Map(t?t.field.map(p=>[p.memberId,'T'+(p.team||0)]):[]);
@@ -265,7 +339,7 @@ function editGroup(ev,grp){
     return `<div class="fld"><span class="lbl">${ev.format==='match'?'Sides (first two teams play each other)':`Teams of ${tsz} · ${esc(evSummary(ev))}`}</span><div class="mini">${players.map((p,i)=>`<div class="mr" style="grid-template-columns:minmax(0,1fr) 200px"><span class="trunc">${esc(p.name||'(new player)')}</span><select class="inp" data-team="${i}" aria-label="${esc(p.name)} team">${ks.map(k=>`<option value="${esc(k)}"${k===p.team?' selected':''}>${esc(teamLabel(k,ks))}</option>`).join('')}</select></div>`).join('')||'<div class="mr"><span class="muted">Add players first.</span></div>'}</div></div>`; };
   openDrawer({kicker:ev.name+' · Group',title:grp?'Group '+grp.code:'Add group',wide:true,
     body:pair(field('Group ID','ggCode',grp?.code||newCode(ev),{hint:'What players type on the scoring page. Make it anything unique — a tee time, a cart number, or leave the random one.'}),field('Label (optional)','ggL',grp?.label||'',{ph:'e.g. 8:10 · Oak 1'}))+
-      pair(field('Course','ggC',grp?.course||'oak',{type:'select',options:g.courses.map(c=>[c.id,c.name])}),field('Starting hole','ggS',grp?.startHole||1,{type:'select',options:Array.from({length:18},(_,i)=>[i+1,'Hole '+(i+1)])}))+
+      pair(`<div class="fld"><label class="lbl" for="ggC">Course</label><select class="inp" id="ggC">${courseOptionsHTML(grp?.course||homeCourseId())}</select></div>`,field('Starting hole','ggS',grp?.startHole||1,{type:'select',options:Array.from({length:18},(_,i)=>[i+1,'Hole '+(i+1)])}))+
       field('Tee time (optional)','ggTT',grp?.teeTime||'',{type:'time',hint:'Leave blank for a shotgun start.'})+
       `<div class="fld"><span class="lbl">Players</span><div class="mini">${rowsHead}<div id="ggRows">${rows()}</div></div><p class="hint">Index comes from the member’s profile (Golf Genius import). Type over it for a guest or a one-off change.</p></div><div id="ggTeams">${teamsHTML()}
        <div style="display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px"><select class="inp" id="ggPick" aria-label="Add a member">${opts}</select><button class="btn" type="button" id="ggGuest">+ Guest</button></div></div>
@@ -364,7 +438,7 @@ function planFlights(ev,count,basis,unit,per,courseOf){
 }
 /* each flight: which course, and shotgun or tee times (first time + gap, off hole 1 or 10) */
 function flightPlan(ev){ const F=ev.flights||{}; F.plan=F.plan||{};
-  (F.names||[]).forEach(n=>{ const p=F.plan[n]=F.plan[n]||{}; if(!p.course) p.course=(F.courseOf&&F.courseOf[n])||'oak'; if(!p.start) p.start='shotgun'; if(!p.first) p.first='08:30'; if(p.gap==null) p.gap=8; if(!p.hole) p.hole=1; });
+  (F.names||[]).forEach(n=>{ const p=F.plan[n]=F.plan[n]||{}; if(!p.course) p.course=(F.courseOf&&F.courseOf[n])||ev.defaultCourse||homeCourseId(); if(!p.start) p.start='shotgun'; if(!p.first) p.first='08:30'; if(p.gap==null) p.gap=8; if(!p.hole) p.hole=1; });
   F.courseOf=Object.fromEntries((F.names||[]).map(n=>[n,F.plan[n].course])); return F.plan; }
 const fmtTime=t=>{ const [h,m]=String(t||'').split(':').map(Number); if(!isFinite(h)) return t||''; const ap=h>=12?'PM':'AM'; return ((h%12)||12)+':'+String(m||0).padStart(2,'0')+' '+ap; };
 const addMin=(t,min)=>{ const [h,m]=String(t).split(':').map(Number); const x=(h*60+(m||0)+min)%1440; return String(Math.floor(x/60)).padStart(2,'0')+':'+String(x%60).padStart(2,'0'); };
@@ -498,7 +572,7 @@ function gFlights(el,ev){
       <div class="fld" style="width:230px"><label class="lbl" for="flB">Fill by</label><select class="inp" id="flB"><option value="course"${F.basis!=='index'?' selected':''}>Course handicap (rating & slope)</option><option value="index"${F.basis==='index'?' selected':''}>Handicap Index</option></select></div>
       ${teams?`<div class="fld" style="width:220px"><label class="lbl" for="flU">Flight</label><select class="inp" id="flU"><option value="team"${F.unit!=='player'?' selected':''}>Teams (combined handicap)</option><option value="player"${F.unit==='player'?' selected':''}>Individual players</option></select></div>`:''}
       <div class="fld" style="width:120px"><label class="lbl" for="flG">Players per group</label><select class="inp" id="flG">${[4,3,2,5].map(n=>`<option value="${n}"${(F.groupSize||4)===n?' selected':''}>${n}</option>`).join('')}</select></div>
-      <div class="fld" style="width:230px"><label class="lbl" for="flC">Courses</label><select class="inp" id="flC">${[['split','Split flights between Oak and Pecan'],['oak','All on Oak'],['pecan','All on Pecan']].map(([v,l])=>`<option value="${v}"${(F.courses||'split')===v?' selected':''}>${l}</option>`).join('')}</select></div>
+      <div class="fld" style="width:260px"><label class="lbl" for="flC">Courses</label><select class="inp" id="flC">${(g.courses.length>1?[['split',`Split flights between ${courseShort(g.courses[0].id)} and ${courseShort(g.courses[1].id)}`]]:[]).concat(g.courses.map(c=>[c.id,'All on '+courseShort(c.id)])).map(([v,l])=>`<option value="${v}"${(F.courses||(g.courses.length>1?'split':g.courses[0].id))===v?' selected':''}>${esc(l)}</option>`).join('')}</select></div>
       <button class="btn pri" id="flGo">${F.count?'Re-flight':'Set flights'}</button>${F.count?`<button class="btn" id="flClear">Remove flights</button>`:''}
     </div>
     <p class="hint" style="margin:0">Lowest handicaps go to Flight A. Flights are sized in whole groups${teams?' — an even number of teams, two per foursome':''} — so groups never mix flights; group counts differ by at most one. Each flight is placed on one course, and everyone is rated on the course they’ll play. Course handicap = Index × Slope ÷ 113 + (Course Rating − Par), with the event’s handicap allowances for net.</p>
@@ -547,6 +621,7 @@ function gFlights(el,ev){
         golfSave(ev); toast(`${plan.flights.length} flights set`); }}); };
   const clr=$('flClear'); if(clr) clr.onclick=()=>{ if(!confirm('Remove all flights?')) return; evPlayers(ev).forEach(({p})=>{ p.flight=''; }); ev.flights={count:0,names:[]}; golfSave(ev); render(); };
   const nx=$('flNext'); if(nx) nx.onclick=()=>{ view.getab='groups'; render(); buildGroupsFromFlights(ev); };
+  el.querySelectorAll('[data-fp$="|course"]').forEach(wireCourseSelect);
   el.querySelectorAll('[data-fp]').forEach(inp=>inp.onchange=()=>{ const [n,k]=inp.dataset.fp.split('|'); const P=flightPlan(ev);
     let v=inp.value; if(k==='gap'){ v=Math.max(1,Math.min(30,parseInt(v,10)||8)); } if(k==='hole') v=+v; P[n][k]=v; flightPlan(ev); golfSave(ev); render(); });
   el.querySelectorAll('[data-mv]').forEach(s=>s.onchange=()=>{ const x=all.find(y=>y.p.id===s.dataset.mv); const mates=F.unit==='team'&&x.p.team?all.filter(y=>y.p.team===x.p.team):[x];
@@ -578,7 +653,7 @@ function buildGroupsFromFlights(ev){
   const loose=units.filter(u=>!plan.flights.some(f=>f.units.includes(u)));
   const P=flightPlan(ev);
   const preview=start=>{ const gs=buildFlightGroups(ev,plan,per,F.courseOf||F.courses||'split',start,P);
-    for(let i=0;i<loose.length;i+=per){ const us=loose.slice(i,i+per); gs.push({id:uid(),code:newCode({groups:gs}),course:ev.defaultCourse||'oak',startHole:1,label:'Not flighted',players:us.flatMap(u=>u.members.map(m=>({...m.p})))}); }
+    for(let i=0;i<loose.length;i+=per){ const us=loose.slice(i,i+per); gs.push({id:uid(),code:newCode({groups:gs}),course:ev.defaultCourse||homeCourseId(),startHole:1,label:'Not flighted',players:us.flatMap(u=>u.members.map(m=>({...m.p})))}); }
     return gs; };
   const summary=gs=>F.names.map(n=>{ const fg=gs.filter(x=>x.flight===n); const tee=P[n]&&P[n].start==='tee'; return `<div class="mr num" style="grid-template-columns:70px minmax(0,1fr)"><b>Flight ${n}</b><div class="cell2"><span>${fg.length} groups · ${courseById(fg[0]?.course)?.name||''} · ${tee?'tee times off hole '+P[n].hole:'shotgun'}</span><small>${tee?fg.map(x=>fmtTime(x.teeTime)).join(', '):'Holes '+fg.map(x=>x.startHole+(/ B /.test(x.label)?'B':'')).join(', ')}</small></div></div>`; }).join('');
   const odd=gs=>gs.filter(x=>x.players.length!==(F.groupSize||4));

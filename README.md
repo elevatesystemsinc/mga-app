@@ -439,7 +439,12 @@ online.
 One-time: Supabase → SQL Editor → run `golf-setup.sql`. Upload `score.html` alongside
 `index.html` on the `hub` branch.
 
-- **Golf → Courses:** Oak and Pecan scorecards (par, men's/women's handicap, every tee).
+- **Golf → Courses:** the club's course cards (par, men's/women's handicap, every tee with its rating and slope). They come
+  from the **Flagstick course library** — the portal's Courses page holds every card, tee and rating; a client's default
+  courses are set there and a new hub starts with them. **Add from the library** brings in any other course (a tournament away
+  from home, a group playing somewhere else), **New course** types a card in and shares it with every hub of the club. Every
+  course pick in the app (a game, a group, a flight, Tournament details → Course) ends with **Other course…**, which searches the
+  library in place.
 - **Golf → New scoring event:** name, date, default tee, a **custom link**, and optionally the
   tournament it belongs to. Add groups by hand, or **Build groups from the field** (keeps
   teams together; all Oak, all Pecan, or split; shotgun or off hole 1).

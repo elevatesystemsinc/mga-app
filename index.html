@@ -795,6 +795,26 @@ const tq=q=>TENANCY&&TENANT?q.eq('tenant',TENANT):q;
 const trow=o=>TENANCY&&TENANT?Object.assign({tenant:TENANT},o):o;
 /* Supabase answers at most 1000 rows a request; a season of accounts, tickets or a big field's scores runs past that.
    selectAll(q) pages a built query with .range() until a short page comes back — the same {data,error} shape. */
+/* ---------- the course library (courses-setup.sql) ----------
+   One table of courses: tenant null = Flagstick's library (every client reads it), tenant set = a club's own course
+   (its staff add it from Golf → Courses; every organization of that club sees it). A document keeps a copy of each
+   course it uses (golf.courses, `lib` = the library id), so events, phones and PDFs never depend on this table. */
+const LIB={courses:null,loading:null};
+async function loadCourseLibrary(force){
+  const inPortal=typeof PORTAL!=='undefined'&&PORTAL&&ACCESS&&ACCESS.admin;   // the portal is signed in without a hub session
+  if(!CLOUD||KEYMODE||!(sessionOK||inPortal)){ LIB.courses=LIB.courses||[]; return LIB.courses; }
+  if(LIB.courses&&!force) return LIB.courses; if(LIB.loading) return LIB.loading;
+  LIB.loading=(async()=>{ try{ const r=await selectAll(sb.from('courses').select('*').eq('status','live')); if(!r.error) LIB.courses=(r.data||[]).filter(c=>!c.tenant||PORTAL||c.tenant===TENANT); else LIB.courses=LIB.courses||[]; }   // RLS already keeps other clubs' own courses out; the filter is belt and braces
+    catch(_){ LIB.courses=LIB.courses||[]; } finally{ LIB.loading=null; } return LIB.courses; })();
+  return LIB.loading;
+}
+const libraryCourses=()=>LIB.courses||[];
+const libCourse=id=>libraryCourses().find(c=>c.id===id)||null;
+const tenantCourseIds=()=>(TENANCY&&TENANT_INFO&&Array.isArray(TENANT_INFO.courses))?TENANT_INFO.courses.filter(Boolean):[];
+/* a library row → the course shape golfcore reads (WCCC_COURSES is the reference) */
+function courseFromLib(row){ const d=row.data||{}; return {id:row.id,lib:row.id,name:row.name,club:row.club||'',city:row.city||'',state:row.state||'',holes:row.holes||18,
+  par:{M:(d.par&&d.par.M)||[],W:(d.par&&d.par.W)||(d.par&&d.par.M)||[]},hcp:{M:(d.hcp&&d.hcp.M)||[],W:(d.hcp&&d.hcp.W)||(d.hcp&&d.hcp.M)||[]},
+  tees:(d.tees||[]).map(t=>Object.assign({name:t.name,rating:t.rating||{},yards:t.yards||null},t.total?{total:t.total}:{})),geo:row.geo||null,verified:!!row.verified}; }
 async function selectAll(q,page){ page=page||1000; const out=[]; for(let i=0;;i+=page){ const r=await q.range(i,i+page-1); if(r.error) return r; const rows=r.data||[]; out.push(...rows); if(rows.length<page) break; } return {data:out,error:null}; }
 /* the tenant row is remembered per host so the first paint already knows the client's kind and modules — without it the rail
    flashed the full club management set before tenant_lookup answered (the owner, Oct 29). The lookup still runs and wins. */
@@ -997,7 +1017,7 @@ async function startCloud(){
   try{
     if(KEYMODE&&ORG_ID!==HUBKEY.org){ chooseOrg(HUBKEY.org); return; }       // the link is for one organization only
     if(SCOPED&&ORG_ID==='club'&&SCOPE_ORGS.length){ chooseOrg(SCOPE_ORGS[0]); return; }   // a board login lands on its own hub
-    const club=await loadDoc('club',CLUB_META);
+    const [club]=await Promise.all([loadDoc('club',CLUB_META),loadCourseLibrary()]);
     cloudReady=true; CACHE_RESETS.forEach(f=>{ try{ f(); }catch(_){} });
     if(!club){ setupNeeded=true; CLUB=null; db=null; render(); return; }          // first run: the club hasn't been set up yet
     setupNeeded=false; CLUB=club;
@@ -1435,14 +1455,15 @@ function editTournament(t){
     body:field('Name','eName',t.name)+
       `<div class="fld"><span class="lbl">Length</span>${seg('eDays',[[1,'1 day'],[2,'2 days'],[3,'3 days']],t.days)}<p class="hint">Shortening keeps the later days’ items but stops counting them.</p></div>`+
       pair(field('Start date','eStart',t.startDate,{type:'date'}),field('Venue','eVenue',t.venue))+
+      `<div class="fld"><label class="lbl" for="eCourse">Course</label><select class="inp" id="eCourse">${courseOptionsHTML(t.course||homeCourseId())}</select><p class="hint">Where it is played: new rounds and flights start on this course (any flight or group can still differ). <b>Other course…</b> reaches the whole library — a tournament away from home.</p></div>`+
       pair(field('Entry fee per player','eFee',t.entryFee,{type:'number'}),field('Skins / day money per player','eSkins',t.skinsFee,{type:'number'}))+
       field('Budget player count from','eBasis',t.budgetBasis,{type:'select',options:[['planned','Planned count'],['field',`The field (${t.field.length} players now)`]],hint:'Switch to the field once signups close.'})+pair(field('Planned players','ePlayers',t.plannedPlayers,{type:'number'}),field('Players per team','eTeam',t.teamSize,{type:'select',options:[[1,'Individual'],[2,'2-person teams'],[3,'3-person teams'],[4,'4-person teams']]}))+
       pair(field('Status','eStatus',t.status,{type:'select',options:['Planning','Open for signups','Complete']}),field('Sponsorship goal','eGoal',t.goal,{type:'number'}))+
       field('Partner handicap differential cap','eDiff',t.hcpDiff||0,{type:'select',options:[[0,'Off'],[8,'8 strokes'],[10,'10 strokes'],[12,'12 strokes']],hint:'The higher partner’s index is pulled down to the lower index + cap before course handicaps are worked out.'})+
       pair(field('Places paid','ePlaces',t.placesPaid||0,{type:'number',hint:'How many places pay out.'}),field('How it pays','ePayHow',t.payoutNote||'',{ph:'e.g. 1st and 2nd net, per flight'}))+field('Rule sheet','eRules',t.rules||'',{type:'textarea',hint:'One rule per line. The registration page shows these with the format, the handicap rules and the payouts.'})+
       featuresHTML('ef',tFeatures(t))+field('Golf Genius event','eGG',t.ggEvent)+field('Notes','eNotes',t.notes,{type:'textarea'}),
-    wire:r=>wireSeg(r,'eDays'),
-    save:()=>{ Object.assign(t,{name:fv('eName')||t.name,days:+$('eDays').dataset.val||t.days,startDate:fv('eStart'),venue:fv('eVenue'),entryFee:fnum('eFee'),skinsFee:fnum('eSkins'),
+    wire:r=>{ wireSeg(r,'eDays'); wireCourseSelect(r.querySelector('#eCourse')); },
+    save:()=>{ Object.assign(t,{name:fv('eName')||t.name,days:+$('eDays').dataset.val||t.days,startDate:fv('eStart'),venue:fv('eVenue'),course:fv('eCourse')||t.course||'',entryFee:fnum('eFee'),skinsFee:fnum('eSkins'),
       plannedPlayers:fnum('ePlayers'),budgetBasis:fv('eBasis'),teamSize:+fv('eTeam'),status:fv('eStatus'),goal:fnum('eGoal'),ggEvent:fv('eGG'),notes:fv('eNotes'),features:readFeatures('ef'),hcpDiff:+fv('eDiff')||0,placesPaid:fnum('ePlaces'),payoutNote:fv('ePayHow'),rules:fv('eRules')}); toast('Saved'); },
     del:()=>{ if(!confirm(`Delete ${t.name} and everything in it?`)) return false; const i=db.tournaments.indexOf(t), copy=clone(t);
       db.tournaments.splice(i,1); view.page='tournaments'; toast('Tournament deleted',()=>{db.tournaments.splice(i,0,copy);persist();render();}); },delLabel:'Delete tournament'});
@@ -2357,14 +2378,14 @@ function portalBoot(){
   $('btnSignOut').hidden=false; $('who').textContent='Signed in as '+((ACCESS&&ACCESS.email)||'Flagstick admin'); $('who').hidden=false; portalNav(); vPortal($('main')); loadPortal();
 }
 function portalNav(){
-  const items=[['clients','Clients',I.org],['team','Team',I.shield],['activity','Activity',I.ledger]];
+  const items=[['clients','Clients',I.org],['courses','Courses',I.flag],['team','Team',I.shield],['activity','Activity',I.ledger]];
   $('nav').innerHTML=items.map(([k,l,ic])=>`<button class="nav${PS.view===k||(k==='clients'&&PS.view==='client')?' on':''}" data-pv="${k}">${ic}<span>${l}</span></button>`).join('');
   $('nav').querySelectorAll('[data-pv]').forEach(b=>b.onclick=()=>{ PS.view=b.dataset.pv; PS.slug=null; $('side').classList.remove('open'); portalNav(); vPortal($('main')); window.scrollTo(0,0); });
 }
 async function loadPortal(){
   PS.err=null;
   const q=async t=>{ const {data,error}=await sb.from(t).select('*'); if(error){ PS.err=(PS.err?PS.err+' · ':'')+t+': '+error.message; return []; } return data||[]; };
-  const [tenants,users,contacts,admins,events]=await Promise.all([q('tenants'),q('tenant_users'),q('tenant_contacts'),q('flagstick_admins'),q('tenant_events')]);
+  const [tenants,users,contacts,admins,events]=await Promise.all([q('tenants'),q('tenant_users'),q('tenant_contacts'),q('flagstick_admins'),q('tenant_events'),loadCourseLibrary(true)]);
   PS.tenants=tenants.sort((a,b)=>a.name.localeCompare(b.name)); PS.users=users; PS.contacts=contacts; PS.admins=admins; PS.events=events.sort((a,b)=>new Date(b.at)-new Date(a.at));
   const ids=[...new Set([...users.map(u=>u.user_id),...admins.map(a=>a.user_id)])].filter(Boolean);
   if(ids.length){ try{ const {data}=await sb.rpc('admin_users_info',{p_ids:ids}); PS.auth={}; (data||[]).forEach(x=>PS.auth[x.id]=x); }catch(_){} }
@@ -2389,6 +2410,7 @@ function vPortal(m){
   if(!m) return;
   if(PS.view==='client'&&PS.slug) return vClient(m,PS.slug);
   if(PS.view==='team') return vTeam(m);
+  if(PS.view==='courses') return vCourses(m);
   if(PS.view==='activity') return vActivity(m);
   return vClients(m);
 }
@@ -2445,6 +2467,8 @@ function vClient(m,slug){
         <div class="actions" style="margin-top:10px"><button class="btn" id="ptModSave">Save modules</button><span class="hint" style="margin-left:8px">The club’s hub picks changes up on its next load.</span></div></div></div>`)}
       ${card('Club details',`<div style="padding:0 22px 18px">${kv('Address',addr.length?addr.map(esc).join('<br>'):'')}${kv('Phone',esc(t.phone||''))}${kv('Website',t.website?`<a href="${esc(/^https?:/.test(t.website)?t.website:'https://'+t.website)}" target="_blank" rel="noopener">${esc(t.website)}</a>`:'')}${kv('Time zone',esc(t.timezone||''))}${kv('Short name',esc(t.short||''))}${kv('Other hosts',(t.hosts||[]).map(esc).join('<br>'))}${kv('Organizations',orgs.length?orgs.map(o=>esc(o.short||o.name)).join(', '):'')}${kv('Notes',esc(t.notes||'').replace(/\n/g,'<br>'))}</div>`,btn('Edit','ptEdit2','',I.edit))}
     </div>
+    ${card('Courses <span class="muted" style="font-size:13px;font-weight:400">· the club’s defaults</span>',`<div class="t">${(t.courses||[]).length?(t.courses||[]).map(id=>{ const c=libCourse(id); return `<div class="tr" style="grid-template-columns:minmax(0,1.4fr) minmax(0,1fr) 120px;min-height:42px"><div class="cell2"><b>${esc(c?c.name:id)}</b><small>${esc(c?[c.club,[c.city,c.state].filter(Boolean).join(', ')].filter(Boolean).join(' · '):'not in the library')}</small></div><span class="muted" style="font-size:13px">${c?((c.data&&c.data.tees)||[]).length+' tees':''}</span><span>${c&&c.verified?'<span class="chip gold">Verified</span>':''}</span></div>`; }).join(''):'<div class="tr"><span class="muted">No default courses yet — a new club document starts with Walnut Creek’s cards until these are set. Pick the club’s own course(s) from the library.</span></div>'}</div>
+      <div style="padding:12px 22px 18px"><p class="hint" style="margin:0">These show first everywhere the club picks a course; any event can still reach the whole library. Add the club’s courses to the library on the Courses page first.</p></div>`,btn('Choose courses','ptCourses','',I.edit))}
     ${card('Points of contact',`<div class="t">${contacts.length?contacts.map(crow).join(''):'<div class="tr"><span class="muted">No contacts yet — add the head pro, the GM, the billing contact.</span></div>'}</div>`,btn('Add contact','ptAddC','',I.plus))}
     ${card('Staff logins',`<div class="t"><div class="tr th" style="grid-template-columns:minmax(0,1.6fr) minmax(0,1.2fr) 130px 32px"><span>Login</span><span>Last activity</span><span></span><span></span></div>${staff.length?staff.map(urow).join(''):'<div class="tr"><span class="muted">No staff logins yet.</span></div>'}</div>
       <div style="padding:12px 22px 18px"><p class="hint" style="margin:0">Staff see the whole club and manage their own board logins from the club hub (Logins). Flagstick creates staff logins; the club does the rest.</p>${fnNote()}</div>`,
@@ -2453,6 +2477,7 @@ function vClient(m,slug){
     ${card('Activity',`<div class="t">${events.length?events.map(erow).join(''):'<div class="tr"><span class="muted">Nothing yet.</span></div>'}</div>`)}`;
   $('ptBack').onclick=e=>{ e.preventDefault(); PS.view='clients'; PS.slug=null; portalNav(); vPortal(m); };
   $('ptOpen').onclick=()=>openHub(t); $('ptStatus').onclick=()=>statusDrawer(t); $('ptEdit').onclick=()=>editClient(t); $('ptEdit2').onclick=()=>editClient(t);
+  $('ptCourses').onclick=()=>clientCoursesDrawer(t);
   $('ptAddC').onclick=()=>editContact(t,null); $('ptAddU').onclick=()=>staffDrawer(t,null); $('ptLink').onclick=()=>linkDrawer(t);
   wireModRows(m,'data-mod');
   $('ptModSave').onclick=async()=>{ const nm={golf:true}; m.querySelectorAll('[data-mod]').forEach(c=>{ if(c.checked) nm[c.dataset.mod]=true; }); if(nm.club) (MODULE_CATALOG.find(x=>x.id==='club').includes||[]).forEach(k=>nm[k]=true); const b=$('ptModSave'); b.disabled=true;
@@ -2568,6 +2593,59 @@ function linkDrawer(t){
         try{ await linkUser(data.id,{tenant:t.slug,role:'staff',email:data.email}); logEvent(t.slug,'login','Linked existing login '+data.email+' as staff'); await loadPortal(); toast('Linked'); }catch(e){ toast(e.message); } })(); }});
 }
 /* ---------- Team ---------- */
+/* ---------- the course library ----------
+   Flagstick's courses (tenant null) and every client's own (tenant set), one table. A row's data is the card golfcore
+   reads; the hub copies a row into a document when a club picks it. */
+PS.cq=''; PS.cstate='';
+function vCourses(m){
+  const all=libraryCourses().slice().sort((a,b)=>(a.state||'').localeCompare(b.state||'')||(a.club||a.name).localeCompare(b.club||b.name)||a.name.localeCompare(b.name));
+  const q=PS.cq.trim().toLowerCase(), rows=all.filter(c=>(!PS.cstate||c.state===PS.cstate)&&(!q||[c.name,c.club,c.city,c.state,c.id].some(x=>String(x||'').toLowerCase().includes(q))));
+  const states=[...new Set(all.map(c=>c.state).filter(Boolean))].sort();
+  const tname=slug=>{ const t=tenantOf(slug); return t?t.short||t.name:slug; };
+  const row=c=>{ const d=c.data||{}, tees=(d.tees||[]), par=d.par&&d.par.M?d.par.M.reduce((a,b)=>a+(+b||0),0):''; return `<div class="tr click" data-crow="${esc(c.id)}" style="grid-template-columns:minmax(0,1.6fr) minmax(0,1.2fr) 90px 120px 130px 32px">
+      <div class="cell2"><b>${esc(c.name)}</b><small>${esc([c.club,[c.city,c.state].filter(Boolean).join(', ')].filter(Boolean).join(' · '))}</small></div>
+      <span class="muted" style="font-size:13px">${tees.length?tees.map(t=>esc(t.name)).join(' · '):'<span class="neg">no tees</span>'}</span><span class="muted num" style="font-size:13px">${par?'par '+par:''}</span>
+      <span>${c.tenant?`<span class="chip">${esc(tname(c.tenant))}</span>`:'<span class="chip gold">Library</span>'}</span><span>${c.verified?'<span class="chip gold">Verified</span>':'<span class="chip warn">Unverified</span>'}${c.geo?' <span class="chip" title="Hole lines for GameCast">Map</span>':''}</span><span class="ib">${I.edit}</span></div>`; };
+  m.innerHTML=head('Courses',`The course library: the cards, tees and ratings every client can pick from. ${all.length} course${all.length===1?'':'s'}${all.filter(c=>c.tenant).length?' · '+all.filter(c=>c.tenant).length+' added by clubs':''}.`,btn('Import JSON','pcImport','')+btn('New course','pcNew','pri',I.plus))+
+    `<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:12px"><input class="inp" id="pcQ" placeholder="Search — name, club, city, state" value="${esc(PS.cq)}" style="max-width:360px" aria-label="Search courses"><div class="seg" id="pcSt"><button class="${PS.cstate?'':'on'}" data-st="">All</button>${states.map(s=>`<button class="${PS.cstate===s?'on':''}" data-st="${esc(s)}">${esc(s)}</button>`).join('')}</div></div>
+    <div class="card" style="overflow:hidden"><div class="t"><div class="tr th" style="grid-template-columns:minmax(0,1.6fr) minmax(0,1.2fr) 90px 120px 130px 32px"><span>Course</span><span>Tees</span><span></span><span>Owner</span><span>Status</span><span></span></div>${rows.length?rows.map(row).join(''):`<div class="tr"><span class="muted">${all.length?'Nothing matches.':'The library is empty — New course, or Import JSON from tools/courses.'}</span></div>`}</div></div>
+    <p class="hint">A club’s own course (added from its hub) shows here too. <b>Verified</b> means someone checked the card against the printed scorecard or the USGA rating database; imports start unverified.</p>`;
+  const qi=$('pcQ'); qi.oninput=()=>{ PS.cq=qi.value; const pos=qi.selectionStart; vCourses(m); const q2=$('pcQ'); q2.focus(); q2.setSelectionRange(pos,pos); };
+  m.querySelectorAll('[data-st]').forEach(b=>b.onclick=()=>{ PS.cstate=b.dataset.st; vCourses(m); });
+  m.querySelectorAll('[data-crow]').forEach(r=>r.onclick=()=>libraryCourseDrawer(libCourse(r.dataset.crow)));
+  $('pcNew').onclick=()=>libraryCourseDrawer(null);
+  $('pcImport').onclick=()=>importCoursesDrawer();
+}
+/* the editor over a library row (courseEditorDrawer is shared with the hub) */
+function libraryCourseDrawer(row){
+  const c=row?courseFromLib(row):null;
+  const extra=`<div class="fld"><span class="lbl">Library</span><label class="chk"><input type="checkbox" id="cVer"${row&&row.verified?' checked':''}> Verified against the printed card or the USGA rating database</label>${field('Source','cSrc',(row&&row.source)||'scorecard',{ph:'scorecard · golfcourseapi · osm · club'})}${field('Notes','cNotes',(row&&row.notes)||'',{type:'textarea'})}${row&&row.tenant?`<p class="hint">Added by ${esc((tenantOf(row.tenant)||{}).name||row.tenant)} from its hub. Clear the owner to move it into the shared library.</p><label class="chk"><input type="checkbox" id="cShare"> Move into the Flagstick library (every client sees it)</label>`:''}</div>`;
+  courseEditorDrawer(c,{kicker:'Course library',idField:true,saveLabel:row?'Save':'Add to the library',extra,
+    onSave:async out=>{ const rec={id:out.id,tenant:row?(($('cShare')&&$('cShare').checked)?null:row.tenant):null,name:out.name,club:out.club||'',city:out.city||'',state:out.state||'',holes:18,data:{par:out.par,hcp:out.hcp,tees:out.tees},geo:row?row.geo||null:null,source:fv('cSrc')||'scorecard',verified:!!($('cVer')&&$('cVer').checked),status:'live',notes:fv('cNotes')||null,updated_at:new Date().toISOString(),updated_by:(ACCESS&&ACCESS.email)||''};
+      const r=await sb.from('courses').upsert(rec); if(r.error){ toast(r.error.message); return false; } await loadCourseLibrary(true); logEvent(null,'courses',(row?'Updated ':'Added ')+rec.name+(rec.club?' · '+rec.club:'')+' in the course library'); toast('Saved'); vCourses($('main')); },
+    onDelete:row?async()=>{ if(!confirm('Remove '+row.name+' from the library? Clubs that already copied it keep their copy.')) return false; const r=await sb.from('courses').delete().eq('id',row.id); if(r.error){ toast(r.error.message); return false; } await loadCourseLibrary(true); logEvent(null,'courses','Removed '+row.name+' from the course library'); vCourses($('main')); }:undefined});
+}
+/* paste the importer's JSON (tools/courses) — an array of library rows */
+function importCoursesDrawer(){
+  openDrawer({kicker:'Course library',title:'Import courses',saveLabel:'Import',wide:true,
+    body:`<p style="margin:0 0 8px">Paste the JSON that <code>tools/courses/import_courses.py</code> wrote — an array of rows with <code>id, name, club, city, state, data, geo, source</code>. Existing ids are updated; everything comes in <b>unverified</b> unless the row says otherwise.</p><textarea class="inp" id="pcJ" style="min-height:260px;font-family:ui-monospace,monospace;font-size:12px" placeholder='[{"id":"tx-mansfield-walnut-creek-oak", …}]'></textarea><p class="hint" id="pcJH"></p>`,
+    wire:r=>{ r.querySelector('#pcJ').oninput=()=>{ try{ const a=JSON.parse(r.querySelector('#pcJ').value); r.querySelector('#pcJH').textContent=Array.isArray(a)?a.length+' course'+(a.length===1?'':'s')+' ready':'Expected an array'; }catch(_){ r.querySelector('#pcJH').textContent=''; } }; },
+    save:async()=>{ let rows; try{ rows=JSON.parse(fv('pcJ')); }catch(e){ toast('That is not valid JSON'); return false; } if(!Array.isArray(rows)||!rows.length){ toast('Expected an array of courses'); return false; }
+      const bad=rows.find(r=>!r.id||!r.name||!r.data||!r.data.par||!r.data.hcp); if(bad){ toast('Every row needs id, name and data.par / data.hcp — '+(bad.id||bad.name||'?')); return false; }
+      const recs=rows.map(r=>({id:String(r.id).slice(0,80),tenant:r.tenant||null,name:r.name,club:r.club||'',city:r.city||'',state:r.state||'',country:r.country||'US',holes:r.holes||18,data:{par:r.data.par,hcp:r.data.hcp,tees:r.data.tees||[]},geo:r.geo||null,source:r.source||'import',verified:!!r.verified,status:'live',notes:r.notes||null,updated_at:new Date().toISOString(),updated_by:(ACCESS&&ACCESS.email)||''}));
+      for(let i=0;i<recs.length;i+=100){ const x=await sb.from('courses').upsert(recs.slice(i,i+100)); if(x.error){ toast(x.error.message); return false; } }
+      await loadCourseLibrary(true); logEvent(null,'courses','Imported '+recs.length+' courses into the library'); toast(recs.length+' courses imported'); vCourses($('main')); }});
+}
+/* a client's default courses: ticked from the library */
+function clientCoursesDrawer(t){
+  const cur=new Set(t.courses||[]); let q='';
+  const list=()=>{ const rows=libraryCourses().filter(c=>!c.tenant||c.tenant===t.slug).filter(c=>!q||[c.name,c.club,c.city,c.state].some(x=>String(x||'').toLowerCase().includes(q))).sort((a,b)=>(cur.has(b.id)-cur.has(a.id))||(a.club||a.name).localeCompare(b.club||b.name));
+    return rows.length?rows.slice(0,80).map(c=>`<label class="tr" style="grid-template-columns:28px minmax(0,1fr) 110px;min-height:40px;cursor:pointer"><input type="checkbox" data-cc="${esc(c.id)}"${cur.has(c.id)?' checked':''}><div class="cell2"><b>${esc(c.name)}</b><small>${esc([c.club,[c.city,c.state].filter(Boolean).join(', ')].filter(Boolean).join(' · '))}</small></div><span class="muted" style="font-size:12.5px">${c.tenant?'the club’s own':c.verified?'verified':''}</span></label>`).join(''):'<div class="tr"><span class="muted">Nothing matches.</span></div>'; };
+  openDrawer({kicker:t.name,title:'Default courses',saveLabel:'Save',
+    body:`<input class="inp" id="pccQ" placeholder="Search the library" aria-label="Search"><div class="mini" style="margin-top:8px;max-height:60vh;overflow:auto"><div class="t" id="pccL">${list()}</div></div><p class="hint">Ticked courses come first in every course pick on the club’s hubs, and a new club document starts with them (a hub that already has courses keeps those and can add these from Golf → Courses).</p>`,
+    wire:r=>{ const wireL=()=>r.querySelectorAll('[data-cc]').forEach(cb=>cb.onchange=()=>{ if(cb.checked) cur.add(cb.dataset.cc); else cur.delete(cb.dataset.cc); }); wireL(); r.querySelector('#pccQ').oninput=e=>{ q=e.target.value.trim().toLowerCase(); r.querySelector('#pccL').innerHTML=list(); wireL(); }; },
+    save:async()=>{ const ids=[...cur]; const {error}=await sb.from('tenants').update({courses:ids,updated_at:new Date().toISOString()}).eq('slug',t.slug); if(error){ toast(error.message); return false; } t.courses=ids; logEvent(t.slug,'edit','Default courses: '+(ids.map(id=>(libCourse(id)||{name:id}).name).join(', ')||'none')); toast('Saved'); vClient($('main'),t.slug); }});
+}
 function vTeam(m){
   const row=a=>{ const x=PS.auth[a.user_id]||{}; return `<div class="tr" style="grid-template-columns:minmax(0,1.6fr) minmax(0,1fr) 150px 40px"><div class="cell2"><b>${esc(x.name||a.email||'')}</b><small>${esc(a.email||x.email||'')}</small></div><span class="muted" style="font-size:13px">${x.last_sign_in_at?'Signed in '+fwhen(x.last_sign_in_at):'Never signed in'}</span><span class="muted" style="font-size:13px">Added ${fdate(a.created_at)}</span><button class="ib" data-rm="${esc(a.user_id)}" title="Remove from the team">${I.trash}</button></div>`; };
   m.innerHTML=head('Team','Flagstick’s own administrators: everyone here can open the portal and any client’s hub.',btn('Add administrator','ptAddA','pri',I.plus))+
@@ -3832,12 +3910,13 @@ function wrapMoney(pub,recorded){
    ===================================================================== */
 I.golf=svg('<path d="M12 21V3l7 3.5-7 3.5"/><ellipse cx="12" cy="21" rx="6" ry="1.5"/>');
 NAV.splice(2,0,['golf','Golf',I.golf]);
-view.gtab='events'; view.geid=null; view.getab='groups'; view.gcourse='oak';
+view.gtab='events'; view.geid=null; view.getab='groups'; view.gcourse='';
 
 /* ---------- data ---------- */
 function golfData(){
-  if(!db.golf) db.golf={courses:clone(WCCC_COURSES),events:[],localScores:{}};
-  const g=db.golf; g.courses=g.courses&&g.courses.length?g.courses:clone(WCCC_COURSES); g.events=g.events||[]; g.localScores=g.localScores||{};
+  if(!db.golf) db.golf={courses:defaultCourses(),events:[],localScores:{}};
+  const g=db.golf; g.courses=g.courses&&g.courses.length?g.courses:defaultCourses(); g.events=g.events||[]; g.localScores=g.localScores||{};
+  if(g.courses.length===1&&g.courses[0].placeholder&&typeof tenantCourseIds==='function'&&tenantCourseIds().some(id=>libCourse(id))) g.courses=defaultCourses();   // the defaults arrived after the stand-in
   if((g.ratingsVersion||0)<RATINGS_VERSION){ for(const c of g.courses){ const seed=WCCC_COURSES.find(x=>x.id===c.id); if(!seed) continue;
       c.tees=seed.tees.map(st=>{ const old=c.tees.find(t=>t.name===st.name); return Object.assign({},clone(st),old&&old.yards&&!st.yards?{yards:old.yards}:{}); }); }
     g.ratingsVersion=RATINGS_VERSION; }
@@ -3845,7 +3924,71 @@ function golfData(){
   for(const e of g.events){ migrateAllow(e); if(!e.scoring) e.scoring='gross'; if(!e.format) e.format='stroke'; e.flights=e.flights||{count:0,names:[]}; e.pool=e.pool||[]; }
   return g;
 }
-const courseById=id=>golfData().courses.find(c=>c.id===id);
+/* a course the document knows, else one from the library (an event may name a library course before anyone copied it) */
+const courseById=id=>golfData().courses.find(c=>c.id===id)||(typeof libCourse==='function'&&libCourse(id)?courseFromLib(libCourse(id)):undefined);
+const homeCourseId=()=>(golfData().courses[0]||{}).id||'oak';
+/* the courses a new document starts with: the client's defaults from the library; Walnut Creek's own two without tenancy */
+function defaultCourses(){ const ids=typeof tenantCourseIds==='function'?tenantCourseIds():[]; const fromLib=ids.map(id=>libCourse(id)).filter(Boolean).map(courseFromLib); if(fromLib.length) return fromLib;
+  if(!TENANCY||TENANT==='wccc') return clone(WCCC_COURSES);
+  return [{id:'home',name:'Home course',club:(CLUB&&CLUB.name)||'',placeholder:true,par:{M:[4,4,3,5,4,4,3,4,5, 4,4,3,5,4,4,3,4,5],W:[4,4,3,5,4,4,3,4,5, 4,4,3,5,4,4,3,4,5]},hcp:{M:[7,3,17,11,1,9,15,5,13, 8,2,16,12,4,10,18,6,14],W:[7,3,17,11,1,9,15,5,13, 8,2,16,12,4,10,18,6,14]},
+    tees:[{name:'White',rating:{M:{cr:70.0,slope:120},W:{cr:75.0,slope:130}},yards:null}]}]; }   // a stand-in until the club picks its course on Golf → Courses
+/* copy a library course into this document (ids stay the library's, so geometry and re-syncs keep working) */
+function adoptCourse(src){ const g=golfData(); let c=g.courses.find(x=>x.id===src.id); if(c) return c; c=clone(src); g.courses=g.courses.filter(x=>!x.placeholder); g.courses.push(c); persist(); return c; }
+/* the one course <select>: the document's courses, then "Other course…" which opens the library picker right under it */
+function courseOptionsHTML(sel){ return golfData().courses.map(c=>`<option value="${esc(c.id)}"${c.id===sel?' selected':''}>${esc(c.name)}${c.club&&c.club!==(CLUB&&CLUB.name)?' · '+esc(c.club):''}</option>`).join('')+(libraryCourses().length||!CLOUD?'<option value="__lib__">Other course…</option>':''); }
+function wireCourseSelect(sel,onPicked){ if(!sel||sel._cw) return; sel._cw=true; let prev=sel.value;
+  sel.addEventListener('change',e=>{ if(sel.value!=='__lib__'){ prev=sel.value; return; } e.stopImmediatePropagation(); sel.value=prev;
+    coursePickerInline(sel,c=>{ sel.innerHTML=courseOptionsHTML(c.id); prev=c.id; if(onPicked) onPicked(c.id); else sel.dispatchEvent(new Event('change',{bubbles:true})); }); },true); }
+/* the inline picker: a search box and the library under the select; a tap copies the course into the document */
+function coursePickerInline(anchor,onPick){ let box=anchor.parentElement.querySelector('.cpick'); if(box) box.remove();
+  box=document.createElement('div'); box.className='cpick mini'; box.style.cssText='position:absolute;left:0;top:100%;margin-top:6px;z-index:40;background:#fff;box-shadow:0 14px 40px rgba(15,42,56,.18);min-width:min(420px,92vw);max-width:560px'; if(getComputedStyle(anchor.parentElement).position==='static') anchor.parentElement.style.position='relative';
+  const list=()=>{ const q=(box.querySelector('input')||{}).value||''; const rows=searchLibrary(q).slice(0,40);
+    box.querySelector('.cpl').innerHTML=rows.length?rows.map(r=>`<button type="button" class="tr click" data-cp="${esc(r.id)}" style="grid-template-columns:minmax(0,1fr) auto;text-align:left;width:100%"><div class="cell2"><b>${esc(r.name)}</b><small>${esc([r.club,[r.city,r.state].filter(Boolean).join(', ')].filter(Boolean).join(' · '))}${r.tenant?' · this club’s':''}</small></div><span class="muted" style="font-size:12px">${(r.data&&r.data.tees||[]).length} tees${r.verified?' · verified':''}</span></button>`).join(''):`<div class="tr"><span class="muted">${q?'Nothing in the library matches.':'The library is empty.'} ${iAmStaffish()?'Add it with <b>New course</b> on Golf → Courses.':''}</span></div>`;
+    box.querySelectorAll('[data-cp]').forEach(b=>b.onclick=()=>{ const row=libCourse(b.dataset.cp); if(!row) return; const c=adoptCourse(courseFromLib(row)); box.remove(); onPick(c); }); };
+  box.innerHTML=`<div style="display:flex;gap:8px;align-items:center;padding:8px"><input class="inp" placeholder="Search the course library — name, club, city or state" aria-label="Search courses" style="flex:1"><button type="button" class="btn sm" data-cpx>Cancel</button></div><div class="cpl" style="max-height:260px;overflow:auto"></div>`;
+  anchor.insertAdjacentElement('afterend',box); box.querySelector('input').oninput=list; box.querySelector('[data-cpx]').onclick=()=>box.remove(); list(); setTimeout(()=>box.querySelector('input').focus(),30); }
+const iAmStaffish=()=>typeof iAmStaff==='function'?iAmStaff():true;
+function searchLibrary(q){ q=String(q||'').trim().toLowerCase(); const have=new Set(golfData().courses.map(c=>c.id)); const rows=libraryCourses().filter(r=>!have.has(r.id));
+  const score=r=>{ const s=[r.name,r.club,r.city,r.state].map(x=>String(x||'').toLowerCase()); if(!q) return (r.tenant?0:1)+(r.state==='TX'?0:0.5); const i=s.findIndex(x=>x.includes(q)); return i<0?null:i; };
+  return rows.map(r=>({r,k:score(r)})).filter(x=>x.k!=null).sort((a,b)=>a.k-b.k||a.r.name.localeCompare(b.r.name)).map(x=>x.r); }
+/* ---------- the course editor: one drawer for the hub (a club's own course) and the portal (the library) ----------
+   course = the document shape; onSave(course) decides where it goes. */
+function courseEditorDrawer(course,opt){ opt=opt||{}; const c=course?clone(course):{id:'',name:'',club:(CLUB&&CLUB.name)||'',city:'',state:'',holes:18,par:{M:Array(18).fill(4),W:[]},hcp:{M:[...Array(18).keys()].map(i=>i+1),W:[]},tees:[{name:'White',rating:{M:{},W:{}},yards:null}]};   // women's rows start blank = the men's
+  c.par=c.par||{M:[],W:[]}; c.hcp=c.hcp||{M:[],W:[]}; c.tees=c.tees||[];
+  const nums=(a,n)=>Array.from({length:n||18},(_,i)=>a&&a[i]!=null?a[i]:'');
+  const rowIn=(k,vals,ph)=>`<div class="tr num" style="grid-template-columns:110px repeat(18,minmax(28px,1fr));gap:3px;min-height:34px"><span style="font-size:12.5px">${k}</span>${vals.map((v,i)=>`<input class="inp r" data-cr="${esc(k)}|${i}" value="${esc(v)}" inputmode="numeric" style="height:30px;padding:0 2px;font-size:12.5px" aria-label="${k} hole ${i+1}" placeholder="${ph||''}">`).join('')}</div>`;
+  const teeRow=(t,i)=>`<div class="card pad" data-tee="${i}" style="display:flex;flex-direction:column;gap:8px;padding:10px 12px"><div style="display:flex;gap:8px;align-items:end;flex-wrap:wrap">${field('Tee','ctN'+i,t.name,{ph:'White'})}${field('Men · rating','ctMC'+i,(t.rating&&t.rating.M&&t.rating.M.cr)||'',{type:'number'})}${field('Men · slope','ctMS'+i,(t.rating&&t.rating.M&&t.rating.M.slope)||'',{type:'number'})}${field('Women · rating','ctWC'+i,(t.rating&&t.rating.W&&t.rating.W.cr)||'',{type:'number'})}${field('Women · slope','ctWS'+i,(t.rating&&t.rating.W&&t.rating.W.slope)||'',{type:'number'})}<button type="button" class="btn sm danger" data-teex="${i}" style="margin-bottom:6px">${I.trash}</button></div>
+      ${field('Yardage, 18 holes','ctY'+i,(t.yards||[]).join(' '),{ph:'525 379 523 … — paste the row from the card, or leave blank',hint:(t.yards&&t.yards.length===18)?G_SUM(t.yards).toLocaleString()+' yards':''})}</div>`;
+  openDrawer({kicker:opt.kicker||'Course',title:course?(course.name||'Course'):'New course',saveLabel:opt.saveLabel||'Save course',wide:'x',
+    body:pair(field('Course name','cName',c.name,{ph:'e.g. Oak Course'}),field('Club or facility','cClub',c.club||'',{ph:'e.g. Walnut Creek Country Club'}))+pair(field('City','cCity',c.city||''),field('State','cState',c.state||'',{ph:'TX'}))+
+      (opt.idField?field('Library id','cId',c.id||'',{ph:'tx-mansfield-walnut-creek-oak',hint:'Letters, numbers and dashes. Fixed once saved.',disabled:!!course}):'')+
+      `<div class="fld"><span class="lbl">The card</span><div class="mini" style="overflow:auto"><div class="t" style="min-width:860px"><div class="tr th num" style="grid-template-columns:110px repeat(18,minmax(28px,1fr));gap:3px;min-height:30px"><span>Hole</span>${[...Array(18).keys()].map(i=>`<span class="r">${i+1}</span>`).join('')}</div>
+        ${rowIn('Par (men)',nums(c.par.M))}${rowIn('Hcp (men)',nums(c.hcp.M))}${rowIn('Par (women)',nums(JSON.stringify(c.par.W)===JSON.stringify(c.par.M)?[]:c.par.W),'')}${rowIn('Hcp (women)',nums(JSON.stringify(c.hcp.W)===JSON.stringify(c.hcp.M)?[]:c.hcp.W),'')}</div></div><p class="hint">Women’s rows may be left blank to follow the men’s. Paste works: copy a row of 18 numbers from a spreadsheet into the first box.</p></div>
+      <div class="fld"><div style="display:flex;justify-content:space-between;align-items:center"><span class="lbl">Tees</span><button type="button" class="btn sm" id="cAddTee">${I.plus}Add tee</button></div><div id="cTees" style="display:flex;flex-direction:column;gap:8px">${c.tees.map(teeRow).join('')}</div></div>
+      ${opt.extra||''}`,
+    wire:r=>{ r.querySelectorAll('[data-cr]').forEach(inp=>inp.addEventListener('paste',e=>{ const txt=(e.clipboardData||window.clipboardData).getData('text'); const parts=txt.trim().split(/[\s,;\t]+/).filter(Boolean); if(parts.length<2) return; e.preventDefault(); const [k,i0]=inp.dataset.cr.split('|'); parts.forEach((v,j)=>{ const el=r.querySelector(`[data-cr="${k}|${+i0+j}"]`); if(el) el.value=v; }); }));
+      const addTee=()=>{ const i=r.querySelectorAll('[data-tee]').length; r.querySelector('#cTees').insertAdjacentHTML('beforeend',teeRow({name:'',rating:{M:{},W:{}},yards:null},i)); wireX(); };
+      const wireX=()=>r.querySelectorAll('[data-teex]').forEach(b=>b.onclick=()=>{ b.closest('[data-tee]').remove(); });
+      r.querySelector('#cAddTee').onclick=addTee; wireX(); },
+    save:()=>{ const read=k=>[...document.querySelectorAll(`[data-cr^="${k}|"]`)].map(i=>i.value.trim()===''?null:+i.value); const pm=read('Par (men)'), hm=read('Hcp (men)'), pw=read('Par (women)'), hw=read('Hcp (women)');
+      const name=fv('cName').trim(); if(!name){ toast('Name the course'); return false; }
+      if(pm.some(v=>!(v>=3&&v<=6))){ toast('Par needs 18 holes of 3–6'); return false; } if(hm.some(v=>!(v>=1&&v<=18))||new Set(hm).size!==18){ toast('Men’s handicap row needs 1–18, each once'); return false; }
+      const W=pw.every(v=>v==null)?pm:pw, HW=hw.every(v=>v==null)?hm:hw; if(W.some(v=>!(v>=3&&v<=6))||HW.some(v=>!(v>=1&&v<=18))){ toast('Women’s rows: par 3–6, handicap 1–18, or blank'); return false; }
+      const tees=[...document.querySelectorAll('[data-tee]')].map(el=>{ const i=el.dataset.tee, num=id=>{ const v=fv(id); return v===''?null:+v; }; const y=fv('ctY'+i).trim().split(/[\s,;]+/).filter(Boolean).map(Number);
+        const t={name:fv('ctN'+i).trim(),rating:{M:{},W:{}},yards:y.length===18&&y.every(v=>v>0)?y:null}; const mc=num('ctMC'+i),ms=num('ctMS'+i),wc=num('ctWC'+i),ws=num('ctWS'+i); if(mc!=null) t.rating.M.cr=mc; if(ms!=null) t.rating.M.slope=ms; if(wc!=null) t.rating.W.cr=wc; if(ws!=null) t.rating.W.slope=ws; return t; }).filter(t=>t.name);
+      if(!tees.length){ toast('Add at least one tee'); return false; } const bad=tees.find(t=>['M','W'].some(s=>(t.rating[s].slope!=null&&(t.rating[s].slope<55||t.rating[s].slope>155))||(t.rating[s].cr!=null&&(t.rating[s].cr<50||t.rating[s].cr>85)))); if(bad){ toast(bad.name+': slope is 55–155, rating 50–85'); return false; }
+      const out=Object.assign({},c,{name,club:fv('cClub').trim(),city:fv('cCity').trim(),state:fv('cState').trim().toUpperCase(),par:{M:pm,W:W},hcp:{M:hm,W:HW},tees,holes:18}); delete out.placeholder;
+      if(opt.idField&&!course){ const id=slugify(fv('cId')||[out.state,out.city,out.club,out.name].filter(Boolean).join(' ')).slice(0,80); if(!id){ toast('Give it an id'); return false; } out.id=id; }
+      if(!out.id) out.id=slugify([out.club,out.name].filter(Boolean).join(' '))||uid();
+      return opt.onSave?opt.onSave(out):undefined; },
+    del:opt.onDelete});
+}
+/* the hub saves a club's own course to the courses table (the whole club sees it) when it can, else into this document */
+async function saveClubCourse(out,existing){ const row={id:out.id,tenant:TENANT,name:out.name,club:out.club||'',city:out.city||'',state:out.state||'',holes:18,data:{par:out.par,hcp:out.hcp,tees:out.tees},source:'club',verified:false,status:'live',updated_at:new Date().toISOString(),updated_by:(ACCESS&&ACCESS.email)||''};
+  if(CLOUD&&sessionOK&&!KEYMODE&&TENANCY&&typeof iAmStaff==='function'&&iAmStaff()){ const r=await sb.from('courses').upsert(row); if(r.error){ toast('Kept in this hub only — '+r.error.message); } else { LIB.courses=(LIB.courses||[]).filter(x=>x.id!==row.id).concat([row]); } }
+  const g=golfData(); const i=g.courses.findIndex(x=>x.id===out.id); const doc=Object.assign({},out,{lib:TENANCY?out.id:undefined}); if(i>=0) Object.assign(g.courses[i],doc); else { g.courses=g.courses.filter(x=>!x.placeholder); g.courses.push(doc); }
+  golfData().events.forEach(e=>{ if(e.groups.some(gr=>gr.course===out.id)) publishEvent(e); }); view.gcourse=out.id; }
+
 /* formats + allowances per event (USGA defaults; an older single allowance carries over to its format) */
 function migrateAllow(e){ if(!e.allow){ e.allow={}; if(e.allowance!=null&&e.allowance!==100&&(e.format==='stroke'||e.format==='bestball')) e.allow[e.format]=+e.allowance; }
   for(const k of Object.keys(e.allow)){ const d=USGA_ALLOW[k]; if(d!=null&&JSON.stringify(d)===JSON.stringify(e.allow[k])) delete e.allow[k]; }   // older events saved every default
@@ -3890,11 +4033,11 @@ function playerHcp(ev,grp,p){ const c=courseById(grp.course); const e=effIndex(e
   return {idx,raw:e.raw,capped:e.capped,cap:e.cap,ch,ph:phFromCH(ev,ch),missing:idx==null?'index':ch==null?'rating':''}; }
 /* every player in the event: in a group, or on the roster waiting for one */
 function evPlayers(ev){ return ev.groups.flatMap(grp=>grp.players.map(p=>({p,grp}))).concat((ev.pool||[]).map(p=>({p,grp:null}))); }
-function courseFor(ev,p,grp){ if(grp) return grp.course; const F=ev.flights||{}; return (F.courseOf&&F.courseOf[p.flight])||(F.courses&&F.courses!=='split'?F.courses:'')||ev.defaultCourse||'oak'; }
+function courseFor(ev,p,grp){ if(grp) return grp.course; const F=ev.flights||{}; return (F.courseOf&&F.courseOf[p.flight])||(F.courses&&F.courses!=='split'?F.courses:'')||ev.defaultCourse||homeCourseId(); }
 const hcpOf=(ev,p,grp)=>playerHcp(ev,{course:courseFor(ev,p,grp)},p);
 function publicEvent(ev){
   const courses={}; const tt=db.tournaments.find(x=>x.id===ev.tournamentId); const ftm=new Map(tt?tt.field.map(p=>[p.memberId,'T'+(p.team||0)]):[]);
-  for(const g of ev.groups){ if(!courses[g.course]){ const c=courseById(g.course); if(c) courses[g.course]={name:c.name,par:c.par,hcp:c.hcp,tees:Object.fromEntries(c.tees.map(t=>[t.name,t.yards||null]))}; } }
+  for(const g of ev.groups){ if(!courses[g.course]){ const c=courseById(g.course); if(c) courses[g.course]=Object.assign({name:c.name,par:c.par,hcp:c.hcp,tees:Object.fromEntries(c.tees.map(t=>[t.name,t.yards||null]))},c.geo?{geo:c.geo}:{}); } }
   return {slug:ev.slug,name:ev.name,date:ev.date,status:ev.status,club:(CLUB&&CLUB.name)||CLUB_META.name,org:ORG_ID,courses,
     groups:ev.groups.map(g=>({id:g.id,label:g.label||'',course:g.course,startHole:+g.startHole||1,teeTime:g.teeTime||'',players:g.players.map(p=>{ const h=playerHcp(ev,g,p); return {id:p.id,name:p.name,tee:p.tee||ev.defaultTee||'White',set:p.set||'M',ch:h.ch,ph:h.ph,flight:p.flight||'',team:evTeam(ev)?(p.team||ftm.get(p.memberId)||''):''}; })})),
     format:ev.format||'stroke',front:ev.front,back:ev.back,teamSize:ev.teamSize||(isTeamEvent(ev)||ev.format==='match'&&ev.teamSize>=2?2:1),count:ev.count||1,countPattern:ev.countPattern||'',quotaBase:ev.quotaBase||36,cap:ev.cap||'',matchScoring:ev.matchScoring||'holes',matchForm:ev.matchForm||'',matchBy:ev.matchBy||'holes',all918:!!ev.all918,noPar3:!!ev.noPar3,points:ev.points||{},game:ev.game||'',allow:Object.assign({},ev.allow||{}),scoring:ev.scoring||'gross',flights:(ev.flights&&ev.flights.names)||[],
@@ -3979,11 +4122,16 @@ const shortDate=s=>{ const d=parseD(s); return d?MONTHS[d.getMonth()]+' '+d.getD
 
 /* Courses: scorecards */
 function gCourses(el){
-  const g=golfData(), c=courseById(view.gcourse)||g.courses[0];
+  const g=golfData(), c=g.courses.find(x=>x.id===view.gcourse)||g.courses[0];
+  if(!c){ el.innerHTML='<div class="empty"><b>No courses yet</b><span>Add one from the library or set up your own.</span></div>'; return; }
   const nine=(arr,a,b)=>arr.slice(a,b);
   const rowH=(label,vals,cls='',tot=true)=>`<tr class="${cls}"><th scope="row">${label}</th>${nine(vals,0,9).map(v=>`<td>${v}</td>`).join('')}<td class="st">${tot?G_SUM(nine(vals,0,9)):''}</td>${nine(vals,9,18).map(v=>`<td>${v}</td>`).join('')}<td class="st">${tot?G_SUM(nine(vals,9,18)):''}</td><td class="st">${tot?G_SUM(vals):''}</td></tr>`;
-  el.innerHTML=`<div class="seg">${g.courses.map(x=>`<button class="${x.id===c.id?'on':''}" data-gc="${x.id}">${esc(x.name)}</button>`).join('')}</div>
-  <div class="card" style="overflow:hidden"><div class="cardhead"><div><h2 class="h2">${esc(c.name)}</h2><span class="muted">Men’s par ${G_SUM(c.par.M)} · women’s par ${G_SUM(c.par.W)} · ${c.tees.map(t=>t.name+' '+(t.yards?G_SUM(t.yards):G_SUM(t.total||[])).toLocaleString()).join(' · ')}</span></div></div>
+  const used=g.events.filter(e=>e.groups.some(gr=>gr.course===c.id)).length, own=!!(c.lib&&libCourse(c.lib)&&libCourse(c.lib).tenant), fromLib=!!(c.lib&&libCourse(c.lib)&&!libCourse(c.lib).tenant);
+  el.innerHTML=`<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;justify-content:space-between"><div class="seg">${g.courses.map(x=>`<button class="${x.id===c.id?'on':''}" data-gc="${x.id}">${esc(x.name)}</button>`).join('')}</div>
+    <div class="actions"><button class="btn" id="gcAdd">${I.plus}Add from the library</button><button class="btn pri" id="gcNew">${I.plus}New course</button></div></div>
+  ${c.placeholder?`<div class="banner">This is a stand-in card until the club picks its course: <b>Add from the library</b>, or <b>New course</b> to type the card in.</div>`:''}
+  <div class="card" style="overflow:hidden"><div class="cardhead"><div><h2 class="h2">${esc(c.name)}</h2><span class="muted">${c.club&&c.club!==(CLUB&&CLUB.name)?esc(c.club)+' · ':''}Men’s par ${G_SUM(c.par.M)} · women’s par ${G_SUM(c.par.W)} · ${c.tees.map(t=>t.name+' '+(t.yards?G_SUM(t.yards):G_SUM(t.total||[])).toLocaleString()).join(' · ')}${fromLib?' · from the Flagstick library':own?' · this club’s own':''}</span></div>
+    <div class="actions">${(!fromLib||!CLOUD)?`<button class="btn sm" id="gcEdit">${I.edit}Edit the card</button>`:''}<button class="btn sm${used?'':' danger'}" id="gcRemove" ${used?'disabled title="Used by '+used+' scoring event'+(used>1?'s':'')+'"':''}>${I.trash}Remove from this hub</button></div></div>
    <div class="tw"><table class="scard num"><thead><tr><th scope="col">Hole</th>${[1,2,3,4,5,6,7,8,9].map(h=>`<th scope="col">${h}</th>`).join('')}<th scope="col" class="st">Out</th>${[10,11,12,13,14,15,16,17,18].map(h=>`<th scope="col">${h}</th>`).join('')}<th scope="col" class="st">In</th><th scope="col" class="st">Tot</th></tr></thead><tbody>
    ${c.tees.map(t=>t.yards?rowH(t.name,t.yards,'tee tee-'+t.name.toLowerCase().replace('/','-')):`<tr class="tee"><th scope="row">${esc(t.name)}</th>${'<td class="muted">·</td>'.repeat(9)}<td class="st">${t.total?t.total[0]:''}</td>${'<td class="muted">·</td>'.repeat(9)}<td class="st">${t.total?t.total[1]:''}</td><td class="st">${t.total?G_SUM(t.total):''}</td></tr>`).join('')}
    ${rowH('Par',c.par.M,'par')}${rowH('Men’s hcp',c.hcp.M,'hcp',false)}${rowH('Women’s par',c.par.W,'par2')}${rowH('Women’s hcp',c.hcp.W,'hcp',false)}
@@ -3999,6 +4147,10 @@ function gCourses(el){
     if(bad){ toast(bad+' value'+(bad>1?'s look':' looks')+' off — slope is 55–155, rating 50–85'); return; }
     persist(); golfData().events.forEach(e=>{ if(e.groups.some(gr=>gr.course===c.id)) publishEvent(e); }); toast('Ratings saved'); render(); };
   el.querySelectorAll('[data-gc]').forEach(b=>b.onclick=()=>{ view.gcourse=b.dataset.gc; render(); });
+  $('gcAdd').onclick=()=>{ const seg=el.querySelector('.seg'); coursePickerInline(seg,cc=>{ view.gcourse=cc.id; render(); toast(cc.name+' added — every event here can pick it now'); }); };
+  $('gcNew').onclick=()=>courseEditorDrawer(null,{kicker:'Golf · Courses',onSave:out=>saveClubCourse(out).then(()=>{ toast('Course saved'); })});
+  const ed=$('gcEdit'); if(ed) ed.onclick=()=>courseEditorDrawer(c,{kicker:'Golf · Courses',onSave:out=>saveClubCourse(out,c).then(()=>{ toast('Course saved'); })});
+  $('gcRemove').onclick=()=>{ if(used) return; if(g.courses.length<=1){ toast('Keep at least one course — add another first'); return; } g.courses=g.courses.filter(x=>x!==c); view.gcourse=g.courses[0].id; persist(); render(); toast(c.name+' removed from this hub'); };
 }
 
 /* Event editor */
@@ -4079,8 +4231,8 @@ function editGroup(ev,grp){
   const fieldIds=new Set(t?t.field.map(p=>p.memberId):[]);
   const pool=members().sort((a,b)=>(fieldIds.has(b.id)-fieldIds.has(a.id))||memberName(a).localeCompare(memberName(b)));
   const opts=`<option value="">— Add a member —</option>`+(t?`<optgroup label="${esc(t.name)} field">${pool.filter(m=>fieldIds.has(m.id)).map(m=>`<option value="${m.id}">${esc(memberName(m))}${inOther.has(m.id)?' (in another group)':''}</option>`).join('')}</optgroup><optgroup label="All members">`:'')+pool.filter(m=>!t||!fieldIds.has(m.id)).map(m=>`<option value="${m.id}">${esc(memberName(m))}${inOther.has(m.id)?' (in another group)':''}</option>`).join('')+(t?'</optgroup>':'');
-  const tees=c=>(courseById(c)||g.courses[0]).tees.map(x=>x.name);
-  const chTxt=p=>{ const c=courseById(($('ggC')&&$('ggC').value)||grp?.course||'oak'); const idx=parseIndex(p.index!=null&&String(p.index).trim()!==''?p.index:(memberById(p.memberId)||{}).hcp); const ch=c?courseHcp(idx,c,p.tee||ev.defaultTee,p.set||'M'):null; return ch==null?(idx==null?'no index':'no rating'):'CH '+ch; };
+  const tees=c=>(courseById(c)||g.courses[0]).tees.map(x=>x.name); setTimeout(()=>wireCourseSelect($('ggC')),0);
+  const chTxt=p=>{ const c=courseById(($('ggC')&&$('ggC').value)||grp?.course||homeCourseId())||g.courses[0]; const idx=parseIndex(p.index!=null&&String(p.index).trim()!==''?p.index:(memberById(p.memberId)||{}).hcp); const ch=c?courseHcp(idx,c,p.tee||ev.defaultTee,p.set||'M'):null; return ch==null?(idx==null?'no index':'no rating'):'CH '+ch; };
   const rows=()=>players.map((p,i)=>`<div class="mr" style="grid-template-columns:minmax(0,1fr) 64px 84px 66px 64px 28px"><input class="inp" data-pi="${i}" data-k="name" value="${esc(p.name)}" aria-label="Player name"><input class="inp r" data-pi="${i}" data-k="index" value="${esc(p.index!=null&&p.index!==''?p.index:((memberById(p.memberId)||{}).hcp||''))}" placeholder="12.4 / +1.2" aria-label="${esc(p.name)} handicap index" autocomplete="off" autocapitalize="off"><span class="muted" style="font-size:12px" data-ch="${i}">${chTxt(p)}</span><select class="inp" data-pi="${i}" data-k="tee" aria-label="Tee">${tees(fv('ggC')||grp?.course||'oak').map(x=>`<option${x===(p.tee||ev.defaultTee)?' selected':''}>${x}</option>`).join('')}</select><select class="inp" data-pi="${i}" data-k="set" aria-label="Par set"><option value="M"${p.set!=='W'?' selected':''}>Men</option><option value="W"${p.set==='W'?' selected':''}>Women</option></select><button class="ib" type="button" data-pdel="${i}" aria-label="Remove ${esc(p.name)}">${I.x}</button></div>`).join('')||'<div class="mr"><span class="muted">No players yet.</span></div>';
   const rowsHead='<div class="mr h" style="grid-template-columns:minmax(0,1fr) 64px 84px 66px 64px 28px"><span>Player</span><span class="r">Index</span><span>Course hcp</span><span>Tee</span><span>Par</span><span></span></div>';
   const BB=evTeam(ev), fieldTeam=new Map(t?t.field.map(p=>[p.memberId,'T'+(p.team||0)]):[]);
@@ -4091,7 +4243,7 @@ function editGroup(ev,grp){
     return `<div class="fld"><span class="lbl">${ev.format==='match'?'Sides (first two teams play each other)':`Teams of ${tsz} · ${esc(evSummary(ev))}`}</span><div class="mini">${players.map((p,i)=>`<div class="mr" style="grid-template-columns:minmax(0,1fr) 200px"><span class="trunc">${esc(p.name||'(new player)')}</span><select class="inp" data-team="${i}" aria-label="${esc(p.name)} team">${ks.map(k=>`<option value="${esc(k)}"${k===p.team?' selected':''}>${esc(teamLabel(k,ks))}</option>`).join('')}</select></div>`).join('')||'<div class="mr"><span class="muted">Add players first.</span></div>'}</div></div>`; };
   openDrawer({kicker:ev.name+' · Group',title:grp?'Group '+grp.code:'Add group',wide:true,
     body:pair(field('Group ID','ggCode',grp?.code||newCode(ev),{hint:'What players type on the scoring page. Make it anything unique — a tee time, a cart number, or leave the random one.'}),field('Label (optional)','ggL',grp?.label||'',{ph:'e.g. 8:10 · Oak 1'}))+
-      pair(field('Course','ggC',grp?.course||'oak',{type:'select',options:g.courses.map(c=>[c.id,c.name])}),field('Starting hole','ggS',grp?.startHole||1,{type:'select',options:Array.from({length:18},(_,i)=>[i+1,'Hole '+(i+1)])}))+
+      pair(`<div class="fld"><label class="lbl" for="ggC">Course</label><select class="inp" id="ggC">${courseOptionsHTML(grp?.course||homeCourseId())}</select></div>`,field('Starting hole','ggS',grp?.startHole||1,{type:'select',options:Array.from({length:18},(_,i)=>[i+1,'Hole '+(i+1)])}))+
       field('Tee time (optional)','ggTT',grp?.teeTime||'',{type:'time',hint:'Leave blank for a shotgun start.'})+
       `<div class="fld"><span class="lbl">Players</span><div class="mini">${rowsHead}<div id="ggRows">${rows()}</div></div><p class="hint">Index comes from the member’s profile (Golf Genius import). Type over it for a guest or a one-off change.</p></div><div id="ggTeams">${teamsHTML()}
        <div style="display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px"><select class="inp" id="ggPick" aria-label="Add a member">${opts}</select><button class="btn" type="button" id="ggGuest">+ Guest</button></div></div>
@@ -4190,7 +4342,7 @@ function planFlights(ev,count,basis,unit,per,courseOf){
 }
 /* each flight: which course, and shotgun or tee times (first time + gap, off hole 1 or 10) */
 function flightPlan(ev){ const F=ev.flights||{}; F.plan=F.plan||{};
-  (F.names||[]).forEach(n=>{ const p=F.plan[n]=F.plan[n]||{}; if(!p.course) p.course=(F.courseOf&&F.courseOf[n])||'oak'; if(!p.start) p.start='shotgun'; if(!p.first) p.first='08:30'; if(p.gap==null) p.gap=8; if(!p.hole) p.hole=1; });
+  (F.names||[]).forEach(n=>{ const p=F.plan[n]=F.plan[n]||{}; if(!p.course) p.course=(F.courseOf&&F.courseOf[n])||ev.defaultCourse||homeCourseId(); if(!p.start) p.start='shotgun'; if(!p.first) p.first='08:30'; if(p.gap==null) p.gap=8; if(!p.hole) p.hole=1; });
   F.courseOf=Object.fromEntries((F.names||[]).map(n=>[n,F.plan[n].course])); return F.plan; }
 const fmtTime=t=>{ const [h,m]=String(t||'').split(':').map(Number); if(!isFinite(h)) return t||''; const ap=h>=12?'PM':'AM'; return ((h%12)||12)+':'+String(m||0).padStart(2,'0')+' '+ap; };
 const addMin=(t,min)=>{ const [h,m]=String(t).split(':').map(Number); const x=(h*60+(m||0)+min)%1440; return String(Math.floor(x/60)).padStart(2,'0')+':'+String(x%60).padStart(2,'0'); };
@@ -4324,7 +4476,7 @@ function gFlights(el,ev){
       <div class="fld" style="width:230px"><label class="lbl" for="flB">Fill by</label><select class="inp" id="flB"><option value="course"${F.basis!=='index'?' selected':''}>Course handicap (rating & slope)</option><option value="index"${F.basis==='index'?' selected':''}>Handicap Index</option></select></div>
       ${teams?`<div class="fld" style="width:220px"><label class="lbl" for="flU">Flight</label><select class="inp" id="flU"><option value="team"${F.unit!=='player'?' selected':''}>Teams (combined handicap)</option><option value="player"${F.unit==='player'?' selected':''}>Individual players</option></select></div>`:''}
       <div class="fld" style="width:120px"><label class="lbl" for="flG">Players per group</label><select class="inp" id="flG">${[4,3,2,5].map(n=>`<option value="${n}"${(F.groupSize||4)===n?' selected':''}>${n}</option>`).join('')}</select></div>
-      <div class="fld" style="width:230px"><label class="lbl" for="flC">Courses</label><select class="inp" id="flC">${[['split','Split flights between Oak and Pecan'],['oak','All on Oak'],['pecan','All on Pecan']].map(([v,l])=>`<option value="${v}"${(F.courses||'split')===v?' selected':''}>${l}</option>`).join('')}</select></div>
+      <div class="fld" style="width:260px"><label class="lbl" for="flC">Courses</label><select class="inp" id="flC">${(g.courses.length>1?[['split',`Split flights between ${courseShort(g.courses[0].id)} and ${courseShort(g.courses[1].id)}`]]:[]).concat(g.courses.map(c=>[c.id,'All on '+courseShort(c.id)])).map(([v,l])=>`<option value="${v}"${(F.courses||(g.courses.length>1?'split':g.courses[0].id))===v?' selected':''}>${esc(l)}</option>`).join('')}</select></div>
       <button class="btn pri" id="flGo">${F.count?'Re-flight':'Set flights'}</button>${F.count?`<button class="btn" id="flClear">Remove flights</button>`:''}
     </div>
     <p class="hint" style="margin:0">Lowest handicaps go to Flight A. Flights are sized in whole groups${teams?' — an even number of teams, two per foursome':''} — so groups never mix flights; group counts differ by at most one. Each flight is placed on one course, and everyone is rated on the course they’ll play. Course handicap = Index × Slope ÷ 113 + (Course Rating − Par), with the event’s handicap allowances for net.</p>
@@ -4373,6 +4525,7 @@ function gFlights(el,ev){
         golfSave(ev); toast(`${plan.flights.length} flights set`); }}); };
   const clr=$('flClear'); if(clr) clr.onclick=()=>{ if(!confirm('Remove all flights?')) return; evPlayers(ev).forEach(({p})=>{ p.flight=''; }); ev.flights={count:0,names:[]}; golfSave(ev); render(); };
   const nx=$('flNext'); if(nx) nx.onclick=()=>{ view.getab='groups'; render(); buildGroupsFromFlights(ev); };
+  el.querySelectorAll('[data-fp$="|course"]').forEach(wireCourseSelect);
   el.querySelectorAll('[data-fp]').forEach(inp=>inp.onchange=()=>{ const [n,k]=inp.dataset.fp.split('|'); const P=flightPlan(ev);
     let v=inp.value; if(k==='gap'){ v=Math.max(1,Math.min(30,parseInt(v,10)||8)); } if(k==='hole') v=+v; P[n][k]=v; flightPlan(ev); golfSave(ev); render(); });
   el.querySelectorAll('[data-mv]').forEach(s=>s.onchange=()=>{ const x=all.find(y=>y.p.id===s.dataset.mv); const mates=F.unit==='team'&&x.p.team?all.filter(y=>y.p.team===x.p.team):[x];
@@ -4404,7 +4557,7 @@ function buildGroupsFromFlights(ev){
   const loose=units.filter(u=>!plan.flights.some(f=>f.units.includes(u)));
   const P=flightPlan(ev);
   const preview=start=>{ const gs=buildFlightGroups(ev,plan,per,F.courseOf||F.courses||'split',start,P);
-    for(let i=0;i<loose.length;i+=per){ const us=loose.slice(i,i+per); gs.push({id:uid(),code:newCode({groups:gs}),course:ev.defaultCourse||'oak',startHole:1,label:'Not flighted',players:us.flatMap(u=>u.members.map(m=>({...m.p})))}); }
+    for(let i=0;i<loose.length;i+=per){ const us=loose.slice(i,i+per); gs.push({id:uid(),code:newCode({groups:gs}),course:ev.defaultCourse||homeCourseId(),startHole:1,label:'Not flighted',players:us.flatMap(u=>u.members.map(m=>({...m.p})))}); }
     return gs; };
   const summary=gs=>F.names.map(n=>{ const fg=gs.filter(x=>x.flight===n); const tee=P[n]&&P[n].start==='tee'; return `<div class="mr num" style="grid-template-columns:70px minmax(0,1fr)"><b>Flight ${n}</b><div class="cell2"><span>${fg.length} groups · ${courseById(fg[0]?.course)?.name||''} · ${tee?'tee times off hole '+P[n].hole:'shotgun'}</span><small>${tee?fg.map(x=>fmtTime(x.teeTime)).join(', '):'Holes '+fg.map(x=>x.startHole+(/ B /.test(x.label)?'B':'')).join(', ')}</small></div></div>`; }).join('');
   const odd=gs=>gs.filter(x=>x.players.length!==(F.groupSize||4));
@@ -4739,7 +4892,7 @@ let GD=null;
 /* a fresh draft: today, and the last game's name, course, tee, timing, rules and (unless told otherwise) its players
    and competitions — the regular game is the default everywhere */
 function draftFromLast(opt){ opt=opt||{}; const last=seasonGames()[0], today=new Date().toISOString().slice(0,10);
-  const d={id:uid(),season:Y(),status:'open',name:last?last.name:'',date:today,time:last?last.time||'':'',course:last?last.course:'oak',tee:last?last.tee||'White':'White',notes:'',rules:last?last.rules||'':'',hcp:last?last.hcp||'full':'full',payWhen:last?last.payWhen||'after':'after',settle:last?last.settle||'pot':'pot',golfEventId:'',players:[],pots:[]};
+  const d={id:uid(),season:Y(),status:'open',name:last?last.name:'',date:today,time:last?last.time||'':'',course:last?last.course:homeCourseId(),tee:last?last.tee||'White':'White',notes:'',rules:last?last.rules||'':'',hcp:last?last.hcp||'full':'full',payWhen:last?last.payWhen||'after':'after',settle:last?last.settle||'pot':'pot',golfEventId:'',players:[],pots:[]};
   if(last&&opt.players!==false) last.players.forEach(p=>d.players.push({id:uid(),memberId:p.memberId||'',name:p.name||'',paid:false,extraIn:0,gpid:''}));
   if(opt.pots!==false){ if(last) copyPots(last.pots,d); else d.pots.push(newPot('stroke',d)); }
   return d; }
@@ -4822,7 +4975,7 @@ function vQuick(m){
     const opt=(key,title,text,on)=>`<button type="button" class="qopt${on?' on':''}" data-qs="${esc(key)}"><b>${esc(title)}</b><span>${esc(text)}</span></button>`;
     m.innerHTML=top(2,'What are we playing?','Pick a whole game from before, or build one from the starters.')+`
       <div class="card pad qday"><div class="cell2" style="min-width:0"><b>${esc(d.name||dayName(d.date))} · ${esc(shortDate(d.date))}${d.time?' · '+esc(fmtTime(d.time)):''}</b><small>${esc(c?c.name:'Course TBD')} · ${esc(d.tee||'White')} tees</small></div><button class="btn sm" id="qgDay" type="button">${Q.dayOpen?'Done':'Change'}</button></div>
-      ${Q.dayOpen?`<div class="card pad" style="display:flex;flex-direction:column;gap:12px">${field('Name','qgName',d.name,{ph:'e.g. Thursday game'})}<div class="frow2">${field('Date','qgDate',d.date,{type:'date'})}${field('Tee time','qgTime',d.time||'',{type:'time'})}</div><div class="frow2">${field('Course','qgCourse',d.course,{type:'select',options:courses.map(x=>[x.id,x.name])})}${field('Tee','qgTee',d.tee||'White',{type:'select',options:((c||{tees:[]}).tees||[]).map(t=>[t.name,t.name])})}</div></div>`:''}
+      ${Q.dayOpen?`<div class="card pad" style="display:flex;flex-direction:column;gap:12px">${field('Name','qgName',d.name,{ph:'e.g. Thursday game'})}<div class="frow2">${field('Date','qgDate',d.date,{type:'date'})}${field('Tee time','qgTime',d.time||'',{type:'time'})}</div><div class="frow2"><div class="fld"><label class="lbl" for="qgCourse">Course</label><select class="inp" id="qgCourse">${courseOptionsHTML(d.course)}</select></div>${field('Tee','qgTee',d.tee||'White',{type:'select',options:((c||{tees:[]}).tees||[]).map(t=>[t.name,t.name])})}</div></div>`:''}
       ${last?`<div class="qsec">From before</div>${opt('last','Same as last time',potsText(last.pots)+' — '+gameWhen(last),Q.set==='last')}${prev.map(g=>opt('prev:'+g.id,gameTitle(g)+' · '+shortDate(g.date),potsText(g.pots),Q.set==='prev:'+g.id)).join('')}`:''}
       <div class="qsec">${last?'Or build the game — tap all that apply':'Tap all that apply'}</div>${starters.map(S=>opt('s:'+S.id,S.title,S.text,!Q.set&&Q.starters.includes(S.id))).join('')}
       <div class="card pad" style="display:flex;justify-content:space-between;gap:12px;align-items:center"><div class="cell2"><b>${built.pots.length?`Each player puts in ${gMoney(per)}`:'Nothing picked yet'}</b><small>${built.players.length} playing${built.pots.length?` · ${gMoney(total)} in the pots · ${esc(potsText(built.pots))}`:''}</small></div></div>
@@ -4831,7 +4984,7 @@ function vQuick(m){
     m.querySelectorAll('[data-qs]').forEach(b=>b.onclick=()=>{ const k=b.dataset.qs; if(k.startsWith('s:')){ const id=k.slice(2); Q.set=null; Q.starters=Q.starters.includes(id)?Q.starters.filter(x=>x!==id):Q.starters.concat(id); } else { Q.set=Q.set===k?null:k; } render(); });
     const readDay=()=>{ if(!Q.dayOpen) return; d.name=fv('qgName'); d.date=fv('qgDate')||d.date; d.time=fv('qgTime'); d.course=fv('qgCourse'); d.tee=fv('qgTee')||d.tee; const cc=courseById(d.course); if(cc&&!cc.tees.some(t=>t.name===d.tee)) d.tee=(cc.tees[0]||{}).name||'White'; };
     $('qgDay').onclick=()=>{ readDay(); Q.dayOpen=!Q.dayOpen; render(); };
-    if(Q.dayOpen){ const cs=$('qgCourse'); cs.onchange=()=>{ readDay(); render(); }; ['qgName','qgDate','qgTime','qgTee'].forEach(id=>{ const e=$(id); if(e) e.onchange=readDay; }); }
+    if(Q.dayOpen){ const cs=$('qgCourse'); wireCourseSelect(cs); cs.onchange=()=>{ readDay(); render(); }; ['qgName','qgDate','qgTime','qgTee'].forEach(id=>{ const e=$(id); if(e) e.onchange=readDay; }); }
     $('qgPrev').onclick=()=>{ readDay(); Q.step=1; render(); window.scrollTo(0,0); };
     $('qgCreate').onclick=()=>{ readDay(); quickCreate(); };
     $('qgMore').onclick=e=>{ e.preventDefault(); readDay(); const dd=quickBuild(); if(!dd.pots.length) dd.pots.push(newPot('stroke',dd)); GD={id:null,draft:dd}; QG=null; view.gquick=null; view.gdesign='new'; render(); window.scrollTo(0,0); };
@@ -4888,7 +5041,7 @@ function vGameDesign(m){
   m.innerHTML=`<div class="crumb"><button id="gdBack">Games</button><span class="muted">/</span><span class="muted">${isNew?'New game':esc(gameTitle(d))}</span></div>
   <div class="phead"><div><h1 class="h1">${isNew?'Design the game':'Game design'}</h1><p class="sub">Who plays, which competitions run on the day’s scores, what goes in each and how it pays.</p></div><div class="actions">${isNew?'':`<button class="btn danger" id="gdDelete">${I.trash}Delete game</button>`}<button class="btn" id="gdCancel">Cancel</button><button class="btn pri" id="gdSave">${isNew?'Create game':'Save game'}</button></div></div><div class="rule"></div>
   <div class="card pad" style="display:flex;flex-direction:column;gap:14px"><h2 class="h2">The day</h2>
-    <div class="frow2">${field('Name','gdName',d.name,{ph:'e.g. Friday game'})}<div class="frow2">${field('Course','gdCourse',d.course,{type:'select',options:courses.map(c=>[c.id,c.name])})}${field('Tee','gdTee',d.tee||'White',{type:'select',options:((courseById(d.course)||courses[0]||{tees:[]}).tees||[]).map(t=>[t.name,t.name]),hint:'The game default — any group or player can differ'})}</div></div>
+    <div class="frow2">${field('Name','gdName',d.name,{ph:'e.g. Friday game'})}<div class="frow2"><div class="fld"><label class="lbl" for="gdCourse">Course</label><select class="inp" id="gdCourse">${courseOptionsHTML(d.course)}</select></div>${field('Tee','gdTee',d.tee||'White',{type:'select',options:((courseById(d.course)||courses[0]||{tees:[]}).tees||[]).map(t=>[t.name,t.name]),hint:'The game default — any group or player can differ'})}</div></div>
     <div class="frow2">${field('Date','gdDate',d.date,{type:'date'})}${field('Tee time','gdTime',d.time||'',{type:'time'})}</div>
     ${field('When a skin fails validation, the call-out says','gdFail',d.failWord||'',{ph:'Didn’t validate',hint:'This game only. Leave blank for the usual wording; the phones say the same.'})}
     <div class="frow2"><div class="fld"><span class="lbl">Money changes hands</span>${seg('gdWhen',[['after','After the round'],['before','Before the round']],d.payWhen||'after')}<p class="hint">After: the sheet leads with results and the settlement. Before: it leads with who has paid in.</p></div>
@@ -4928,7 +5081,7 @@ function vGameDesign(m){
     card.querySelector('[data-gdrm]').onclick=()=>{ readAll(); if(pot.payouts.length&&!confirm('This competition has payouts recorded. Remove it anyway?')) return; d.pots=d.pots.filter(x=>x!==pot); rerender(); }; });
   wireSeg(m,'gdWhen',()=>{}); wireSeg(m,'gdSettle',()=>{}); wireSeg(m,'gdHcp',()=>{});
   $('gdAddSel').onchange=e=>{ if(!e.target.value) return; readAll(); d.pots.push(newPot(e.target.value,d)); rerender(); };
-  $('gdCourse').onchange=()=>{ readAll(); const c=courseById(d.course); if(c&&!c.tees.some(t=>t.name===d.tee)) d.tee=(c.tees[0]||{}).name||'White'; rerender(); };   // the tee list follows the course
+  wireCourseSelect($('gdCourse')); $('gdCourse').onchange=()=>{ readAll(); const c=courseById(d.course); if(c&&!c.tees.some(t=>t.name===d.tee)) d.tee=(c.tees[0]||{}).name||'White'; rerender(); };   // the tee list follows the course
   m.querySelectorAll('[data-gdin]').forEach(c=>c.onchange=()=>{ readAll(); const [pid,plid]=c.dataset.gdin.split('|'); const pot=d.pots.find(x=>x.id===pid); if(c.checked) pot.inn[plid]=true; else delete pot.inn[plid]; rerender(); });
   m.querySelectorAll('[data-gdpx]').forEach(b=>b.onclick=()=>{ readAll(); const p=d.players.find(x=>x.id===b.dataset.gdpx); if(gpOut(d,p)&&!confirm(`${gpName(p)} has payouts recorded. Remove anyway?`)) return; removePlayer(d,p,{keepEvent:true}); rerender(); });
   const q=$('gdQ'), pk=$('gdPick'); q.oninput=()=>{ const s=q.value.toLowerCase().trim(); const hits=s?pool.filter(x=>!inG.has(x.id)&&memberName(x).toLowerCase().includes(s)).slice(0,8):[];
@@ -5022,12 +5175,12 @@ function gameGroupsCard(g,ev){
       <span class="r">${h.ch!=null?h.ch:'—'}</span><b class="r">${h.ph!=null?h.ph:'—'}</b>
       <select class="inp" data-gmove="${p.id}" aria-label="Group for ${esc(p.name)}">${ev.groups.map((x,i)=>`<option value="${x.id}"${x===grp?' selected':''}>Group ${i+1} · ${esc(x.code)}</option>`).join('')}<option value="__new">+ New group</option></select></div>`; };
   const groupHead=(grp,i)=>`<div class="tr" style="grid-template-columns:minmax(0,1fr) 150px 120px 110px;background:var(--ivory)"><div class="cell2" style="flex-direction:row;align-items:center;gap:10px"><div class="cell2"><b>Group ${i+1} · ${esc(grp.code)}</b><small>${grp.players.length?grp.players.length+' player'+(grp.players.length===1?'':'s'):'Empty — a placeholder tee time; move players in with the Group column'}</small></div>${grp.players.length?'':`<button class="ib" data-grm="${grp.id}" aria-label="Remove empty group" title="Remove this group">${I.trash}</button>`}</div>
-      <select class="inp" data-gcourse="${grp.id}" aria-label="Course">${courses.map(c=>`<option value="${c.id}"${c.id===grp.course?' selected':''}>${esc(c.name)}</option>`).join('')}</select>
+      <select class="inp" data-gcourse="${grp.id}" aria-label="Course">${courseOptionsHTML(grp.course)}</select>
       <select class="inp" data-ghole="${grp.id}" aria-label="Starting hole">${Array.from({length:18},(_,k)=>`<option value="${k+1}"${(+grp.startHole||1)===k+1?' selected':''}>Hole ${k+1}</option>`).join('')}</select>
       <input class="inp" type="time" data-gtime="${grp.id}" value="${esc(grp.teeTime||'')}" aria-label="Tee time"></div>`;
-  const defC=courseById(g.course||ev.defaultCourse||'oak'), defTee=g.tee||ev.defaultTee||'White';
+  const defC=courseById(g.course||ev.defaultCourse||homeCourseId())||courses[0], defTee=g.tee||ev.defaultTee||'White';
   const defaults=`<div class="gdef"><div class="cell2"><b>Game default</b><small class="muted">Sets every group's course and every player's tee below; any group or player can then differ.</small></div>
-      <label class="fld"><span class="lbl">Course</span><select class="inp" id="ggDefCourse">${courses.map(c=>`<option value="${c.id}"${c.id===(defC||{}).id?' selected':''}>${esc(c.name)}</option>`).join('')}</select></label>
+      <label class="fld"><span class="lbl">Course</span><select class="inp" id="ggDefCourse">${courseOptionsHTML((defC||{}).id)}</select></label>
       <label class="fld"><span class="lbl">Tee</span><select class="inp" id="ggDefTee">${tees(defC).map(t=>`<option${t===defTee?' selected':''}>${esc(t)}</option>`).join('')}</select></label></div>`;
   return `<div class="card" style="overflow:hidden"><div class="cardhead"><div><h2 class="h2">Groups &amp; handicaps</h2><span class="muted">Who plays with whom, their tees, and each player’s course (CH) and playing (PH) handicap for today. An index typed here is for this game only, and can be corrected mid-round: the handicaps, the standings and the live leaderboard on everyone’s phone follow within half a minute.</span></div><div class="actions"><button class="btn sm" id="ggAddGroup">${I.plus}New group</button></div></div>
     ${defaults}${ev.groups.length?`<div class="tw"><div class="t" style="min-width:720px"><div class="tr th" style="${cols}"><span>Player</span><span class="r">Index</span><span>Tee</span><span class="r">CH</span><span class="r">PH</span><span>Group</span></div>
@@ -5041,12 +5194,12 @@ function wireGameGroups(m,g,ev){
   m.querySelectorAll('[data-gmove]').forEach(s=>s.onchange=()=>{ const f=find(s.dataset.gmove); if(!f) return; let to=ev.groups.find(x=>x.id===s.value);
     if(s.value==='__new'){ to={id:uid(),code:newCode(ev),label:'Group '+(ev.groups.length+1),course:f.grp.course,startHole:1,teeTime:f.grp.teeTime||'',players:[]}; ev.groups.push(to); }
     if(!to||to===f.grp) return; f.grp.players=f.grp.players.filter(x=>x!==f.p); to.players.push(f.p); save(); });   // an emptied group stays — it may be a placeholder tee time
-  m.querySelectorAll('[data-gcourse]').forEach(s=>s.onchange=()=>{ const grp=ev.groups.find(x=>x.id===s.dataset.gcourse); if(grp){ grp.course=s.value; save(); } });
+  m.querySelectorAll('[data-gcourse]').forEach(s=>{ wireCourseSelect(s); s.onchange=()=>{ const grp=ev.groups.find(x=>x.id===s.dataset.gcourse); if(grp){ grp.course=s.value; save(); } }; });
   m.querySelectorAll('[data-ghole]').forEach(s=>s.onchange=()=>{ const grp=ev.groups.find(x=>x.id===s.dataset.ghole); if(grp){ grp.startHole=+s.value; save(); } });
   m.querySelectorAll('[data-gtime]').forEach(s=>s.onchange=()=>{ const grp=ev.groups.find(x=>x.id===s.dataset.gtime); if(grp){ grp.teeTime=s.value; save(); } });
-  const dc=$('ggDefCourse'); if(dc) dc.onchange=()=>{ g.course=dc.value; const c=courseById(g.course); if(c&&!c.tees.some(t=>t.name===g.tee)) g.tee=(c.tees[0]||{}).name||'White'; applyGameDefaults(g,ev,{course:true,tee:true}); save(); toast('Course set for every group'); };
+  const dc=$('ggDefCourse'); if(dc){ wireCourseSelect(dc); } if(dc) dc.onchange=()=>{ g.course=dc.value; const c=courseById(g.course); if(c&&!c.tees.some(t=>t.name===g.tee)) g.tee=(c.tees[0]||{}).name||'White'; applyGameDefaults(g,ev,{course:true,tee:true}); save(); toast('Course set for every group'); };
   const dt=$('ggDefTee'); if(dt) dt.onchange=()=>{ g.tee=dt.value; applyGameDefaults(g,ev,{tee:true}); save(); toast('Tee set for every player'); };
-  const ng=$('ggAddGroup'); if(ng) ng.onclick=()=>{ ev.groups.push({id:uid(),code:newCode(ev),label:'Group '+(ev.groups.length+1),course:g.course||ev.defaultCourse||'oak',startHole:1,teeTime:'',players:[]}); save(); toast('Empty group added — set its tee time, move players in with the Group column'); };
+  const ng=$('ggAddGroup'); if(ng) ng.onclick=()=>{ ev.groups.push({id:uid(),code:newCode(ev),label:'Group '+(ev.groups.length+1),course:g.course||ev.defaultCourse||homeCourseId(),startHole:1,teeTime:'',players:[]}); save(); toast('Empty group added — set its tee time, move players in with the Group column'); };
   m.querySelectorAll('[data-grm]').forEach(b=>b.onclick=()=>{ const grp=ev.groups.find(x=>x.id===b.dataset.grm); if(!grp||grp.players.length) return; ev.groups=ev.groups.filter(x=>x!==grp); save(); });
 }
 /* live standings for one competition, from the day's scores */
@@ -5377,13 +5530,13 @@ function gameEventEngine(g){
 }
 /* every game has live scoring: its event exists from the moment the game does, open, and follows the players */
 /* the game's default course and tee onto the event: every group's course, every player's tee (per-row edits come after) */
-function applyGameDefaults(g,ev,what){ what=what||{}; ev.defaultCourse=g.course||ev.defaultCourse||'oak'; ev.defaultTee=g.tee||ev.defaultTee||'White';
+function applyGameDefaults(g,ev,what){ what=what||{}; ev.defaultCourse=g.course||ev.defaultCourse||homeCourseId(); ev.defaultTee=g.tee||ev.defaultTee||'White';
   if(what.course) ev.groups.forEach(gr=>{ gr.course=ev.defaultCourse; });
   if(what.tee) ev.groups.forEach(gr=>gr.players.forEach(p=>{ p.tee=ev.defaultTee; })); }
 function ensureGameEvent(g){
   const G=golfData(); let ev=gameEvent(g);
   if(!ev){ let slug=slugify(orgShort()+'-'+(g.date||'game')), n=2; while(G.events.some(e=>e.slug===slug)) slug=slugify(orgShort()+'-'+(g.date||'game'))+'-'+(n++);
-    ev={id:uid(),status:'live',name:gameTitle(g)+(g.date?' · '+shortDate(g.date):''),date:g.date,defaultTee:'White',defaultCourse:g.course||'oak',slug,tournamentId:'',front:'scramble',back:'shamble',scoring:'net',allow:{},groups:[],pool:[],flights:{count:0,names:[]},createdAt:new Date().toISOString(),gameId:g.id};
+    ev={id:uid(),status:'live',name:gameTitle(g)+(g.date?' · '+shortDate(g.date):''),date:g.date,defaultTee:'White',defaultCourse:g.course||homeCourseId(),slug,tournamentId:'',front:'scramble',back:'shamble',scoring:'net',allow:{},groups:[],pool:[],flights:{count:0,names:[]},createdAt:new Date().toISOString(),gameId:g.id};
     G.events.push(ev); g.golfEventId=ev.id; }
   syncGameEvent(g,ev); return ev;
 }
@@ -5431,11 +5584,11 @@ function syncGameEvent(g,ev){
   for(const p of g.players){ if(p.gpid&&have.has(p.gpid)) continue;
     const gp={id:uid(),memberId:p.memberId||'',name:gpName(p),tee:g.tee||ev.defaultTee||'White',set:'M',index:'',flight:'',team:''}; p.gpid=gp.id;
     let grp=ev.groups.find(x=>x.players.length<4);
-    if(!grp){ grp={id:uid(),code:newCode(ev),label:'Group '+(ev.groups.length+1),course:g.course||ev.defaultCourse||'oak',startHole:1,teeTime:g.time||'',players:[]}; ev.groups.push(grp); }
+    if(!grp){ grp={id:uid(),code:newCode(ev),label:'Group '+(ev.groups.length+1),course:g.course||ev.defaultCourse||homeCourseId(),startHole:1,teeTime:g.time||'',players:[]}; ev.groups.push(grp); }
     grp.players.push(gp); }
   const ids=new Set(g.players.map(p=>p.gpid));   // anyone no longer in the game leaves the event, scores and all
   evPlayers(ev).filter(x=>!ids.has(x.p.id)).forEach(x=>removeEventPlayer(ev,x.p.id));
-  ev.defaultCourse=g.course||ev.defaultCourse||'oak'; ev.defaultTee=g.tee||ev.defaultTee||'White';
+  ev.defaultCourse=g.course||ev.defaultCourse||homeCourseId(); ev.defaultTee=g.tee||ev.defaultTee||'White';
   const E=gameEventEngine(g); EV_GAME_KEYS.forEach(k=>{ ev[k]=E[k]; });
   ev.allow=(g.hcp||'full')==='usga'?{}:{'*':100};   // a group's game is 100% across the board unless the designer says USGA
   ev.scoring=g.pots.some(p=>p.kind==='format'&&(p.rules.scoring||'gross')==='net')||g.pots.some(p=>p.kind==='skins'&&skinsRulesOf(p).net)?'net':'gross';
@@ -6250,7 +6403,7 @@ async function calcShareAll(){
 }
 function calcStampNow(){ for(const t of db.tournaments){ const c=t.calcutta; if(!(c&&c.share&&c.share.token)) continue; const b0=shareBase.get(t); if(b0&&b0.doc) calcStamp(c,b0.doc); } }
 function calcAfterPersist(){ if(calcShareBusy||!CLOUD||!sessionOK) return; if(!db.tournaments.some(t=>t.calcutta&&t.calcutta.share&&t.calcutta.share.token)) return; clearTimeout(calcShareTimer); calcShareTimer=setTimeout(calcShareAll,700); }
-setInterval(()=>{ if(document.visibilityState==='visible'&&!calcShareBusy&&db.tournaments.some(t=>t.calcutta&&t.calcutta.share&&t.calcutta.share.token)) calcShareAll(); },view&&view.ttab==='calcutta'?3000:4000);
+setInterval(()=>{ if(document.visibilityState==='visible'&&!calcShareBusy&&db&&(db.tournaments||[]).some(t=>t.calcutta&&t.calcutta.share&&t.calcutta.share.token)) calcShareAll(); },view&&view.ttab==='calcutta'?3000:4000);
 async function startCashierLink(t){
   const c=calc(t); if(!CLOUD||!sessionOK){ toast('The cashier link needs the cloud sign-in'); return; }
   const token=newToken(); c.people=calcPeople(t); c.name=t.name; c._del=c._del||[];
@@ -6733,7 +6886,7 @@ async function ckShareAll(){ if(ckiBusy) return; const ts=db.tournaments.filter(
   try{ for(const t of ts) ch=(await ckShareSync(t))||ch; } finally{ ckiBusy=false; }
   if(ch){ persist(); if(view.page==='tournament'&&view.ttab==='checkin') render(); } }
 setInterval(()=>{ if(document.visibilityState==='visible'&&db&&(db.tournaments||[]).some(t=>t.checkinShare&&t.checkinShare.token)) ckShareAll(); },3500);
-const _ckAfter=window.afterPersist; window.afterPersist=function(){ if(typeof _ckAfter==='function') _ckAfter.apply(this,arguments); if(!ckiBusy&&db.tournaments.some(t=>t.checkinShare&&t.checkinShare.token)) setTimeout(ckShareAll,500); };
+const _ckAfter=window.afterPersist; window.afterPersist=function(){ if(typeof _ckAfter==='function') _ckAfter.apply(this,arguments); if(!ckiBusy&&db&&(db.tournaments||[]).some(t=>t.checkinShare&&t.checkinShare.token)) setTimeout(ckShareAll,500); };
 async function startCheckinLink(t){
   if(!CLOUD||!sessionOK){ toast('The registration link needs the cloud sign-in'); return; }
   const token=newToken(); const doc=ckDocFromField(t);
@@ -9242,7 +9395,7 @@ function editRound(t,r){
 function buildRoundEvent(t,r,rs){
   const G=golfData();
   let slug=slugify(`${t.name}-${t.season}-d${r.day+1}`), n=2; while(G.events.some(e=>e.slug===slug)) slug=slugify(`${t.name}-${t.season}-d${r.day+1}`)+'-'+(n++);
-  const ev={id:uid(),status:'live',name:`${t.name} · ${dayLabel(t,r.day).split(' · ')[0]}${rs.filter(x=>x.day===r.day).length>1?' · '+formatSummary(r):''}`,date:roundDate(t,r.day),defaultTee:'White',defaultCourse:'oak',slug,tournamentId:t.id,allow:{},groups:[],pool:[],flights:{count:0,names:[]},createdAt:new Date().toISOString(),roundId:r.id};
+  const ev={id:uid(),status:'live',name:`${t.name} · ${dayLabel(t,r.day).split(' · ')[0]}${rs.filter(x=>x.day===r.day).length>1?' · '+formatSummary(r):''}`,date:roundDate(t,r.day),defaultTee:'White',defaultCourse:t.course||homeCourseId(),slug,tournamentId:t.id,allow:{},groups:[],pool:[],flights:{count:0,names:[]},createdAt:new Date().toISOString(),roundId:r.id};
   roundToEvent(r,ev);
   G.events.push(ev); r.eventId=ev.id;
   if(t.flights&&t.flights.count) applyFlights(t,ev); else { const first=rs.map(roundEvent).find(e=>e&&e!==ev&&e.flights&&e.flights.count); if(first) copyFlightsInto(first,ev); }
@@ -9331,7 +9484,7 @@ function setTournamentFlights(t,count){
   const old=t.flights||{}; t.flights={count:k,names,of,basis:'index',unit:(t.teamSize||1)>1?'team':'player',perGroup:per,groupSize:per*(t.teamSize||1),plan:old.plan||{},setAt:new Date().toISOString()}; tFlightPlan(t);
   return {units,missing:units.filter(u=>u.val==null)};
 }
-function tFlightPlan(t){ const F=t.flights; F.plan=F.plan||{}; (F.names||[]).forEach((n,i)=>{ const p=F.plan[n]=F.plan[n]||{}; if(!p.course){ const C=golfData().courses.map(c=>c.id); p.course=i<Math.ceil(F.names.length/2)?(C[0]||'oak'):(C[1]||C[0]||'pecan'); } if(!p.start) p.start='shotgun'; if(!p.first) p.first='08:30'; if(p.gap==null) p.gap=8; if(!p.hole) p.hole=1; }); return F.plan; }
+function tFlightPlan(t){ const F=t.flights; F.plan=F.plan||{}; (F.names||[]).forEach((n,i)=>{ const p=F.plan[n]=F.plan[n]||{}; if(!p.course){ const C=golfData().courses.map(c=>c.id), first=t.course&&C.includes(t.course)?t.course:(C[0]||'oak'), second=C.find(x=>x!==first)||first; p.course=i<Math.ceil(F.names.length/2)?first:second; } if(!p.start) p.start='shotgun'; if(!p.first) p.first='08:30'; if(p.gap==null) p.gap=8; if(!p.hole) p.hole=1; }); return F.plan; }
 /* push the tournament's flights onto a round's event: names, plan, perGroup and each player's flight */
 function applyFlights(t,ev){ const F=t.flights; if(!F||!F.count) return; const plan=tFlightPlan(t), ts=t.teamSize||1;
   ev.flights={count:F.count,names:F.names.slice(),basis:'index',unit:F.unit,groupSize:F.groupSize,perGroup:F.perGroup,courseOf:Object.fromEntries(F.names.map(n=>[n,plan[n].course])),plan:clone(plan)};
@@ -9342,7 +9495,7 @@ function flightsCard(t){
   const plan=has?tFlightPlan(t):{};
   const rows=has?F.names.map(n=>{ const us=byF(n).sort((a,b)=>a.val-b.val), p=plan[n], tee=p.start==='tee', ng=Math.ceil(us.length/(F.perGroup||2));
     return `<div class="tr num" style="grid-template-columns:70px minmax(0,1fr) 140px 130px 120px 80px 70px 60px"><b>Flight ${n}</b><div class="cell2"><span>${us.length} ${ts>1?'teams':'players'} · ${us.length?fmtH(us[0].val,'index')+' – '+fmtH(us[us.length-1].val,'index'):'—'}</span><small><button class="linkbtn" data-fview="${n}" style="color:var(--gold);text-decoration:underline;font-size:12px">who’s in it</button></small></div>
-      <select class="inp" data-tfp="${n}|course" aria-label="Flight ${n} course">${golfData().courses.map(c=>`<option value="${c.id}"${c.id===p.course?' selected':''}>${esc(c.name)}</option>`).join('')}</select>
+      <select class="inp" data-tfp="${n}|course" aria-label="Flight ${n} course">${courseOptionsHTML(p.course)}</select>
       <select class="inp" data-tfp="${n}|start" aria-label="Flight ${n} start"><option value="shotgun"${!tee?' selected':''}>Shotgun</option><option value="tee"${tee?' selected':''}>Tee times</option></select>
       <input class="inp num" type="time" data-tfp="${n}|first" value="${esc(p.first)}" aria-label="Flight ${n} first tee time"${tee?'':' disabled'}>
       <input class="inp num r" data-tfp="${n}|gap" value="${esc(p.gap)}" inputmode="numeric" aria-label="Flight ${n} gap"${tee?'':' disabled'}>
@@ -9357,6 +9510,7 @@ function flightsCard(t){
 function wireFlightsCard(el,t){
   const st=$('tfSet'); if(st) st.onclick=()=>{ const n=+$('tfN').value||2; if(t.flights&&t.flights.count&&!confirm('Re-flight the tournament? Flight letters may change; apply to the events afterwards.')) return; const r=setTournamentFlights(t,n); persist(); render(); toast(`${t.flights.count} flight${t.flights.count>1?'s':''} set${r.missing.length?` · ${r.missing.length} without an index left out`:''}`); };
   const ap=$('tfApply'); if(ap) ap.onclick=()=>{ let n=0; tournamentRounds(t).forEach(r=>{ const ev=roundEvent(r); if(ev){ applyFlights(t,ev); publishEvent(ev); n++; } }); persist(); render(); toast(`Flights applied to ${n} event${n===1?'':'s'}`); };
+  el.querySelectorAll('[data-tfp$="|course"]').forEach(wireCourseSelect);
   el.querySelectorAll('[data-tfp]').forEach(i=>i.onchange=()=>{ const [n,k]=i.dataset.tfp.split('|'); const p=tFlightPlan(t)[n]; p[k]=k==='gap'||k==='hole'?+i.value:i.value; persist(); render(); });
   el.querySelectorAll('[data-fview]').forEach(b=>b.onclick=()=>{ const n=b.dataset.fview, us=tFlightUnits(t).filter(u=>t.flights.of[u.key]===n).sort((a,b)=>a.val-b.val);
     openDrawer({kicker:t.name,title:'Flight '+n,body:`<div class="mini">${us.map(u=>`<div class="mr num" style="grid-template-columns:minmax(0,1fr) 90px"><div class="cell2"><b>${esc(u.label)}</b><small>${u.members.map(m=>idxTxt(m.idx)+(m.capped?' <span class="muted">(from '+idxTxt(m.raw)+')</span>':'')).join(' + ')}</small></div><b class="r">${fmtH(u.val,'index')}</b></div>`).join('')}</div>`,saveLabel:'Close',save:()=>{}}); });
@@ -9503,7 +9657,7 @@ function wireSignupCard(t){
    page counts, and a reload is tried once per build — if the page that comes back is still the old one, the CDN
    hasn't caught up; wait a while before trying that build again. */
 (function(){
-  const ME='20261110155913', KEY='au_tried', RETRY=10*60*1000; let ready=false, lastCheck=0;
+  const ME='20261112174838', KEY='au_tried', RETRY=10*60*1000; let ready=false, lastCheck=0;
   const typing=()=>{ const a=document.activeElement; return a&&/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)&&a.value&&a.type!=='search'; };
   const safe=()=>!typing()&&(typeof window.__canReload!=='function'||window.__canReload());
   const tried=()=>{ try{ const [b,t]=(sessionStorage.getItem(KEY)||'').split('|'); return b?{build:b,at:+t||0}:null; }catch(_){ return null; } };

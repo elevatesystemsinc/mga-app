@@ -146,7 +146,7 @@ let GD=null;
 /* a fresh draft: today, and the last game's name, course, tee, timing, rules and (unless told otherwise) its players
    and competitions — the regular game is the default everywhere */
 function draftFromLast(opt){ opt=opt||{}; const last=seasonGames()[0], today=new Date().toISOString().slice(0,10);
-  const d={id:uid(),season:Y(),status:'open',name:last?last.name:'',date:today,time:last?last.time||'':'',course:last?last.course:'oak',tee:last?last.tee||'White':'White',notes:'',rules:last?last.rules||'':'',hcp:last?last.hcp||'full':'full',payWhen:last?last.payWhen||'after':'after',settle:last?last.settle||'pot':'pot',golfEventId:'',players:[],pots:[]};
+  const d={id:uid(),season:Y(),status:'open',name:last?last.name:'',date:today,time:last?last.time||'':'',course:last?last.course:homeCourseId(),tee:last?last.tee||'White':'White',notes:'',rules:last?last.rules||'':'',hcp:last?last.hcp||'full':'full',payWhen:last?last.payWhen||'after':'after',settle:last?last.settle||'pot':'pot',golfEventId:'',players:[],pots:[]};
   if(last&&opt.players!==false) last.players.forEach(p=>d.players.push({id:uid(),memberId:p.memberId||'',name:p.name||'',paid:false,extraIn:0,gpid:''}));
   if(opt.pots!==false){ if(last) copyPots(last.pots,d); else d.pots.push(newPot('stroke',d)); }
   return d; }
@@ -229,7 +229,7 @@ function vQuick(m){
     const opt=(key,title,text,on)=>`<button type="button" class="qopt${on?' on':''}" data-qs="${esc(key)}"><b>${esc(title)}</b><span>${esc(text)}</span></button>`;
     m.innerHTML=top(2,'What are we playing?','Pick a whole game from before, or build one from the starters.')+`
       <div class="card pad qday"><div class="cell2" style="min-width:0"><b>${esc(d.name||dayName(d.date))} · ${esc(shortDate(d.date))}${d.time?' · '+esc(fmtTime(d.time)):''}</b><small>${esc(c?c.name:'Course TBD')} · ${esc(d.tee||'White')} tees</small></div><button class="btn sm" id="qgDay" type="button">${Q.dayOpen?'Done':'Change'}</button></div>
-      ${Q.dayOpen?`<div class="card pad" style="display:flex;flex-direction:column;gap:12px">${field('Name','qgName',d.name,{ph:'e.g. Thursday game'})}<div class="frow2">${field('Date','qgDate',d.date,{type:'date'})}${field('Tee time','qgTime',d.time||'',{type:'time'})}</div><div class="frow2">${field('Course','qgCourse',d.course,{type:'select',options:courses.map(x=>[x.id,x.name])})}${field('Tee','qgTee',d.tee||'White',{type:'select',options:((c||{tees:[]}).tees||[]).map(t=>[t.name,t.name])})}</div></div>`:''}
+      ${Q.dayOpen?`<div class="card pad" style="display:flex;flex-direction:column;gap:12px">${field('Name','qgName',d.name,{ph:'e.g. Thursday game'})}<div class="frow2">${field('Date','qgDate',d.date,{type:'date'})}${field('Tee time','qgTime',d.time||'',{type:'time'})}</div><div class="frow2"><div class="fld"><label class="lbl" for="qgCourse">Course</label><select class="inp" id="qgCourse">${courseOptionsHTML(d.course)}</select></div>${field('Tee','qgTee',d.tee||'White',{type:'select',options:((c||{tees:[]}).tees||[]).map(t=>[t.name,t.name])})}</div></div>`:''}
       ${last?`<div class="qsec">From before</div>${opt('last','Same as last time',potsText(last.pots)+' — '+gameWhen(last),Q.set==='last')}${prev.map(g=>opt('prev:'+g.id,gameTitle(g)+' · '+shortDate(g.date),potsText(g.pots),Q.set==='prev:'+g.id)).join('')}`:''}
       <div class="qsec">${last?'Or build the game — tap all that apply':'Tap all that apply'}</div>${starters.map(S=>opt('s:'+S.id,S.title,S.text,!Q.set&&Q.starters.includes(S.id))).join('')}
       <div class="card pad" style="display:flex;justify-content:space-between;gap:12px;align-items:center"><div class="cell2"><b>${built.pots.length?`Each player puts in ${gMoney(per)}`:'Nothing picked yet'}</b><small>${built.players.length} playing${built.pots.length?` · ${gMoney(total)} in the pots · ${esc(potsText(built.pots))}`:''}</small></div></div>
@@ -238,7 +238,7 @@ function vQuick(m){
     m.querySelectorAll('[data-qs]').forEach(b=>b.onclick=()=>{ const k=b.dataset.qs; if(k.startsWith('s:')){ const id=k.slice(2); Q.set=null; Q.starters=Q.starters.includes(id)?Q.starters.filter(x=>x!==id):Q.starters.concat(id); } else { Q.set=Q.set===k?null:k; } render(); });
     const readDay=()=>{ if(!Q.dayOpen) return; d.name=fv('qgName'); d.date=fv('qgDate')||d.date; d.time=fv('qgTime'); d.course=fv('qgCourse'); d.tee=fv('qgTee')||d.tee; const cc=courseById(d.course); if(cc&&!cc.tees.some(t=>t.name===d.tee)) d.tee=(cc.tees[0]||{}).name||'White'; };
     $('qgDay').onclick=()=>{ readDay(); Q.dayOpen=!Q.dayOpen; render(); };
-    if(Q.dayOpen){ const cs=$('qgCourse'); cs.onchange=()=>{ readDay(); render(); }; ['qgName','qgDate','qgTime','qgTee'].forEach(id=>{ const e=$(id); if(e) e.onchange=readDay; }); }
+    if(Q.dayOpen){ const cs=$('qgCourse'); wireCourseSelect(cs); cs.onchange=()=>{ readDay(); render(); }; ['qgName','qgDate','qgTime','qgTee'].forEach(id=>{ const e=$(id); if(e) e.onchange=readDay; }); }
     $('qgPrev').onclick=()=>{ readDay(); Q.step=1; render(); window.scrollTo(0,0); };
     $('qgCreate').onclick=()=>{ readDay(); quickCreate(); };
     $('qgMore').onclick=e=>{ e.preventDefault(); readDay(); const dd=quickBuild(); if(!dd.pots.length) dd.pots.push(newPot('stroke',dd)); GD={id:null,draft:dd}; QG=null; view.gquick=null; view.gdesign='new'; render(); window.scrollTo(0,0); };
@@ -295,7 +295,7 @@ function vGameDesign(m){
   m.innerHTML=`<div class="crumb"><button id="gdBack">Games</button><span class="muted">/</span><span class="muted">${isNew?'New game':esc(gameTitle(d))}</span></div>
   <div class="phead"><div><h1 class="h1">${isNew?'Design the game':'Game design'}</h1><p class="sub">Who plays, which competitions run on the day’s scores, what goes in each and how it pays.</p></div><div class="actions">${isNew?'':`<button class="btn danger" id="gdDelete">${I.trash}Delete game</button>`}<button class="btn" id="gdCancel">Cancel</button><button class="btn pri" id="gdSave">${isNew?'Create game':'Save game'}</button></div></div><div class="rule"></div>
   <div class="card pad" style="display:flex;flex-direction:column;gap:14px"><h2 class="h2">The day</h2>
-    <div class="frow2">${field('Name','gdName',d.name,{ph:'e.g. Friday game'})}<div class="frow2">${field('Course','gdCourse',d.course,{type:'select',options:courses.map(c=>[c.id,c.name])})}${field('Tee','gdTee',d.tee||'White',{type:'select',options:((courseById(d.course)||courses[0]||{tees:[]}).tees||[]).map(t=>[t.name,t.name]),hint:'The game default — any group or player can differ'})}</div></div>
+    <div class="frow2">${field('Name','gdName',d.name,{ph:'e.g. Friday game'})}<div class="frow2"><div class="fld"><label class="lbl" for="gdCourse">Course</label><select class="inp" id="gdCourse">${courseOptionsHTML(d.course)}</select></div>${field('Tee','gdTee',d.tee||'White',{type:'select',options:((courseById(d.course)||courses[0]||{tees:[]}).tees||[]).map(t=>[t.name,t.name]),hint:'The game default — any group or player can differ'})}</div></div>
     <div class="frow2">${field('Date','gdDate',d.date,{type:'date'})}${field('Tee time','gdTime',d.time||'',{type:'time'})}</div>
     ${field('When a skin fails validation, the call-out says','gdFail',d.failWord||'',{ph:'Didn’t validate',hint:'This game only. Leave blank for the usual wording; the phones say the same.'})}
     <div class="frow2"><div class="fld"><span class="lbl">Money changes hands</span>${seg('gdWhen',[['after','After the round'],['before','Before the round']],d.payWhen||'after')}<p class="hint">After: the sheet leads with results and the settlement. Before: it leads with who has paid in.</p></div>
@@ -335,7 +335,7 @@ function vGameDesign(m){
     card.querySelector('[data-gdrm]').onclick=()=>{ readAll(); if(pot.payouts.length&&!confirm('This competition has payouts recorded. Remove it anyway?')) return; d.pots=d.pots.filter(x=>x!==pot); rerender(); }; });
   wireSeg(m,'gdWhen',()=>{}); wireSeg(m,'gdSettle',()=>{}); wireSeg(m,'gdHcp',()=>{});
   $('gdAddSel').onchange=e=>{ if(!e.target.value) return; readAll(); d.pots.push(newPot(e.target.value,d)); rerender(); };
-  $('gdCourse').onchange=()=>{ readAll(); const c=courseById(d.course); if(c&&!c.tees.some(t=>t.name===d.tee)) d.tee=(c.tees[0]||{}).name||'White'; rerender(); };   // the tee list follows the course
+  wireCourseSelect($('gdCourse')); $('gdCourse').onchange=()=>{ readAll(); const c=courseById(d.course); if(c&&!c.tees.some(t=>t.name===d.tee)) d.tee=(c.tees[0]||{}).name||'White'; rerender(); };   // the tee list follows the course
   m.querySelectorAll('[data-gdin]').forEach(c=>c.onchange=()=>{ readAll(); const [pid,plid]=c.dataset.gdin.split('|'); const pot=d.pots.find(x=>x.id===pid); if(c.checked) pot.inn[plid]=true; else delete pot.inn[plid]; rerender(); });
   m.querySelectorAll('[data-gdpx]').forEach(b=>b.onclick=()=>{ readAll(); const p=d.players.find(x=>x.id===b.dataset.gdpx); if(gpOut(d,p)&&!confirm(`${gpName(p)} has payouts recorded. Remove anyway?`)) return; removePlayer(d,p,{keepEvent:true}); rerender(); });
   const q=$('gdQ'), pk=$('gdPick'); q.oninput=()=>{ const s=q.value.toLowerCase().trim(); const hits=s?pool.filter(x=>!inG.has(x.id)&&memberName(x).toLowerCase().includes(s)).slice(0,8):[];
@@ -429,12 +429,12 @@ function gameGroupsCard(g,ev){
       <span class="r">${h.ch!=null?h.ch:'—'}</span><b class="r">${h.ph!=null?h.ph:'—'}</b>
       <select class="inp" data-gmove="${p.id}" aria-label="Group for ${esc(p.name)}">${ev.groups.map((x,i)=>`<option value="${x.id}"${x===grp?' selected':''}>Group ${i+1} · ${esc(x.code)}</option>`).join('')}<option value="__new">+ New group</option></select></div>`; };
   const groupHead=(grp,i)=>`<div class="tr" style="grid-template-columns:minmax(0,1fr) 150px 120px 110px;background:var(--ivory)"><div class="cell2" style="flex-direction:row;align-items:center;gap:10px"><div class="cell2"><b>Group ${i+1} · ${esc(grp.code)}</b><small>${grp.players.length?grp.players.length+' player'+(grp.players.length===1?'':'s'):'Empty — a placeholder tee time; move players in with the Group column'}</small></div>${grp.players.length?'':`<button class="ib" data-grm="${grp.id}" aria-label="Remove empty group" title="Remove this group">${I.trash}</button>`}</div>
-      <select class="inp" data-gcourse="${grp.id}" aria-label="Course">${courses.map(c=>`<option value="${c.id}"${c.id===grp.course?' selected':''}>${esc(c.name)}</option>`).join('')}</select>
+      <select class="inp" data-gcourse="${grp.id}" aria-label="Course">${courseOptionsHTML(grp.course)}</select>
       <select class="inp" data-ghole="${grp.id}" aria-label="Starting hole">${Array.from({length:18},(_,k)=>`<option value="${k+1}"${(+grp.startHole||1)===k+1?' selected':''}>Hole ${k+1}</option>`).join('')}</select>
       <input class="inp" type="time" data-gtime="${grp.id}" value="${esc(grp.teeTime||'')}" aria-label="Tee time"></div>`;
-  const defC=courseById(g.course||ev.defaultCourse||'oak'), defTee=g.tee||ev.defaultTee||'White';
+  const defC=courseById(g.course||ev.defaultCourse||homeCourseId())||courses[0], defTee=g.tee||ev.defaultTee||'White';
   const defaults=`<div class="gdef"><div class="cell2"><b>Game default</b><small class="muted">Sets every group's course and every player's tee below; any group or player can then differ.</small></div>
-      <label class="fld"><span class="lbl">Course</span><select class="inp" id="ggDefCourse">${courses.map(c=>`<option value="${c.id}"${c.id===(defC||{}).id?' selected':''}>${esc(c.name)}</option>`).join('')}</select></label>
+      <label class="fld"><span class="lbl">Course</span><select class="inp" id="ggDefCourse">${courseOptionsHTML((defC||{}).id)}</select></label>
       <label class="fld"><span class="lbl">Tee</span><select class="inp" id="ggDefTee">${tees(defC).map(t=>`<option${t===defTee?' selected':''}>${esc(t)}</option>`).join('')}</select></label></div>`;
   return `<div class="card" style="overflow:hidden"><div class="cardhead"><div><h2 class="h2">Groups &amp; handicaps</h2><span class="muted">Who plays with whom, their tees, and each player’s course (CH) and playing (PH) handicap for today. An index typed here is for this game only, and can be corrected mid-round: the handicaps, the standings and the live leaderboard on everyone’s phone follow within half a minute.</span></div><div class="actions"><button class="btn sm" id="ggAddGroup">${I.plus}New group</button></div></div>
     ${defaults}${ev.groups.length?`<div class="tw"><div class="t" style="min-width:720px"><div class="tr th" style="${cols}"><span>Player</span><span class="r">Index</span><span>Tee</span><span class="r">CH</span><span class="r">PH</span><span>Group</span></div>
@@ -448,12 +448,12 @@ function wireGameGroups(m,g,ev){
   m.querySelectorAll('[data-gmove]').forEach(s=>s.onchange=()=>{ const f=find(s.dataset.gmove); if(!f) return; let to=ev.groups.find(x=>x.id===s.value);
     if(s.value==='__new'){ to={id:uid(),code:newCode(ev),label:'Group '+(ev.groups.length+1),course:f.grp.course,startHole:1,teeTime:f.grp.teeTime||'',players:[]}; ev.groups.push(to); }
     if(!to||to===f.grp) return; f.grp.players=f.grp.players.filter(x=>x!==f.p); to.players.push(f.p); save(); });   // an emptied group stays — it may be a placeholder tee time
-  m.querySelectorAll('[data-gcourse]').forEach(s=>s.onchange=()=>{ const grp=ev.groups.find(x=>x.id===s.dataset.gcourse); if(grp){ grp.course=s.value; save(); } });
+  m.querySelectorAll('[data-gcourse]').forEach(s=>{ wireCourseSelect(s); s.onchange=()=>{ const grp=ev.groups.find(x=>x.id===s.dataset.gcourse); if(grp){ grp.course=s.value; save(); } }; });
   m.querySelectorAll('[data-ghole]').forEach(s=>s.onchange=()=>{ const grp=ev.groups.find(x=>x.id===s.dataset.ghole); if(grp){ grp.startHole=+s.value; save(); } });
   m.querySelectorAll('[data-gtime]').forEach(s=>s.onchange=()=>{ const grp=ev.groups.find(x=>x.id===s.dataset.gtime); if(grp){ grp.teeTime=s.value; save(); } });
-  const dc=$('ggDefCourse'); if(dc) dc.onchange=()=>{ g.course=dc.value; const c=courseById(g.course); if(c&&!c.tees.some(t=>t.name===g.tee)) g.tee=(c.tees[0]||{}).name||'White'; applyGameDefaults(g,ev,{course:true,tee:true}); save(); toast('Course set for every group'); };
+  const dc=$('ggDefCourse'); if(dc){ wireCourseSelect(dc); } if(dc) dc.onchange=()=>{ g.course=dc.value; const c=courseById(g.course); if(c&&!c.tees.some(t=>t.name===g.tee)) g.tee=(c.tees[0]||{}).name||'White'; applyGameDefaults(g,ev,{course:true,tee:true}); save(); toast('Course set for every group'); };
   const dt=$('ggDefTee'); if(dt) dt.onchange=()=>{ g.tee=dt.value; applyGameDefaults(g,ev,{tee:true}); save(); toast('Tee set for every player'); };
-  const ng=$('ggAddGroup'); if(ng) ng.onclick=()=>{ ev.groups.push({id:uid(),code:newCode(ev),label:'Group '+(ev.groups.length+1),course:g.course||ev.defaultCourse||'oak',startHole:1,teeTime:'',players:[]}); save(); toast('Empty group added — set its tee time, move players in with the Group column'); };
+  const ng=$('ggAddGroup'); if(ng) ng.onclick=()=>{ ev.groups.push({id:uid(),code:newCode(ev),label:'Group '+(ev.groups.length+1),course:g.course||ev.defaultCourse||homeCourseId(),startHole:1,teeTime:'',players:[]}); save(); toast('Empty group added — set its tee time, move players in with the Group column'); };
   m.querySelectorAll('[data-grm]').forEach(b=>b.onclick=()=>{ const grp=ev.groups.find(x=>x.id===b.dataset.grm); if(!grp||grp.players.length) return; ev.groups=ev.groups.filter(x=>x!==grp); save(); });
 }
 /* live standings for one competition, from the day's scores */
@@ -784,13 +784,13 @@ function gameEventEngine(g){
 }
 /* every game has live scoring: its event exists from the moment the game does, open, and follows the players */
 /* the game's default course and tee onto the event: every group's course, every player's tee (per-row edits come after) */
-function applyGameDefaults(g,ev,what){ what=what||{}; ev.defaultCourse=g.course||ev.defaultCourse||'oak'; ev.defaultTee=g.tee||ev.defaultTee||'White';
+function applyGameDefaults(g,ev,what){ what=what||{}; ev.defaultCourse=g.course||ev.defaultCourse||homeCourseId(); ev.defaultTee=g.tee||ev.defaultTee||'White';
   if(what.course) ev.groups.forEach(gr=>{ gr.course=ev.defaultCourse; });
   if(what.tee) ev.groups.forEach(gr=>gr.players.forEach(p=>{ p.tee=ev.defaultTee; })); }
 function ensureGameEvent(g){
   const G=golfData(); let ev=gameEvent(g);
   if(!ev){ let slug=slugify(orgShort()+'-'+(g.date||'game')), n=2; while(G.events.some(e=>e.slug===slug)) slug=slugify(orgShort()+'-'+(g.date||'game'))+'-'+(n++);
-    ev={id:uid(),status:'live',name:gameTitle(g)+(g.date?' · '+shortDate(g.date):''),date:g.date,defaultTee:'White',defaultCourse:g.course||'oak',slug,tournamentId:'',front:'scramble',back:'shamble',scoring:'net',allow:{},groups:[],pool:[],flights:{count:0,names:[]},createdAt:new Date().toISOString(),gameId:g.id};
+    ev={id:uid(),status:'live',name:gameTitle(g)+(g.date?' · '+shortDate(g.date):''),date:g.date,defaultTee:'White',defaultCourse:g.course||homeCourseId(),slug,tournamentId:'',front:'scramble',back:'shamble',scoring:'net',allow:{},groups:[],pool:[],flights:{count:0,names:[]},createdAt:new Date().toISOString(),gameId:g.id};
     G.events.push(ev); g.golfEventId=ev.id; }
   syncGameEvent(g,ev); return ev;
 }
@@ -838,11 +838,11 @@ function syncGameEvent(g,ev){
   for(const p of g.players){ if(p.gpid&&have.has(p.gpid)) continue;
     const gp={id:uid(),memberId:p.memberId||'',name:gpName(p),tee:g.tee||ev.defaultTee||'White',set:'M',index:'',flight:'',team:''}; p.gpid=gp.id;
     let grp=ev.groups.find(x=>x.players.length<4);
-    if(!grp){ grp={id:uid(),code:newCode(ev),label:'Group '+(ev.groups.length+1),course:g.course||ev.defaultCourse||'oak',startHole:1,teeTime:g.time||'',players:[]}; ev.groups.push(grp); }
+    if(!grp){ grp={id:uid(),code:newCode(ev),label:'Group '+(ev.groups.length+1),course:g.course||ev.defaultCourse||homeCourseId(),startHole:1,teeTime:g.time||'',players:[]}; ev.groups.push(grp); }
     grp.players.push(gp); }
   const ids=new Set(g.players.map(p=>p.gpid));   // anyone no longer in the game leaves the event, scores and all
   evPlayers(ev).filter(x=>!ids.has(x.p.id)).forEach(x=>removeEventPlayer(ev,x.p.id));
-  ev.defaultCourse=g.course||ev.defaultCourse||'oak'; ev.defaultTee=g.tee||ev.defaultTee||'White';
+  ev.defaultCourse=g.course||ev.defaultCourse||homeCourseId(); ev.defaultTee=g.tee||ev.defaultTee||'White';
   const E=gameEventEngine(g); EV_GAME_KEYS.forEach(k=>{ ev[k]=E[k]; });
   ev.allow=(g.hcp||'full')==='usga'?{}:{'*':100};   // a group's game is 100% across the board unless the designer says USGA
   ev.scoring=g.pots.some(p=>p.kind==='format'&&(p.rules.scoring||'gross')==='net')||g.pots.some(p=>p.kind==='skins'&&skinsRulesOf(p).net)?'net':'gross';

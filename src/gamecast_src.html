@@ -141,9 +141,11 @@ function loadLeaflet(){ if(window.L) return Promise.resolve(window.L); if(mapLoa
   mapLoading=new Promise((ok,bad)=>{ const css=document.createElement('link'); css.rel='stylesheet'; css.href='https://unpkg.com/leaflet@1.9.4/dist/leaflet.css'; document.head.appendChild(css);
     const s=document.createElement('script'); s.src='https://unpkg.com/leaflet@1.9.4/dist/leaflet.js'; s.onload=()=>ok(window.L); s.onerror=()=>bad(new Error('leaflet')); document.head.appendChild(s); setTimeout(()=>bad(new Error('timeout')),12000); });
   return mapLoading; }
-const geoCourses=()=>[...new Set((pub.groups||[]).map(g=>g.course))].filter(c=>typeof COURSE_GEO!=='undefined'&&COURSE_GEO[c]);
+/* hole centerlines: the ones the event published with its course (a library course's), else the built-in WCCC set */
+const geoOf=c=>(pub.courses&&pub.courses[c]&&pub.courses[c].geo)||(typeof COURSE_GEO!=='undefined'&&COURSE_GEO[c])||null;
+const geoCourses=()=>[...new Set((pub.groups||[]).map(g=>g.course))].filter(c=>!!geoOf(c));
 const hasGeo=()=>geoCourses().length>0;
-function holeLine(course,h){ const c=COURSE_GEO[course]||COURSE_GEO[geoCourses()[0]]; return c?c[String(h)]:null; }
+function holeLine(course,h){ const c=geoOf(course)||geoOf(geoCourses()[0]); return c?c[String(h)]:null; }
 const along=(line,t)=>{ if(!line||line.length<2) return line&&line[0]; const segs=[]; let tot=0; for(let i=0;i<line.length-1;i++){ const d=Math.hypot(line[i+1][0]-line[i][0],(line[i+1][1]-line[i][1])*Math.cos(line[i][0]*Math.PI/180)); segs.push(d); tot+=d; } let want=tot*t; for(let i=0;i<segs.length;i++){ if(want<=segs[i]){ const f=segs[i]?want/segs[i]:0; return [line[i][0]+(line[i+1][0]-line[i][0])*f,line[i][1]+(line[i+1][1]-line[i][1])*f]; } want-=segs[i]; } return line[line.length-1]; };
 /* mount the map into the current card (the same Leaflet map survives every render), then redraw the moving parts */
 function drawMap(pos,fg,moveTo){
@@ -157,7 +159,7 @@ function drawMap(pos,fg,moveTo){
     mapLayers=L.layerGroup().addTo(MAP); }
   MAP.invalidateSize();
   mapLayers.clearLayers(); mapLines={}; const all=[];
-  for(const course of geoCourses()){ const G=COURSE_GEO[course]; for(let h=1;h<=18;h++){ const line=G[String(h)]; if(!line) continue; all.push(...line); const on=h===holeSel;
+  for(const course of geoCourses()){ const G=geoOf(course); for(let h=1;h<=18;h++){ const line=G[String(h)]; if(!line) continue; all.push(...line); const on=h===holeSel;
       L.polyline(line,{color:'#fff',weight:on?8:5,opacity:on?.9:.55,lineCap:'round',interactive:false}).addTo(mapLayers);
       const pl=L.polyline(line,{color:on?'#F2D27A':'#D8B75F',weight:on?4:2.5,opacity:.95,lineCap:'round'}).addTo(mapLayers); pl.on('click',()=>{ holeSel=h; render(true); });
       L.circleMarker(line[line.length-1],{radius:on?6:4.5,color:'#fff',weight:1.5,fillColor:'#6FAE6B',fillOpacity:1}).addTo(mapLayers);

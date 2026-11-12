@@ -70,7 +70,7 @@ class FakeDB:
             if not self.tenancy: return json.dumps({'data':None,'error':{'message':'Could not find the function public.tenant_lookup(p_host) in the schema cache','code':'PGRST202'}})
             h=str(a.get('p_host') or '').lower().split(':')[0]
             t=next((t for t in self._rows('tenants') if h in (t['slug'],t['slug']+'.flagstickhub.com') or h in (t.get('hosts') or [])),None)
-            return json.dumps({'data':(dict({k:t[k] for k in ('slug','name','short','plan','modules','status','login_email')},kind=t.get('kind','private')) if t else None),'error':None})
+            return json.dumps({'data':(dict({k:t[k] for k in ('slug','name','short','plan','modules','status','login_email')},kind=t.get('kind','private'),courses=t.get('courses') or []) if t else None),'error':None})
         if fn=='my_access':
             grants=self.grants if self.grants is not None else [{'tenant':r['tenant'],'role':r['role'],'orgs':r['orgs'],'manage':r.get('manage',False),'name':r.get('name','')} for r in self._rows('tenant_users') if r['user_id']==self.me]
             tenants=sorted({g['tenant'] for g in grants}|set(self.user_tenants)) if self.grants is None and not self._rows('tenant_users') else sorted({g['tenant'] for g in grants})

@@ -40,14 +40,14 @@ function portalBoot(){
   $('btnSignOut').hidden=false; $('who').textContent='Signed in as '+((ACCESS&&ACCESS.email)||'Flagstick admin'); $('who').hidden=false; portalNav(); vPortal($('main')); loadPortal();
 }
 function portalNav(){
-  const items=[['clients','Clients',I.org],['team','Team',I.shield],['activity','Activity',I.ledger]];
+  const items=[['clients','Clients',I.org],['courses','Courses',I.flag],['team','Team',I.shield],['activity','Activity',I.ledger]];
   $('nav').innerHTML=items.map(([k,l,ic])=>`<button class="nav${PS.view===k||(k==='clients'&&PS.view==='client')?' on':''}" data-pv="${k}">${ic}<span>${l}</span></button>`).join('');
   $('nav').querySelectorAll('[data-pv]').forEach(b=>b.onclick=()=>{ PS.view=b.dataset.pv; PS.slug=null; $('side').classList.remove('open'); portalNav(); vPortal($('main')); window.scrollTo(0,0); });
 }
 async function loadPortal(){
   PS.err=null;
   const q=async t=>{ const {data,error}=await sb.from(t).select('*'); if(error){ PS.err=(PS.err?PS.err+' · ':'')+t+': '+error.message; return []; } return data||[]; };
-  const [tenants,users,contacts,admins,events]=await Promise.all([q('tenants'),q('tenant_users'),q('tenant_contacts'),q('flagstick_admins'),q('tenant_events')]);
+  const [tenants,users,contacts,admins,events]=await Promise.all([q('tenants'),q('tenant_users'),q('tenant_contacts'),q('flagstick_admins'),q('tenant_events'),loadCourseLibrary(true)]);
   PS.tenants=tenants.sort((a,b)=>a.name.localeCompare(b.name)); PS.users=users; PS.contacts=contacts; PS.admins=admins; PS.events=events.sort((a,b)=>new Date(b.at)-new Date(a.at));
   const ids=[...new Set([...users.map(u=>u.user_id),...admins.map(a=>a.user_id)])].filter(Boolean);
   if(ids.length){ try{ const {data}=await sb.rpc('admin_users_info',{p_ids:ids}); PS.auth={}; (data||[]).forEach(x=>PS.auth[x.id]=x); }catch(_){} }
@@ -72,6 +72,7 @@ function vPortal(m){
   if(!m) return;
   if(PS.view==='client'&&PS.slug) return vClient(m,PS.slug);
   if(PS.view==='team') return vTeam(m);
+  if(PS.view==='courses') return vCourses(m);
   if(PS.view==='activity') return vActivity(m);
   return vClients(m);
 }
@@ -128,6 +129,8 @@ function vClient(m,slug){
         <div class="actions" style="margin-top:10px"><button class="btn" id="ptModSave">Save modules</button><span class="hint" style="margin-left:8px">The club’s hub picks changes up on its next load.</span></div></div></div>`)}
       ${card('Club details',`<div style="padding:0 22px 18px">${kv('Address',addr.length?addr.map(esc).join('<br>'):'')}${kv('Phone',esc(t.phone||''))}${kv('Website',t.website?`<a href="${esc(/^https?:/.test(t.website)?t.website:'https://'+t.website)}" target="_blank" rel="noopener">${esc(t.website)}</a>`:'')}${kv('Time zone',esc(t.timezone||''))}${kv('Short name',esc(t.short||''))}${kv('Other hosts',(t.hosts||[]).map(esc).join('<br>'))}${kv('Organizations',orgs.length?orgs.map(o=>esc(o.short||o.name)).join(', '):'')}${kv('Notes',esc(t.notes||'').replace(/\n/g,'<br>'))}</div>`,btn('Edit','ptEdit2','',I.edit))}
     </div>
+    ${card('Courses <span class="muted" style="font-size:13px;font-weight:400">· the club’s defaults</span>',`<div class="t">${(t.courses||[]).length?(t.courses||[]).map(id=>{ const c=libCourse(id); return `<div class="tr" style="grid-template-columns:minmax(0,1.4fr) minmax(0,1fr) 120px;min-height:42px"><div class="cell2"><b>${esc(c?c.name:id)}</b><small>${esc(c?[c.club,[c.city,c.state].filter(Boolean).join(', ')].filter(Boolean).join(' · '):'not in the library')}</small></div><span class="muted" style="font-size:13px">${c?((c.data&&c.data.tees)||[]).length+' tees':''}</span><span>${c&&c.verified?'<span class="chip gold">Verified</span>':''}</span></div>`; }).join(''):'<div class="tr"><span class="muted">No default courses yet — a new club document starts with Walnut Creek’s cards until these are set. Pick the club’s own course(s) from the library.</span></div>'}</div>
+      <div style="padding:12px 22px 18px"><p class="hint" style="margin:0">These show first everywhere the club picks a course; any event can still reach the whole library. Add the club’s courses to the library on the Courses page first.</p></div>`,btn('Choose courses','ptCourses','',I.edit))}
     ${card('Points of contact',`<div class="t">${contacts.length?contacts.map(crow).join(''):'<div class="tr"><span class="muted">No contacts yet — add the head pro, the GM, the billing contact.</span></div>'}</div>`,btn('Add contact','ptAddC','',I.plus))}
     ${card('Staff logins',`<div class="t"><div class="tr th" style="grid-template-columns:minmax(0,1.6fr) minmax(0,1.2fr) 130px 32px"><span>Login</span><span>Last activity</span><span></span><span></span></div>${staff.length?staff.map(urow).join(''):'<div class="tr"><span class="muted">No staff logins yet.</span></div>'}</div>
       <div style="padding:12px 22px 18px"><p class="hint" style="margin:0">Staff see the whole club and manage their own board logins from the club hub (Logins). Flagstick creates staff logins; the club does the rest.</p>${fnNote()}</div>`,
@@ -136,6 +139,7 @@ function vClient(m,slug){
     ${card('Activity',`<div class="t">${events.length?events.map(erow).join(''):'<div class="tr"><span class="muted">Nothing yet.</span></div>'}</div>`)}`;
   $('ptBack').onclick=e=>{ e.preventDefault(); PS.view='clients'; PS.slug=null; portalNav(); vPortal(m); };
   $('ptOpen').onclick=()=>openHub(t); $('ptStatus').onclick=()=>statusDrawer(t); $('ptEdit').onclick=()=>editClient(t); $('ptEdit2').onclick=()=>editClient(t);
+  $('ptCourses').onclick=()=>clientCoursesDrawer(t);
   $('ptAddC').onclick=()=>editContact(t,null); $('ptAddU').onclick=()=>staffDrawer(t,null); $('ptLink').onclick=()=>linkDrawer(t);
   wireModRows(m,'data-mod');
   $('ptModSave').onclick=async()=>{ const nm={golf:true}; m.querySelectorAll('[data-mod]').forEach(c=>{ if(c.checked) nm[c.dataset.mod]=true; }); if(nm.club) (MODULE_CATALOG.find(x=>x.id==='club').includes||[]).forEach(k=>nm[k]=true); const b=$('ptModSave'); b.disabled=true;
@@ -251,6 +255,59 @@ function linkDrawer(t){
         try{ await linkUser(data.id,{tenant:t.slug,role:'staff',email:data.email}); logEvent(t.slug,'login','Linked existing login '+data.email+' as staff'); await loadPortal(); toast('Linked'); }catch(e){ toast(e.message); } })(); }});
 }
 /* ---------- Team ---------- */
+/* ---------- the course library ----------
+   Flagstick's courses (tenant null) and every client's own (tenant set), one table. A row's data is the card golfcore
+   reads; the hub copies a row into a document when a club picks it. */
+PS.cq=''; PS.cstate='';
+function vCourses(m){
+  const all=libraryCourses().slice().sort((a,b)=>(a.state||'').localeCompare(b.state||'')||(a.club||a.name).localeCompare(b.club||b.name)||a.name.localeCompare(b.name));
+  const q=PS.cq.trim().toLowerCase(), rows=all.filter(c=>(!PS.cstate||c.state===PS.cstate)&&(!q||[c.name,c.club,c.city,c.state,c.id].some(x=>String(x||'').toLowerCase().includes(q))));
+  const states=[...new Set(all.map(c=>c.state).filter(Boolean))].sort();
+  const tname=slug=>{ const t=tenantOf(slug); return t?t.short||t.name:slug; };
+  const row=c=>{ const d=c.data||{}, tees=(d.tees||[]), par=d.par&&d.par.M?d.par.M.reduce((a,b)=>a+(+b||0),0):''; return `<div class="tr click" data-crow="${esc(c.id)}" style="grid-template-columns:minmax(0,1.6fr) minmax(0,1.2fr) 90px 120px 130px 32px">
+      <div class="cell2"><b>${esc(c.name)}</b><small>${esc([c.club,[c.city,c.state].filter(Boolean).join(', ')].filter(Boolean).join(' · '))}</small></div>
+      <span class="muted" style="font-size:13px">${tees.length?tees.map(t=>esc(t.name)).join(' · '):'<span class="neg">no tees</span>'}</span><span class="muted num" style="font-size:13px">${par?'par '+par:''}</span>
+      <span>${c.tenant?`<span class="chip">${esc(tname(c.tenant))}</span>`:'<span class="chip gold">Library</span>'}</span><span>${c.verified?'<span class="chip gold">Verified</span>':'<span class="chip warn">Unverified</span>'}${c.geo?' <span class="chip" title="Hole lines for GameCast">Map</span>':''}</span><span class="ib">${I.edit}</span></div>`; };
+  m.innerHTML=head('Courses',`The course library: the cards, tees and ratings every client can pick from. ${all.length} course${all.length===1?'':'s'}${all.filter(c=>c.tenant).length?' · '+all.filter(c=>c.tenant).length+' added by clubs':''}.`,btn('Import JSON','pcImport','')+btn('New course','pcNew','pri',I.plus))+
+    `<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:12px"><input class="inp" id="pcQ" placeholder="Search — name, club, city, state" value="${esc(PS.cq)}" style="max-width:360px" aria-label="Search courses"><div class="seg" id="pcSt"><button class="${PS.cstate?'':'on'}" data-st="">All</button>${states.map(s=>`<button class="${PS.cstate===s?'on':''}" data-st="${esc(s)}">${esc(s)}</button>`).join('')}</div></div>
+    <div class="card" style="overflow:hidden"><div class="t"><div class="tr th" style="grid-template-columns:minmax(0,1.6fr) minmax(0,1.2fr) 90px 120px 130px 32px"><span>Course</span><span>Tees</span><span></span><span>Owner</span><span>Status</span><span></span></div>${rows.length?rows.map(row).join(''):`<div class="tr"><span class="muted">${all.length?'Nothing matches.':'The library is empty — New course, or Import JSON from tools/courses.'}</span></div>`}</div></div>
+    <p class="hint">A club’s own course (added from its hub) shows here too. <b>Verified</b> means someone checked the card against the printed scorecard or the USGA rating database; imports start unverified.</p>`;
+  const qi=$('pcQ'); qi.oninput=()=>{ PS.cq=qi.value; const pos=qi.selectionStart; vCourses(m); const q2=$('pcQ'); q2.focus(); q2.setSelectionRange(pos,pos); };
+  m.querySelectorAll('[data-st]').forEach(b=>b.onclick=()=>{ PS.cstate=b.dataset.st; vCourses(m); });
+  m.querySelectorAll('[data-crow]').forEach(r=>r.onclick=()=>libraryCourseDrawer(libCourse(r.dataset.crow)));
+  $('pcNew').onclick=()=>libraryCourseDrawer(null);
+  $('pcImport').onclick=()=>importCoursesDrawer();
+}
+/* the editor over a library row (courseEditorDrawer is shared with the hub) */
+function libraryCourseDrawer(row){
+  const c=row?courseFromLib(row):null;
+  const extra=`<div class="fld"><span class="lbl">Library</span><label class="chk"><input type="checkbox" id="cVer"${row&&row.verified?' checked':''}> Verified against the printed card or the USGA rating database</label>${field('Source','cSrc',(row&&row.source)||'scorecard',{ph:'scorecard · golfcourseapi · osm · club'})}${field('Notes','cNotes',(row&&row.notes)||'',{type:'textarea'})}${row&&row.tenant?`<p class="hint">Added by ${esc((tenantOf(row.tenant)||{}).name||row.tenant)} from its hub. Clear the owner to move it into the shared library.</p><label class="chk"><input type="checkbox" id="cShare"> Move into the Flagstick library (every client sees it)</label>`:''}</div>`;
+  courseEditorDrawer(c,{kicker:'Course library',idField:true,saveLabel:row?'Save':'Add to the library',extra,
+    onSave:async out=>{ const rec={id:out.id,tenant:row?(($('cShare')&&$('cShare').checked)?null:row.tenant):null,name:out.name,club:out.club||'',city:out.city||'',state:out.state||'',holes:18,data:{par:out.par,hcp:out.hcp,tees:out.tees},geo:row?row.geo||null:null,source:fv('cSrc')||'scorecard',verified:!!($('cVer')&&$('cVer').checked),status:'live',notes:fv('cNotes')||null,updated_at:new Date().toISOString(),updated_by:(ACCESS&&ACCESS.email)||''};
+      const r=await sb.from('courses').upsert(rec); if(r.error){ toast(r.error.message); return false; } await loadCourseLibrary(true); logEvent(null,'courses',(row?'Updated ':'Added ')+rec.name+(rec.club?' · '+rec.club:'')+' in the course library'); toast('Saved'); vCourses($('main')); },
+    onDelete:row?async()=>{ if(!confirm('Remove '+row.name+' from the library? Clubs that already copied it keep their copy.')) return false; const r=await sb.from('courses').delete().eq('id',row.id); if(r.error){ toast(r.error.message); return false; } await loadCourseLibrary(true); logEvent(null,'courses','Removed '+row.name+' from the course library'); vCourses($('main')); }:undefined});
+}
+/* paste the importer's JSON (tools/courses) — an array of library rows */
+function importCoursesDrawer(){
+  openDrawer({kicker:'Course library',title:'Import courses',saveLabel:'Import',wide:true,
+    body:`<p style="margin:0 0 8px">Paste the JSON that <code>tools/courses/import_courses.py</code> wrote — an array of rows with <code>id, name, club, city, state, data, geo, source</code>. Existing ids are updated; everything comes in <b>unverified</b> unless the row says otherwise.</p><textarea class="inp" id="pcJ" style="min-height:260px;font-family:ui-monospace,monospace;font-size:12px" placeholder='[{"id":"tx-mansfield-walnut-creek-oak", …}]'></textarea><p class="hint" id="pcJH"></p>`,
+    wire:r=>{ r.querySelector('#pcJ').oninput=()=>{ try{ const a=JSON.parse(r.querySelector('#pcJ').value); r.querySelector('#pcJH').textContent=Array.isArray(a)?a.length+' course'+(a.length===1?'':'s')+' ready':'Expected an array'; }catch(_){ r.querySelector('#pcJH').textContent=''; } }; },
+    save:async()=>{ let rows; try{ rows=JSON.parse(fv('pcJ')); }catch(e){ toast('That is not valid JSON'); return false; } if(!Array.isArray(rows)||!rows.length){ toast('Expected an array of courses'); return false; }
+      const bad=rows.find(r=>!r.id||!r.name||!r.data||!r.data.par||!r.data.hcp); if(bad){ toast('Every row needs id, name and data.par / data.hcp — '+(bad.id||bad.name||'?')); return false; }
+      const recs=rows.map(r=>({id:String(r.id).slice(0,80),tenant:r.tenant||null,name:r.name,club:r.club||'',city:r.city||'',state:r.state||'',country:r.country||'US',holes:r.holes||18,data:{par:r.data.par,hcp:r.data.hcp,tees:r.data.tees||[]},geo:r.geo||null,source:r.source||'import',verified:!!r.verified,status:'live',notes:r.notes||null,updated_at:new Date().toISOString(),updated_by:(ACCESS&&ACCESS.email)||''}));
+      for(let i=0;i<recs.length;i+=100){ const x=await sb.from('courses').upsert(recs.slice(i,i+100)); if(x.error){ toast(x.error.message); return false; } }
+      await loadCourseLibrary(true); logEvent(null,'courses','Imported '+recs.length+' courses into the library'); toast(recs.length+' courses imported'); vCourses($('main')); }});
+}
+/* a client's default courses: ticked from the library */
+function clientCoursesDrawer(t){
+  const cur=new Set(t.courses||[]); let q='';
+  const list=()=>{ const rows=libraryCourses().filter(c=>!c.tenant||c.tenant===t.slug).filter(c=>!q||[c.name,c.club,c.city,c.state].some(x=>String(x||'').toLowerCase().includes(q))).sort((a,b)=>(cur.has(b.id)-cur.has(a.id))||(a.club||a.name).localeCompare(b.club||b.name));
+    return rows.length?rows.slice(0,80).map(c=>`<label class="tr" style="grid-template-columns:28px minmax(0,1fr) 110px;min-height:40px;cursor:pointer"><input type="checkbox" data-cc="${esc(c.id)}"${cur.has(c.id)?' checked':''}><div class="cell2"><b>${esc(c.name)}</b><small>${esc([c.club,[c.city,c.state].filter(Boolean).join(', ')].filter(Boolean).join(' · '))}</small></div><span class="muted" style="font-size:12.5px">${c.tenant?'the club’s own':c.verified?'verified':''}</span></label>`).join(''):'<div class="tr"><span class="muted">Nothing matches.</span></div>'; };
+  openDrawer({kicker:t.name,title:'Default courses',saveLabel:'Save',
+    body:`<input class="inp" id="pccQ" placeholder="Search the library" aria-label="Search"><div class="mini" style="margin-top:8px;max-height:60vh;overflow:auto"><div class="t" id="pccL">${list()}</div></div><p class="hint">Ticked courses come first in every course pick on the club’s hubs, and a new club document starts with them (a hub that already has courses keeps those and can add these from Golf → Courses).</p>`,
+    wire:r=>{ const wireL=()=>r.querySelectorAll('[data-cc]').forEach(cb=>cb.onchange=()=>{ if(cb.checked) cur.add(cb.dataset.cc); else cur.delete(cb.dataset.cc); }); wireL(); r.querySelector('#pccQ').oninput=e=>{ q=e.target.value.trim().toLowerCase(); r.querySelector('#pccL').innerHTML=list(); wireL(); }; },
+    save:async()=>{ const ids=[...cur]; const {error}=await sb.from('tenants').update({courses:ids,updated_at:new Date().toISOString()}).eq('slug',t.slug); if(error){ toast(error.message); return false; } t.courses=ids; logEvent(t.slug,'edit','Default courses: '+(ids.map(id=>(libCourse(id)||{name:id}).name).join(', ')||'none')); toast('Saved'); vClient($('main'),t.slug); }});
+}
 function vTeam(m){
   const row=a=>{ const x=PS.auth[a.user_id]||{}; return `<div class="tr" style="grid-template-columns:minmax(0,1.6fr) minmax(0,1fr) 150px 40px"><div class="cell2"><b>${esc(x.name||a.email||'')}</b><small>${esc(a.email||x.email||'')}</small></div><span class="muted" style="font-size:13px">${x.last_sign_in_at?'Signed in '+fwhen(x.last_sign_in_at):'Never signed in'}</span><span class="muted" style="font-size:13px">Added ${fdate(a.created_at)}</span><button class="ib" data-rm="${esc(a.user_id)}" title="Remove from the team">${I.trash}</button></div>`; };
   m.innerHTML=head('Team','Flagstick’s own administrators: everyone here can open the portal and any client’s hub.',btn('Add administrator','ptAddA','pri',I.plus))+

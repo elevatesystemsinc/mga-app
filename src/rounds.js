@@ -93,7 +93,7 @@ function editRound(t,r){
 function buildRoundEvent(t,r,rs){
   const G=golfData();
   let slug=slugify(`${t.name}-${t.season}-d${r.day+1}`), n=2; while(G.events.some(e=>e.slug===slug)) slug=slugify(`${t.name}-${t.season}-d${r.day+1}`)+'-'+(n++);
-  const ev={id:uid(),status:'live',name:`${t.name} · ${dayLabel(t,r.day).split(' · ')[0]}${rs.filter(x=>x.day===r.day).length>1?' · '+formatSummary(r):''}`,date:roundDate(t,r.day),defaultTee:'White',defaultCourse:'oak',slug,tournamentId:t.id,allow:{},groups:[],pool:[],flights:{count:0,names:[]},createdAt:new Date().toISOString(),roundId:r.id};
+  const ev={id:uid(),status:'live',name:`${t.name} · ${dayLabel(t,r.day).split(' · ')[0]}${rs.filter(x=>x.day===r.day).length>1?' · '+formatSummary(r):''}`,date:roundDate(t,r.day),defaultTee:'White',defaultCourse:t.course||homeCourseId(),slug,tournamentId:t.id,allow:{},groups:[],pool:[],flights:{count:0,names:[]},createdAt:new Date().toISOString(),roundId:r.id};
   roundToEvent(r,ev);
   G.events.push(ev); r.eventId=ev.id;
   if(t.flights&&t.flights.count) applyFlights(t,ev); else { const first=rs.map(roundEvent).find(e=>e&&e!==ev&&e.flights&&e.flights.count); if(first) copyFlightsInto(first,ev); }
@@ -182,7 +182,7 @@ function setTournamentFlights(t,count){
   const old=t.flights||{}; t.flights={count:k,names,of,basis:'index',unit:(t.teamSize||1)>1?'team':'player',perGroup:per,groupSize:per*(t.teamSize||1),plan:old.plan||{},setAt:new Date().toISOString()}; tFlightPlan(t);
   return {units,missing:units.filter(u=>u.val==null)};
 }
-function tFlightPlan(t){ const F=t.flights; F.plan=F.plan||{}; (F.names||[]).forEach((n,i)=>{ const p=F.plan[n]=F.plan[n]||{}; if(!p.course){ const C=golfData().courses.map(c=>c.id); p.course=i<Math.ceil(F.names.length/2)?(C[0]||'oak'):(C[1]||C[0]||'pecan'); } if(!p.start) p.start='shotgun'; if(!p.first) p.first='08:30'; if(p.gap==null) p.gap=8; if(!p.hole) p.hole=1; }); return F.plan; }
+function tFlightPlan(t){ const F=t.flights; F.plan=F.plan||{}; (F.names||[]).forEach((n,i)=>{ const p=F.plan[n]=F.plan[n]||{}; if(!p.course){ const C=golfData().courses.map(c=>c.id), first=t.course&&C.includes(t.course)?t.course:(C[0]||'oak'), second=C.find(x=>x!==first)||first; p.course=i<Math.ceil(F.names.length/2)?first:second; } if(!p.start) p.start='shotgun'; if(!p.first) p.first='08:30'; if(p.gap==null) p.gap=8; if(!p.hole) p.hole=1; }); return F.plan; }
 /* push the tournament's flights onto a round's event: names, plan, perGroup and each player's flight */
 function applyFlights(t,ev){ const F=t.flights; if(!F||!F.count) return; const plan=tFlightPlan(t), ts=t.teamSize||1;
   ev.flights={count:F.count,names:F.names.slice(),basis:'index',unit:F.unit,groupSize:F.groupSize,perGroup:F.perGroup,courseOf:Object.fromEntries(F.names.map(n=>[n,plan[n].course])),plan:clone(plan)};
@@ -193,7 +193,7 @@ function flightsCard(t){
   const plan=has?tFlightPlan(t):{};
   const rows=has?F.names.map(n=>{ const us=byF(n).sort((a,b)=>a.val-b.val), p=plan[n], tee=p.start==='tee', ng=Math.ceil(us.length/(F.perGroup||2));
     return `<div class="tr num" style="grid-template-columns:70px minmax(0,1fr) 140px 130px 120px 80px 70px 60px"><b>Flight ${n}</b><div class="cell2"><span>${us.length} ${ts>1?'teams':'players'} · ${us.length?fmtH(us[0].val,'index')+' – '+fmtH(us[us.length-1].val,'index'):'—'}</span><small><button class="linkbtn" data-fview="${n}" style="color:var(--gold);text-decoration:underline;font-size:12px">who’s in it</button></small></div>
-      <select class="inp" data-tfp="${n}|course" aria-label="Flight ${n} course">${golfData().courses.map(c=>`<option value="${c.id}"${c.id===p.course?' selected':''}>${esc(c.name)}</option>`).join('')}</select>
+      <select class="inp" data-tfp="${n}|course" aria-label="Flight ${n} course">${courseOptionsHTML(p.course)}</select>
       <select class="inp" data-tfp="${n}|start" aria-label="Flight ${n} start"><option value="shotgun"${!tee?' selected':''}>Shotgun</option><option value="tee"${tee?' selected':''}>Tee times</option></select>
       <input class="inp num" type="time" data-tfp="${n}|first" value="${esc(p.first)}" aria-label="Flight ${n} first tee time"${tee?'':' disabled'}>
       <input class="inp num r" data-tfp="${n}|gap" value="${esc(p.gap)}" inputmode="numeric" aria-label="Flight ${n} gap"${tee?'':' disabled'}>
@@ -208,6 +208,7 @@ function flightsCard(t){
 function wireFlightsCard(el,t){
   const st=$('tfSet'); if(st) st.onclick=()=>{ const n=+$('tfN').value||2; if(t.flights&&t.flights.count&&!confirm('Re-flight the tournament? Flight letters may change; apply to the events afterwards.')) return; const r=setTournamentFlights(t,n); persist(); render(); toast(`${t.flights.count} flight${t.flights.count>1?'s':''} set${r.missing.length?` · ${r.missing.length} without an index left out`:''}`); };
   const ap=$('tfApply'); if(ap) ap.onclick=()=>{ let n=0; tournamentRounds(t).forEach(r=>{ const ev=roundEvent(r); if(ev){ applyFlights(t,ev); publishEvent(ev); n++; } }); persist(); render(); toast(`Flights applied to ${n} event${n===1?'':'s'}`); };
+  el.querySelectorAll('[data-tfp$="|course"]').forEach(wireCourseSelect);
   el.querySelectorAll('[data-tfp]').forEach(i=>i.onchange=()=>{ const [n,k]=i.dataset.tfp.split('|'); const p=tFlightPlan(t)[n]; p[k]=k==='gap'||k==='hole'?+i.value:i.value; persist(); render(); });
   el.querySelectorAll('[data-fview]').forEach(b=>b.onclick=()=>{ const n=b.dataset.fview, us=tFlightUnits(t).filter(u=>t.flights.of[u.key]===n).sort((a,b)=>a.val-b.val);
     openDrawer({kicker:t.name,title:'Flight '+n,body:`<div class="mini">${us.map(u=>`<div class="mr num" style="grid-template-columns:minmax(0,1fr) 90px"><div class="cell2"><b>${esc(u.label)}</b><small>${u.members.map(m=>idxTxt(m.idx)+(m.capped?' <span class="muted">(from '+idxTxt(m.raw)+')</span>':'')).join(' + ')}</small></div><b class="r">${fmtH(u.val,'index')}</b></div>`).join('')}</div>`,saveLabel:'Close',save:()=>{}}); });
