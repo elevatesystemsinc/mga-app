@@ -90,7 +90,7 @@ function editTxn(x,prefill,onSaved){
 /* ---------- Treasury page ---------- */
 function vTreasury(m){
   const tabs=[['ledger','Ledger'],['bva','Budget vs actual'],['rec','Reconcile']];
-  m.innerHTML=head('Treasury',`Every dollar in and out for the ${Y()} season, checked against the bank.`,btn('Record income','xIn','',I.plus)+btn('Record expense','xOut','pri',I.plus))+
+  m.innerHTML=head('Treasury',`Every dollar in and out for ${isClub()?Y():'the '+Y()+' season'}, checked against the bank.`,(isClub()?yearBar(false):'')+btn('Record income','xIn','',I.plus)+btn('Record expense','xOut','pri',I.plus))+
     `<div class="tabs">${tabs.map(([k,l])=>`<button class="tab${view.xtab===k?' on':''}" data-x="${k}">${l}</button>`).join('')}</div><div id="xbody" style="display:flex;flex-direction:column;gap:20px"></div>`;
   m.querySelectorAll('[data-x]').forEach(b=>b.onclick=()=>{ view.xtab=b.dataset.x; render(); });
   $('xIn').onclick=()=>editTxn(null,{dir:'in'}); $('xOut').onclick=()=>editTxn(null,{dir:'out'});
@@ -151,9 +151,9 @@ function xBva(el){
     return card(esc(t.name),`${dateRange(t)}${isPast(t)?' · complete — actuals count in the season projection':''}`,c.net,c.netA,gh('Income')+inc.join('')+gh('Expenses')+exp.join(''));
   }).join('')+
   card('MGA-level',`Dues and anything not tied to a tournament`,sc.duesBudget+sum(sc.s.lines,l=>(l.type==='Income'?1:-1)*n0(l.budget)),sc.duesActual+sum(sc.s.lines,l=>(l.type==='Income'?1:-1)*actualOf(IX,'',l.type==='Income'?'mgaInc':'mgaExp',l.id,l.actual)),
-    row('Annual dues',`${sc.active} active × ${fmt(sc.s.dues.amount)} · recorded on each member`,sc.duesBudget,sc.duesActual,true,'',0)+
+    (isClub()?'':row('Annual dues',`${sc.active} active × ${fmt(sc.s.dues.amount)} · recorded on each member`,sc.duesBudget,sc.duesActual,true,'',0))+
     sc.s.lines.map(l=>{ const k=l.type==='Income'?'mgaInc':'mgaExp'; return row(l.desc,l.type,l.budget,actualOf(IX,'',k,l.id,l.actual),l.type==='Income',`|${k}|${l.id}`,cnt('',k,l.id)); }).join('')+
-    `<div class="tr"><button class="btn sm" id="bvaMga">${I.plus}Add MGA-level line</button></div>`);
+    `<div class="tr"><button class="btn sm" id="bvaMga">${I.plus}Add ${esc(orgShort())}-level line</button></div>`);
   el.querySelectorAll('[data-bx]').forEach(b=>b.onclick=()=>{ const [t,k,id]=b.dataset.bx.split('|'); editTxn(null,{dir:b.dataset.bd,link:{t,k,id}}); });
   $('bvaMga').onclick=()=>editSeasonLine(null);
 }

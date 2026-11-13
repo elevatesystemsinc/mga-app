@@ -1,0 +1,182 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0F2A38">
+<meta name="robots" content="noindex">
+<title>Registration · Flagstick</title>
+<link rel="icon" href="favicon.png?v=3">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@600;700&family=Public+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script src="config.js"></script>
+<style>
+:root{--navy:#0F2A38;--gold:#C7A13A;--goldl:#D8B75F;--golddk:#7E5F1A;--paper:#F4F0E6;--ivory:#FBFAF5;--line:#E3DCC9;--muted:#56626A;--ink:#14222B;--pos:#1F6B4A;--neg:#B5443A;
+  --serif:'Cormorant Garamond',Georgia,serif;--sans:'Public Sans',system-ui,-apple-system,'Segoe UI',sans-serif}
+*{box-sizing:border-box} html,body{margin:0} [hidden]{display:none!important}
+body{font-family:var(--sans);background:var(--paper);color:var(--ink);font-size:16px;line-height:1.4;-webkit-font-smoothing:antialiased;font-variant-numeric:lining-nums}
+button,input,textarea{font:inherit;color:inherit} button{cursor:pointer}
+.top{background:radial-gradient(circle at 10% 40%,#1B3D50,var(--navy) 65%);color:#fff;padding:calc(14px + env(safe-area-inset-top,0px)) 18px 14px;display:flex;align-items:center;gap:14px;border-bottom:4px solid var(--gold)}
+.top img{width:48px;height:48px;object-fit:contain} .top img.own{background:#fff;border-radius:10px;padding:3px}
+.top .t{flex:1;min-width:0} .top b{display:block;font-family:var(--serif);font-size:24px;line-height:1.05;white-space:nowrap;overflow:hidden;text-overflow:ellipsis} .top small{color:#C9CFD2;font-size:12.5px;display:block;margin-top:2px}
+main{max-width:720px;margin:0 auto;padding:16px 14px 100px}
+.card{background:#fff;border:1px solid var(--line);border-radius:14px;padding:18px 18px 16px;margin-bottom:14px}
+.hero h1{font-family:var(--serif);font-size:32px;line-height:1.02;margin:0 0 6px;color:var(--navy)}
+.hero .when{font-size:15px;color:#2B3940;margin:0} .hero .when b{color:var(--navy)}
+.kp{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:14px}
+.kp div{background:var(--ivory);border:1px solid var(--line);border-radius:10px;padding:10px 12px;min-width:0} .kp small{display:block;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:700} .kp b{display:block;font-size:17px;margin-top:2px;color:var(--navy);line-height:1.15}
+.sched{margin-top:14px;display:flex;flex-direction:column;gap:6px} .sched .row{display:flex;gap:12px;font-size:14.5px} .sched .row b{min-width:84px;color:var(--navy)} .sched .row small{color:var(--muted);display:block}
+.sec{margin:22px 0 8px;display:flex;align-items:baseline;gap:10px} .sec h2{font-family:var(--serif);font-size:25px;margin:0;color:var(--navy);line-height:1.05} .sec small{color:var(--muted);font-size:13px}
+.fact{display:grid;grid-template-columns:140px minmax(0,1fr);gap:6px 14px;font-size:14.5px;margin:0} .fact dt{color:var(--muted);font-weight:600} .fact dd{margin:0}
+.pts{display:grid;grid-template-columns:repeat(6,1fr);gap:6px;margin-top:12px} .pts div{text-align:center;background:var(--ivory);border:1px solid var(--line);border-radius:10px;padding:8px 4px} .pts b{display:block;font-family:var(--serif);font-size:24px;color:var(--navy);line-height:1} .pts small{display:block;font-size:10.5px;color:var(--muted);margin-top:4px;font-weight:600;line-height:1.15}
+ul.rules{margin:0;padding-left:20px;font-size:14.5px} ul.rules li{margin:4px 0}
+.who{display:flex;flex-direction:column;gap:8px} .who .tm{display:flex;gap:10px;align-items:baseline;font-size:14.5px;padding:8px 0;border-top:1px solid var(--line)} .who .tm:first-child{border-top:none;padding-top:0} .who .tm .n{color:var(--muted);font-weight:700;min-width:64px;font-size:12.5px;letter-spacing:.06em;text-transform:uppercase} .who .tm .open{color:var(--golddk);font-weight:600}
+.slot{border:1.5px solid var(--line);border-radius:12px;padding:12px 14px;margin-top:10px;background:var(--ivory)} .slot.done{border-color:#BCD9C7;background:#F2F8F4}
+.slot .sl{display:flex;justify-content:space-between;align-items:center;gap:10px;font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:700}
+.slot .pick{display:flex;align-items:center;gap:10px;margin-top:6px;font-size:17px;font-weight:700;color:var(--navy)} .slot .pick button{margin-left:auto;background:none;border:none;color:var(--muted);font-size:13px;text-decoration:underline;padding:0}
+.slot input.q{width:100%;height:46px;border:1.5px solid #CFC6AE;border-radius:10px;padding:0 12px;background:#fff;font-size:16px;margin-top:8px} .slot input.q:focus{outline:none;border-color:var(--gold);box-shadow:0 0 0 3px rgba(199,161,58,.2)}
+.hits{display:flex;flex-direction:column;gap:4px;margin-top:6px;max-height:260px;overflow:auto} .hits button{text-align:left;background:#fff;border:1.5px solid var(--line);border-radius:10px;padding:10px 12px;font-weight:600;font-size:15px;display:flex;justify-content:space-between;gap:10px} .hits button:disabled{opacity:.55;cursor:default} .hits button small{color:var(--muted);font-weight:500;font-size:12.5px} .hits .none{color:var(--muted);font-size:13.5px;padding:6px 2px}
+label.chk{display:flex;gap:10px;align-items:center;margin-top:10px;font-size:15px;font-weight:600;color:var(--navy)} label.chk input{width:22px;height:22px;accent-color:var(--navy)}
+.qa{display:flex;flex-wrap:wrap;gap:8px 16px;margin-top:10px} .qa .one{display:flex;align-items:center;gap:8px;font-size:14px} .qa .yn{display:inline-flex;gap:4px} .qa .yn button{height:32px;padding:0 12px;border-radius:999px;border:1.5px solid #CFC6AE;background:#fff;font-weight:700;font-size:13px} .qa .yn button.on{background:var(--navy);border-color:var(--navy);color:#fff}
+textarea{width:100%;min-height:72px;border:1.5px solid #CFC6AE;border-radius:10px;padding:10px 12px;background:#fff;font-size:15px;resize:vertical;margin-top:10px} textarea:focus{outline:none;border-color:var(--gold);box-shadow:0 0 0 3px rgba(199,161,58,.2)}
+.send{position:fixed;left:0;right:0;bottom:0;background:rgba(244,240,230,.94);backdrop-filter:blur(8px);border-top:1px solid var(--line);padding:12px 14px calc(12px + env(safe-area-inset-bottom,0px))}
+.send .in{max-width:720px;margin:0 auto;display:flex;gap:12px;align-items:center}
+.send small{flex:1;color:var(--muted);font-size:12.5px} .send button{height:50px;padding:0 24px;border-radius:12px;border:none;background:var(--navy);color:#fff;font-weight:800;font-size:16px;white-space:nowrap} .send button:disabled{opacity:.5}
+.done{text-align:center;padding:34px 18px} .done .ok{width:70px;height:70px;border-radius:999px;background:#E3F0E8;color:var(--pos);display:inline-flex;align-items:center;justify-content:center;margin-bottom:14px}
+.done h1{font-family:var(--serif);font-size:32px;margin:0 0 8px;color:var(--navy)} .done p{color:var(--muted);margin:0 0 14px} .done .team{font-size:17px;font-weight:700;color:var(--navy);margin:0 0 14px}
+.done .again{background:none;border:none;color:var(--muted);font-size:13px;text-decoration:underline}
+.closed{background:#F6ECCF;border:1px solid #E5CF8E;color:#5C4410;border-radius:10px;padding:12px 14px;font-size:14.5px;margin-bottom:14px}
+.toast{position:fixed;left:50%;bottom:90px;transform:translateX(-50%);background:var(--navy);color:#fff;padding:12px 18px;border-radius:10px;font-weight:600;z-index:60;box-shadow:0 6px 20px rgba(0,0,0,.25);max-width:92vw;text-align:center}
+.fs{display:flex;align-items:center;justify-content:center;gap:8px;margin-top:30px;color:var(--muted);font-size:11px;letter-spacing:.14em;text-transform:uppercase;font-weight:800} .fs img{width:18px;height:18px}
+@media (max-width:460px){ .kp{grid-template-columns:1fr 1fr} .pts{grid-template-columns:repeat(3,1fr)} .fact{grid-template-columns:1fr} .fact dt{margin-top:6px} .hero h1{font-size:28px} }
+</style>
+</head>
+<body>
+<header class="top"><img id="hLogo" src="flagstick-crest-light.svg" alt=""><div class="t"><b id="hTitle">Registration</b><small id="hSub">Player registration</small></div></header>
+<main id="main"><div class="card"><p style="color:var(--muted);margin:0">Loading…</p></div></main>
+<script>
+const $=id=>document.getElementById(id);
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const CFG=window.MM_CONFIG||{}; const sb=(CFG.url&&CFG.anonKey&&window.supabase)?window.supabase.createClient(CFG.url,CFG.anonKey,{auth:{persistSession:false}}):null;
+const Q=new URLSearchParams(location.search), TOKEN=(Q.get('k')||'').trim();
+const DONE_KEY='reg_done_'+TOKEN;
+let D=null, E=[], SLOTS=[], ANS={}, NOTE='', sending=false;
+const ORD=['','1st','2nd','3rd','4th','5th','6th'];
+const money=n=>'$'+(Math.round(+n||0)).toLocaleString('en-US');
+function toast(m){ const d=document.createElement('div'); d.className='toast'; d.textContent=m; document.body.appendChild(d); setTimeout(()=>d.remove(),2800); }
+const ls={get(k){ try{ return localStorage.getItem(k); }catch(_){ return null; } },set(k,v){ try{ localStorage.setItem(k,v); }catch(_){ } },del(k){ try{ localStorage.removeItem(k); }catch(_){ } }};
+function msg(title,text){ $('main').innerHTML=`<div class="card"><b style="font-family:var(--serif);font-size:24px;color:var(--navy)">${esc(title)}</b><p style="color:var(--muted);margin:8px 0 0">${esc(text)}</p></div>`; }
+function longDate(d){ if(!d) return ''; const x=new Date(d+'T12:00:00'); return isNaN(x)?d:x.toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric',year:'numeric'}); }
+async function load(){
+  if(!TOKEN) return msg('This link is not complete','Ask for the registration link again.');
+  if(!sb) return msg('Not connected','Registration is not available right now.');
+  const {data,error}=await sb.rpc('signup_get',{p_token:TOKEN});
+  if(error||!data||!data.doc) return msg('This registration link is not valid','It may have been turned off. Ask the golf shop or the board for a new link.');
+  D=data.doc; D.status=data.status; D.rounds=D.rounds||[]; D.pool=D.pool||[]; E=data.entries||[]; SLOTS=Array.from({length:D.teamSize||1},()=>({id:'',name:'',help:false,q:''}));
+  header(); render();
+}
+function header(){ $('hTitle').textContent=D.orgName||D.org||'Registration'; $('hSub').textContent=(D.club?D.club+' · ':'')+'Player registration'; document.title=(D.name||'Registration')+' · '+(D.orgName||'Flagstick');
+  if(D.brand){ const im=$('hLogo'); im.src=D.brand; im.className='own'; } }
+/* who is already in: the field's teams plus entries the hub has not taken in yet */
+function enteredIds(){ const s=new Set(D.taken||[]); E.forEach(e=>(e.players||[]).forEach(p=>p&&p.memberId&&s.add(p.memberId))); return s; }
+function whoHTML(){ const size=D.teamSize||1, teams=(D.teams||[]).map(t=>({names:t.names,open:t.open,shop:t.shop})).concat(E.map(e=>({names:(e.players||[]).map(p=>p.name),open:+e.need||0,shop:+e.need>0,pending:true})));
+  if(!teams.length) return `<p style="margin:0;color:var(--muted);font-size:14.5px">Nobody yet — be the first.</p>`;
+  const players=teams.reduce((a,t)=>a+t.names.length,0);
+  return `<p style="margin:0 0 8px;color:var(--muted);font-size:13.5px">${players} player${players===1?'':'s'}${size>1?` · ${teams.length} team${teams.length===1?'':'s'}`:''}</p><div class="who">${teams.map((t,i)=>`<div class="tm"><span class="n">${size>1?'Team '+(i+1):'#'+(i+1)}</span><span>${t.names.map(esc).join(', ')}${t.open?`<span class="open"> + ${t.open} open spot${t.open===1?'':'s'} (shop pairing)</span>`:''}</span></div>`).join('')}</div>`; }
+function roundHTML(r,i,many){ const team=r.teamSize>1; const countTxt=team&&r.count?`The best ${r.count} of ${r.teamSize} ${r.scoring} ${r.unit==='points'?'scores':'balls'} count on every hole.`:'';
+  return `<div class="card"><div style="display:flex;justify-content:space-between;gap:10px;align-items:baseline"><b style="font-size:16px;color:var(--navy)">${esc(many?r.label+' · ':'')}${esc(r.format)}</b><small style="color:var(--muted)">${esc(r.scoring)}${r.unit==='points'?' · points':''}</small></div>
+    ${r.name&&r.name!==r.format?`<p style="margin:4px 0 0;color:var(--muted);font-size:14px">${esc(r.name)}</p>`:''}
+    <dl class="fact" style="margin-top:10px"><dt>How it's scored</dt><dd>${esc([countTxt,r.unit==='points'?'Points per hole, by net score against par.':r.unit==='holes'?'Holes won.':r.unit==='match'?'Match play.':(r.scoring==='net'?'Net strokes.':'Gross strokes.')].filter(Boolean).join(' '))}</dd>
+      <dt>Handicaps</dt><dd>${esc(r.allowance)}${r.noPar3?' · no strokes on par 3s':''}${D.hcpDiff?`<br>Partner differential cap: ${D.hcpDiff} strokes — a higher index is pulled down to the lowest partner’s index + ${D.hcpDiff} before course handicaps are worked out.`:''}</dd></dl>
+    ${r.points?`<div class="pts">${r.points.map(([l,v])=>`<div><b>${v}</b><small>${esc(l)}</small></div>`).join('')}</div>`:''}</div>`; }
+function detailsHTML(){ const many=(D.rounds||[]).length>1, size=D.teamSize||1;
+  const sched=(D.schedule||[]).filter(d=>d.items.length);
+  return `<div class="card hero"><h1>${esc(D.name)}</h1><p class="when"><b>${esc(longDate(D.date))}</b>${D.days>1?` · ${D.days} days`:''}${D.venue?` · ${esc(D.venue)}`:''}</p>
+      <div class="kp"><div><small>Entry fee</small><b>${money(D.entryFee)} <span style="font-size:12px;color:var(--muted);font-weight:600">per player</span></b></div><div><small>Teams</small><b>${size>1?size+'-player':'Individual'}</b></div><div><small>Format</small><b style="font-size:14.5px">${esc((D.rounds[0]||{}).format||'—')}</b></div></div>
+      ${sched.length?`<div class="sched">${sched.map(d=>`${many||D.days>1?`<b style="font-size:13px;color:var(--muted);margin-top:4px">${esc(d.label)}</b>`:''}${d.items.map(i=>`<div class="row"><b>${esc(i.time||'—')}</b><span>${esc(i.event)}${i.notes?`<small>${esc(i.notes)}</small>`:''}</span></div>`).join('')}`).join('')}</div>`:''}
+      ${D.skinsFee?`<p style="margin:12px 0 0;font-size:14px;color:var(--muted)">Skins / day money: ${money(D.skinsFee)} per player, optional.</p>`:''}</div>
+    ${D.rounds.length?`<div class="sec"><h2>How it's played</h2><small>the format, the handicaps, the points</small></div>${D.rounds.map((r,i)=>roundHTML(r,i,many)).join('')}`:''}
+    ${D.placesPaid||D.payoutNote?`<div class="sec"><h2>Payouts</h2></div><div class="card"><p style="margin:0;font-size:15.5px">${D.placesPaid?`<b style="color:var(--navy)">${D.placesPaid} place${D.placesPaid===1?'':'s'} paid</b>`:''}${D.placesPaid&&D.payoutNote?' · ':''}${esc(D.payoutNote||'')}</p></div>`:''}
+    ${(D.rules||[]).length||D.notes?`<div class="sec"><h2>Rules</h2></div><div class="card">${(D.rules||[]).length?`<ul class="rules">${D.rules.map(l=>`<li>${esc(l)}</li>`).join('')}</ul>`:''}${D.notes?`<p style="margin:${(D.rules||[]).length?'12px':'0'} 0 0;font-size:14.5px;white-space:pre-wrap">${esc(D.notes)}</p>`:''}</div>`:''}
+    <div class="sec"><h2>Who's in</h2></div><div class="card" id="who">${whoHTML()}</div>`; }
+function slotHTML(s,i){ const size=D.teamSize||1, lab=i===0?'You':size===2?'Your partner':'Player '+(i+1), taken=enteredIds(), pickedIds=new Set(SLOTS.map(x=>x.id).filter(Boolean));
+  if(s.id) return `<div class="slot done" data-i="${i}"><div class="sl"><span>${lab}</span></div><div class="pick"><span>${esc(s.name)}</span><button type="button" data-clear="${i}">Change</button></div>${qaHTML(s)}</div>`;
+  if(s.help) return `<div class="slot done" data-i="${i}"><div class="sl"><span>${lab}</span></div><label class="chk"><input type="checkbox" data-help="${i}" checked>Need help finding a ${ORD[i+1]} player — the golf shop will pair me</label></div>`;
+  const q=(s.q||'').trim().toLowerCase(), hits=q.length<2?[]:(D.pool||[]).filter(p=>p.name.toLowerCase().includes(q)).slice(0,14);
+  return `<div class="slot" data-i="${i}"><div class="sl"><span>${lab}</span></div><input class="q" data-q="${i}" type="search" autocomplete="off" placeholder="${i===0?'Find your name':'Find a name'}" value="${esc(s.q||'')}" aria-label="${lab}">
+    ${q.length>=2?`<div class="hits">${hits.length?hits.map(p=>{ const in_=taken.has(p.id), dup=pickedIds.has(p.id); return `<button type="button" data-pick="${i}" data-id="${esc(p.id)}"${in_||dup?' disabled':''}><span>${esc(p.name)}</span>${in_?'<small>already entered</small>':dup?'<small>on this team</small>':''}</button>`; }).join(''):'<div class="none">No one by that name on the member list — see the golf shop.</div>'}</div>`:''}
+    ${i>0?`<label class="chk"><input type="checkbox" data-help="${i}">Need help finding a ${ORD[i+1]} player — the golf shop will pair me</label>`:''}</div>`; }
+function qaHTML(s){ const qs=D.qs||[]; if(!qs.length) return ''; const a=ANS[s.id]||{};
+  return `<div class="qa">${qs.map(q=>`<div class="one"><span>${esc(q.label)}</span><span class="yn" data-qa="${esc(s.id)}" data-k="${esc(q.key)}">${['Yes','No'].map(v=>`<button type="button" data-v="${v}" class="${a[q.key]===v?'on':''}">${v}</button>`).join('')}</span></div>`).join('')}</div>`; }
+function ready(){ return SLOTS.every(s=>s.id||s.help)&&SLOTS.some(s=>s.id); }
+function status(){ const n=SLOTS.filter(s=>s.id).length, h=SLOTS.filter(s=>s.help).length, miss=SLOTS.findIndex(s=>!s.id&&!s.help);
+  if(!SLOTS[0].id) return 'Start with your own name.'; if(miss>=0) return `Player ${miss+1}: pick a name or tick the box for a ${ORD[miss+1]}.`; return `${n} player${n===1?'':'s'}${h?` + ${h} open spot${h===1?'':'s'} for the shop to fill`:''} · ${money(D.entryFee)} each, paid at the golf shop.`; }
+function render(){
+  const closed=D.status!=='open';
+  $('main').innerHTML=detailsHTML()+(closed?`<div class="closed" style="margin-top:22px"><b>Registration has closed.</b> See the golf shop about a spot.</div>`:
+    `<div class="sec"><h2>Enter</h2><small>${(D.teamSize||1)>1?'you and your partners — every spot filled or asked for':'your name'}</small></div><div class="card" id="enter">${SLOTS.map(slotHTML).join('')}<textarea id="note" placeholder="Anything the golf shop should know (optional)">${esc(NOTE)}</textarea></div>`)+
+    `<div class="fs"><img src="flagstick-crest.svg" alt="">Flagstick</div>${closed?'':`<div class="send"><div class="in"><small id="cnt">${esc(status())}</small><button id="go" type="button"${ready()?'':' disabled'}>Enter</button></div></div>`}`;
+  if(!closed) wire();
+}
+function paintEnter(focus){ const el=$('enter'); if(!el) return; el.innerHTML=SLOTS.map(slotHTML).join('')+`<textarea id="note" placeholder="Anything the golf shop should know (optional)">${esc(NOTE)}</textarea>`; wire();
+  $('cnt').textContent=status(); $('go').disabled=!ready(); if(focus!=null){ const q=document.querySelector(`input[data-q="${focus}"]`); if(q){ q.focus(); const v=q.value; q.value=''; q.value=v; } } }
+function wire(){
+  document.querySelectorAll('input[data-q]').forEach(inp=>inp.oninput=()=>{ const i=+inp.dataset.q; SLOTS[i].q=inp.value; paintEnter(i); });
+  document.querySelectorAll('[data-pick]').forEach(b=>b.onclick=()=>{ const i=+b.dataset.pick, p=(D.pool||[]).find(x=>x.id===b.dataset.id); if(!p) return; SLOTS[i]={id:p.id,name:p.name,help:false,q:''}; const nx=SLOTS.findIndex(s=>!s.id&&!s.help); paintEnter(nx>=0?nx:null); });
+  document.querySelectorAll('[data-clear]').forEach(b=>b.onclick=()=>{ const i=+b.dataset.clear; SLOTS[i]={id:'',name:'',help:false,q:''}; paintEnter(i); });
+  document.querySelectorAll('[data-help]').forEach(cb=>cb.onchange=()=>{ const i=+cb.dataset.help; SLOTS[i]={id:'',name:'',help:cb.checked,q:''}; paintEnter(null); });
+  document.querySelectorAll('[data-qa]').forEach(el=>el.querySelectorAll('button').forEach(b=>b.onclick=()=>{ const a=ANS[el.dataset.qa]=ANS[el.dataset.qa]||{}; a[el.dataset.k]=b.dataset.v; el.querySelectorAll('button').forEach(x=>x.classList.toggle('on',x===b)); }));
+  const n=$('note'); if(n) n.oninput=()=>{ NOTE=n.value; };
+  const go=$('go'); if(go) go.onclick=send;
+}
+async function send(){
+  if(!ready()){ toast(status()); return; }
+  const players=SLOTS.filter(s=>s.id).map(s=>({memberId:s.id,name:s.name})), need=SLOTS.filter(s=>s.help).length;
+  const answers={}; players.forEach(p=>{ if(ANS[p.memberId]) answers[p.memberId]=ANS[p.memberId]; });
+  if(sending) return; sending=true; $('go').disabled=true; $('go').textContent='Entering…';
+  const {data,error}=await sb.rpc('signup_submit',{p_token:TOKEN,p_players:players,p_need:need,p_answers:answers,p_note:(NOTE||'').trim().slice(0,400)});
+  sending=false; $('go').textContent='Enter';
+  if(error){ $('go').disabled=!ready(); const m=error.message||'';
+    if(/closed/i.test(m)){ D.status='closed'; return render(); }
+    if(/already entered/i.test(m)){ toast(m.replace(/^.*already entered:?\s*/i,'')+' is already entered'); const r=await sb.rpc('signup_get',{p_token:TOKEN}); if(r.data){ D=r.data.doc; D.status=r.data.status; E=r.data.entries||[]; const ids=enteredIds(); SLOTS.forEach((s,i)=>{ if(s.id&&ids.has(s.id)) SLOTS[i]={id:'',name:'',help:false,q:''}; }); render(); } return; }
+    toast(/eligible|spot|players|twice/i.test(m)?m:'Could not enter — check your connection and try again'); return; }
+  ls.set(DONE_KEY,JSON.stringify({at:new Date().toISOString().slice(0,10),names:players.map(p=>p.name),need}));
+  E=E.concat([{players,need}]); doneScreen(players.map(p=>p.name),need);
+}
+function doneScreen(names,need){
+  $('main').innerHTML=`<div class="card done"><div class="ok"><svg viewBox="0 0 24 24" width="34" height="34" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5L20 7"/></svg></div>
+    <h1>You're in</h1><p class="team">${names.map(esc).join(', ')}${need?`<br><span style="color:var(--golddk);font-size:15px">+ ${need} open spot${need===1?'':'s'} — the golf shop will pair you</span>`:''}</p>
+    <p>${esc(D.name)} · ${esc(longDate(D.date))}${D.venue?' · '+esc(D.venue):''}<br>Entry ${money(D.entryFee)} per player, paid at the golf shop.</p>
+    <button class="again" id="again">Enter another team</button></div>`+detailsHTML();
+  $('again').onclick=()=>{ SLOTS=Array.from({length:D.teamSize||1},()=>({id:'',name:'',help:false,q:''})); ANS={}; NOTE=''; render(); window.scrollTo(0,0); };
+  window.scrollTo(0,0);
+}
+load();
+/* Keeps every open device on the latest version: checks version.json about once a minute and, when a
+   newer build is live, reloads at a safe moment (nothing unsaved, no editor open, not mid-typing).
+   The host's CDN caches version.json and the pages separately (up to 5 min each), so right after a deploy they can
+   disagree in either direction. Two rules keep that from turning into a reload loop: only a build NEWER than this
+   page counts, and a reload is tried once per build — if the page that comes back is still the old one, the CDN
+   hasn't caught up; wait a while before trying that build again. */
+(function(){
+  const ME='20261113173848', KEY='au_tried', RETRY=10*60*1000; let ready=false, lastCheck=0;
+  const typing=()=>{ const a=document.activeElement; return a&&/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)&&a.value&&a.type!=='search'; };
+  const safe=()=>!typing()&&(typeof window.__canReload!=='function'||window.__canReload());
+  const tried=()=>{ try{ const [b,t]=(sessionStorage.getItem(KEY)||'').split('|'); return b?{build:b,at:+t||0}:null; }catch(_){ return null; } };
+  async function check(){ lastCheck=Date.now(); if(location.protocol==='file:') return;
+    try{ const r=await fetch('version.json?t='+Date.now(),{cache:'no-store'}); if(!r.ok) return; const v=await r.json(); if(!v||!v.build||!(v.build>ME)) return;
+      const t=tried(); if(t&&t.build===v.build&&Date.now()-t.at<RETRY) return;   // already reloaded for this build and still got the old page
+      ready=v.build; }catch(_){} }
+  setInterval(()=>{ if(ready){ if(safe()){ try{ sessionStorage.setItem(KEY,ready+'|'+Date.now()); }catch(_){ } location.reload(); } } else if(Date.now()-lastCheck>60000) check(); },3000);
+  document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='visible') check(); });
+  window.__build=ME;
+})();
+
+/* Supabase answers at most 1000 rows a request; selectAll(q) pages a built query with .range() until a short page comes
+   back — the same {data,error} shape. core.js defines the same helper for the hub; this copy serves the public pages. */
+if(typeof selectAll!=='function'){ window.selectAll=async function(q,page){ page=page||1000; const out=[]; for(let i=0;;i+=page){ const r=await q.range(i,i+page-1); if(r.error) return r; const rows=r.data||[]; out.push(...rows); if(rows.length<page) break; } return {data:out,error:null}; }; }
+</script>
+</body>
+</html>

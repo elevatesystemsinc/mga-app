@@ -1,0 +1,145 @@
+# Dallas–Fort Worth clubs and courses, looked up by name in GolfCourseAPI and kept only when the API places them inside the DFW box.
+# Add a line, run `python3 import_courses.py names dfw_names.txt dfw`, paste the JSON into the portal's Courses → Import JSON.
+Walnut Creek Country Club
+Dallas Country Club
+Brook Hollow Golf Club
+Preston Trail Golf Club
+Northwood Club
+Bent Tree Country Club
+Prestonwood Country Club
+Gleneagles Country Club
+Royal Oaks Country Club
+Lakewood Country Club
+Dallas Athletic Club
+Dallas National Golf Club
+Trinity Forest Golf Club
+Maridoe Golf Club
+The Golf Club of Dallas
+Brookhaven Country Club
+Canyon Creek Country Club
+Sherrill Park Golf Course
+Stevens Park Golf Course
+Cedar Crest Golf Course
+Tenison Park Golf Course
+Keeton Park Golf Course
+Firewheel Golf Park
+Oakridge Country Club
+Duck Creek Golf Club
+Waterview Golf Club
+Woodbridge Golf Club
+Buffalo Creek Golf Club
+The Shores Country Club
+Stonebriar Country Club
+Frisco Lakes Golf Club
+The Trails of Frisco Golf Club
+Plantation Golf Club
+Gentle Creek Golf Club
+Stonebridge Ranch Country Club
+Eldorado Country Club
+TPC Craig Ranch
+Oak Hollow Golf Course
+WestRidge Golf Course
+Twin Creeks Golf Club
+The Courses at Watters Creek
+Heritage Ranch Golf and Country Club
+Los Rios Country Club
+Pecan Hollow Golf Course
+Ridgeview Ranch Golf Club
+Indian Creek Golf Club
+Coyote Ridge Golf Club
+The Honors Golf Club
+Riverchase Golf Club
+The Lakes at Castle Hills
+Las Colinas Country Club
+TPC Four Seasons Las Colinas
+Hackberry Creek Country Club
+Cowboys Golf Club
+Grapevine Golf Course
+Bear Creek Golf Club
+Texas Rangers Golf Club
+Tierra Verde Golf Club
+Rolling Hills Country Club
+Shady Valley Golf Club
+Lake Arlington Golf Course
+Chester W. Ditto Golf Course
+Great Southwest Golf Club
+Tour 18 Dallas
+Bridlewood Golf Club
+Lantana Golf Club
+The Tribute Golf Links
+Old American Golf Club
+Denton Country Club
+Robson Ranch Golf Club
+Oakmont Country Club
+Trophy Club Country Club
+Vaquero Club
+Timarron Country Club
+Hawks Creek Golf Club
+Fossil Creek Golf Club
+Iron Horse Golf Course
+Ridglea Country Club
+Colonial Country Club
+Shady Oaks Country Club
+Rivercrest Country Club
+Mira Vista Country Club
+Diamond Oaks Country Club
+Woodhaven Country Club
+Meadowbrook Golf Course
+Rockwood Golf Course
+Lost Creek Golf Club
+Waterchase Golf Club
+Texas Star Golf Course
+Sky Creek Ranch Golf Club
+Squaw Creek Golf Course
+Mansfield National Golf Club
+Southern Oaks Golf Club
+Hidden Creek Golf Club
+Split Rail Links
+The Golf Club at Champions Circle
+Whitestone Golf Club
+Thorntree Country Club
+Tangle Ridge Golf Club
+Prairie Lakes Golf Course
+Riverside Golf Club
+Fort Worth Country Club
+Glen Garden Golf and Country Club
+Pecan Valley Golf Course
+Luna Vista Golf Course
+Country View Golf Club
+Mesquite Golf Club
+Hank Haney Golf Ranch
+Golf Club at Fossil Creek
+Timber-View Golf Club
+Cleburne Golf Links
+Nutcracker Golf Club
+Squaw Valley Golf Course
+Hidden Oaks Golf Club
+Lake Park Golf Course
+Woodcreek Golf Club
+Coppell
+Garland
+Irving
+Richardson
+McKinney
+Allen
+Rockwall
+Mesquite
+Grand Prairie
+Arlington
+Southlake
+Keller
+Flower Mound
+Lewisville
+Carrollton
+Frisco
+Prosper
+Celina
+Weatherford
+Granbury
+Waxahachie
+Midlothian
+Ennis
+Terrell
+Forney
+Sachse
+Wylie
