@@ -63,7 +63,7 @@ function gameMoney(g){ const total=sum(g.pots,pot=>potTotal(g,pot))+sum(g.player
   return {total,paid,left:total-paid,unpaid:g.players.filter(p=>!p.paid&&gpIn(g,p)>0).length,entry:sum(g.pots.filter(p=>p.kind!=='manual'),p=>n0(p.entry))}; }
 const gameEvent=g=>g&&g.golfEventId?golfData().events.find(e=>e.id===g.golfEventId):null;
 const gameTitle=g=>g.name||(orgShort()+' game');
-const gameName=g=>g.pots.filter(p=>p.kind!=='manual').map(p=>p.name).join(' · ')||'No competitions yet';
+const gameName=g=>g.pots.filter(p=>p.kind!=='manual').map(p=>p.name).join(' · ')||(g.cart?'Cart game — no pots':'No competitions yet');
 const gameWhen=g=>(g.date?shortDate(g.date):'Date TBD')+(g.time?' · '+fmtTime(g.time):'');
 const isUpcoming=g=>{ const d=parseD(g.date); if(!d) return true; const now=new Date(); now.setHours(0,0,0,0); return d>=now; };
 /* the catalog entry behind a pot and what it implies */
@@ -179,6 +179,7 @@ const STARTERS=[
   {id:'waltz123',title:'Waltz (1-2-3)',text:'Team against team · $20 a man · one ball counts, then two, then three, every ball on 9 and 18 · lowest total takes the whole pot',make:d=>newPot('waltz123',d)},
   {id:'dots',title:'Dots',text:'$2 a man · birdies and eagles from the cards, sandies and greenies by hand',make:d=>newPot('dots',d,{entry:2})}];
 const potsText=pots=>pots.filter(p=>p.kind!=='manual').map(p=>`${p.name} ${gMoney(p.entry)}`).join(' · ')||'no competitions';
+const gamePotsText=g=>isCartGame(g)?'a cart game — '+CART_TEXT:potsText(g.pots);
 const dayName=date=>{ const d=parseD(date); return d?d.toLocaleDateString('en-US',{weekday:'long'})+' game':'Game'; };
 function quickGame(again){
   const last=seasonGames()[0], d=draftFromLast({players:false,pots:false}); if(!d.name) d.name=dayName(d.date);
@@ -189,12 +190,16 @@ function quickGame(again){
   go('games');
 }
 /* the draft from the choices: players, then the competitions (a whole past game, or the starters picked) */
-function quickBuild(){ const Q=QG, d=Q.d; d.players=[]; d.pots=[];
+function quickBuild(){ const Q=QG, d=Q.d; d.players=[]; d.pots=[]; d.cart=false;
   Object.keys(Q.picked).forEach(id=>d.players.push({id:uid(),memberId:id,name:'',paid:false,extraIn:0,gpid:''})); Q.guests.forEach(n=>d.players.push({id:uid(),memberId:'',name:n,paid:false,extraIn:0,gpid:''}));
   const src=Q.set==='last'?seasonGames()[0]:Q.set&&Q.set.startsWith('prev:')?gamesData().find(g=>g.id===Q.set.slice(5)):null;
-  if(src) copyPots(src.pots,d); else Q.starters.forEach(id=>{ const S=STARTERS.find(x=>x.id===id); if(S) d.pots.push(S.make(d)); });
+  if(Q.set==='cart') d.cart=true; else if(src){ copyPots(src.pots,d); d.cart=!!src.cart&&!d.pots.length; } else Q.starters.forEach(id=>{ const S=STARTERS.find(x=>x.id===id); if(S) d.pots.push(S.make(d)); });
   return d; }
-function quickCreate(){ const d=quickBuild(); if(!d.players.length){ toast('Pick who’s playing first'); return; } if(!d.pots.length){ toast('Pick what you’re playing'); return; }
+/* a cart game: no pots at all — the money is the side game the cart sets up on the scoring page (wolf, hammer, banker, flip, the
+   robin), so up to five play as one group (the owner, Nov 13: "it's just five of us, so we're in a single group… we're just playing banker") */
+const isCartGame=g=>!!g&&(!!g.cart||!(g.pots||[]).length);
+const CART_TEXT='no pots — the cart sets its game up on the scoring page: Wolf, Hammer, Banker, Flip or a round robin';
+function quickCreate(){ const d=quickBuild(); if(!d.players.length){ toast('Pick who’s playing first'); return; } if(!d.pots.length&&!d.cart){ toast('Pick what you’re playing'); return; }
   const g=commitGameDraft(d,null); QG.step=3; QG.gameId=g.id; render(); window.scrollTo(0,0); }
 /* past games with a different set of competitions than the last one, newest first */
 function pastSets(){ const gs=seasonGames(), sig=g=>g.pots.filter(p=>p.kind!=='manual').map(p=>[p.kind,p.rules.game,p.entry,p.rules.scoring,p.rules.teamSize||'',p.rules.teamsBy||''].join(':')).sort().join('|');
@@ -230,12 +235,13 @@ function vQuick(m){
     m.innerHTML=top(2,'What are we playing?','Pick a whole game from before, or build one from the starters.')+`
       <div class="card pad qday"><div class="cell2" style="min-width:0"><b>${esc(d.name||dayName(d.date))} · ${esc(shortDate(d.date))}${d.time?' · '+esc(fmtTime(d.time)):''}</b><small>${esc(c?c.name:'Course TBD')} · ${esc(d.tee||'White')} tees</small></div><button class="btn sm" id="qgDay" type="button">${Q.dayOpen?'Done':'Change'}</button></div>
       ${Q.dayOpen?`<div class="card pad" style="display:flex;flex-direction:column;gap:12px">${field('Name','qgName',d.name,{ph:'e.g. Thursday game'})}<div class="frow2">${field('Date','qgDate',d.date,{type:'date'})}${field('Tee time','qgTime',d.time||'',{type:'time'})}</div><div class="frow2"><div class="fld"><label class="lbl" for="qgCourse">Course</label><select class="inp" id="qgCourse">${courseOptionsHTML(d.course)}</select></div>${field('Tee','qgTee',d.tee||'White',{type:'select',options:((c||{tees:[]}).tees||[]).map(t=>[t.name,t.name])})}</div></div>`:''}
-      ${last?`<div class="qsec">From before</div>${opt('last','Same as last time',potsText(last.pots)+' — '+gameWhen(last),Q.set==='last')}${prev.map(g=>opt('prev:'+g.id,gameTitle(g)+' · '+shortDate(g.date),potsText(g.pots),Q.set==='prev:'+g.id)).join('')}`:''}
+      ${last?`<div class="qsec">From before</div>${opt('last','Same as last time',gamePotsText(last)+' — '+gameWhen(last),Q.set==='last')}${prev.map(g=>opt('prev:'+g.id,gameTitle(g)+' · '+shortDate(g.date),potsText(g.pots),Q.set==='prev:'+g.id)).join('')}`:''}
       <div class="qsec">${last?'Or build the game — tap all that apply':'Tap all that apply'}</div>${starters.map(S=>opt('s:'+S.id,S.title,S.text,!Q.set&&Q.starters.includes(S.id))).join('')}
-      <div class="card pad" style="display:flex;justify-content:space-between;gap:12px;align-items:center"><div class="cell2"><b>${built.pots.length?`Each player puts in ${gMoney(per)}`:'Nothing picked yet'}</b><small>${built.players.length} playing${built.pots.length?` · ${gMoney(total)} in the pots · ${esc(potsText(built.pots))}`:''}</small></div></div>
+      <div class="qsec">Or nothing in the pots</div>${opt('cart','Just a cart game',`No pots. Wolf, hammer, banker, flip or a round robin — set up on the scoring page in the cart, the money hole by hole. ${nPicked<=5?'Everyone plays as one group.':'Groups of four.'}`,Q.set==='cart')}
+      <div class="card pad" style="display:flex;justify-content:space-between;gap:12px;align-items:center"><div class="cell2"><b>${built.cart?'A cart game — nothing in the pots':built.pots.length?`Each player puts in ${gMoney(per)}`:'Nothing picked yet'}</b><small>${built.players.length} playing${built.cart?(built.players.length<=5?' · one group · the game is set up on the phones':' · the game is set up on the phones'):built.pots.length?` · ${gMoney(total)} in the pots · ${esc(potsText(built.pots))}`:''}</small></div></div>
       <p class="hint">Everything else — the payout split, handicaps, pops on par 3s, the house rules — has a sensible default. <a href="#" id="qgMore">More options</a> opens the full designer with this game in it.</p>
-      <div class="qbar"><button class="btn" id="qgPrev">Back</button><button class="btn pri" id="qgCreate"${built.pots.length&&built.players.length?'':' disabled'}>Create the game</button></div>`;
-    m.querySelectorAll('[data-qs]').forEach(b=>b.onclick=()=>{ const k=b.dataset.qs; if(k.startsWith('s:')){ const id=k.slice(2); Q.set=null; Q.starters=Q.starters.includes(id)?Q.starters.filter(x=>x!==id):Q.starters.concat(id); } else { Q.set=Q.set===k?null:k; } render(); });
+      <div class="qbar"><button class="btn" id="qgPrev">Back</button><button class="btn pri" id="qgCreate"${(built.pots.length||built.cart)&&built.players.length?'':' disabled'}>Create the game</button></div>`;
+    m.querySelectorAll('[data-qs]').forEach(b=>b.onclick=()=>{ const k=b.dataset.qs; if(k.startsWith('s:')){ const id=k.slice(2); Q.set=null; Q.starters=Q.starters.includes(id)?Q.starters.filter(x=>x!==id):Q.starters.concat(id); } else { Q.set=Q.set===k?null:k; if(Q.set==='cart') Q.starters=[]; } render(); });
     const readDay=()=>{ if(!Q.dayOpen) return; d.name=fv('qgName'); d.date=fv('qgDate')||d.date; d.time=fv('qgTime'); d.course=fv('qgCourse'); d.tee=fv('qgTee')||d.tee; const cc=courseById(d.course); if(cc&&!cc.tees.some(t=>t.name===d.tee)) d.tee=(cc.tees[0]||{}).name||'White'; };
     $('qgDay').onclick=()=>{ readDay(); Q.dayOpen=!Q.dayOpen; render(); };
     if(Q.dayOpen){ const cs=$('qgCourse'); wireCourseSelect(cs); cs.onchange=()=>{ readDay(); render(); }; ['qgName','qgDate','qgTime','qgTee'].forEach(id=>{ const e=$(id); if(e) e.onchange=readDay; }); }
@@ -247,21 +253,22 @@ function vQuick(m){
 }
 /* step 3: the game exists — send the players the link */
 function vQuickShare(m,g){
-  const ev=gameEvent(g), link=scoringLink(ev), pots=g.pots.filter(p=>p.kind!=='manual');
-  m.innerHTML=`<div class="crumb"><button id="qgGames">Games</button><span class="muted">/</span><span class="muted">${esc(gameTitle(g))}</span></div><div class="qstep"><span class="qn">Step 3 of 3 · ready</span><h1 class="h1">${esc(gameTitle(g))}</h1><p class="sub">${esc(gameWhen(g))} · ${g.players.length} playing · ${esc(potsText(pots))}</p></div>
+  const ev=gameEvent(g), link=scoringLink(ev), pots=g.pots.filter(p=>p.kind!=='manual'), cart=isCartGame(g);
+  m.innerHTML=`<div class="crumb"><button id="qgGames">Games</button><span class="muted">/</span><span class="muted">${esc(gameTitle(g))}</span></div><div class="qstep"><span class="qn">Step 3 of 3 · ready</span><h1 class="h1">${esc(gameTitle(g))}</h1><p class="sub">${esc(gameWhen(g))} · ${g.players.length} playing · ${esc(gamePotsText(g))}</p></div>
     <div class="card pad" style="display:flex;flex-direction:column;gap:12px"><div><b>Send everyone the scoring link.</b><span class="muted"> They open it on their phone and type their group ID — it’s on the groups below and on the game sheet.</span></div>
+      ${cart?`<div class="banner" style="margin:0"><b>The cart game:</b> once the first phone has joined with the group ID, the hole screen asks “Playing a game in your cart?” — <b>Set up</b> picks Wolf, Hammer, Banker, Flip or a round robin, who you are, the stakes and the order. The other phones in the cart pick it up by themselves. The money shows hole by hole on every phone and on the game page here.</div>`:''}
       <a class="qlink" href="${esc(link)}" target="_blank" rel="noopener">${esc(link)}</a>
       <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn pri" id="qgSend" style="flex:1">Send the link…</button><button class="btn" id="qgCopy" style="flex:1">Copy link</button></div>
       <p class="hint" style="margin:0">Spectators: <a href="${esc(gamecastLink(ev))}" target="_blank" rel="noopener">GameCast</a> follows the game live without a group ID.</p>
       <div id="qgQR" style="display:flex;justify-content:center"></div></div>
     <div class="card" style="overflow:hidden"><div class="cardhead"><div><h2 class="h2">Groups</h2><span class="muted">Each group scores under its own ID — move people around on the game page.</span></div></div>
       <div class="mini" style="margin:0 22px 14px">${ev.groups.map(grp=>`<div class="mr" style="grid-template-columns:90px minmax(0,1fr)"><b>${esc(grp.code)}</b><span>${esc(grp.players.map(p=>p.name).join(', '))||'<span class="muted">empty</span>'}</span></div>`).join('')}</div></div>
-    <div class="card pad" style="display:flex;flex-direction:column;gap:10px"><b>For the group chat</b><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" id="qgImg1" style="flex:1">Rules image</button><button class="btn" id="qgImg2" style="flex:1">Groups image</button></div><p class="hint" style="margin:0">After the round the players finish the game themselves on the scoring page — close scoring, call out the skins, draw, pay out.</p></div>
+    <div class="card pad" style="display:flex;flex-direction:column;gap:10px"><b>For the group chat</b><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" id="qgImg1" style="flex:1">Rules image</button><button class="btn" id="qgImg2" style="flex:1">Groups image</button></div><p class="hint" style="margin:0">${cart?'The cart’s own ledger settles hole by hole on the phones — there is nothing to pay out from the hub.':'After the round the players finish the game themselves on the scoring page — close scoring, call out the skins, draw, pay out.'}</p></div>
     <div class="qbar"><button class="btn pri" id="qgOpen">Open the game</button></div>`;
   $('qgGames').onclick=()=>{ QG=null; view.gquick=null; render(); };
   $('qgOpen').onclick=()=>{ QG=null; view.gquick=null; view.gameId=g.id; render(); window.scrollTo(0,0); };
   $('qgCopy').onclick=async()=>{ try{ await navigator.clipboard.writeText(link); toast('Link copied'); }catch(_){ prompt('Copy this link:',link); } };
-  $('qgSend').onclick=async()=>{ const text=`${gameTitle(g)} · ${gameWhen(g)}\n${potsText(pots)}\nScore here: ${link}\nGroup IDs: ${ev.groups.map(gr=>gr.code+' — '+gr.players.map(p=>p.name.split(' ')[0]).join(', ')).join(' · ')}`; if(navigator.share){ try{ await navigator.share({title:gameTitle(g),text}); return; }catch(_){ } } try{ await navigator.clipboard.writeText(text); toast('Message copied — paste it into the group chat'); }catch(_){ prompt('Copy this:',text); } };
+  $('qgSend').onclick=async()=>{ const text=`${gameTitle(g)} · ${gameWhen(g)}\n${cart?'Cart game — set it up on the scoring page once you are in (Wolf, Hammer, Banker, Flip or a round robin)':potsText(pots)}\nScore here: ${link}\nGroup IDs: ${ev.groups.map(gr=>gr.code+' — '+gr.players.map(p=>p.name.split(' ')[0]).join(', ')).join(' · ')}`; if(navigator.share){ try{ await navigator.share({title:gameTitle(g),text}); return; }catch(_){ } } try{ await navigator.clipboard.writeText(text); toast('Message copied — paste it into the group chat'); }catch(_){ prompt('Copy this:',text); } };
   $('qgImg1').onclick=()=>sheetImage(g,1); $('qgImg2').onclick=()=>sheetImage(g,2);
   loadQR().then(()=>{ const el=$('qgQR'); if(!el||typeof qrcode!=='function') return; const q=qrcode(0,'M'); q.addData(link); q.make(); el.innerHTML=`<div style="width:160px">${q.createSvgTag({cellSize:4,margin:0,scalable:true})}</div>`; },()=>{});
 }
@@ -305,7 +312,7 @@ function vGameDesign(m){
     ${field('Rules for the game sheet','gdRules',d.rules||'',{type:'textarea'})}<p class="hint" style="margin:-8px 0 0">Printed on the sheet as the house rules — one rule per line (e.g. “Gimmes inside the leather”, “Ties in skins: nobody’s”, “$5 for a two”).</p></div>
   <div class="card pad" style="display:flex;flex-direction:column;gap:14px"><div class="cardhead" style="padding:0;border:0"><div><h2 class="h2">Competitions</h2><span class="muted">Each runs on the same scores with its own entry, players and payout.</span></div>
       <div class="actions"><select class="inp" id="gdAddSel" style="height:38px;width:auto"><option value="">Add a competition…</option>${groups.map(gr=>`<optgroup label="${esc(gr)}">${lib.filter(x=>x.group===gr).map(x=>`<option value="${x.id}">${esc(x.name)}</option>`).join('')}</optgroup>`).join('')}</select></div></div>
-    ${d.pots.length?d.pots.map(potCard).join(''):'<div class="empty"><b>No competitions yet</b><span>Add stroke play, a best ball, skins — as many as the group wants.</span></div>'}
+    ${d.pots.length?d.pots.map(potCard).join(''):d.cart?'<div class="empty"><b>A cart game — nothing in the pots</b><span>The cart sets its own game up on the scoring page (wolf, hammer, banker, flip, a round robin). Add a competition here and it becomes an ordinary game.</span></div>':'<div class="empty"><b>No competitions yet</b><span>Add stroke play, a best ball, skins — as many as the group wants.</span></div>'}
     ${d.pots.filter(potOneBall).length&&d.pots.some(p=>p.kind==='format'&&!potOneBall(p))?'<div class="banner">A scramble, foursomes or greensome is one ball per team — it can’t share a round with own-ball competitions. Keep one or the other.</div>':''}</div>
   <div class="card pad" style="display:flex;flex-direction:column;gap:14px"><div class="cardhead" style="padding:0;border:0"><div><h2 class="h2">Who’s in</h2><span class="muted">${d.players.length} playing · tick who is in each competition</span></div>
       <div class="actions"><input class="inp" id="gdQ" placeholder="Add anyone from the club…" style="height:38px;width:220px" autocomplete="off"><div class="pick" id="gdPick" style="display:none;position:absolute;z-index:5;max-height:260px;width:300px"></div><input class="inp" id="gdGuest" placeholder="Guest name" style="height:38px;width:160px"><button class="btn sm" id="gdGuestAdd" type="button">Add guest</button></div></div>
@@ -342,7 +349,7 @@ function vGameDesign(m){
     pk.innerHTML=hits.map(x=>`<button type="button" data-gdadd="${x.id}"><span class="av">${initials(x)}</span><b>${esc(memberName(x))}</b>${poolTag(x)}<span class="muted" style="margin-left:auto;font-size:12.5px">${x.hcp?'Index '+esc(x.hcp):''}</span></button>`).join('')||(s?'<span class="muted" style="padding:10px 14px;display:block">No one matches.</span>':''); pk.style.display=pk.innerHTML?'':'none';
     pk.querySelectorAll('[data-gdadd]').forEach(b=>b.onclick=()=>{ readAll(); addPlayer(d,{memberId:b.dataset.gdadd}); rerender(); setTimeout(()=>{ const n=$('gdQ'); if(n) n.focus(); },0); }); };
   $('gdGuestAdd').onclick=()=>{ const n=fv('gdGuest'); if(!n) return; readAll(); addPlayer(d,{name:n}); rerender(); };
-  $('gdSave').onclick=()=>{ readAll(); if(!d.pots.length){ toast('Add at least one competition'); return; }
+  $('gdSave').onclick=()=>{ readAll(); if(!d.pots.length&&!d.cart){ toast('Add at least one competition'); return; }
     const bad=d.pots.find(p=>p.kind==='format'&&p.rules.places&&p.rules.places.length&&p.rules.places.reduce((a,b)=>a+b,0)!==100); if(bad){ toast(`${bad.name||'A competition'}: the payout places add up to ${bad.rules.places.reduce((a,b)=>a+b,0)}% — make it 100%`); return; }
     if(d.pots.filter(potOneBall).length&&d.pots.some(p=>p.kind==='format'&&!potOneBall(p))){ toast('A one-ball game can’t share the round with own-ball competitions'); return; }
     if(d.pots.filter(potOneBall).length>1){ toast('Only one one-ball game per round'); return; }
@@ -386,13 +393,15 @@ function vGame(m,g){
     <div class="actions"><button class="btn sm" id="gmCopy">Copy link</button><a class="btn sm" href="${esc(link)}&view=board" target="_blank" rel="noopener">Leaderboard screen</a><a class="btn sm" href="${esc(gamecastLink(ev))}" target="_blank" rel="noopener" title="Follow along live — the course, every group’s hole, the feed, the board; no group ID needed">GameCast</a><button class="btn sm" id="gmGroups">Groups</button></div>
     <div class="mini">${ev.groups.map(grp=>`<div class="mr" style="grid-template-columns:minmax(0,1fr) auto"><div class="cell2"><b>Group ${esc(grp.code)}</b><small>${esc(grp.players.map(p=>p.name.split(' ')[0]).join(', '))}${grp.teeTime?' · '+fmtTime(grp.teeTime):grp.startHole>1?' · hole '+grp.startHole:''}</small></div><button class="btn sm" data-gsheet="${grp.id}">Enter scores</button></div>`).join('')||'<div class="mr"><span class="muted">Groups appear as players are added.</span></div>'}</div>
     <p class="hint">Everyone plays their own ball; every competition is scored from those cards. Enter scores here for anyone who doesn’t use the page.</p></div>`;
-  const sideCard=typeof sideGamesCard==='function'?sideGamesCard(ev):'';
-  const first=after?[...pots.map(potCard),settleCard]:[grid,...pots.map(potCard),settleCard];
+  const sideCard=typeof sideGamesCard==='function'?sideGamesCard(ev):'', cart=isCartGame(g);
+  const cartCard=cart?`<div class="card" style="overflow:hidden"><div class="cardhead"><div><h2 class="h2">A cart game</h2><span class="muted">Nothing in the pots. The cart sets its own game up on the scoring page — Wolf, Hammer, Banker, Flip or a round robin — and settles it hole by hole on the phones; the money shows under <b>Side games in the carts</b> once a cart has set one up. Add a competition from Design to make it an ordinary game.</span></div>
+      <div class="actions"><button class="btn sm" id="gmSheet">${I.down}Game sheet PDF</button><button class="btn sm" id="gmImg1" title="Page 1 — the game and house rules, as an image for BAND or a text">Rules image</button><button class="btn sm" id="gmImg2" title="Page 2 — the groups and tee times, as an image">Groups image</button><button class="btn sm" id="gmCards" title="Every scorecard and the handicaps in one file">Export cards</button></div></div></div>`:'';
+  const first=cart?[cartCard,sideCard]:after?[...pots.map(potCard),settleCard]:[grid,...pots.map(potCard),settleCard];
   m.innerHTML=`<div class="crumb"><button id="gmBack">Games</button><span class="muted">/</span><span class="muted">${esc(gameTitle(g))}</span></div>
-  <div class="phead"><div><h1 class="h1">${esc(gameTitle(g))}</h1><div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap"><span class="chip navy">${esc(gameWhen(g))}</span><span class="chip">${esc(courseById(g.course)?.name||'Course TBD')}</span>${pots.map(p=>`<span class="chip gold">${esc(p.name)} ${gMoney(p.entry)}</span>`).join('')}<span class="chip">${after?'paid after the round':'paid before the round'} · ${g.settle==='net'?'net':'pot'}</span>${g.status==='settled'?'<span class="chip navy">Settled</span>':''}${live?'<span class="chip ok">● Live scoring</span>':''}</div></div>
+  <div class="phead"><div><h1 class="h1">${esc(gameTitle(g))}</h1><div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap"><span class="chip navy">${esc(gameWhen(g))}</span><span class="chip">${esc(courseById(g.course)?.name||'Course TBD')}</span>${pots.map(p=>`<span class="chip gold">${esc(p.name)} ${gMoney(p.entry)}</span>`).join('')}${cart?'<span class="chip gold">Cart game · no pots</span>':`<span class="chip">${after?'paid after the round':'paid before the round'} · ${g.settle==='net'?'net':'pot'}</span>`}${g.status==='settled'?'<span class="chip navy">Settled</span>':''}${live?'<span class="chip ok">● Live scoring</span>':''}</div></div>
     <div class="actions"><button class="btn" id="gmDesign">${I.edit}Design</button></div></div>
-  <div class="grid g4">${kpi('Players',String(g.players.length),mo.unpaid?`<span class="neg">${mo.unpaid} still owe</span>`:g.players.length?'all paid in':'add who’s playing')}${kpi('In the pots',gMoney(mo.total),pots.map(p=>`${esc(p.name)} ${gMoney(potTotal(g,p))}`).join(' · ')||'no competitions')}${kpi('Paid out',gMoney(mo.paid),`${sum(g.pots,p=>p.payouts.length)} payout${sum(g.pots,p=>p.payouts.length)===1?'':'s'}`)}${kpi(mo.left>0.004?'Still to pay out':mo.left<-0.004?'Paid out over the pots':'Balance',gMoney(Math.abs(mo.left)),mo.left>0.004?'allocate it below':mo.left<-0.004?'check the payouts':'pots fully paid out',mo.left<-0.004?'neg':mo.left>0.004?'':'pos')}</div>
-  ${after?first.join('')+grid:first.join('')}${gameGroupsCard(g,ev)}${liveCard}${sideCard}
+  ${cart?'':`<div class="grid g4">${kpi('Players',String(g.players.length),mo.unpaid?`<span class="neg">${mo.unpaid} still owe</span>`:g.players.length?'all paid in':'add who’s playing')}${kpi('In the pots',gMoney(mo.total),pots.map(p=>`${esc(p.name)} ${gMoney(potTotal(g,p))}`).join(' · ')||'no competitions')}${kpi('Paid out',gMoney(mo.paid),`${sum(g.pots,p=>p.payouts.length)} payout${sum(g.pots,p=>p.payouts.length)===1?'':'s'}`)}${kpi(mo.left>0.004?'Still to pay out':mo.left<-0.004?'Paid out over the pots':'Balance',gMoney(Math.abs(mo.left)),mo.left>0.004?'allocate it below':mo.left<-0.004?'check the payouts':'pots fully paid out',mo.left<-0.004?'neg':mo.left>0.004?'':'pos')}</div>`}
+  ${after||cart?first.join('')+grid:first.join('')}${gameGroupsCard(g,ev)}${liveCard}${cart?'':sideCard}
   ${g.notes?`<div class="card pad"><span class="lbl">Notes</span><p style="margin:6px 0 0;white-space:pre-wrap">${esc(g.notes)}</p></div>`:''}`;
   $('gmBack').onclick=()=>{ view.gameId=null; render(); }; $('gmDesign').onclick=()=>designGame(g);
   $('gmAdd').onclick=()=>addGamePlayers(g); $('gmAllPaid').onclick=()=>{ g.players.forEach(p=>p.paid=true); persist(); render(); toast('Everyone marked paid'); };
@@ -837,7 +846,8 @@ function syncGameEvent(g,ev){
   const have=new Set(evPlayers(ev).map(x=>x.p.id));
   for(const p of g.players){ if(p.gpid&&have.has(p.gpid)) continue;
     const gp={id:uid(),memberId:p.memberId||'',name:gpName(p),tee:g.tee||ev.defaultTee||'White',set:'M',index:'',flight:'',team:''}; p.gpid=gp.id;
-    let grp=ev.groups.find(x=>x.players.length<4);
+    const cap=isCartGame(g)&&g.players.length<=5?5:4;   // a cart game of five is one cart: the side games take 3–5
+    let grp=ev.groups.find(x=>x.players.length<cap);
     if(!grp){ grp={id:uid(),code:newCode(ev),label:'Group '+(ev.groups.length+1),course:g.course||ev.defaultCourse||homeCourseId(),startHole:1,teeTime:g.time||'',players:[]}; ev.groups.push(grp); }
     grp.players.push(gp); }
   const ids=new Set(g.players.map(p=>p.gpid));   // anyone no longer in the game leaves the event, scores and all

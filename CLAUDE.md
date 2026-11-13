@@ -107,6 +107,7 @@ python3 tests/test_signup.py  # player registration against the fake: open the p
 python3 tests/test_wolf.py    # a cart's wolf on the scoring page against the fake: set-up, picks, money net zero, two phones, a stale phone, the hub card
 python3 tests/test_sidegames.py # Banker, Flip and the round robin in a cart: the range and the bets, the bank passing, coins and birdies, the partner draw with no repeats, the hub card
 python3 tests/test_hammer.py  # Hammer in a cart: thrown, accepted (×2, the hammer passes), hammered back (×4), declined (a forfeit at the bet before it), the shaved birdie, eagles triple, 3–5 players
+python3 tests/test_cartgame.py # a cart game: five players, no pots, one group, the phone offers the side games and has no Finish tab; browsing ahead writes no pars
 git add -A && git commit && git push origin main  # Render deploys main to app.wcccmga.org
 ```
 Tests need `pip install playwright && playwright install chromium` and `cd tests && npm i xlsx@0.18.5`.
@@ -309,13 +310,22 @@ Tournament = { id, name, season, days, startDate, field:[{id,memberId,team,paid,
     *Who's playing* (tap the names: the group's members, people who have played before, anyone at the club through a
     search, guests by name; last game's players come pre-ticked), *What are we playing* (**Same as last time** and up
     to three other past games with a different set of competitions, `pastSets()`; or build it from `STARTERS` in plain
-    words — skins, stroke play, blind-draw partners, quota, team Nassau, dots — tap all that apply; the day's name,
-    date, course and tee sit in one row behind Change), *Share* (`vQuickShare`: the scoring link, Send… / Copy, a QR
+    words — skins, stroke play, blind-draw partners, quota, team Nassau, dots — tap all that apply; or **Just a cart game**,
+    below; the day's name, date, course and tee sit in one row behind Change), *Share* (`vQuickShare`: the scoring link, Send… / Copy, a QR
     through `loadQR`, the groups with their IDs, the sheet images, Open the game). Everything the full designer asks
     for is a default: today, last game's course / tee / rules / timing, after the round, pot settlement, full
     handicaps, the usual split. **More options** opens the designer with the same draft (`quickBuild()` →
     `GD`). **Same as last time** on the Games page (`quickGame(true)`) creates the game in one tap and lands on the
-    share step. `draftFromLast(opt)` / `copyPots` / `commitGameDraft(d, existing)` are shared with the designer. The
+    share step. `draftFromLast(opt)` / `copyPots` / `commitGameDraft(d, existing)` are shared with the designer.
+    **A cart game** (the owner, Nov 13: "it's just five of us, so we're in a single group… we're just playing banker"): step 2's
+    **Just a cart game** (`Q.set='cart'`) makes a game with **no pots** (`g.cart=true`; `isCartGame(g)` = the flag or an empty
+    `pots`) — the money is the side game the cart sets up on the scoring page (wolf, hammer, banker, flip, the robin). Up to five
+    play as **one group** (`syncGameEvent` fills a cart game's group to 5, the side games' limit; six or more go in fours), the
+    share step and the Send text say how the cart sets it up, the game page leads with "A cart game" (the sheet / image buttons
+    there, no pot KPIs, the Side games in the carts card next, the who's-in grid without pot columns), the Games list reads "Cart
+    game — no pots", the designer saves a cart game with zero competitions (adding one makes it an ordinary game), and **Same as
+    last time** after a cart game makes another. The phone shows no Finish tab for it (`isGame()` = the event has comps).
+    `tests/test_cartgame.py` runs it on the hub and a phone. The
     half-done setup survives a reload (`_qg` in `rememberView`) and blocks the auto-update like the designer.
   - **Designer** (`designGame(g|null)` → `vGameDesign`, draft in `GD`; reached from the game page's Design and from
     More options — no longer the New game button): the day (name, date, course, pay timing,

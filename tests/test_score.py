@@ -60,10 +60,14 @@ async def main():
     sc=await D.new_page(); scerr=[]; sc.on('pageerror',lambda e:scerr.append(str(e)))
     await sc.goto(page('score.html')+'?e=test-day'); await sc.wait_for_function("()=>!!pub&&!!document.getElementById('code')")
     await sc.fill('#code','DEF34'); await sc.click('#joinBtn'); await sc.wait_for_function("()=>groupId==='g2'&&tab==='score'")
+    # the › arrow over a hole nobody has been scored on is browsing — nothing is written (pars nobody played once settled a cart's banker);
+    # once one player on the hole is scored, moving on records par for the rest
     r=await sc.evaluate("""async()=>{ const g=group(), order=playOrder(g.startHole); holeIdx=9; renderHole(); const h=order[9], par=pub.courses[g.course].par.M[h-1]; const before=(scores.p3||{})[h]||null;
-      document.getElementById('next').click(); await new Promise(r=>setTimeout(r,400)); return {h, par, before, after:(scores.p3||{})[h]||null, hole:holeIdx, queued:queue.length}; }""")
+      document.getElementById('next').click(); await new Promise(r=>setTimeout(r,300)); const browsed={after:(scores.p3||{})[h]||null, hole:holeIdx, queued:queue.length};
+      holeIdx=9; renderHole(); document.getElementById('nextBtn').click(); await new Promise(r=>setTimeout(r,400));
+      return {h, par, before, browsed, after:(scores.p3||{})[h]||null, hole:holeIdx, queued:queue.length}; }""")
     srv=[x for x in fdb._rows('golf_scores') if x['player_id']=='p3' and x['hole']==r['h']]
-    check('the › arrow records par for an untouched hole and it reaches the server',r['before'] is None and r['after']==r['par'] and r['hole']==10 and len(srv)==1 and srv[0]['strokes']==r['par'],json.dumps(r))
+    check('the › arrow over an untouched hole writes nothing; Save & next records par for it, and that reaches the server',r['before'] is None and r['browsed']=={'after':None,'hole':10,'queued':0} and r['after']==r['par'] and r['hole']==10 and len(srv)==1 and srv[0]['strokes']==r['par'],json.dumps(r))
     r=await sc.evaluate("""async()=>{ const g=group(), order=playOrder(g.startHole); holeIdx=10; renderHole(); const h=order[10]; document.getElementById('prev').click(); return {h, left:(scores.p3||{})[h]||null, hole:holeIdx}; }""")
     check('going back leaves the hole alone',r['left'] is None and r['hole']==9,json.dumps(r))
     # --- flights on the board: none → no mention of flights; two → the TV shows one at a time and the phone gets tabs

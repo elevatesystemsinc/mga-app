@@ -137,6 +137,13 @@ par 3s, house rules, who is in which competition — has a sensible default and 
 opens the full designer with the same game in it. **Same as last time** on the Games page creates today's game in one
 tap.
 
+**Just a cart game.** Five of you, nothing in the pots, playing banker (or wolf, hammer, flip, a round robin) in the cart:
+in *What are we playing* tap **Just a cart game**. The game has no competitions, up to five play as one group under one
+Group ID, and the phones do the rest — the first one to join is asked "Playing a game in your cart?", picks the game, who
+they are, the stakes and the order, and every other phone in the cart picks it up. The money settles hole by hole on the
+phones and shows on the game page under *Side games in the carts*; there is nothing to pay out from the hub and no Finish
+tab on the phones. Add a competition from Design and it becomes an ordinary game.
+
 A small group's hub is the regular game, and small tournaments when it wants them (the same Tournaments page as an
 association, with the Calcutta, meals and the rest switched on per tournament).
 
@@ -453,8 +460,10 @@ One-time: Supabase → SQL Editor → run `golf-setup.sql`. Upload `score.html` 
   a tee and men's/women's par.
 - **Open scoring**, then share the link: `…/score.html?e=<your-link>`. Players enter their
   Group ID and score hole by hole. Each hole starts at par and the scorer taps up or down from there;
-  moving on from a hole (the Save button, the › arrow or a tap on a later hole) records par for anyone
-  left untouched, while going back changes nothing. Scores save as they tap, queue up in dead zones, and
+  **Save & next hole** records par for anyone left untouched, and so do the › arrow and a tap on a later hole once at
+  least one player on the hole has been scored — moving ahead over a hole nobody has been scored on is just looking
+  (nothing is written, so a cart's wolf or banker never settles on pars nobody played); going back changes nothing.
+  Scores save as they tap, queue up in dead zones, and
   send when signal returns. `…&view=board` is a big-screen leaderboard for the clubhouse TV.
 - **Leaderboard:** gross stroke play, to par for holes played, both courses combined. It's in the
   event page, on the Dashboard, and a live link sits in the sidebar while scoring is open.
