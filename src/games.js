@@ -349,7 +349,7 @@ function vGameDesign(m){
     pk.innerHTML=hits.map(x=>`<button type="button" data-gdadd="${x.id}"><span class="av">${initials(x)}</span><b>${esc(memberName(x))}</b>${poolTag(x)}<span class="muted" style="margin-left:auto;font-size:12.5px">${x.hcp?'Index '+esc(x.hcp):''}</span></button>`).join('')||(s?'<span class="muted" style="padding:10px 14px;display:block">No one matches.</span>':''); pk.style.display=pk.innerHTML?'':'none';
     pk.querySelectorAll('[data-gdadd]').forEach(b=>b.onclick=()=>{ readAll(); addPlayer(d,{memberId:b.dataset.gdadd}); rerender(); setTimeout(()=>{ const n=$('gdQ'); if(n) n.focus(); },0); }); };
   $('gdGuestAdd').onclick=()=>{ const n=fv('gdGuest'); if(!n) return; readAll(); addPlayer(d,{name:n}); rerender(); };
-  $('gdSave').onclick=()=>{ readAll(); if(!d.pots.length&&!d.cart){ toast('Add at least one competition'); return; }
+  $('gdSave').onclick=()=>{ readAll(); if(!d.pots.length&&!d.cart){ if(!confirm('No competitions — save it as a cart game? Nothing in the pots; the cart sets its own game up on the scoring page (wolf, hammer, banker, flip, a round robin).')) return; d.cart=true; }
     const bad=d.pots.find(p=>p.kind==='format'&&p.rules.places&&p.rules.places.length&&p.rules.places.reduce((a,b)=>a+b,0)!==100); if(bad){ toast(`${bad.name||'A competition'}: the payout places add up to ${bad.rules.places.reduce((a,b)=>a+b,0)}% — make it 100%`); return; }
     if(d.pots.filter(potOneBall).length&&d.pots.some(p=>p.kind==='format'&&!potOneBall(p))){ toast('A one-ball game can’t share the round with own-ball competitions'); return; }
     if(d.pots.filter(potOneBall).length>1){ toast('Only one one-ball game per round'); return; }
