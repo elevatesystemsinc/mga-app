@@ -97,7 +97,7 @@ function spPaid(s){ return sum(s.payments,p=>p.amount); }
 /* ---------- ledger-driven actuals ----------
    A budget line's actual comes from the Treasury ledger once any entry is linked to it;
    until then it uses the number typed on the line. Link = {t: tournament id ('' = MGA), k: kind, id}. */
-const INCOME_KINDS=new Set(['inc','entry','skins','mgaInc']);
+const INCOME_KINDS=new Set(['inc','entry','skins','mgaInc','fstream']);   // fstream / fexp: a fundraising event's streams and expense lines (t = 'fund:<event id>')
 function ledgerIndex(season){ const s=db.seasons[season], idx={}; if(!s) return idx;
   for(const x of s.txns||[]){ const L=x.link; if(!L||!L.k) continue; const key=(L.t||'')+'|'+L.k+'|'+(L.id||'');
     const signed=n0(x.amount)*((x.dir==='in')===INCOME_KINDS.has(L.k)?1:-1);
@@ -144,10 +144,19 @@ function scalc(y){
   const past=ts.filter(x=>isPast(x.t)), upcoming=ts.filter(x=>!isPast(x.t));
   const tProj=sum(past,x=>x.c.netA)+sum(upcoming,x=>x.c.net);
   const mgaBud=duesBudget+sum(incLines,l=>l.budget)-sum(expLines,l=>l.budget);
-  const projected=tProj+mgaBud;
-  return {s,ts,active,duesBudget,duesActual,tRev,tExp,revenue,expenses,net:revenue-expenses,past,upcoming,tProj,projected,revenueA,expensesA,netA:revenueA-expensesA,raffle,raffleA,
-          pledged:sum(ts,x=>x.c.pledged),received:sum(ts,x=>x.c.received)};
+  /* Fundraising events are programs of the year like tournaments (a nonprofit's gala, a dinner, an auction night): their plan
+     counts in the budget, what they record in the actual, and the projection takes the actual once the event is past. A linked
+     golf tournament is already in `ts`, so an event counts only its own money here (`own`). */
+  const es=yearEvents(y).map(e=>({e,P:fundPlan(e,{own:true}),S:fundTotals(e,{own:true})}));
+  const eRev=sum(es,x=>x.P.inc), eExp=sum(es,x=>x.P.exp), eRevA=sum(es,x=>x.S.raised), eExpA=sum(es,x=>x.S.expenses);
+  const ePast=es.filter(x=>x.S.past), eUp=es.filter(x=>!x.S.past), eProj=sum(ePast,x=>x.S.net)+sum(eUp,x=>x.P.net);
+  const projected=tProj+mgaBud+eProj;
+  return {s,ts,es,active,duesBudget,duesActual,tRev,tExp,eRev,eExp,eRevA,eExpA,eProj,ePast,eUp,revenue:revenue+eRev,expenses:expenses+eExp,net:revenue+eRev-expenses-eExp,past,upcoming,tProj,projected,
+          revenueA:revenueA+eRevA,expensesA:expensesA+eExpA,netA:revenueA+eRevA-expensesA-eExpA,raffle,raffleA,
+          pledged:sum(ts,x=>x.c.pledged)+sum(es,x=>x.S.sponsors),received:sum(ts,x=>x.c.received)+sum(es,x=>x.S.sponsorsPaid)};
 }
+/* the fundraising events of a year (the club tier only; nothing when the module is off or fund.js is not on the page) */
+function yearEvents(y){ if(typeof fundOn!=='function'||!fundOn()||typeof fundData!=='function') return []; return fundData().events.filter(e=>String(e.date||'').slice(0,4)===String(y)); }
 function memberDues(y,mid){ const s=db.seasons[y]; return s?sum(s.duesPayments.filter(p=>p.memberId===mid),p=>p.amount):0; }
 const memberName=m=>m?[m.first,m.last].filter(Boolean).join(' ')||'(no name)':'';
 const initials=m=>m?((m.first||'?')[0]+((m.last||'')[0]||'')).toUpperCase():'—';

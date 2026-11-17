@@ -1016,9 +1016,21 @@ groups, printed scorecards — the printed cards include a live-scoring QR that 
   is the record. **Raffle legitimacy, as the 50/50**: Lock the list (`raffleLock`: a SHA-256 fingerprint of every ticket, `raffleCanon`)
   before a draw; selling stops while locked; the draw refuses a list that changed; a void (`raffleVoid`) or an unlock needs a reason
   and is logged; **Record** prints `raffleRecordPDF` (tickets, buyers, the fingerprint, every draw, the log). **Budgets**: the event's
-  **Budget** tab (`e.budget = {streams:{tickets,sponsors,silent,live,raffles,donations}, expenses:[]}`, `ftBudget`, `fundPlan`) sets the
-  plan per stream and the planned expenses against the actual; the **Annual budget** page carries a Fundraising events card
-  (`fundBudgetCard(y)`: planned in / net against raised / net per event); the Fundraising page shows the year's planned and actual net.
+  **Budget** tab (`e.budget = {streams:{tickets,sponsors,silent,live,raffles,donations}}` is the plan per stream — the ticket plan
+  falls back to `ticketPlan(e)`, the seats on offer × price —, `e.expenses = [{id,name,budget,actual,note}]` **one list with a
+  budget and an actual per line** (Nov 2026: the old planned list in `e.budget.expenses` and the actual-only `amount` lines fold in
+  by name in `normFundEvent`), `ftBudget`, `fundPlan(e,{own})`, `fundTotals(e,{own})`: `raised` = committed, `collected` = checkout
+  payments + the sponsors' `payments[]` (`fspPaid`; the old Paid tick became one payment), `past`, `own` leaves the linked
+  tournament out); the **Annual budget** page carries a Fundraising events card (`fundBudgetCard(y)`, own money only — the
+  tournament is under Tournaments); the Fundraising page shows the year's planned and actual net. **Events are programs of the
+  year** (`docs/budgeting.md` is the reference): `scalc` adds `yearEvents(y)` (`es`, `eRev/eExp/eRevA/eExpA/eProj`, `ePast/eUp`;
+  `pledged/received` include event sponsors), `INCOME_KINDS` has `fstream`, `budgetLines` lists an event's streams (`fund:<id>|fstream|<k>`)
+  and expense lines (`fund:<id>|fexp|<line id>`), `bookEntries` carries checkout payments (`fp:`) and event sponsor payments (`fs:`),
+  `budgetRows(y)` (treasury.js) is the one source for Treasury → Budget vs actual (a card per tournament, event and the
+  organization-level lines), `budgetPDF(y)` and `budgetCSV(y)` (buttons on the Budget page and on Budget vs actual). A linked
+  tournament's sponsors are the event's (`ftSponsors` renders `tSponsors`, `fundLevels` publishes its tiers); `fundTabs(e)` leads a
+  golf-day event with Sponsors · Budget · Money. `orgLevel()` = "Organization" on the club tier, else the short name — no "MGA" copy
+  anywhere but the MGA's own hub.
   **A fundraiser with a golf tournament, and per-event thermometers** (Battle of the Nines, Oct 29: "a fundraising event can also be a golf
   tournament… keep track of how much money has been raised for that entire tournament and the evening event after… a big status bar";
   then "it's not really a year goal. It's a per event goal… multiple goals and thermometers"): `e.tournamentId` links an event to a

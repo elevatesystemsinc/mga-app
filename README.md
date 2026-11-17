@@ -550,9 +550,12 @@ One-time: Supabase → SQL Editor → run `golf-setup.sql`. Upload `score.html` 
 - **Treasury** (sidebar): the treasurer's books for the season.
   - *Ledger* — every dollar in and out: expenses and income recorded here, plus sponsor
     payments and dues recorded elsewhere. Filter, search, export CSV.
-  - *Budget vs actual* — every line of every tournament plus MGA-level lines, with variance.
-    Use + on a line to record money against it. Once a line has ledger entries, its actual
-    comes from them (the typed "Actual $" field shows the ledger total instead).
+  - *Budget vs actual* — a card per program of the year: every tournament, every fundraising
+    event (a nonprofit), and the organization's own lines, with variance; a branded **Budget vs
+    actual PDF** and a CSV of the whole year. Use + on a line to record money against it. Once a
+    line has ledger entries, its actual comes from them (the typed "Actual $" field shows the
+    ledger total instead). How the money fits together, for an association and for a nonprofit,
+    is in `docs/budgeting.md`.
   - *Reconcile* — upload the bank's activity export (CSV, Excel, or OFX/QFX). Re-uploads and
     overlapping statements are de-duplicated. Suggested matches: same check #, same amount and
     name, nearest date, and one deposit made of several payments. Accept, Find (tick one or more
@@ -583,8 +586,11 @@ the hammer falls, paddle-raise gifts the same way. A raffle sells numbered ticke
 recording every draw: lock the list first (a fingerprint of every ticket goes on the record), and a void needs a reason.
 Silent items and live lots can carry a **reserve** the bidders never see. A **cashier link** puts the cashier's table on a phone
 or laptop without the hub login: look up any paddle, record live-auction sales, raffle tickets, gifts and payments, and the
-hub takes it all in. Each event has a **Budget** tab (the plan per stream and the planned expenses against the actual) and the
-Annual budget page carries every event of the year. A nonprofit also has a plain **register** for merchandise and payments, with
+hub takes it all in. Each event has a **Budget** tab — the plan per stream (the ticket plan starts from the seats on offer × their
+price) and one expense list with a budget and an actual per line — and a **Money** tab (what came in by stream, what was
+collected by method, what was spent). An event's sponsors carry their payments, pledged against received, like a tournament's.
+The event is a program of the year like a tournament: the Annual budget page and the dashboard's projected net count it, Treasury's
+Budget vs actual has a card for it, and its checkout and sponsor payments are in the ledger against the bank. A nonprofit also has a plain **register** for merchandise and payments, with
 no restaurant setup. **Checkout** gathers what each paddle owes (tickets, wins, raffle tickets, gifts), takes the payment,
 and prints or e-mails the acknowledgement with the fair market value and the deductible portion. The tax ID and the
 thank-you line live under Fundraising, Settings.

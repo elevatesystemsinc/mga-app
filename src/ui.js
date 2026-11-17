@@ -304,9 +304,9 @@ function vDash(m){
       <div class="card pad" style="display:flex;flex-direction:column;gap:12px"><h2 class="h2">Needs attention</h2>
         ${attention.length?attention.map(([c,txt,k,id])=>`<div style="display:flex;gap:10px;align-items:flex-start;font-size:13.5px"><span class="chip ${k}">${c}</span><span>${id?`<a href="#" data-open="${id}">${txt}</a>`:txt}</span></div>`).join(''):'<span class="muted">Nothing outstanding.</span>'}
       </div>
-      <div class="card pad" style="display:flex;flex-direction:column;gap:12px"><div style="display:flex;justify-content:space-between;align-items:center"><h2 class="h2">Board</h2><button class="btn sm" data-go="board">Manage</button></div>
+      ${isClub()&&typeof isNonprofit==='function'&&isNonprofit()?'':`<div class="card pad" style="display:flex;flex-direction:column;gap:12px"><div style="display:flex;justify-content:space-between;align-items:center"><h2 class="h2">Board</h2><button class="btn sm" data-go="board">Manage</button></div>
         ${db.board.filter(b=>b.memberId).map(b=>{const mm=memberById(b.memberId);return `<div style="display:flex;align-items:center;gap:10px"><span class="av">${initials(mm)}</span><div class="cell2"><b>${esc(memberName(mm))}</b><small>${esc(b.role)}</small></div></div>`;}).join('')||'<span class="muted">No seats filled yet. Add members, then fill seats on the Board page.</span>'}
-      </div>
+      </div>`}
     </div>
   </div>`;
   wireCommon(m);
@@ -1032,31 +1032,34 @@ function vBudget(m){
   const y=Y(), sc=scalc(y), s=sc.s;
   const cols='grid-template-columns:minmax(160px,2fr) 140px 130px 130px 120px 120px';
   const r=(n,d,rv,ex,nt,act,cls='',attr='')=>`<div class="tr num ${cls}" ${attr} style="${cols}"><span style="font-weight:600;color:var(--navy)">${n}</span><span class="muted">${d}</span><span class="r">${rv}</span><span class="r">${ex}</span><b class="r ${typeof nt==='number'?netCls(nt):''}">${typeof nt==='number'?fmtS(nt):nt}</b><span class="r muted">${act}</span></div>`;
-  const club=isClub();
-  m.innerHTML=head(club?'Annual budget':'Season budget',club?'Club tournaments and club-level lines. Dues and the 50/50 belong to the associations; the club only collects dues on their behalf (Dues collection).':`Tournaments are self-sustaining; dues are the ${esc(orgShort())}’s own income. Everything rolls up here.`,(club?yearBar(false):'')+btn('Add '+orgShort()+' line','sbAdd','',I.plus))+`
-  <div class="grid g3">${kpi('Budgeted revenue',fmt(sc.revenue),club?'tournaments + club lines':'tournaments + dues + '+orgShort()+' lines')}${kpi('Budgeted expenses',fmt(sc.expenses),'tournaments + MGA lines')}${kpi('Season net (projected)',fmtS(sc.projected),`Actuals for ${sc.past.length} completed, budget for ${sc.upcoming.length} upcoming · all-budget net ${fmtS(sc.net)}`,netCls(sc.projected))}</div>
+  const club=isClub(), np=club&&typeof isNonprofit==='function'&&isNonprofit(), lvl=orgLevel(), nPast=sc.past.length+(sc.ePast||[]).length, nUp=sc.upcoming.length+(sc.eUp||[]).length;
+  const intro=np?'Every tournament and fundraising event of the year, plus the organization’s own lines — one plan, one set of actuals. Budget vs actual, the ledger and the bank are under Treasury.'
+    :club?'Club tournaments and club-level lines. Dues and the 50/50 belong to the associations; the club only collects dues on their behalf (Dues collection).'
+    :db.kind==='group'?`The group’s tournaments and its own lines. Everything rolls up here.`:`Tournaments are self-sustaining; dues are the ${esc(orgShort())}’s own income. Everything rolls up here.`;
+  m.innerHTML=head(club?'Annual budget':'Season budget',intro,(club?yearBar(false):'')+btn('Budget vs actual PDF','sbPdf','',I.down)+btn('CSV','sbCsv','')+btn('Add '+lvl+' line','sbAdd','',I.plus))+`
+  <div class="grid g3">${kpi('Budgeted revenue',fmt(sc.revenue),[sc.ts.length?'tournaments':'',(sc.es||[]).length?'events':'',club?'':'dues',lvl.toLowerCase()+' lines'].filter(Boolean).join(' + '))}${kpi('Budgeted expenses',fmt(sc.expenses),[sc.ts.length?'tournaments':'',(sc.es||[]).length?'events':'',lvl.toLowerCase()+' lines'].filter(Boolean).join(' + '))}${kpi((club?'Year':'Season')+' net (projected)',fmtS(sc.projected),`Actuals for ${nPast} past, budget for ${nUp} to come · all-budget net ${fmtS(sc.net)}`,netCls(sc.projected))}</div>
   <div class="card" style="overflow:hidden"><div class="cardhead"><h2 class="h2">Tournaments</h2></div><div class="tw"><div class="t" style="min-width:820px">
     <div class="tr th" style="${cols}"><span>Tournament</span><span>Dates</span><span class="r">Revenue</span><span class="r">Expenses</span><span class="r">Net</span><span class="r">Actual net</span></div>
     ${sc.ts.map(({t,c})=>r(esc(t.name)+(isPast(t)?' <span class="chip ok" style="height:20px;font-size:11px;margin-left:6px">Actual counts</span>':''),dateRange(t).replace(/, \d{4}$/,''),fmt(c.revenue),fmt(c.expenses),c.net,fmtS(c.netA),'click',`data-open="${t.id}"`)).join('')||'<div class="tr"><span class="muted">No tournaments this season.</span></div>'}
     ${r('Tournaments subtotal','',fmt(sc.tRev),fmt(sc.tExp),sc.tRev-sc.tExp,'','tot')}
   </div></div></div>
-  <div class="card" style="overflow:hidden"><div class="cardhead"><h2 class="h2">${esc(orgShort())}-level money</h2></div><div class="tw"><div class="t" style="min-width:820px">
+  <div class="card" style="overflow:hidden"><div class="cardhead"><h2 class="h2">${esc(lvl)}-level money</h2></div><div class="tw"><div class="t" style="min-width:820px">
     <div class="tr th" style="${cols}"><span>Line</span><span>Basis</span><span class="r">Budget</span><span class="r"></span><span class="r"></span><span class="r">Actual</span></div>
     ${club?'':r('Annual dues',`${sc.active} × ${fmt(s.dues.amount)}`,fmt(sc.duesBudget),'','','<span>'+fmt(sc.duesActual)+'</span>','click','id="sbDues"')+
     `<div class="tr" style="${cols};border-top:none;min-height:0;padding-bottom:12px"><span class="muted" style="font-size:12.5px;grid-column:1/-1">${n0(s.dues.installments)>1?`Charged as ${s.dues.installments} × ${fmt(n0(s.dues.amount)/s.dues.installments)}, `:''}not prorated. Billed through the club (${duesBilledText(s)}); actual comes from dues recorded on each member.</span></div>`+
     r('50/50 raffle (all season)','Assigned to tournaments',fmt(sc.raffle)+' → tournaments','','',fmt(sc.raffleA))+
     `<div class="tr" style="${cols};border-top:none;min-height:0;padding-bottom:12px"><span class="muted" style="font-size:12.5px;grid-column:1/-1">Collected at every event and counted in the tournament it’s assigned to (Member-Member), so it isn’t added again here.</span></div>`}
-    ${club&&!s.lines.length?`<div class="tr"><span class="muted">No club-level lines yet.</span></div>`:''}
+    ${club&&!s.lines.length?`<div class="tr"><span class="muted">No ${esc(lvl.toLowerCase())}-level lines yet${np?' — rent, insurance, the check to the beneficiary, a grant received: anything not tied to one event':''}.</span></div>`:''}
     ${s.lines.map(l=>r(esc(l.desc),esc(l.type),l.type==='Income'?fmt(l.budget):'',l.type==='Income'?'':fmt(l.budget),'',fmt(actualOf(ledgerIndex(y),'',l.type==='Income'?'mgaInc':'mgaExp',l.id,l.actual)),'click',`data-sl="${l.id}"`)).join('')}
   </div></div></div>`;
   if(typeof fundBudgetCard==='function'&&typeof fundOn==='function'&&fundOn()) m.insertAdjacentHTML('beforeend',fundBudgetCard(y));
-  wireCommon(m);
-  const sd=$('sbDues'); if(sd) sd.onclick=editDues; $('sbAdd').onclick=()=>editSeasonLine(null);
+  wireCommon(m); m.querySelectorAll('[data-fe]').forEach(r=>r.onclick=()=>go('fundev',{fid:r.dataset.fe,ftab:'budget'}));
+  const sd=$('sbDues'); if(sd) sd.onclick=editDues; $('sbAdd').onclick=()=>editSeasonLine(null); $('sbPdf').onclick=()=>budgetPDF(y); $('sbCsv').onclick=()=>budgetCSV(y);
   m.querySelectorAll('[data-sl]').forEach(x=>x.onclick=()=>editSeasonLine(s.lines.find(l=>l.id===x.dataset.sl)));
 }
 function editSeasonLine(l){
   const s=db.seasons[Y()];
-  openDrawer({kicker:Y()+' season · MGA-level',title:l?l.desc:'Add MGA line',body:field('Description','slD',l?.desc||'',{ph:'e.g. Year-end banquet'})+field('Type','slT',l?.type||'Expense',{type:'select',options:['Income','Expense']})+pair(field('Budget $','slB',l?.budget??'',{type:'number'}),actField('Actual $','slA',Y(),'',(l?.type||'Expense')==='Income'?'mgaInc':'mgaExp',l?.id,l?.actual)),
+  openDrawer({kicker:Y()+(isClub()?'':' season')+' · '+orgLevel()+'-level',title:l?l.desc:'Add '+orgLevel()+' line',body:field('Description','slD',l?.desc||'',{ph:isClub()&&typeof isNonprofit==='function'&&isNonprofit()?'e.g. Grant to PGA HOPE, Insurance, Website':'e.g. Year-end banquet'})+field('Type','slT',l?.type||'Expense',{type:'select',options:['Income','Expense']})+pair(field('Budget $','slB',l?.budget??'',{type:'number'}),actField('Actual $','slA',Y(),'',(l?.type||'Expense')==='Income'?'mgaInc':'mgaExp',l?.id,l?.actual)),
     save:()=>{ const d=fv('slD'); if(!d){ toast('Add a description'); return false; } const data={desc:d,type:fv('slT'),budget:fnum('slB'),actual:fnum('slA')};
       if(l) Object.assign(l,data); else s.lines.push(Object.assign({id:uid()},data)); },
     del:l?()=>{ s.lines=s.lines.filter(x=>x!==l); }:null});
