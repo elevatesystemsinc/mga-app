@@ -606,44 +606,37 @@ function editTiers(t){
 
 /* Budget: every number, grouped, read-only rows → drawer */
 function tBudget(el,t){
-  const c=tcalc(t);
-  const row=(name,how,amt,act,key,sub)=>`<div class="tr num bl${key?' click':''}" ${key?`data-b="${key}"`:''}><div class="cell2"><span style="font-weight:500">${name}</span>${sub?`<small>${sub}</small>`:''}</div><span class="muted" style="font-size:13px">${how}</span><b class="r">${fmt(amt)}</b><span class="r muted" style="font-size:12.5px">${act==null||!n0(act)?'—':fmt(act)}</span><span class="ib" aria-hidden="true">${key?I.edit:''}</span></div>`;
-  const grp=(title,total,chip,body,addKey)=>`<div class="gh"><div style="display:flex;align-items:center;gap:10px"><b>${title}</b>${chip?`<span class="chip">${chip}</span>`:''}${addKey?`<button class="btn sm" data-badd="${addKey}">${I.plus}Add</button>`:''}</div><b class="num">${fmt(total)}</b></div>${body}`;
-  const pl=`${c.players} ${t.budgetBasis==='field'?'in the field':'planned'}`;
-  const rev=grp('Revenue',c.revenue,'',
-    row('Entry fees',`${pl} × ${fmt(t.entryFee)}`,c.entryFees,tA(t,'entry','',t.actuals.entryFees),'a:entryFees',t.budgetBasis==='field'?'Players from the Field tab':'')+
-    (n0(t.skinsFee)||c.skins?row('Skins / day money',`${c.players} × ${fmt(t.skinsFee)} · paid back out`,c.skins,tA(t,'skins','',t.actuals.skins),'a:skins'):'')+
-    row('Sponsors',`${t.sponsors.length} sponsors · Sponsors tab`,c.pledged,c.received,'go:sponsors')+
-    t.income.map(i=>row(esc(i.desc),i.source==='raffle'?'Season raffle':'',i.budget,tA(t,'inc',i.id,i.actual),'inc:'+i.id,i.notes?esc(i.notes):'')).join(''),'inc');
-  const days=[0,1,2].slice(0,t.days).map(di=>grp(dayLabel(t,di),c.dayTot[di],dayShort(t,di),t.dayItems[di].map(it=>row(esc(it.item),it.menu?`Menu · ${it.menu.items.length} items · all-in`:`${itemQty(t,it)} × ${fmt2(it.unitCost).replace('.00','')}`,itemTotal(t,it),tA(t,'item',it.id,it.actual),`it:${di}:${it.id}`,it.menu?`${it.menu.items.length} menu items · ${n0(it.menu.guests)} guests`:'')).join('')||'<div class="tr"><span class="muted">No meals or events.</span></div>','day'+di)).join('');
-  const groups=[...new Set(t.lines.map(l=>l.group||'Other'))];
-  const wide=grp('Tournament-wide',c.perPlayer+c.skinsPayout+c.lineTot,'',
-    t.perPlayer.map(p=>row(esc(p.desc),`${c.players} × ${fmt(p.perPlayer)} per player`,c.players*n0(p.perPlayer),tA(t,'pp',p.id,p.actual),'pp:'+p.id)).join('')+
-    (c.skinsPayout?row('Skins / day money payout','Matches what’s collected',c.skinsPayout,tA(t,'skinsPaid','',t.actuals.skinsPaid),'a:skinsPaid'):'')+
-    groups.map(g=>t.lines.filter(l=>(l.group||'Other')===g).map(l=>row(esc(l.desc),esc(g),l.budget,tA(t,'line',l.id,l.actual),'ln:'+l.id,l.notes?esc(l.notes):'')).join('')).join(''),'wide');
-  el.innerHTML=`<div style="display:flex;gap:20px;align-items:flex-start;flex-wrap:wrap">
-    <div class="card" style="flex:1 1 640px;overflow:hidden;min-width:0"><div class="tw"><div class="t bt">
-      <div class="tr th bl"><span>Line</span><span>How it’s calculated</span><span class="r">Budget</span><span class="r">Actual</span><span></span></div>
-      ${rev}${days}${wide}
-      <div class="tr num bl" style="border-top:2px solid var(--navy);font-weight:700;font-size:15px"><span>Total expenses</span><span></span><span class="r">${fmt(c.expenses)}</span><span class="r muted">${fmt(c.expensesA)}</span><span></span></div>
-    </div></div></div>
-    <div class="card pad" style="flex:0 0 300px;display:flex;flex-direction:column;gap:14px;position:sticky;top:20px">
-      <span class="lbl">Budget summary</span>
-      <div class="num" style="display:flex;flex-direction:column;gap:10px">
-        <div style="display:flex;justify-content:space-between"><span>Revenue</span><b>${fmt(c.revenue)}</b></div>
-        <div style="display:flex;justify-content:space-between"><span>Expenses</span><b>${fmt(c.expenses)}</b></div>
-        <div style="height:1px;background:var(--line)"></div>
-        <div style="display:flex;justify-content:space-between;align-items:baseline"><b>Net</b><span class="serif ${netCls(c.net)}" style="font-size:34px;font-weight:700">${fmtS(c.net)}</span></div>
-      </div>
-      ${c.revenue?`<div style="height:8px;border-radius:4px;background:var(--paper);overflow:hidden"><div style="width:${Math.min(100,c.expenses/c.revenue*100).toFixed(1)}%;height:100%;background:${c.expenses>c.revenue?'var(--neg)':'var(--gold)'}"></div></div><span class="muted" style="font-size:12.5px">Expenses use ${(c.expenses/c.revenue*100).toFixed(1)}% of revenue. Feeds the ${esc(t.season)} season budget.</span>`:''}
-      <div style="height:1px;background:var(--line)"></div>
-      <div class="num" style="display:flex;flex-direction:column;gap:8px;font-size:13.5px"><span class="lbl">Actuals so far</span>
-        <div style="display:flex;justify-content:space-between"><span class="muted">Money in</span><span>${fmt(c.revenueA)}</span></div>
-        <div style="display:flex;justify-content:space-between"><span class="muted">Money out</span><span>${fmt(c.expensesA)}</span></div>
-        <div style="display:flex;justify-content:space-between;font-weight:700"><span>Actual net</span><span class="${netCls(c.netA)}">${fmtS(c.netA)}</span></div></div>
-    </div></div>`;
+  const c=tcalc(t), club=isClub(), np=club&&typeof isNonprofit==='function'&&isNonprofit();
+  const money=v=>n0(v)?fmt(v):'<span class="muted">—</span>', varTxt=(bud,act,inc)=>{ if(!n0(act)) return '<span class="muted">—</span>'; const v=inc?n0(act)-n0(bud):n0(bud)-n0(act); return `<b class="${v>0.004?'pos':v<-0.004?'neg':'muted'}">${fmtS(v)}</b>`; };
+  const row=(name,how,amt,act,key,sub,inc)=>`<div class="tr num bl${key?' click':''}" ${key?`data-b="${key}"`:''}><div class="cell2"><span class="bname">${name}</span>${sub?`<small>${sub}</small>`:''}</div><span class="muted bhow">${how}</span><span class="r">${money(amt)}</span><span class="r">${money(act)}</span><span class="r">${varTxt(amt,act,inc)}</span><span class="ib" aria-hidden="true">${key?I.edit:''}</span></div>`;
+  const grp=(title,chip,bud,act,addKey,addLabel)=>`<div class="tr bl grp"><div class="cell2" style="flex-direction:row;align-items:center;gap:10px;flex-wrap:wrap"><b>${title}</b>${chip?`<span class="chip">${chip}</span>`:''}${addKey?`<button class="btn sm" data-badd="${addKey}" title="${esc(addLabel||'Add a line')}">${I.plus}Add</button>`:''}</div><span></span><span class="r num">${money(bud)}</span><span class="r num muted">${money(act)}</span><span></span><span></span></div>`;
+  const pl=`${c.players} ${t.budgetBasis==='field'?'in the field':'planned'}`, cost=u=>n0(u)?fmt2(u).replace('.00',''):'no cost yet';
+  const rev=grp('Revenue','',c.revenue,c.revenueA,'inc','Add an income line')+
+    row('Entry fees',n0(t.entryFee)?`${pl} × ${fmt(t.entryFee)}`:`${pl} · no entry fee set`,c.entryFees,tA(t,'entry','',t.actuals.entryFees),'a:entryFees',t.budgetBasis==='field'?'Players from the Field tab':'',true)+
+    (n0(t.skinsFee)||c.skins?row('Skins / day money',`${c.players} × ${fmt(t.skinsFee)} · paid back out`,c.skins,tA(t,'skins','',t.actuals.skins),'a:skins','',true):'')+
+    row('Sponsors',`${t.sponsors.length} sponsor${t.sponsors.length===1?'':'s'} · pledged / received`,c.pledged,c.received,'go:sponsors','',true)+
+    t.income.map(i=>row(esc(i.desc),i.source==='raffle'?'Season 50/50 drawing':'',i.budget,tA(t,'inc',i.id,i.actual),'inc:'+i.id,i.notes?esc(i.notes):'',true)).join('');
+  const days=[0,1,2].slice(0,t.days).map(di=>grp(esc(dayLabel(t,di)),esc(dayShort(t,di)),c.dayTot[di],c.dayAct[di],'day'+di,'Add a meal or event')+
+    (t.dayItems[di].map(it=>row(esc(it.item),it.menu?`Menu · ${it.menu.items.length} items · all-in`:`${itemQty(t,it)} × ${cost(it.unitCost)}`,itemTotal(t,it),tA(t,'item',it.id,it.actual),`it:${di}:${it.id}`,it.menu?`${it.menu.items.length} menu items · ${n0(it.menu.guests)} guests`:'',false)).join('')||`<div class="tr bl"><span class="muted" style="grid-column:1/-1">No meals or events on this day yet.</span></div>`)).join('');
+  const groups=[...new Set(t.lines.map(l=>l.group||'Other'))], wideTot=c.perPlayer+c.skinsPayout+c.lineTot, wideAct=sum(t.perPlayer,p=>tA(t,'pp',p.id,p.actual))+tA(t,'skinsPaid','',t.actuals.skinsPaid)+sum(t.lines,l=>tA(t,'line',l.id,l.actual));
+  const wide=grp('Tournament-wide','',wideTot,wideAct,'wide','Add a tournament-wide expense')+
+    t.perPlayer.map(p=>row(esc(p.desc),`${c.players} × ${fmt(p.perPlayer)} per player`,c.players*n0(p.perPlayer),tA(t,'pp',p.id,p.actual),'pp:'+p.id,'',false)).join('')+
+    (c.skinsPayout?row('Skins / day money payout','Matches what’s collected',c.skinsPayout,tA(t,'skinsPaid','',t.actuals.skinsPaid),'a:skinsPaid','',false):'')+
+    groups.map(g=>t.lines.filter(l=>(l.group||'Other')===g).map(l=>row(esc(l.desc),esc(g),l.budget,tA(t,'line',l.id,l.actual),'ln:'+l.id,l.notes?esc(l.notes):'',false)).join('')).join('')+
+    (!t.perPlayer.length&&!t.lines.length&&!c.skinsPayout?`<div class="tr bl"><span class="muted" style="grid-column:1/-1">Prizes, gifts, signage, printing, insurance — anything that is not a meal or an event on a day.</span></div>`:'');
+  const pct=c.revenue?Math.min(100,c.expenses/c.revenue*100):0;
+  el.innerHTML=`<div class="grid g4">${kpi('Budgeted net',fmtS(c.net),`${fmt(c.revenue)} in · ${fmt(c.expenses)} out`,netCls(c.net))}${kpi('Actual net so far',fmtS(c.netA),`${fmt(c.revenueA)} in · ${fmt(c.expensesA)} out`,netCls(c.netA))}${kpi('Against budget',(c.netA-c.net>=0?'+':'')+fmt(c.netA-c.net),isPast(t)?'played — the actual counts in the year':'upcoming — the budget counts in the year until it is played',netCls(c.netA-c.net))}${kpi('Players',String(c.players),`${t.budgetBasis==='field'?'in the field':'planned · '+t.field.length+' in the field so far'} · sponsors ${fmt(c.received)} of ${fmt(c.pledged)}`)}</div>
+    <div class="card" style="overflow:hidden"><div class="cardhead"><div><h2 class="h2">Budget vs actual</h2><span class="muted">Tap a line to set its budget or its actual · an actual follows the Treasury ledger once money is recorded against the line${c.revenue?` · expenses use ${pct.toFixed(0)}% of revenue`:''} · counts in the ${esc(t.season)} ${club?'annual':'season'} budget</span></div></div>
+      <div class="tw"><div class="t bt">
+      <div class="tr th bl"><span>Line</span><span>Basis</span><span class="r">Budget</span><span class="r">Actual</span><span class="r">Variance</span><span></span></div>
+      ${rev}
+      <div class="tr num bl tot"><span>Total revenue</span><span></span><span class="r">${fmt(c.revenue)}</span><span class="r">${money(c.revenueA)}</span><span class="r">${varTxt(c.revenue,c.revenueA,true)}</span><span></span></div>
+      ${days}${wide}
+      <div class="tr num bl tot"><span>Total expenses</span><span></span><span class="r">${fmt(c.expenses)}</span><span class="r">${money(c.expensesA)}</span><span class="r">${varTxt(c.expenses,c.expensesA,false)}</span><span></span></div>
+      <div class="tr num bl tot net"><span>Net</span><span class="muted" style="font-weight:400;font-size:12.5px">${np?'what the event leaves for the cause':'revenue less expenses'}</span><b class="r ${netCls(c.net)}">${fmtS(c.net)}</b><b class="r ${netCls(c.netA)}">${n0(c.netA)||n0(c.revenueA)||n0(c.expensesA)?fmtS(c.netA):'<span class="muted">—</span>'}</b><span class="r">${n0(c.revenueA)||n0(c.expensesA)?`<b class="${netCls(c.netA-c.net)}">${fmtS(c.netA-c.net)}</b>`:'<span class="muted">—</span>'}</span><span></span></div>
+      </div></div></div>`;
   el.querySelectorAll('[data-b]').forEach(r=>r.onclick=()=>budgetEdit(t,r.dataset.b));
-  el.querySelectorAll('[data-badd]').forEach(b=>b.onclick=()=>{ const k=b.dataset.badd;
+  el.querySelectorAll('[data-badd]').forEach(b=>b.onclick=ev=>{ ev.stopPropagation(); const k=b.dataset.badd;
     if(k==='inc') editLine(t,'income',null); else if(k==='wide') chooseWide(t); else { const di=+k.slice(3); editItem(t,di,null); } });
 }
 function budgetEdit(t,key){
