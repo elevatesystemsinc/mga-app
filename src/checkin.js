@@ -7,7 +7,7 @@ TT.splice(TT.findIndex(x=>x[0]==='field')+1,0,['checkin','Check-in']);
 view.ckiQ=''; view.ckiF='all';
 function ckPlayers(t){
   const par3q=(t.fieldQuestions||[]).find(q=>q.kind==='par3');
-  const rows=(t.field||[]).map(p=>{ const m=memberById(p.memberId); const full=tidyName(m?memberName(m):(p.name||'')); const parts=full.split(' ');
+  const rows=(t.field||[]).filter(p=>!p.tbd).map(p=>{ const m=memberById(p.memberId);   // a sponsor's unnamed seat has nobody to check in const full=tidyName(m?memberName(m):(p.name||'')); const parts=full.split(' ');
     return {p,id:p.id,first:m&&m.first?tidyName(m.first):parts.slice(0,-1).join(' '),last:m&&m.last?tidyName(m.last):parts.slice(-1)[0]||'',team:p.team,par3:!!(par3q&&String((p.answers||{})[par3q.key]||'').toLowerCase().startsWith('y'))}; });
   // the hub's member records sometimes have first/last swapped (e.g. "andy, sauter"); keep display sane
   rows.forEach(r=>{ if(r.last.toLowerCase()==='andy'&&r.first.toLowerCase()==='sauter'){ r.last='Sauter'; r.first='Andy'; } });

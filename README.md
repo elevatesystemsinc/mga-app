@@ -595,6 +595,12 @@ no restaurant setup. **Checkout** gathers what each paddle owes (tickets, wins, 
 and prints or e-mails the acknowledgement with the fair market value and the deductible portion. The tax ID and the
 thank-you line live under Fundraising, Settings.
 
+**Sponsorship packages that include players.** Give a sponsor tier a number of players (Sponsor tiers → Players; 4 for a foursome)
+and every sponsor on that tier gets a team in the field the moment it is saved — **TBD** in each seat until the names come in. The
+seats count as players in the field and the budget, carry the sponsor's name, owe no entry fee, and stay out of check-in and live
+scoring until a person is named from the Field tab (open the team, pick the player). The Sponsors tab shows how many of each package's
+seats are named.
+
 **A fundraiser can include a golf tournament.** Battle of the Nines is a tournament by day and a gala that night: tick
 *Includes a golf tournament* when you create the event and a tournament of the same name is made with it (or link one later
 from the event's Overview, *Add a golf tournament*). Its paid entries, sponsors and 50/50 count toward the event's total and

@@ -108,6 +108,7 @@ python3 tests/test_wolf.py    # a cart's wolf on the scoring page against the fa
 python3 tests/test_sidegames.py # Banker, Flip and the round robin in a cart: the range and the bets, the bank passing, coins and birdies, the partner draw with no repeats, the hub card
 python3 tests/test_hammer.py  # Hammer in a cart: thrown, accepted (×2, the hammer passes), hammered back (×4), declined (a forfeit at the bet before it), the shaved birdie, eagles triple, 3–5 players
 python3 tests/test_cartgame.py # a cart game: five players, no pots, one group, the phone offers the side games and has no Finish tab; browsing ahead writes no pars
+python3 tests/test_sponsorteam.py # a sponsor tier that includes a team: TBD seats in the field, counted as players, named one by one, dropped with the package
 git add -A && git commit && git push origin main  # Render deploys main to app.wcccmga.org
 ```
 Tests need `pip install playwright && playwright install chromium` and `cd tests && npm i xlsx@0.18.5`.
@@ -632,6 +633,16 @@ flight positions (lots matched by member id or name). **Results sheet (PDF)** = 
   order); later days → `pairByStandings(t, round)`: teams ordered by the standings over the earlier rounds within
   each flight, paired in order; tee-time flights send the leaders off last, shotgun flights put the leaders on hole 1.
   Groups stay editable on the event.
+- **Sponsorship packages that include a team** (the owner, Nov 17: "anytime a sponsor has a certain sponsorship level that includes a
+  team, and they don't know their players' names, it should fill it with a TBD, but it still should be counted as a player"): a tier
+  carries **`spots`** (Sponsor tiers → Players; 4 = a foursome). Saving a sponsor on such a tier (`sponsorTeamSync(t,s)`, also run when
+  the tiers change) gives it a team in the field — entries `{tbd:true, name:'TBD', memberId:'', sponsorId, team, paid:true}` for every
+  unnamed seat. TBD seats count in `t.field` (so `playersUsed` on the field basis, the Field KPI "· n TBD (sponsor seats)", the
+  registration page's team list with no open spots), show as *TBD* with the sponsor's name on the Field tab, owe no entry fee, and stay
+  out of check-in (`checkin.js` filters `tbd`) and live scoring (`syncRoundEvent` skips entries without a member). The team editor on
+  a sponsor's team (`sponsorOfTeam`) keeps a blank seat TBD instead of dropping it; naming a seat replaces the TBD; a smaller package
+  drops only TBD seats; removing the sponsor removes its TBD seats and keeps the people. The Sponsors tab shows "Team n · 1 of 4 named"
+  per sponsor; the sponsor drawer says what the package includes. `tests/test_sponsorteam.py`.
 - **Partner handicap differential cap** (`t.hcpDiff`, 0/8/10/12, Tournament details): `effIndex(ev, p)` in golf.js
   pulls the higher partner's index down to the lowest partner's index + cap before the course handicap; the Field
   tab flags capped players (↓ from). Applies to every event of the tournament and to the tournament flights.

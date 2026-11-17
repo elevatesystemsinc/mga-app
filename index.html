@@ -1591,37 +1591,38 @@ function tField(el,t){
   const rs=fieldRSVP(t), qs=t.fieldQuestions||[];
   const ansLine=p=>qs.filter(q=>yes((p.answers||{})[q.key])).map(q=>q.short||qShort(q.label)).join(' · ');
   const nInact=t.field.filter(p=>{const m=memberById(p.memberId);return m&&m.status==='Inactive';}).length;
-  el.innerHTML=`<div class="grid g4">${kpi('Players in field',String(t.field.length),(size>1?`${nums.length} team${nums.length===1?'':'s'} of ${size}`:'individual')+(nInact?` · ${nInact} not active`:''))}${kpi('Entry fee',fmt(t.entryFee),'per player')}${kpi('Entry fees paid',String(paid),`of ${t.field.length} · ${fmt(paid*n0(t.entryFee))} collected`)}${rs.headcount!=null?kpi('Dinner headcount',String(rs.headcount),`${rs.dinner} players${rs.guests!=null?' + '+rs.guests+' plus-ones':''}`):kpi('Skins entered',String(skins),n0(t.skinsFee)?'× '+fmt(t.skinsFee):'no skins fee set')}</div>
+  const nTbd=t.field.filter(p=>p.tbd).length;
+  el.innerHTML=`<div class="grid g4">${kpi('Players in field',String(t.field.length),(size>1?`${nums.length} team${nums.length===1?'':'s'} of ${size}`:'individual')+(nInact?` · ${nInact} not active`:'')+(nTbd?` · ${nTbd} TBD (sponsor seats)`:''))}${kpi('Entry fee',fmt(t.entryFee),'per player')}${kpi('Entry fees paid',String(paid),`of ${t.field.length} · ${fmt(paid*n0(t.entryFee))} collected`)}${rs.headcount!=null?kpi('Dinner headcount',String(rs.headcount),`${rs.dinner} players${rs.guests!=null?' + '+rs.guests+' plus-ones':''}`):kpi('Skins entered',String(skins),n0(t.skinsFee)?'× '+fmt(t.skinsFee):'no skins fee set')}</div>
   ${qs.length?`<div class="card pad" style="display:flex;gap:10px 24px;flex-wrap:wrap;align-items:center;font-size:13.5px"><span class="lbl">RSVPs</span>${qs.map(q=>`<span><b class="num">${t.field.filter(p=>yes((p.answers||{})[q.key])).length}</b> <span class="muted">${esc(q.label)}</span></span>`).join('')}${t.rosterFile?`<span class="muted" style="margin-left:auto;font-size:12.5px">From ${esc(t.rosterFile)} · ${new Date(t.rosterImportedAt).toLocaleDateString()}</span>`:''}</div>`:''}
   ${typeof signupCard==='function'?signupCard(t):''}
   ${t.budgetBasis!=='field'?`<div class="banner">The budget uses ${n0(t.plannedPlayers)} planned players. Switch it to the field in Tournament details once signups close.</div>`:''}
   <div class="toolbar"><div class="actions"><button class="btn pri" id="fImp">${I.down}Import roster</button><button class="btn" id="fAdd">${I.plus}Add ${size>1?'team':'player'}</button></div><span class="muted" style="margin-left:auto;font-size:13px">Players are picked from ${isClub()?'the Directory':'Members'}${members().length?'':' — add members first'}.</span></div>
   <div class="card" style="overflow:hidden">${t.field.length?`<div class="tw"><div class="t"><div class="tr th" style="${cols}"><span>${size>1?'Team':'#'}</span>${Array.from({length:size},(_,i)=>`<span>Player ${i+1}</span>`).join('')}<span>Entry</span><span></span></div>
-    ${nums.map(n=>`<div class="tr click" data-team="${n}" style="${cols}"><span class="muted">${size>1?'Team '+n:n}</span>${Array.from({length:size},(_,i)=>{const p=teams[n][i];const mm=p&&memberById(p.memberId);const sub=[ansLine(p),p&&p.reg&&p.reg.note?'“'+p.reg.note+'”':''].filter(Boolean).join(' · ');return p?`<div class="cell2"><b class="trunc">${esc(mm?memberName(mm):p.name||'Unknown')}${inactiveBadge(mm)}${p.skins?' <span class="chip" style="height:20px;font-size:11px">Skins</span>':''}</b>${sub?`<small class="trunc">${esc(sub)}</small>`:''}</div>`:(teams[n].some(x=>x.reg&&x.reg.need)?'<span class="chip gold" style="height:22px;font-size:11px">Shop pairing</span>':'<span class="muted">—</span>');}).join('')}<span>${teams[n].every(p=>p.paid)?'<span class="chip ok">Paid</span>':`<span class="chip warn">${fmt(teams[n].filter(p=>!p.paid).length*n0(t.entryFee))} due</span>`}</span><span class="ib">${I.edit}</span></div>`).join('')}</div></div>`:`<div class="empty"><b>No field yet</b><span>Import the Golf Genius roster, or add ${size>1?'teams':'players'} from the member list as they sign up.</span></div>`}</div>`;
+    ${nums.map(n=>`<div class="tr click" data-team="${n}" style="${cols}"><span class="muted">${size>1?'Team '+n:n}</span>${Array.from({length:size},(_,i)=>{const p=teams[n][i];const mm=p&&memberById(p.memberId);const sub=[ansLine(p),p&&p.reg&&p.reg.note?'“'+p.reg.note+'”':''].filter(Boolean).join(' · ');if(p&&p.tbd){ const sp=t.sponsors.find(x=>x.id===p.sponsorId); return `<div class="cell2"><b class="muted" style="font-style:italic;font-weight:500">TBD</b><small class="trunc">${esc(sp?sp.company:'sponsor’s seat')}</small></div>`; }return p?`<div class="cell2"><b class="trunc">${esc(mm?memberName(mm):p.name||'Unknown')}${inactiveBadge(mm)}${p.skins?' <span class="chip" style="height:20px;font-size:11px">Skins</span>':''}</b>${sub?`<small class="trunc">${esc(sub)}</small>`:''}</div>`:(teams[n].some(x=>x.reg&&x.reg.need)?'<span class="chip gold" style="height:22px;font-size:11px">Shop pairing</span>':'<span class="muted">—</span>');}).join('')}<span>${teams[n].every(p=>p.paid)?'<span class="chip ok">Paid</span>':`<span class="chip warn">${fmt(teams[n].filter(p=>!p.paid).length*n0(t.entryFee))} due</span>`}</span><span class="ib">${I.edit}</span></div>`).join('')}</div></div>`:`<div class="empty"><b>No field yet</b><span>Import the Golf Genius roster, or add ${size>1?'teams':'players'} from the member list as they sign up.</span></div>`}</div>`;
   $('fAdd').onclick=()=>editTeam(t,null); $('fImp').onclick=()=>importField(t); if(typeof wireSignupCard==='function') wireSignupCard(t);
   el.querySelectorAll('[data-team]').forEach(r=>r.onclick=()=>editTeam(t,+r.dataset.team));
 }
 function editTeam(t,num){
-  const size=t.teamSize||2, existing=num!=null?t.field.filter(p=>(p.team||0)===num):[];
+  const size=t.teamSize||2, existing=num!=null?t.field.filter(p=>(p.team||0)===num):[], spon=num!=null?sponsorOfTeam(t,num):null, spots=spon?Math.max(sponsorSpots(t,spon),existing.length):0;
   const next=num!=null?num:(Math.max(0,...t.field.map(p=>p.team||0))+1);
   const taken=new Set(t.field.filter(p=>(p.team||0)!==num).map(p=>p.memberId));
   const opts=[['','— Choose member —'],['__new',`+ New player (not ${isClub()?'in the directory':'a '+orgShort()+' member'} — added as Not Active)`]].concat(members().sort((a,b)=>memberName(a).localeCompare(memberName(b))).map(m=>[m.id,memberName(m)+(m.status==='Inactive'?' — Not Active':'')+(taken.has(m.id)?' (already in field)':'')]));
-  openDrawer({kicker:t.name+' · Field',title:size>1?(num!=null?'Team '+num:'Add team'):(num!=null?'Edit player':'Add player'),
-    body:(size>1?field('Team number','tmNum',next,{type:'number'}):'')+Array.from({length:size},(_,i)=>{const p=existing[i]||{};return `<div class="card pad" style="display:flex;flex-direction:column;gap:10px">${field('Player '+(i+1),'tmM'+i,p.memberId||'',{type:'select',options:opts})}<div id="tmB${i}">${inactiveBadge(memberById(p.memberId))?`<span class="chip inact">Not Active</span>`:''}</div>
+  openDrawer({kicker:t.name+' · Field'+(spon?' · '+spon.company:''),title:size>1?(num!=null?'Team '+num:'Add team'):(num!=null?'Edit player':'Add player'),
+    body:(spon?`<div class="banner" style="margin:0 0 4px">${esc(spon.company)}’s package includes ${spots} player${spots===1?'':'s'}. A seat left blank stays <b>TBD</b> and still counts; name them as they come in.</div>`:'')+(size>1?field('Team number','tmNum',next,{type:'number'}):'')+Array.from({length:size},(_,i)=>{const p=existing[i]||{};return `<div class="card pad" style="display:flex;flex-direction:column;gap:10px">${field('Player '+(i+1),'tmM'+i,p.memberId||'',{type:'select',options:opts})}<div id="tmB${i}">${inactiveBadge(memberById(p.memberId))?`<span class="chip inact">Not Active</span>`:''}</div>
       <div id="tmN${i}" hidden style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px"><input class="inp" id="tmNF${i}" placeholder="First name" aria-label="New player first name"><input class="inp" id="tmNL${i}" placeholder="Last name" aria-label="New player last name"><input class="inp" id="tmNE${i}" placeholder="Email (optional)" aria-label="New player email"></div><div style="display:flex;gap:10px 18px;flex-wrap:wrap"><label class="check"><input type="checkbox" id="tmP${i}"${p.paid?' checked':''}>Entry paid</label><label class="check"><input type="checkbox" id="tmS${i}"${p.skins?' checked':''}>In skins</label>${(t.fieldQuestions||[]).map((q,qi)=>`<label class="check"><input type="checkbox" id="tmQ${i}_${qi}"${yes((p.answers||{})[q.key])?' checked':''}>${esc(q.short||qShort(q.label))}</label>`).join('')}</div></div>`;}).join('')+
       `<p class="hint">Players who aren’t active ${esc(orgShort())} members can still play. Pick “New player” to add them as Inactive; they show as Not Active in the field.</p>`,
     wire:r=>{ for(let i=0;i<size;i++){ const s=r.querySelector('#tmM'+i); const upd=()=>{ const n=r.querySelector('#tmN'+i); n.hidden=s.value!=='__new'; n.style.display=s.value==='__new'?'grid':'none';
         r.querySelector('#tmB'+i).innerHTML=(s.value==='__new'||inactiveBadge(memberById(s.value)))?'<span class="chip inact">Not Active</span>':''; if(s.value==='__new') r.querySelector('#tmNF'+i).focus(); }; s.onchange=upd; upd(); } },
     save:()=>{ const team=size>1?(+fv('tmNum')||next):next; const picks=[], created=[];
-      for(let i=0;i<size;i++){ let mid=fv('tmM'+i); if(!mid) continue;
+      for(let i=0;i<size;i++){ let mid=fv('tmM'+i); if(!mid){ if(spon&&i<spots){ const prev=existing[i]&&existing[i].tbd?existing[i]:null; picks.push(prev||{id:uid(),memberId:'',name:'TBD',tbd:true,sponsorId:spon.id,team:0,paid:true,skins:false,answers:{}}); picks[picks.length-1].team=team; } continue; }
         if(mid==='__new'){ const f=fv('tmNF'+i), l=fv('tmNL'+i); if(!f&&!l){ toast('Enter the new player’s name'); return false; }
           const dup=persons().find(m=>(m.first||'').toLowerCase()===f.toLowerCase()&&(m.last||'').toLowerCase()===l.toLowerCase());
           if(dup){ mid=dup.id; } else { const m={id:uid(),first:f,last:l,email:fv('tmNE'+i).toLowerCase(),status:'Inactive',joined:'',notes:'Added from the '+t.name+' field',source:'field'}; created.push(m); mid=m.id; } } if(taken.has(mid)){ toast(memberName(memberById(mid))+' is already in the field'); return false; }
         if(picks.some(p=>p.memberId===mid)){ toast('Same member picked twice'); return false; }
         const prev=existing.find(p=>p.memberId===mid)||existing[i]||{}; const answers=Object.assign({},prev.memberId===mid?prev.answers:{});
         (t.fieldQuestions||[]).forEach((q,qi)=>{ answers[q.key]=$(`tmQ${i}_${qi}`).checked?'Yes':'No'; });
-        picks.push({...(prev.memberId===mid?prev:{}),id:(prev.memberId===mid&&prev.id)||uid(),memberId:mid,team,paid:$('tmP'+i).checked,skins:$('tmS'+i).checked,answers}); }
-      if(!picks.length){ toast('Pick at least one player'); return false; }
+        picks.push({...(prev.memberId===mid?prev:{}),id:(prev.memberId===mid&&prev.id)||uid(),memberId:mid,team,paid:$('tmP'+i).checked,skins:$('tmS'+i).checked,answers,tbd:undefined,name:undefined,sponsorId:spon?spon.id:(prev.sponsorId||undefined)}); }
+      if(!picks.some(p=>!p.tbd)&&!spon){ toast('Pick at least one player'); return false; }
       created.forEach(m=>{ const {id,...data}=m; upsertMember(id,data); });
       t.field=t.field.filter(p=>(p.team||0)!==num).concat(picks);
       if(created.length) toast(created.map(memberName).join(' and ')+' added as Inactive'); },
@@ -1636,11 +1637,25 @@ function tSponsors(el,t){
   el.innerHTML=`<div class="grid g3">${kpi('Pledged',fmt(c.pledged),t.goal?`${Math.round(c.pledged/t.goal*100)}% of ${fmt(t.goal)} goal`:`${t.sponsors.length} sponsors`)}${kpi('Received',fmt(c.received),`${t.sponsors.filter(s=>spPaid(s)>=n0(s.pledged)&&n0(s.pledged)>0).length} paid in full`)}${kpi('Outstanding',fmt(sum(t.sponsors,s=>Math.max(0,n0(s.pledged)-spPaid(s)))),`${t.sponsors.filter(s=>n0(s.pledged)>spPaid(s)+0.004).length} still owe`,'')}</div>
   <div class="toolbar"><div class="actions"><button class="btn pri" id="spAdd">${I.plus}Add sponsor</button><button class="btn" id="spTiers">Sponsor tiers</button></div></div>
   <div class="card" style="overflow:hidden">${list.length?`<div class="tw"><div class="t"><div class="tr th" style="${cols}"><span>Sponsor</span><span>Tier</span><span class="r">Pledged</span><span class="r">Received</span><span>Status</span><span></span></div>
-  ${list.map(s=>{const p=spPaid(s),pl=n0(s.pledged);const st=p<=0?['Pledged','']:p>=pl?['Paid','ok']:['Partial','gold'];return `<div class="tr num click" data-sp="${s.id}" style="${cols}"><div class="cell2"><b class="trunc">${esc(s.company)}</b><small class="trunc">${esc([s.contact,s.committee&&'Committee '+s.committee].filter(Boolean).join(' · '))}</small></div><span class="trunc muted">${esc(s.tier)}</span><span class="r">${fmt(pl)}</span><span class="r">${fmt(p)}</span><span><span class="chip ${st[1]}">${st[0]}</span></span><span class="ib">${I.edit}</span></div>`;}).join('')}
+  ${list.map(s=>{const p=spPaid(s),pl=n0(s.pledged);const st=p<=0?['Pledged','']:p>=pl?['Paid','ok']:['Partial','gold'];const tm=sponsorTeamOf(t,s), named=tm.filter(p=>!p.tbd).length; return `<div class="tr num click" data-sp="${s.id}" style="${cols}"><div class="cell2"><b class="trunc">${esc(s.company)}</b><small class="trunc">${esc([s.contact,s.committee&&'Committee '+s.committee].filter(Boolean).join(' · '))}</small></div><span class="trunc muted">${esc(s.tier)}${tm.length?` <span class="chip${named<tm.length?' gold':' ok'}" style="height:20px;font-size:11px" title="The package’s team in the field">Team ${tm[0].team} · ${named<tm.length?named+' of '+tm.length+' named':'full'}</span>`:''}</span><span class="r">${fmt(pl)}</span><span class="r">${fmt(p)}</span><span><span class="chip ${st[1]}">${st[0]}</span></span><span class="ib">${I.edit}</span></div>`;}).join('')}
   <div class="tr tot num" style="${cols}"><span>Total</span><span></span><span class="r">${fmt(c.pledged)}</span><span class="r">${fmt(c.received)}</span><span></span><span></span></div></div></div>`:`<div class="empty"><b>No sponsors yet</b><span>Add sponsors and log their payments as they come in.</span></div>`}</div>`;
   $('spAdd').onclick=()=>editSponsor(t,null); $('spTiers').onclick=()=>editTiers(t);
   el.querySelectorAll('[data-sp]').forEach(r=>r.onclick=()=>editSponsor(t,t.sponsors.find(s=>s.id===r.dataset.sp)));
 }
+/* ---- sponsorship packages that include a team (the owner, Nov 17: "anytime a sponsor has a sponsorship level that includes a team, and
+   they don't know their players' names, it should fill it with a TBD, but it still should be counted as a player") ----
+   A tier carries `spots`; a sponsor on it owns a team in the field (`sponsorId` on the entries). Seats without a name are TBD entries
+   ({tbd:true, name:'TBD', memberId:''}): they count in the field and the budget, show as TBD on the Field tab and the registration
+   page, stay out of check-in and live scoring until a person is named, and never owe an entry fee (the package covers it). */
+const tierOf=(t,name)=>(t.tiers||[]).find(x=>x.name===name)||null;
+const sponsorSpots=(t,s)=>+((tierOf(t,s.tier)||{}).spots||0);
+const sponsorTeamOf=(t,s)=>t.field.filter(p=>p.sponsorId===s.id);
+function sponsorTeamSync(t,s){ const spots=sponsorSpots(t,s); let team=sponsorTeamOf(t,s);
+  if(!spots){ t.field=t.field.filter(p=>!(p.sponsorId===s.id&&p.tbd)); return; }   // the package no longer includes players: the named ones stay, the TBD seats go
+  const n=team.length?(team[0].team||0):(Math.max(0,...t.field.map(p=>p.team||0))+1);
+  while(team.length<spots){ const e={id:uid(),memberId:'',name:'TBD',tbd:true,sponsorId:s.id,team:n,paid:true,skins:false,answers:{}}; t.field.push(e); team=sponsorTeamOf(t,s); }
+  const extra=team.filter(p=>p.tbd).slice(0,Math.max(0,team.length-spots)); if(extra.length) t.field=t.field.filter(p=>!extra.includes(p)); }
+const sponsorOfTeam=(t,num)=>{ const e=t.field.find(p=>(p.team||0)===num&&p.sponsorId); return e?t.sponsors.find(s=>s.id===e.sponsorId)||null:null; };
 function editSponsor(t,s){
   const pays=s?clone(s.payments||[]):[];
   const payHTML=()=>pays.map((p,i)=>`<div class="mr num" style="grid-template-columns:86px minmax(0,1fr) 72px 76px 28px"><input class="inp r" data-pi="${i}" data-k="amount" inputmode="decimal" value="${esc(p.amount)}" aria-label="Payment amount"><select class="inp" data-pi="${i}" data-k="method" aria-label="Payment method">${['Check','Zelle','CC','Cash','Other'].map(o=>`<option${o===p.method?' selected':''}>${o}</option>`).join('')}</select><input class="inp" data-pi="${i}" data-k="checkNo" value="${esc(p.checkNo||'')}" placeholder="Chk #" aria-label="Check number"><input class="inp" data-pi="${i}" data-k="date" value="${esc(p.date)}" placeholder="Date" aria-label="Payment date"><button class="ib" data-pdel="${i}" aria-label="Remove payment">${I.x}</button></div>`).join('')||'<div class="mr"><span class="muted">No payments logged.</span></div>';
@@ -1648,30 +1663,31 @@ function editSponsor(t,s){
   openDrawer({kicker:t.name+' · Sponsor',title:s?s.company:'Add sponsor',
     body:field('Company','sCo',s?.company||'')+pair(field('Tier','sTier',s?.tier||'',{type:'select',options:tierOpts}),field('Pledged $','sPl',s?.pledged??'',{type:'number'}))+
       pair(field('Contact','sCt',s?.contact||''),field('Committee','sCm',s?.committee||'',{ph:'Initials'}))+pair(field('Phone','sPh',s?.phone||''),field('Email','sEm',s?.email||''))+
-      `<div class="fld"><div style="display:flex;justify-content:space-between;align-items:center"><span class="lbl">Payments received</span><button class="btn sm" id="pAdd" type="button">${I.plus}Log payment</button></div><div class="mini"><div id="pRows">${payHTML()}</div></div><p class="hint" id="pSum"></p></div>`+
+      `<p class="hint" id="sSpots" style="margin:-6px 0 0"></p><div class="fld"><div style="display:flex;justify-content:space-between;align-items:center"><span class="lbl">Payments received</span><button class="btn sm" id="pAdd" type="button">${I.plus}Log payment</button></div><div class="mini"><div id="pRows">${payHTML()}</div></div><p class="hint" id="pSum"></p></div>`+
       field('Notes','sNt',s?.notes||'',{type:'textarea'}),
     wire:r=>{ const sumTxt=()=>{ r.querySelector('#pSum').textContent=`${fmt(sum(pays,p=>p.amount))} received of ${fmt(fnum('sPl'))} pledged`; };
       const bind=()=>{ r.querySelectorAll('[data-pi]').forEach(e=>e.oninput=e.onchange=()=>{ pays[+e.dataset.pi][e.dataset.k]=e.value; sumTxt(); });
         r.querySelectorAll('[data-pdel]').forEach(b=>b.onclick=()=>{ pays.splice(+b.dataset.pdel,1); r.querySelector('#pRows').innerHTML=payHTML(); bind(); sumTxt(); }); };
       bind(); sumTxt(); r.querySelector('#sPl').oninput=sumTxt;
-      r.querySelector('#sTier').onchange=e=>{ const tr=t.tiers.find(x=>x.name===e.target.value); if(tr&&n0(tr.amt)&&!fnum('sPl')){ r.querySelector('#sPl').value=tr.amt; sumTxt(); } };
+      const spotsTxt=()=>{ const tr=tierOf(t,r.querySelector('#sTier').value), n=+((tr||{}).spots||0), team=s?sponsorTeamOf(t,s):[], named=team.filter(p=>!p.tbd).length; r.querySelector('#sSpots').innerHTML=n?`This package includes <b>${n} player${n===1?'':'s'}</b>${team.length?` — Team ${team[0].team} in the field, ${named} of ${n} named${named<n?', the rest TBD':''}`:' — a team of TBDs goes into the field on Save; name them from the Field tab as they come in'}.`:''; };
+      r.querySelector('#sTier').onchange=e=>{ const tr=t.tiers.find(x=>x.name===e.target.value); if(tr&&n0(tr.amt)&&!fnum('sPl')){ r.querySelector('#sPl').value=tr.amt; sumTxt(); } spotsTxt(); }; spotsTxt();
       r.querySelector('#pAdd').onclick=()=>{ const left=Math.max(0,fnum('sPl')-sum(pays,p=>p.amount)); const d=new Date(); pays.push({id:uid(),amount:left||'',method:'Check',date:(d.getMonth()+1)+'/'+d.getDate()}); r.querySelector('#pRows').innerHTML=payHTML(); bind(); sumTxt(); }; },
     save:()=>{ const co=fv('sCo'); if(!co){ toast('Company name is required'); return false; }
       const data={company:co,tier:fv('sTier'),pledged:fnum('sPl'),contact:fv('sCt'),committee:fv('sCm'),phone:fv('sPh'),email:fv('sEm'),notes:fv('sNt'),
         payments:pays.filter(p=>n0(p.amount)).map(p=>({id:p.id||uid(),amount:n0(p.amount),method:p.method||'Check',date:p.date||'',checkNo:p.checkNo||''}))};
-      if(s) Object.assign(s,data); else t.sponsors.push(Object.assign({id:uid()},data)); },
-    del:s?()=>{ const i=t.sponsors.indexOf(s); t.sponsors.splice(i,1); toast('Sponsor removed',()=>{t.sponsors.splice(i,0,s);persist();render();}); }:null});
+      if(s) Object.assign(s,data); else { s=Object.assign({id:uid()},data); t.sponsors.push(s); } sponsorTeamSync(t,s); },
+    del:s?()=>{ const i=t.sponsors.indexOf(s); t.sponsors.splice(i,1); const seats=t.field.filter(p=>p.sponsorId===s.id&&p.tbd); t.field=t.field.filter(p=>!seats.includes(p)); toast('Sponsor removed',()=>{t.sponsors.splice(i,0,s);t.field=t.field.concat(seats);persist();render();}); }:null});
 }
 function editTiers(t){
   const tiers=clone(t.tiers);
-  const rows=()=>tiers.map((x,i)=>`<div class="mr num" style="grid-template-columns:minmax(0,1fr) 100px 28px"><input class="inp" data-ti="${i}" data-k="name" value="${esc(x.name)}" aria-label="Tier name"><input class="inp r" data-ti="${i}" data-k="amt" inputmode="decimal" value="${esc(x.amt)}" aria-label="Tier amount"><button class="ib" data-tdel="${i}" aria-label="Remove tier">${I.x}</button></div>`).join('');
-  openDrawer({kicker:t.name,title:'Sponsor tiers',body:`<div class="mini"><div class="mr h" style="grid-template-columns:minmax(0,1fr) 100px 28px"><span>Tier</span><span class="r">Default $</span><span></span></div><div id="tRows">${rows()}</div></div><button class="btn sm" id="tAdd" type="button" style="align-self:flex-start">${I.plus}Add tier</button><p class="hint">Renaming a tier updates sponsors already on it.</p>`,
+  const rows=()=>tiers.map((x,i)=>`<div class="mr num" style="grid-template-columns:minmax(0,1fr) 96px 76px 28px"><input class="inp" data-ti="${i}" data-k="name" value="${esc(x.name)}" aria-label="Tier name"><input class="inp r" data-ti="${i}" data-k="amt" inputmode="decimal" value="${esc(x.amt)}" aria-label="Tier amount"><input class="inp r" data-ti="${i}" data-k="spots" inputmode="numeric" value="${x.spots||''}" placeholder="0" aria-label="Players included"><button class="ib" data-tdel="${i}" aria-label="Remove tier">${I.x}</button></div>`).join('');
+  openDrawer({kicker:t.name,title:'Sponsor tiers',body:`<div class="mini"><div class="mr h" style="grid-template-columns:minmax(0,1fr) 96px 76px 28px"><span>Tier</span><span class="r">Default $</span><span class="r">Players</span><span></span></div><div id="tRows">${rows()}</div></div><button class="btn sm" id="tAdd" type="button" style="align-self:flex-start">${I.plus}Add tier</button><p class="hint">Renaming a tier updates sponsors already on it. <b>Players</b> is how many spots the package includes (4 = a foursome): a sponsor on that tier gets a team in the field at once, with <b>TBD</b> in every seat until the names come in — the seats count as players in the budget and the field.</p>`,
     wire:r=>{ const bind=()=>{ r.querySelectorAll('[data-ti]').forEach(e=>e.oninput=()=>tiers[+e.dataset.ti][e.dataset.k]=e.value); r.querySelectorAll('[data-tdel]').forEach(b=>b.onclick=()=>{tiers.splice(+b.dataset.tdel,1);r.querySelector('#tRows').innerHTML=rows();bind();}); };
       bind(); r.querySelector('#tAdd').onclick=()=>{ tiers.push({id:uid(),name:'',amt:0}); r.querySelector('#tRows').innerHTML=rows(); bind(); }; },
     save:()=>{ const old=new Map(t.tiers.map(x=>[x.id,x.name]));
-      const next=tiers.filter(x=>x.name.trim()).map(x=>({id:x.id||uid(),name:x.name.trim(),amt:n0(x.amt)}));
+      const next=tiers.filter(x=>x.name.trim()).map(x=>({id:x.id||uid(),name:x.name.trim(),amt:n0(x.amt),spots:Math.max(0,Math.min(8,Math.round(n0(x.spots))))}));
       next.forEach(x=>{ const was=old.get(x.id); if(was&&was!==x.name) t.sponsors.forEach(s=>{ if(s.tier===was) s.tier=x.name; }); });
-      t.tiers=next; }});
+      t.tiers=next; t.sponsors.forEach(sp=>sponsorTeamSync(t,sp)); }});
 }
 
 /* Budget: every number, grouped, read-only rows → drawer */
@@ -6896,7 +6912,7 @@ TT.splice(TT.findIndex(x=>x[0]==='field')+1,0,['checkin','Check-in']);
 view.ckiQ=''; view.ckiF='all';
 function ckPlayers(t){
   const par3q=(t.fieldQuestions||[]).find(q=>q.kind==='par3');
-  const rows=(t.field||[]).map(p=>{ const m=memberById(p.memberId); const full=tidyName(m?memberName(m):(p.name||'')); const parts=full.split(' ');
+  const rows=(t.field||[]).filter(p=>!p.tbd).map(p=>{ const m=memberById(p.memberId);   // a sponsor's unnamed seat has nobody to check in const full=tidyName(m?memberName(m):(p.name||'')); const parts=full.split(' ');
     return {p,id:p.id,first:m&&m.first?tidyName(m.first):parts.slice(0,-1).join(' '),last:m&&m.last?tidyName(m.last):parts.slice(-1)[0]||'',team:p.team,par3:!!(par3q&&String((p.answers||{})[par3q.key]||'').toLowerCase().startsWith('y'))}; });
   // the hub's member records sometimes have first/last swapped (e.g. "andy, sauter"); keep display sane
   rows.forEach(r=>{ if(r.last.toLowerCase()==='andy'&&r.first.toLowerCase()==='sauter'){ r.last='Sauter'; r.first='Andy'; } });
@@ -9786,7 +9802,7 @@ function wireSignupCard(t){
    page counts, and a reload is tried once per build — if the page that comes back is still the old one, the CDN
    hasn't caught up; wait a while before trying that build again. */
 (function(){
-  const ME='20261117234151', KEY='au_tried', RETRY=10*60*1000; let ready=false, lastCheck=0;
+  const ME='20261117234444', KEY='au_tried', RETRY=10*60*1000; let ready=false, lastCheck=0;
   const typing=()=>{ const a=document.activeElement; return a&&/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)&&a.value&&a.type!=='search'; };
   const safe=()=>!typing()&&(typeof window.__canReload!=='function'||window.__canReload());
   const tried=()=>{ try{ const [b,t]=(sessionStorage.getItem(KEY)||'').split('|'); return b?{build:b,at:+t||0}:null; }catch(_){ return null; } };
