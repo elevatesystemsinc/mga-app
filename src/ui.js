@@ -383,7 +383,7 @@ function copyStructure(src,t){
   t.dayItems=[0,1,2].map(i=>i<t.days?re(src.dayItems[i]).map(x=>{x.actual=0; if(x.menu) x.menu.items=re(x.menu.items); return x;}):[]);
   t.income=re(src.income).map(x=>(x.actual=0,x)); t.perPlayer=re(src.perPlayer).map(x=>(x.actual=0,x)); t.lines=re(src.lines).map(x=>(x.actual=0,x));
   t.sponsors=src.sponsors.map(s=>({id:uid(),company:s.company,contact:s.contact,phone:s.phone,email:s.email,tier:s.tier,pledged:0,committee:s.committee,notes:'',payments:[]}));
-  t.schedule=clone(src.schedule||[]).filter(d=>d.day<t.days);
+  t.schedule=clone(src.schedule||[]);
   if(!t.entryFee) t.entryFee=src.entryFee; if(!t.skinsFee) t.skinsFee=src.skinsFee;
 }
 
@@ -437,7 +437,7 @@ function tOverview(el,t){
   const c=tcalc(t);
   el.innerHTML=`<div class="grid g4">${kpi('Budgeted net',fmtS(c.net),`${fmt(c.revenue)} in · ${fmt(c.expenses)} out`,netCls(c.net))}${kpi('Players',String(c.players),t.budgetBasis==='field'?'from the field':`planned · ${t.field.length} in the field so far`)}${kpi('Sponsors',fmt(c.pledged),`${fmt(c.received)} received`)}${kpi('Actual net so far',fmtS(c.netA),'from actuals entered')}</div>
   <div class="split"><div class="card" style="overflow:hidden"><div class="cardhead"><h2 class="h2">Schedule</h2><button class="btn sm" id="schAdd">${I.plus}Add</button></div>
-    ${[0,1,2].slice(0,t.days).map(di=>{const d=t.schedule.find(s=>s.day===di)||{items:[]};return `<div class="gh"><b>${dayLabel(t,di)}</b><span class="muted">${dayShort(t,di)}</span></div>${d.items.length?d.items.map(i=>`<div class="tr click" data-sch="${di}|${i.id}" style="grid-template-columns:150px minmax(0,1fr)"><span class="muted num">${esc(i.time||'—')}</span><div class="cell2"><b>${esc(i.event)}</b>${i.notes?`<small>${esc(i.notes)}</small>`:''}</div></div>`).join(''):'<div class="tr"><span class="muted">Nothing scheduled.</span></div>'}`;}).join('')}
+    ${schedDays(t).map(di=>{const d=t.schedule.find(s=>s.day===di)||{items:[]};return `<div class="gh"><b>${dayLabel(t,di)}</b><span class="muted">${dayShort(t,di)}</span></div>${d.items.length?schedItems(d).map(i=>`<div class="tr click" data-sch="${di}|${i.id}" style="grid-template-columns:150px minmax(0,1fr)"><span class="muted num">${esc(i.time||'—')}</span><div class="cell2"><b>${esc(i.event)}</b>${i.notes?`<small>${esc(i.notes)}</small>`:''}</div></div>`).join(''):'<div class="tr"><span class="muted">Nothing scheduled.</span></div>'}`;}).join('')}
   </div>
   <div class="card pad" style="display:flex;flex-direction:column;gap:12px"><div style="display:flex;justify-content:space-between;align-items:center"><h2 class="h2">Open decisions</h2><button class="ib" id="decAdd" aria-label="Add decision">${I.plus}</button></div>
     ${t.decisions.length?t.decisions.map(d=>`<label class="check" style="align-items:flex-start;font-weight:400"><input type="checkbox" data-dec="${d.id}"${d.done?' checked':''}><span style="${d.done?'text-decoration:line-through;color:var(--muted)':''}">${esc(d.text)}</span></label>`).join(''):'<span class="muted">None.</span>'}
@@ -451,8 +451,8 @@ function tOverview(el,t){
 function editSched(t,di,id){
   const d=t.schedule.find(s=>s.day===di), it=id&&d?d.items.find(x=>x.id===id):null;
   openDrawer({kicker:t.name,title:it?'Edit schedule item':'Add schedule item',
-    body:field('Day','sDay',di,{type:'select',options:[0,1,2].slice(0,t.days).map(i=>[i,dayLabel(t,i)])})+pair(field('Time','sTime',it?.time||'',{ph:'e.g. 5:30pm'}),field('Event','sEvent',it?.event||''))+field('Notes','sNotes',it?.notes||'',{type:'textarea'}),
-    save:()=>{ const nd=+fv('sDay'); const data={time:fv('sTime'),event:fv('sEvent'),notes:fv('sNotes')}; if(!data.event){toast('Name the event');return false;}
+    body:(parseD(t.startDate)?field('Date','sDate',dayDate(t,di),{type:'date'})+`<p class="hint" style="margin:-6px 0 12px">Any day — the reception the evening before, the awards dinner the night after. The golf is ${esc(dayShort(t,0))}${(t.days||1)>1?' – '+esc(dayShort(t,(t.days||1)-1)):''}.</p>`:field('Day','sDay',di,{type:'select',options:schedDays(t).map(i=>[i,dayLabel(t,i)])}))+pair(field('Time','sTime',it?.time||'',{ph:'e.g. 5:30pm'}),field('Event','sEvent',it?.event||''))+field('Notes','sNotes',it?.notes||'',{type:'textarea'}),
+    save:()=>{ const nd=$('sDate')?dayOffset(t,fv('sDate')):+fv('sDay'); const data={time:fv('sTime'),event:fv('sEvent'),notes:fv('sNotes')}; if(!data.event){toast('Name the event');return false;} if(nd==null||isNaN(nd)){toast('Pick a date');return false;}
       if(it&&d) d.items=d.items.filter(x=>x!==it);
       let day=t.schedule.find(s=>s.day===nd); if(!day){ day={day:nd,label:'',items:[]}; t.schedule.push(day); }
       day.items.push(Object.assign(it||{id:uid()},data)); },

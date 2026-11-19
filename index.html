@@ -529,10 +529,19 @@ function dateRange(t){
   return MONTHS[d.getMonth()]+' '+d.getDate()+'–'+(e.getMonth()!==d.getMonth()?MONTHS[e.getMonth()]+' ':'')+e.getDate()+', '+e.getFullYear();
 }
 function dayLabel(t,i){
-  const d=parseD(t.startDate); const nm=['Day 1','Day 2','Day 3'][i];
+  const d=parseD(t.startDate), n=t.days||1;
+  const nm=i>=0&&i<n?'Day '+(i+1):i<0?(i===-1?'Day before':(-i)+' days before'):(i===n?'Day after':(i-n+1)+' days after');
   if(!d) return nm;
   const x=addDays(d,i); return x.toLocaleDateString('en-US',{weekday:'long'})+' · '+nm;
 }
+// The schedule spans any number of days: an item sits on a day index relative to the start date (negative = before the golf, past
+// `days` = after it — the reception the evening before, the awards dinner the night after). The owner, Nov 19 (DCO): "these need to be
+// able to span multiple days".
+function schedDays(t){ const n=t.days||1, set=new Set(Array.from({length:n},(_,i)=>i)); (t.schedule||[]).forEach(d=>{ if((d.items||[]).length) set.add(+d.day||0); }); return [...set].sort((a,b)=>a-b); }
+function timeMins(s){ const m=/^\s*(\d{1,2})(?::(\d{2}))?\s*([ap])?\.?m?\.?\s*$/i.exec(String(s||'')); if(!m) return null; let h=+m[1]; const mm=+(m[2]||0), ap=(m[3]||'').toLowerCase(); if(ap==='p'&&h<12) h+=12; if(ap==='a'&&h===12) h=0; return h*60+mm; }
+function schedItems(d){ return (d&&d.items||[]).map((it,i)=>[it,timeMins(it.time),i]).sort((a,b)=>(a[1]==null)-(b[1]==null)||(a[1]-b[1])||(a[2]-b[2])).map(x=>x[0]); }
+function dayDate(t,i){ const d=parseD(t.startDate); if(!d) return ''; const x=addDays(d,i); return x.getFullYear()+'-'+String(x.getMonth()+1).padStart(2,'0')+'-'+String(x.getDate()).padStart(2,'0'); }
+function dayOffset(t,iso){ const d=parseD(t.startDate), x=parseD(iso); if(!d||!x) return null; return Math.round((x-d)/864e5); }
 function dayShort(t,i){ const d=parseD(t.startDate); if(!d) return ''; const x=addDays(d,i); return MONTHS[x.getMonth()]+' '+x.getDate(); }
 function daysOut(t){ const d=parseD(t.startDate); if(!d) return null; const now=new Date(); now.setHours(0,0,0,0); return Math.round((d-now)/864e5); }
 
@@ -1470,7 +1479,7 @@ function copyStructure(src,t){
   t.dayItems=[0,1,2].map(i=>i<t.days?re(src.dayItems[i]).map(x=>{x.actual=0; if(x.menu) x.menu.items=re(x.menu.items); return x;}):[]);
   t.income=re(src.income).map(x=>(x.actual=0,x)); t.perPlayer=re(src.perPlayer).map(x=>(x.actual=0,x)); t.lines=re(src.lines).map(x=>(x.actual=0,x));
   t.sponsors=src.sponsors.map(s=>({id:uid(),company:s.company,contact:s.contact,phone:s.phone,email:s.email,tier:s.tier,pledged:0,committee:s.committee,notes:'',payments:[]}));
-  t.schedule=clone(src.schedule||[]).filter(d=>d.day<t.days);
+  t.schedule=clone(src.schedule||[]);
   if(!t.entryFee) t.entryFee=src.entryFee; if(!t.skinsFee) t.skinsFee=src.skinsFee;
 }
 
@@ -1524,7 +1533,7 @@ function tOverview(el,t){
   const c=tcalc(t);
   el.innerHTML=`<div class="grid g4">${kpi('Budgeted net',fmtS(c.net),`${fmt(c.revenue)} in · ${fmt(c.expenses)} out`,netCls(c.net))}${kpi('Players',String(c.players),t.budgetBasis==='field'?'from the field':`planned · ${t.field.length} in the field so far`)}${kpi('Sponsors',fmt(c.pledged),`${fmt(c.received)} received`)}${kpi('Actual net so far',fmtS(c.netA),'from actuals entered')}</div>
   <div class="split"><div class="card" style="overflow:hidden"><div class="cardhead"><h2 class="h2">Schedule</h2><button class="btn sm" id="schAdd">${I.plus}Add</button></div>
-    ${[0,1,2].slice(0,t.days).map(di=>{const d=t.schedule.find(s=>s.day===di)||{items:[]};return `<div class="gh"><b>${dayLabel(t,di)}</b><span class="muted">${dayShort(t,di)}</span></div>${d.items.length?d.items.map(i=>`<div class="tr click" data-sch="${di}|${i.id}" style="grid-template-columns:150px minmax(0,1fr)"><span class="muted num">${esc(i.time||'—')}</span><div class="cell2"><b>${esc(i.event)}</b>${i.notes?`<small>${esc(i.notes)}</small>`:''}</div></div>`).join(''):'<div class="tr"><span class="muted">Nothing scheduled.</span></div>'}`;}).join('')}
+    ${schedDays(t).map(di=>{const d=t.schedule.find(s=>s.day===di)||{items:[]};return `<div class="gh"><b>${dayLabel(t,di)}</b><span class="muted">${dayShort(t,di)}</span></div>${d.items.length?schedItems(d).map(i=>`<div class="tr click" data-sch="${di}|${i.id}" style="grid-template-columns:150px minmax(0,1fr)"><span class="muted num">${esc(i.time||'—')}</span><div class="cell2"><b>${esc(i.event)}</b>${i.notes?`<small>${esc(i.notes)}</small>`:''}</div></div>`).join(''):'<div class="tr"><span class="muted">Nothing scheduled.</span></div>'}`;}).join('')}
   </div>
   <div class="card pad" style="display:flex;flex-direction:column;gap:12px"><div style="display:flex;justify-content:space-between;align-items:center"><h2 class="h2">Open decisions</h2><button class="ib" id="decAdd" aria-label="Add decision">${I.plus}</button></div>
     ${t.decisions.length?t.decisions.map(d=>`<label class="check" style="align-items:flex-start;font-weight:400"><input type="checkbox" data-dec="${d.id}"${d.done?' checked':''}><span style="${d.done?'text-decoration:line-through;color:var(--muted)':''}">${esc(d.text)}</span></label>`).join(''):'<span class="muted">None.</span>'}
@@ -1538,8 +1547,8 @@ function tOverview(el,t){
 function editSched(t,di,id){
   const d=t.schedule.find(s=>s.day===di), it=id&&d?d.items.find(x=>x.id===id):null;
   openDrawer({kicker:t.name,title:it?'Edit schedule item':'Add schedule item',
-    body:field('Day','sDay',di,{type:'select',options:[0,1,2].slice(0,t.days).map(i=>[i,dayLabel(t,i)])})+pair(field('Time','sTime',it?.time||'',{ph:'e.g. 5:30pm'}),field('Event','sEvent',it?.event||''))+field('Notes','sNotes',it?.notes||'',{type:'textarea'}),
-    save:()=>{ const nd=+fv('sDay'); const data={time:fv('sTime'),event:fv('sEvent'),notes:fv('sNotes')}; if(!data.event){toast('Name the event');return false;}
+    body:(parseD(t.startDate)?field('Date','sDate',dayDate(t,di),{type:'date'})+`<p class="hint" style="margin:-6px 0 12px">Any day — the reception the evening before, the awards dinner the night after. The golf is ${esc(dayShort(t,0))}${(t.days||1)>1?' – '+esc(dayShort(t,(t.days||1)-1)):''}.</p>`:field('Day','sDay',di,{type:'select',options:schedDays(t).map(i=>[i,dayLabel(t,i)])}))+pair(field('Time','sTime',it?.time||'',{ph:'e.g. 5:30pm'}),field('Event','sEvent',it?.event||''))+field('Notes','sNotes',it?.notes||'',{type:'textarea'}),
+    save:()=>{ const nd=$('sDate')?dayOffset(t,fv('sDate')):+fv('sDay'); const data={time:fv('sTime'),event:fv('sEvent'),notes:fv('sNotes')}; if(!data.event){toast('Name the event');return false;} if(nd==null||isNaN(nd)){toast('Pick a date');return false;}
       if(it&&d) d.items=d.items.filter(x=>x!==it);
       let day=t.schedule.find(s=>s.day===nd); if(!day){ day={day:nd,label:'',items:[]}; t.schedule.push(day); }
       day.items.push(Object.assign(it||{id:uid()},data)); },
@@ -9774,7 +9783,7 @@ function signupPub(t){ const qs=(t.fieldQuestions||[]).map(q=>({key:q.key,label:
   const teams={}; t.field.forEach(p=>{ (teams[p.team||0]=teams[p.team||0]||[]).push(p); });
   const size=t.teamSize||1, rounds=(typeof tournamentRounds==='function'?tournamentRounds(t):[]).slice().sort((a,b)=>a.day-b.day);
   return {tid:t.id,name:t.name,org:orgShort(),orgName:sgOrgName(),club:CLUB&&CLUB.name||'',date:t.startDate||'',days:t.days||1,venue:t.venue||'',entryFee:n0(t.entryFee),skinsFee:n0(t.skinsFee),teamSize:size,
-    schedule:[0,1,2].slice(0,t.days||1).map(di=>{ const d=(t.schedule||[]).find(s=>s.day===di)||{items:[]}; return {day:di,label:dayLabel(t,di),items:(d.items||[]).map(i=>({time:i.time||'',event:i.event||'',notes:i.notes||''}))}; }),
+    schedule:schedDays(t).map(di=>{ const d=(t.schedule||[]).find(s=>s.day===di)||{items:[]}; return {day:di,label:dayLabel(t,di),date:dayShort(t,di),items:schedItems(d).map(i=>({time:i.time||'',event:i.event||'',notes:i.notes||''}))}; }),
     notes:t.notes||'',rules:sgLines(t.rules),placesPaid:+t.placesPaid||0,payoutNote:t.payoutNote||'',hcpDiff:+t.hcpDiff||0,
     rounds:rounds.map(r=>sgRound(t,r)),qs,pool:signupPool(),taken:t.field.map(p=>p.memberId).filter(Boolean),
     teams:Object.keys(teams).map(Number).sort((a,b)=>a-b).map(n=>({n,names:teams[n].map(p=>{ const m=memberById(p.memberId)||personById(p.memberId); return m?memberName(m):(p.name||'Player'); }),open:tbdSeatsOn(t)?0:Math.max(0,size-teams[n].length),tbd:tbdSeatsOn(t)?Math.max(0,size-teams[n].length):0,shop:teams[n].some(p=>p.reg&&p.reg.need)})),
@@ -9833,7 +9842,7 @@ function wireSignupCard(t){
    page counts, and a reload is tried once per build — if the page that comes back is still the old one, the CDN
    hasn't caught up; wait a while before trying that build again. */
 (function(){
-  const ME='20261119032702', KEY='au_tried', RETRY=10*60*1000; let ready=false, lastCheck=0;
+  const ME='20261119041232', KEY='au_tried', RETRY=10*60*1000; let ready=false, lastCheck=0;
   const typing=()=>{ const a=document.activeElement; return a&&/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)&&a.value&&a.type!=='search'; };
   const safe=()=>!typing()&&(typeof window.__canReload!=='function'||window.__canReload());
   const tried=()=>{ try{ const [b,t]=(sessionStorage.getItem(KEY)||'').split('|'); return b?{build:b,at:+t||0}:null; }catch(_){ return null; } };

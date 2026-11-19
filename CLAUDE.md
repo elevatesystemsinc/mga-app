@@ -109,6 +109,7 @@ python3 tests/test_sidegames.py # Banker, Flip and the round robin in a cart: th
 python3 tests/test_hammer.py  # Hammer in a cart: thrown, accepted (×2, the hammer passes), hammered back (×4), declined (a forfeit at the bet before it), the shaved birdie, eagles triple, 3–5 players
 python3 tests/test_cartgame.py # a cart game: five players, no pots, one group, the phone offers the side games and has no Finish tab; browsing ahead writes no pars
 python3 tests/test_sponsorteam.py # a sponsor tier that includes a team: TBD seats in the field, counted as players, named one by one, dropped with the package
+python3 tests/test_schedule.py # a tournament's schedule across the days before and after the golf, sorted by time, on the registration copy
 git add -A && git commit && git push origin main  # Render deploys main to app.wcccmga.org
 ```
 Tests need `pip install playwright && playwright install chromium` and `cd tests && npm i xlsx@0.18.5`.
@@ -674,6 +675,12 @@ flight positions (lots matched by member id or name). **Results sheet (PDF)** = 
   of every team a player without storing anything: `fieldSeats(t)` = Σ max(team size, named) is the field's size (`playersUsed` on the field
   basis, the Field KPI "n named · m TBD"), open seats read *TBD* on the Field tab, `signupPub` gives those teams `open: 0` and `tbd: n`
   (the registration page's Who's in reads "+ 2 TBD" and counts them). Off, a short team is open as before. `tests/test_sponsorteam.py`.
+- **The schedule spans any number of days** (the owner, Nov 19, DCO's reception and golf: "these need to be able to span multiple days"):
+  a `t.schedule` day is an index relative to the start date — negative = before the golf, ≥ `t.days` = after it (`schedDays(t)` = the
+  tournament's days plus every day holding an item, in date order; `dayLabel` reads "Day before" / "2 days before" / "Day after";
+  `dayDate` / `dayOffset` convert). The Overview card groups by day with the items sorted by time (`schedItems`, `timeMins` parses
+  "4:00pm"); the drawer takes a **Date** (any day; a tournament without a start date keeps the Day select); copying a tournament keeps
+  the whole schedule; `signupPub` publishes the same days (label + date) and the registration page labels them. `tests/test_schedule.py`.
 - **Partner handicap differential cap** (`t.hcpDiff`, 0/8/10/12, Tournament details): `effIndex(ev, p)` in golf.js
   pulls the higher partner's index down to the lowest partner's index + cap before the course handicap; the Field
   tab flags capped players (↓ from). Applies to every event of the tournament and to the tournament flights.

@@ -24,10 +24,19 @@ function dateRange(t){
   return MONTHS[d.getMonth()]+' '+d.getDate()+'–'+(e.getMonth()!==d.getMonth()?MONTHS[e.getMonth()]+' ':'')+e.getDate()+', '+e.getFullYear();
 }
 function dayLabel(t,i){
-  const d=parseD(t.startDate); const nm=['Day 1','Day 2','Day 3'][i];
+  const d=parseD(t.startDate), n=t.days||1;
+  const nm=i>=0&&i<n?'Day '+(i+1):i<0?(i===-1?'Day before':(-i)+' days before'):(i===n?'Day after':(i-n+1)+' days after');
   if(!d) return nm;
   const x=addDays(d,i); return x.toLocaleDateString('en-US',{weekday:'long'})+' · '+nm;
 }
+// The schedule spans any number of days: an item sits on a day index relative to the start date (negative = before the golf, past
+// `days` = after it — the reception the evening before, the awards dinner the night after). The owner, Nov 19 (DCO): "these need to be
+// able to span multiple days".
+function schedDays(t){ const n=t.days||1, set=new Set(Array.from({length:n},(_,i)=>i)); (t.schedule||[]).forEach(d=>{ if((d.items||[]).length) set.add(+d.day||0); }); return [...set].sort((a,b)=>a-b); }
+function timeMins(s){ const m=/^\s*(\d{1,2})(?::(\d{2}))?\s*([ap])?\.?m?\.?\s*$/i.exec(String(s||'')); if(!m) return null; let h=+m[1]; const mm=+(m[2]||0), ap=(m[3]||'').toLowerCase(); if(ap==='p'&&h<12) h+=12; if(ap==='a'&&h===12) h=0; return h*60+mm; }
+function schedItems(d){ return (d&&d.items||[]).map((it,i)=>[it,timeMins(it.time),i]).sort((a,b)=>(a[1]==null)-(b[1]==null)||(a[1]-b[1])||(a[2]-b[2])).map(x=>x[0]); }
+function dayDate(t,i){ const d=parseD(t.startDate); if(!d) return ''; const x=addDays(d,i); return x.getFullYear()+'-'+String(x.getMonth()+1).padStart(2,'0')+'-'+String(x.getDate()).padStart(2,'0'); }
+function dayOffset(t,iso){ const d=parseD(t.startDate), x=parseD(iso); if(!d||!x) return null; return Math.round((x-d)/864e5); }
 function dayShort(t,i){ const d=parseD(t.startDate); if(!d) return ''; const x=addDays(d,i); return MONTHS[x.getMonth()]+' '+x.getDate(); }
 function daysOut(t){ const d=parseD(t.startDate); if(!d) return null; const now=new Date(); now.setHours(0,0,0,0); return Math.round((d-now)/864e5); }
 
