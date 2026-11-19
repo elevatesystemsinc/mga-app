@@ -603,6 +603,7 @@ Tournament = { id, name, season, days, startDate, field:[{id,memberId,team,paid,
 | `staff_clock`, `pos_stations.dept` + RPC `staff_clock`, `club_staff`, `station_dept`, `staff_fits` | the time clock and the club-wide staff list behind the registers (`staff-setup.sql`). |
 | `hub_keys` (org_id, key_hash, label, revoked_at) + RPC `hub_key_org/read/write/people/golf_event/golf_delete/score/share` | admin links (`admin-links-setup.sql`): security-definer functions that act for exactly one organization. |
 | `mm_tournament` | the retired Member-Member app's row (`supabase-setup.sql`). Archive only — no hub code reads or writes it. |
+| `service-role-grants.sql` | the service role's select / insert / update / delete on every public table (and on tables created later). The Edge Functions run as the service role; on Nov 19, 2026 it had lost those rights on every table, so `admin-users` could not read `flagstick_admins` and the portal said "Your login may not manage these logins" (and Open hub's one-click sign-in failed the same way). Run it again if a function starts answering 403 / empty reads. |
 
 ---
 
