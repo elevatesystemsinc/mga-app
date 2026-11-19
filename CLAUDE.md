@@ -248,6 +248,14 @@ Tournament = { id, name, season, days, startDate, field:[{id,memberId,team,paid,
   `tools/courses/import_courses.py` (`GCA_KEY` in the environment — the GolfCourseAPI key is never committed) lists an area's courses
   from OpenStreetMap, pulls each scorecard (par, handicap, yardage per tee, rating and slope) from GolfCourseAPI and the hole lines from
   OSM where mapped, and writes rows for the portal's Import JSON; everything imported is **unverified** until someone ticks it. The
+  **The whole catalogue** (`tools/courses/catalogue.py`, the owner, Nov 17: "bring in all 30,000 golf course API courses"): the API has no list
+  endpoint and its search is a substring match capped at 25 with no paging, so `enumerate` refines every full query by one character until
+  every query comes back short (checkpointed every 1,500 queries), `fetch` pulls each card once into `catalogue/details.jsonl`, `rows`
+  builds library rows (non-US ids carry the country code; a slug collision gets the API id as a suffix; 9-hole and odd cards are skipped
+  and counted) and `push` sends them 400 at a time to the Edge Function **`courses-import`** (`supabase/functions/courses-import`): it
+  writes the library with the service role, never touches a verified row or a club's own course, and is guarded by a key whose SHA-256
+  sits in `app_secrets` (`name 'courses_import'`; a table only the service role reads — delete the row when no import is running). The
+  working files under `tools/courses/catalogue/` are git-ignored. The
   library started with Walnut Creek's Oak and Pecan (verified, with hole lines), Creighton Farms (verified against the VSGA listing),
   San Juan Country Club (yardages match the club's site; ratings unverified) and the Bushwood demo's two (owned by that tenant).
   `tests/test_courses.py` covers defaults → document, the picker, the published card and geometry, the Courses tab, the stand-in, a
