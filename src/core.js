@@ -90,7 +90,15 @@ function menuSubtotal(m){ return sum(m&&m.items,i=>n0(i.qty)*n0(i.unitCost)); }
 function menuCharge(m){ return 0; }
 function menuTotal(m){ return menuSubtotal(m); }
 /* Budget uses the planned player count unless the board switches it to the field (so a half-filled field doesn't sink the budget). */
-function playersUsed(t){ return t.budgetBasis==='field'?t.field.length:n0(t.plannedPlayers); }
+/* Teams sold whole (a nonprofit's sponsor packages — the owner, Nov 19: the dashes on a team "should be TBDs so that their actual player
+   number is counted accurately"): with `t.tbdSeats` on, every seat of every team counts as a player, named or not — `fieldSeats(t)` is
+   the field's size, the Field tab shows TBD in the open seats, and the registration page offers no open spots on those teams. Off, a
+   short team is open (the shop pairs singles). Unset = on for a nonprofit, off elsewhere. Explicit TBD entries (a sponsor's package)
+   count either way. */
+const tbdSeatsOn=t=>t.tbdSeats!=null?!!t.tbdSeats:(typeof isNonprofit==='function'&&isNonprofit());
+function fieldTeams(t){ const by={}; (t.field||[]).forEach(p=>{ (by[p.team||0]=by[p.team||0]||[]).push(p); }); return by; }
+function fieldSeats(t){ const size=t.teamSize||1; if(!tbdSeatsOn(t)||size<2) return t.field.length; return Object.values(fieldTeams(t)).reduce((a,tm)=>a+Math.max(size,tm.length),0); }
+function playersUsed(t){ return t.budgetBasis==='field'?fieldSeats(t):n0(t.plannedPlayers); }
 function itemQty(t,it){ return it.qtyLink==='players'?playersUsed(t):n0(it.qty); }
 function itemTotal(t,it){ return it.menu?menuTotal(it.menu):itemQty(t,it)*n0(it.unitCost); }
 function spPaid(s){ return sum(s.payments,p=>p.amount); }

@@ -599,7 +599,10 @@ thank-you line live under Fundraising, Settings.
 and every sponsor on that tier gets a team in the field the moment it is saved — **TBD** in each seat until the names come in. The
 seats count as players in the field and the budget, carry the sponsor's name, owe no entry fee, and stay out of check-in and live
 scoring until a person is named from the Field tab (open the team, pick the player). The Sponsors tab shows how many of each package's
-seats are named.
+seats are named. More generally, a tournament whose teams are sold whole — the usual case for a charity scramble — counts every
+seat of every team as a player whether or not it is named yet: Tournament details → *Open seats on a team* → **Count as TBD
+players** (the default for a nonprofit). The Field tab reads TBD in those seats, the budget counts them, and the registration
+page shows the team as full. Switch it to **Open** for a tournament where singles are paired by the shop.
 
 **A fundraiser can include a golf tournament.** Battle of the Nines is a tournament by day and a gala that night: tick
 *Includes a golf tournament* when you create the event and a tournament of the same name is made with it (or link one later

@@ -650,7 +650,12 @@ flight positions (lots matched by member id or name). **Results sheet (PDF)** = 
   out of check-in (`checkin.js` filters `tbd`) and live scoring (`syncRoundEvent` skips entries without a member). The team editor on
   a sponsor's team (`sponsorOfTeam`) keeps a blank seat TBD instead of dropping it; naming a seat replaces the TBD; a smaller package
   drops only TBD seats; removing the sponsor removes its TBD seats and keeps the people. The Sponsors tab shows "Team n · 1 of 4 named"
-  per sponsor; the sponsor drawer says what the package includes. `tests/test_sponsorteam.py`.
+  per sponsor; the sponsor drawer says what the package includes. **Teams sold whole** (the owner, Nov 19, looking at DCO's field of
+  one-name teams: the dashes "should be TBDs so that their actual player number is counted accurately"): `t.tbdSeats` (Tournament details →
+  *Open seats on a team*: **Count as TBD players** | **Open**; unset = on for a nonprofit, off elsewhere — `tbdSeatsOn(t)`) makes every seat
+  of every team a player without storing anything: `fieldSeats(t)` = Σ max(team size, named) is the field's size (`playersUsed` on the field
+  basis, the Field KPI "n named · m TBD"), open seats read *TBD* on the Field tab, `signupPub` gives those teams `open: 0` and `tbd: n`
+  (the registration page's Who's in reads "+ 2 TBD" and counts them). Off, a short team is open as before. `tests/test_sponsorteam.py`.
 - **Partner handicap differential cap** (`t.hcpDiff`, 0/8/10/12, Tournament details): `effIndex(ev, p)` in golf.js
   pulls the higher partner's index down to the lowest partner's index + cap before the course handicap; the Field
   tab flags capped players (↓ from). Applies to every event of the tournament and to the tournament flights.

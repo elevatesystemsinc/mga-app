@@ -28,7 +28,7 @@ function signupPub(t){ const qs=(t.fieldQuestions||[]).map(q=>({key:q.key,label:
     schedule:[0,1,2].slice(0,t.days||1).map(di=>{ const d=(t.schedule||[]).find(s=>s.day===di)||{items:[]}; return {day:di,label:dayLabel(t,di),items:(d.items||[]).map(i=>({time:i.time||'',event:i.event||'',notes:i.notes||''}))}; }),
     notes:t.notes||'',rules:sgLines(t.rules),placesPaid:+t.placesPaid||0,payoutNote:t.payoutNote||'',hcpDiff:+t.hcpDiff||0,
     rounds:rounds.map(r=>sgRound(t,r)),qs,pool:signupPool(),taken:t.field.map(p=>p.memberId).filter(Boolean),
-    teams:Object.keys(teams).map(Number).sort((a,b)=>a-b).map(n=>({n,names:teams[n].map(p=>{ const m=memberById(p.memberId)||personById(p.memberId); return m?memberName(m):(p.name||'Player'); }),open:Math.max(0,size-teams[n].length),shop:teams[n].some(p=>p.reg&&p.reg.need)})),
+    teams:Object.keys(teams).map(Number).sort((a,b)=>a-b).map(n=>({n,names:teams[n].map(p=>{ const m=memberById(p.memberId)||personById(p.memberId); return m?memberName(m):(p.name||'Player'); }),open:tbdSeatsOn(t)?0:Math.max(0,size-teams[n].length),tbd:tbdSeatsOn(t)?Math.max(0,size-teams[n].length):0,shop:teams[n].some(p=>p.reg&&p.reg.need)})),
     brand:(typeof brandLogo==='function'&&brandLogo())||null,at:new Date().toISOString()}; }
 async function pushSignup(t){ if(!t.reg||!sgCloud()) return false;
   const doc=signupPub(t), sig=JSON.stringify(Object.assign({},doc,{at:null,status:t.reg.status,token:t.reg.token}));

@@ -81,10 +81,10 @@ function header(){ $('hTitle').textContent=D.orgName||D.org||'Registration'; $('
   if(D.brand){ const im=$('hLogo'); im.src=D.brand; im.className='own'; } }
 /* who is already in: the field's teams plus entries the hub has not taken in yet */
 function enteredIds(){ const s=new Set(D.taken||[]); E.forEach(e=>(e.players||[]).forEach(p=>p&&p.memberId&&s.add(p.memberId))); return s; }
-function whoHTML(){ const size=D.teamSize||1, teams=(D.teams||[]).map(t=>({names:t.names,open:t.open,shop:t.shop})).concat(E.map(e=>({names:(e.players||[]).map(p=>p.name),open:+e.need||0,shop:+e.need>0,pending:true})));
+function whoHTML(){ const size=D.teamSize||1, teams=(D.teams||[]).map(t=>({names:t.names,open:t.open,tbd:t.tbd||0,shop:t.shop})).concat(E.map(e=>({names:(e.players||[]).map(p=>p.name),open:+e.need||0,shop:+e.need>0,pending:true})));
   if(!teams.length) return `<p style="margin:0;color:var(--muted);font-size:14.5px">Nobody yet — be the first.</p>`;
-  const players=teams.reduce((a,t)=>a+t.names.length,0);
-  return `<p style="margin:0 0 8px;color:var(--muted);font-size:13.5px">${players} player${players===1?'':'s'}${size>1?` · ${teams.length} team${teams.length===1?'':'s'}`:''}</p><div class="who">${teams.map((t,i)=>`<div class="tm"><span class="n">${size>1?'Team '+(i+1):'#'+(i+1)}</span><span>${t.names.map(esc).join(', ')}${t.open?`<span class="open"> + ${t.open} open spot${t.open===1?'':'s'} (shop pairing)</span>`:''}</span></div>`).join('')}</div>`; }
+  const players=teams.reduce((a,t)=>a+t.names.length+(t.tbd||0),0);
+  return `<p style="margin:0 0 8px;color:var(--muted);font-size:13.5px">${players} player${players===1?'':'s'}${size>1?` · ${teams.length} team${teams.length===1?'':'s'}`:''}</p><div class="who">${teams.map((t,i)=>`<div class="tm"><span class="n">${size>1?'Team '+(i+1):'#'+(i+1)}</span><span>${t.names.map(esc).join(', ')}${t.open?`<span class="open"> + ${t.open} open spot${t.open===1?'':'s'} (shop pairing)</span>`:''}${t.tbd?`<span style="color:var(--muted)"> + ${t.tbd} TBD</span>`:''}</span></div>`).join('')}</div>`; }
 function roundHTML(r,i,many){ const team=r.teamSize>1; const countTxt=team&&r.count?`The best ${r.count} of ${r.teamSize} ${r.scoring} ${r.unit==='points'?'scores':'balls'} count on every hole.`:'';
   return `<div class="card"><div style="display:flex;justify-content:space-between;gap:10px;align-items:baseline"><b style="font-size:16px;color:var(--navy)">${esc(many?r.label+' · ':'')}${esc(r.format)}</b><small style="color:var(--muted)">${esc(r.scoring)}${r.unit==='points'?' · points':''}</small></div>
     ${r.name&&r.name!==r.format?`<p style="margin:4px 0 0;color:var(--muted);font-size:14px">${esc(r.name)}</p>`:''}
