@@ -229,9 +229,10 @@ hub under **Member accounts** (staff logins only, once the billing module is on)
 - **GL export**: a month's journal (receivables, revenue by item, service charge, sales tax, cash, credits) as CSV for the
   bookkeeper.
 - **The member portal** (`member.html` on the club's address): a member signs in with a one-time e-mail link — the e-mail
-  the club has on file — and sees their balance, activity and statements (PDF). With **Connect with Stripe** done in
-  Billing setup, members **pay online** by card or bank account straight into the club's own Stripe account, and can turn
-  on **autopay** so each statement is paid for them. Flagstick never holds the money.
+  the club has on file — and sees their balance, activity and statements (PDF). With online payments switched on in
+  Billing setup, members **pay online** by card or bank account straight into the club's own merchant account, and can turn
+  on **autopay** so each statement is paid for them. Flagstick never holds the money. **Payments are moving to Trinity Merchant
+  Group's integrated processing** (the owner, Nov 2026); the Stripe Connect path in the code is the placeholder until that is built.
 
 ## Point of sale
 

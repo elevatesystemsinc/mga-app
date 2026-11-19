@@ -119,7 +119,7 @@ counts only the evening (`{own:true}`), so nothing is counted twice. A golf-day 
    (tournaments already have *Start from*; events and the organization lines would get it).
 4. **Sponsorship packages with player spots** (DCO): a tier carries the foursomes it includes; the field fills from the
    sponsors; a package's value splits into the sponsorship and the golf for the acknowledgement's fair-market-value line.
-5. **Invoices and online payment for sponsors and tickets** (Stripe is already wired for member accounts): an invoice PDF per
+5. **Invoices and online payment for sponsors and tickets** (the member-account payment layer, Trinity Merchant Group once it is built, is the one to reuse): an invoice PDF per
    sponsor from the tier, a pay link, the receipt into the ledger on its own.
 6. **Reports a board expects**: the year-end statement of activities (revenue by category, expenses by category, net), a
    per-event P&L one-pager, the sponsor list with status — all from `budgetRows` plus categories.

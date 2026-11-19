@@ -159,6 +159,13 @@ and RLS enforces the same on the tables.
    the **magic link** template (members sign in to `member.html` with it) and add `https://<slug>.flagstickhub.com/member.html`
    style redirects (the wildcard already covers it). Each club then connects its own Stripe account from Billing setup;
    until a key is set the hub and the portal say online payments aren't switched on.
+   **Decided Nov 2026: Flagstick will not use Stripe.** Online payments move to a direct, purpose-built integration with **Trinity
+   Merchant Group** (Fort Worth; a registered ISO of Fifth Third Bank; an in-house gateway with an XML API, subscriptions and ACH per
+   their site — the API documentation, sandbox and per-club merchant credentials come from TMG). The plan: one provider-neutral
+   `payments` Edge Function (tokenize at the gateway with hosted fields so card data never touches Flagstick, charge a token, ACH,
+   stored tokens for autopay, refunds, a webhook or a settlement poll) behind which `stripe` / `stripe-webhook` are retired once TMG
+   is live; the hub and the portal already talk to one function and post payments once by `ref`, so the UI changes are the
+   Billing setup card and the portal's pay sheet. Nothing on the marketing site names Stripe any more.
 9a. **Client types and the nonprofit set** (`client-kinds-setup.sql`, `fund-setup.sql`, `fund-cashier-setup.sql`, all applied): New client asks the type;
    a nonprofit starts with Golf management + Fundraising events. Nothing else to configure on Flagstick's side.
 9. **Restaurant stations** (`pos-stations-setup.sql`, `pos-split-setup.sql`, `pos-reopen-setup.sql`, `pos-tips-setup.sql` and `pos-closeout-setup.sql` (check numbers, the `slips` bucket, `pos_days`), all applied): nothing to configure on Flagstick's side — the club makes
