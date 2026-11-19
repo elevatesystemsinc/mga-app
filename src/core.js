@@ -343,17 +343,49 @@ const trow=o=>TENANCY&&TENANT?Object.assign({tenant:TENANT},o):o;
    One table of courses: tenant null = Flagstick's library (every client reads it), tenant set = a club's own course
    (its staff add it from Golf → Courses; every organization of that club sees it). A document keeps a copy of each
    course it uses (golf.courses, `lib` = the library id), so events, phones and PDFs never depend on this table. */
-const LIB={courses:null,loading:null};
-async function loadCourseLibrary(force){
-  const inPortal=typeof PORTAL!=='undefined'&&PORTAL&&ACCESS&&ACCESS.admin;   // the portal is signed in without a hub session
-  if(!CLOUD||KEYMODE||!(sessionOK||inPortal)){ LIB.courses=LIB.courses||[]; return LIB.courses; }
-  if(LIB.courses&&!force) return LIB.courses; if(LIB.loading) return LIB.loading;
-  LIB.loading=(async()=>{ try{ const r=await selectAll(sb.from('courses').select('*').eq('status','live')); if(!r.error) LIB.courses=(r.data||[]).filter(c=>!c.tenant||PORTAL||c.tenant===TENANT); else LIB.courses=LIB.courses||[]; }   // RLS already keeps other clubs' own courses out; the filter is belt and braces
-    catch(_){ LIB.courses=LIB.courses||[]; } finally{ LIB.loading=null; } return LIB.courses; })();
-  return LIB.loading;
-}
-const libraryCourses=()=>LIB.courses||[];
-const libCourse=id=>libraryCourses().find(c=>c.id===id)||null;
+/* ---------- the course library: searched on the server, never downloaded whole (20,000+ rows after the catalogue import, Nov 2026) ----------
+   libCourse(id) is the synchronous cache of full rows (the tenant's defaults are warmed at start-up, anything adopted or edited lands
+   here); libGet / libGetMany fetch the rest on demand; libSearch pages a filtered query (name / club / city, country, region, owner,
+   verified); libRegions gives the counts by country and region for the pickers. The fake emulates in / or / ilike / not and count. */
+const LIB={full:{},miss:new Set(),regions:null,regionsAt:0};
+const LIB_COLS='id,tenant,name,club,city,state,country,holes,verified,source,updated_at';
+const libOnline=()=>!!(CLOUD&&!KEYMODE&&(sessionOK||(typeof PORTAL!=='undefined'&&PORTAL&&typeof ACCESS!=='undefined'&&ACCESS&&ACCESS.admin)));
+const libCourse=id=>(id&&LIB.full[id])||null;
+const libVisible=c=>!!c&&(!c.tenant||(typeof PORTAL!=='undefined'&&PORTAL)||c.tenant===TENANT);
+function libCache(rows){ (rows||[]).forEach(r=>{ if(r&&r.id&&r.data&&libVisible(r)) LIB.full[r.id]=r; }); }
+function libForget(id){ if(id){ delete LIB.full[id]; LIB.miss.delete(id); } LIB.regions=null; }
+async function libGetMany(ids){ ids=[...new Set((ids||[]).filter(Boolean))]; const need=ids.filter(id=>!LIB.full[id]);
+  if(need.length&&libOnline()){ try{ const r=await sb.from('courses').select('*').eq('status','live').in('id',need); if(!r.error) libCache(r.data||[]); }catch(_){ } }
+  return ids.map(id=>LIB.full[id]).filter(Boolean); }
+async function libGet(id){ if(!id) return null; if(LIB.full[id]) return LIB.full[id]; const rows=await libGetMany([id]); return rows[0]||null; }
+/* warm the cache for ids a synchronous renderer needs (courseById's fallback, the Courses tab's badges): fetch once, then call back */
+function libWarm(ids,cb){ const need=[...new Set((ids||[]).filter(id=>id&&!LIB.full[id]&&!LIB.miss.has(id)))]; if(!need.length||!libOnline()) return false;
+  need.forEach(id=>LIB.miss.add(id)); libGetMany(need).then(rows=>{ if(rows.length&&cb) cb(); }); return true; }
+function libSearchTerm(q){ return String(q||'').replace(/[%,()\\]/g,' ').replace(/\s+/g,' ').trim(); }
+async function libSearch(o){ o=o||{}; const lim=Math.max(1,Math.min(200,o.limit||50)), off=Math.max(0,o.offset||0);
+  if(!libOnline()) return {rows:[],total:0};
+  let q=sb.from('courses').select(LIB_COLS+(o.tees?',tees:data->tees,parM:data->par->M':''),{count:'exact'}).eq('status','live');
+  if(!(typeof PORTAL!=='undefined'&&PORTAL)) q=TENANT?q.or('tenant.is.null,tenant.eq.'+TENANT):q.is('tenant',null);
+  if(o.tenant) q=q.or('tenant.is.null,tenant.eq.'+o.tenant);
+  if(o.country) q=q.eq('country',o.country); if(o.state) q=q.eq('state',o.state);
+  if(o.owner==='lib') q=q.is('tenant',null); if(o.owner==='club') q=q.not('tenant','is',null);
+  if(o.verified===true) q=q.eq('verified',true); if(o.verified===false) q=q.eq('verified',false);
+  const s=libSearchTerm(o.q); if(s) q=q.or(`name.ilike.%${s}%,club.ilike.%${s}%,city.ilike.%${s}%`);
+  q=q.order('club').order('name').range(off,off+lim-1);
+  try{ const r=await q; if(r.error) return {rows:[],total:0,error:r.error.message}; const rows=(r.data||[]).filter(libVisible); return {rows,total:r.count==null?off+rows.length:r.count}; }
+  catch(e){ return {rows:[],total:0,error:String(e&&e.message||e)}; } }
+/* counts by country → region: [{country, state, n, own, ver}] (the course_regions function, courses-search-setup.sql), cached a minute */
+async function libRegions(force){ if(!libOnline()) return []; if(LIB.regions&&!force&&Date.now()-LIB.regionsAt<60000) return LIB.regions;
+  try{ const r=await sb.rpc('course_regions'); LIB.regions=r.error?[]:(r.data||[]); }catch(_){ LIB.regions=[]; } LIB.regionsAt=Date.now(); return LIB.regions; }
+/* the tenant's default courses (and Walnut Creek's two) into the cache before the first render — what defaultCourses() reads */
+async function loadTenantCourses(){ const ids=tenantCourseIds().slice(); if(!TENANCY||TENANT==='wccc') ids.push('tx-mansfield-walnut-creek-oak','tx-mansfield-walnut-creek-pecan'); if(ids.length) await libGetMany(ids); return ids; }
+const COUNTRY_NAMES={US:'United States',CA:'Canada',GB:'United Kingdom',IE:'Ireland',AU:'Australia',NZ:'New Zealand',MX:'Mexico',ZA:'South Africa',FR:'France',ES:'Spain',PT:'Portugal',IT:'Italy',DE:'Germany',AT:'Austria',CH:'Switzerland',NL:'Netherlands',BE:'Belgium',DK:'Denmark',SE:'Sweden',NO:'Norway',FI:'Finland',IS:'Iceland',JP:'Japan',KR:'South Korea',CN:'China',TW:'Taiwan',TH:'Thailand',MY:'Malaysia',SG:'Singapore',ID:'Indonesia',PH:'Philippines',VN:'Vietnam',IN:'India',AE:'United Arab Emirates',QA:'Qatar',SA:'Saudi Arabia',OM:'Oman',TR:'Turkey',GR:'Greece',CY:'Cyprus',CZ:'Czechia',PL:'Poland',HU:'Hungary',HR:'Croatia',SI:'Slovenia',SK:'Slovakia',EE:'Estonia',LV:'Latvia',LT:'Lithuania',BA:'Bosnia and Herzegovina',RS:'Serbia',BG:'Bulgaria',RO:'Romania',UA:'Ukraine',RU:'Russia',LU:'Luxembourg',MC:'Monaco',MT:'Malta',AR:'Argentina',BR:'Brazil',CL:'Chile',CO:'Colombia',PE:'Peru',UY:'Uruguay',PY:'Paraguay',BO:'Bolivia',EC:'Ecuador',VE:'Venezuela',CR:'Costa Rica',PA:'Panama',GT:'Guatemala',HN:'Honduras',NI:'Nicaragua',DO:'Dominican Republic',PR:'Puerto Rico',JM:'Jamaica',BS:'Bahamas',BM:'Bermuda',BB:'Barbados',TT:'Trinidad and Tobago',LC:'Saint Lucia',KY:'Cayman Islands',MA:'Morocco',EG:'Egypt',KE:'Kenya',TZ:'Tanzania',UG:'Uganda',ZM:'Zambia',ZW:'Zimbabwe',MW:'Malawi',NA:'Namibia',BW:'Botswana',SZ:'Eswatini',NG:'Nigeria',GH:'Ghana',MU:'Mauritius',MG:'Madagascar',BI:'Burundi',CD:'DR Congo',SD:'Sudan',IL:'Israel',HK:'Hong Kong',LK:'Sri Lanka',BD:'Bangladesh',PK:'Pakistan',MM:'Myanmar',BN:'Brunei',LA:'Laos',MN:'Mongolia',GU:'Guam',FJ:'Fiji',PG:'Papua New Guinea',MH:'Marshall Islands',XX:'Country unknown'};
+const countryName=cc=>COUNTRY_NAMES[cc]||cc||'';
+const REGION_NAMES={US:{AL:'Alabama',AK:'Alaska',AZ:'Arizona',AR:'Arkansas',CA:'California',CO:'Colorado',CT:'Connecticut',DE:'Delaware',DC:'District of Columbia',FL:'Florida',GA:'Georgia',HI:'Hawaii',ID:'Idaho',IL:'Illinois',IN:'Indiana',IA:'Iowa',KS:'Kansas',KY:'Kentucky',LA:'Louisiana',ME:'Maine',MD:'Maryland',MA:'Massachusetts',MI:'Michigan',MN:'Minnesota',MS:'Mississippi',MO:'Missouri',MT:'Montana',NE:'Nebraska',NV:'Nevada',NH:'New Hampshire',NJ:'New Jersey',NM:'New Mexico',NY:'New York',NC:'North Carolina',ND:'North Dakota',OH:'Ohio',OK:'Oklahoma',OR:'Oregon',PA:'Pennsylvania',RI:'Rhode Island',SC:'South Carolina',SD:'South Dakota',TN:'Tennessee',TX:'Texas',UT:'Utah',VT:'Vermont',VA:'Virginia',WA:'Washington',WV:'West Virginia',WI:'Wisconsin',WY:'Wyoming',PR:'Puerto Rico',GU:'Guam',VI:'U.S. Virgin Islands'},
+  CA:{AB:'Alberta',BC:'British Columbia',MB:'Manitoba',NB:'New Brunswick',NL:'Newfoundland and Labrador',NS:'Nova Scotia',NT:'Northwest Territories',NU:'Nunavut',ON:'Ontario',PE:'Prince Edward Island',QC:'Quebec',SK:'Saskatchewan',YT:'Yukon'},
+  AU:{ACT:'Australian Capital Territory',NSW:'New South Wales',NT:'Northern Territory',QLD:'Queensland',SA:'South Australia',TAS:'Tasmania',VIC:'Victoria',WA:'Western Australia'}};
+const regionName=(cc,st)=>(REGION_NAMES[cc]&&REGION_NAMES[cc][st])||st||'';
+const placeText=c=>[c.club,[c.city,regionName(c.country,c.state)].filter(Boolean).join(', '),c.country&&c.country!=='US'?countryName(c.country):''].filter(Boolean).join(' · ');
 const tenantCourseIds=()=>(TENANCY&&TENANT_INFO&&Array.isArray(TENANT_INFO.courses))?TENANT_INFO.courses.filter(Boolean):[];
 /* a library row → the course shape golfcore reads (WCCC_COURSES is the reference) */
 function courseFromLib(row){ const d=row.data||{}; return {id:row.id,lib:row.id,name:row.name,club:row.club||'',city:row.city||'',state:row.state||'',holes:row.holes||18,
@@ -561,7 +593,7 @@ async function startCloud(){
   try{
     if(KEYMODE&&ORG_ID!==HUBKEY.org){ chooseOrg(HUBKEY.org); return; }       // the link is for one organization only
     if(SCOPED&&ORG_ID==='club'&&SCOPE_ORGS.length){ chooseOrg(SCOPE_ORGS[0]); return; }   // a board login lands on its own hub
-    const [club]=await Promise.all([loadDoc('club',CLUB_META),loadCourseLibrary()]);
+    const [club]=await Promise.all([loadDoc('club',CLUB_META),loadTenantCourses()]);
     cloudReady=true; CACHE_RESETS.forEach(f=>{ try{ f(); }catch(_){} });
     if(!club){ setupNeeded=true; CLUB=null; db=null; render(); return; }          // first run: the club hasn't been set up yet
     setupNeeded=false; CLUB=club;

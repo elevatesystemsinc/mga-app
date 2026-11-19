@@ -44,7 +44,22 @@ class FakeDB:
         return True
     # ---- other tables (hub_keys …): plain rows with column filters
     def _rows(self,t): return self.rows.setdefault(('_tbl',t),{'table':t,'id':t,'data':[]})['data']
-    def _col_match(self,row,filters): return all(row.get(k,'wccc' if k=='tenant' else None)==v for kind,k,v in filters if kind=='eq')
+    def _col_match(self,row,filters):
+        def get(k): return row.get(k,'wccc' if k=='tenant' else None)
+        def one(kind,k,v):
+            if kind=='eq': return get(k)==v
+            if kind=='is': return get(k) is None if v is None else get(k)==v
+            if kind=='in': return get(k) in (v or [])
+            if kind=='ilike': return v.strip('%').lower() in str(get(k) or '').lower()
+            if kind=='not': return not one(v[0],k,None if v[1]=='null' else v[1])
+            if kind=='or':   # "name.ilike.%x%,tenant.is.null,tenant.eq.pines" — any part matches
+                for part in v.split(','):
+                    kk,op,vv=part.split('.',2)
+                    if op=='is' and vv=='null': vv=None
+                    if one(op,kk,vv): return True
+                return False
+            return True
+        return all(one(kind,k,v) for kind,k,v in filters)
     # ---- the hub_key_* database functions, as in admin-links-setup.sql
     def _key_org(self,key):
         if not key or len(key)<16: return None
@@ -66,6 +81,12 @@ class FakeDB:
         err=lambda m:json.dumps({'data':None,'error':{'message':m,'code':'42501'}})
         if fn=='pos_next_check': return json.dumps({'data':self._checkno(a.get('p_tenant') or 'wccc',a['p_outlet'],a.get('p_day') or datetime.date.today().isoformat()),'error':None})
         if fn in('calcutta_get','calcutta_put'): return json.dumps({'data':None,'error':None})
+        if fn=='course_regions':
+            agg={}
+            for r in self._rows('courses'):
+                if r.get('status','live')!='live': continue
+                k=(r.get('country') or 'US',r.get('state') or ''); x=agg.setdefault(k,{'country':k[0],'state':k[1],'n':0,'own':0,'ver':0}); x['n']+=1; x['own']+=1 if r.get('tenant') else 0; x['ver']+=1 if r.get('verified') else 0
+            return json.dumps({'data':list(agg.values()),'error':None})
         if fn=='tenant_lookup':
             if not self.tenancy: return json.dumps({'data':None,'error':{'message':'Could not find the function public.tenant_lookup(p_host) in the schema cache','code':'PGRST202'}})
             h=str(a.get('p_host') or '').lower().split(':')[0]

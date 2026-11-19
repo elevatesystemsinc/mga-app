@@ -22,7 +22,7 @@ function golfData(){
   return g;
 }
 /* a course the document knows, else one from the library (an event may name a library course before anyone copied it) */
-const courseById=id=>golfData().courses.find(c=>c.id===id)||(typeof libCourse==='function'&&libCourse(id)?courseFromLib(libCourse(id)):undefined);
+const courseById=id=>golfData().courses.find(c=>c.id===id)||(libCourse(id)?courseFromLib(libCourse(id)):(libWarm([id],()=>{ try{ render(); }catch(_){} }),undefined));
 const homeCourseId=()=>(golfData().courses[0]||{}).id||'oak';
 const LEGACY_LIB={oak:'tx-mansfield-walnut-creek-oak',pecan:'tx-mansfield-walnut-creek-pecan'};
 /* the courses a new document starts with: the client's defaults from the library; Walnut Creek's own two without tenancy */
@@ -33,22 +33,26 @@ function defaultCourses(){ const ids=typeof tenantCourseIds==='function'?tenantC
 /* copy a library course into this document (ids stay the library's, so geometry and re-syncs keep working) */
 function adoptCourse(src){ const g=golfData(); let c=g.courses.find(x=>x.id===src.id); if(c) return c; c=clone(src); g.courses=g.courses.filter(x=>!x.placeholder); g.courses.push(c); persist(); return c; }
 /* the one course <select>: the document's courses, then "Other course…" which opens the library picker right under it */
-function courseOptionsHTML(sel){ return golfData().courses.map(c=>`<option value="${esc(c.id)}"${c.id===sel?' selected':''}>${esc(c.name)}${c.club&&c.club!==(CLUB&&CLUB.name)?' · '+esc(c.club):''}</option>`).join('')+(libraryCourses().length||!CLOUD?'<option value="__lib__">Other course…</option>':''); }
+function courseOptionsHTML(sel){ return golfData().courses.map(c=>`<option value="${esc(c.id)}"${c.id===sel?' selected':''}>${esc(c.name)}${c.club&&c.club!==(CLUB&&CLUB.name)?' · '+esc(c.club):''}</option>`).join('')+(libOnline()||!CLOUD?'<option value="__lib__">Other course…</option>':''); }
 function wireCourseSelect(sel,onPicked){ if(!sel||sel._cw) return; sel._cw=true; let prev=sel.value;
   sel.addEventListener('change',e=>{ if(sel.value!=='__lib__'){ prev=sel.value; return; } e.stopImmediatePropagation(); sel.value=prev;
     coursePickerInline(sel,c=>{ sel.innerHTML=courseOptionsHTML(c.id); prev=c.id; if(onPicked) onPicked(c.id); else sel.dispatchEvent(new Event('change',{bubbles:true})); }); },true); }
 /* the inline picker: a search box and the library under the select; a tap copies the course into the document */
 function coursePickerInline(anchor,onPick){ let box=anchor.parentElement.querySelector('.cpick'); if(box) box.remove();
   box=document.createElement('div'); box.className='cpick mini'; box.style.cssText='position:absolute;left:0;top:100%;margin-top:6px;z-index:40;background:#fff;box-shadow:0 14px 40px rgba(15,42,56,.18);min-width:min(420px,92vw);max-width:560px'; if(getComputedStyle(anchor.parentElement).position==='static') anchor.parentElement.style.position='relative';
-  const list=()=>{ const q=(box.querySelector('input')||{}).value||''; const rows=searchLibrary(q).slice(0,40);
-    box.querySelector('.cpl').innerHTML=rows.length?rows.map(r=>`<button type="button" class="tr click" data-cp="${esc(r.id)}" style="grid-template-columns:minmax(0,1fr) auto;text-align:left;width:100%"><div class="cell2"><b>${esc(r.name)}</b><small>${esc([r.club,[r.city,r.state].filter(Boolean).join(', ')].filter(Boolean).join(' · '))}${r.tenant?' · this club’s':''}</small></div><span class="muted" style="font-size:12px">${(r.data&&r.data.tees||[]).length} tees${r.verified?' · verified':''}</span></button>`).join(''):`<div class="tr"><span class="muted">${q?'Nothing in the library matches.':'The library is empty.'} ${iAmStaffish()?'Add it with <b>New course</b> on Golf → Courses.':''}</span></div>`;
-    box.querySelectorAll('[data-cp]').forEach(b=>b.onclick=()=>{ const row=libCourse(b.dataset.cp); if(!row) return; const c=adoptCourse(courseFromLib(row)); box.remove(); onPick(c); }); };
-  box.innerHTML=`<div style="display:flex;gap:8px;align-items:center;padding:8px"><input class="inp" placeholder="Search the course library — name, club, city or state" aria-label="Search courses" style="flex:1"><button type="button" class="btn sm" data-cpx>Cancel</button></div><div class="cpl" style="max-height:260px;overflow:auto"></div>`;
-  anchor.insertAdjacentElement('afterend',box); box.querySelector('input').oninput=list; box.querySelector('[data-cpx]').onclick=()=>box.remove(); list(); setTimeout(()=>box.querySelector('input').focus(),30); }
+  let seq=0, timer=null;
+  const paint=(rows,q,total)=>{ const L=box.querySelector('.cpl'); if(!L) return;
+    L.innerHTML=rows.length?rows.map(r=>`<button type="button" class="tr click" data-cp="${esc(r.id)}" style="grid-template-columns:minmax(0,1fr) auto;text-align:left;width:100%"><div class="cell2"><b>${esc(r.name)}</b><small>${esc(placeText(r))}${r.tenant?' · this club’s':''}</small></div><span class="muted" style="font-size:12px">${(r.tees||(r.data&&r.data.tees)||[]).length} tees${r.verified?' · verified':''}</span></button>`).join('')+(total>rows.length?`<div class="tr"><span class="muted" style="font-size:12.5px">${total-rows.length} more — narrow the search.</span></div>`:''):`<div class="tr"><span class="muted">${q?'Nothing in the library matches.':'Type a course, club or city.'} ${iAmStaffish()?'Add it with <b>New course</b> on Golf → Courses.':''}</span></div>`;
+    L.querySelectorAll('[data-cp]').forEach(b=>b.onclick=async()=>{ b.disabled=true; const row=await libGet(b.dataset.cp); if(!row){ toast('Could not load that course'); b.disabled=false; return; } const c=adoptCourse(courseFromLib(row)); box.remove(); onPick(c); }); };
+  const list=()=>{ const q=(box.querySelector('input')||{}).value||''; const my=++seq; const have=new Set(golfData().courses.flatMap(c=>[c.id,c.lib].filter(Boolean)));
+    searchLibrary(q).then(r=>{ if(my!==seq||!box.isConnected) return; const rows=r.rows.filter(x=>!have.has(x.id)); paint(rows,libSearchTerm(q),r.total-(r.rows.length-rows.length)); }); };
+  box.innerHTML=`<div style="display:flex;gap:8px;align-items:center;padding:8px"><input class="inp" placeholder="Search the course library — name, club or city" aria-label="Search courses" style="flex:1"><button type="button" class="btn sm" data-cpx>Cancel</button></div><div class="cpl" style="max-height:260px;overflow:auto"><div class="tr"><span class="muted">Searching…</span></div></div>`;
+  anchor.insertAdjacentElement('afterend',box); box.querySelector('input').oninput=()=>{ clearTimeout(timer); timer=setTimeout(list,180); }; box.querySelector('[data-cpx]').onclick=()=>box.remove(); list(); setTimeout(()=>box.querySelector('input').focus(),30); }
 const iAmStaffish=()=>typeof iAmStaff==='function'?iAmStaff():true;
-function searchLibrary(q){ q=String(q||'').trim().toLowerCase(); const have=new Set(golfData().courses.flatMap(c=>[c.id,c.lib].filter(Boolean))); const rows=libraryCourses().filter(r=>!have.has(r.id));
-  const score=r=>{ const s=[r.name,r.club,r.city,r.state].map(x=>String(x||'').toLowerCase()); if(!q) return (r.tenant?0:1)+(r.state==='TX'?0:0.5); const i=s.findIndex(x=>x.includes(q)); return i<0?null:i; };
-  return rows.map(r=>({r,k:score(r)})).filter(x=>x.k!=null).sort((a,b)=>a.k-b.k||a.r.name.localeCompare(b.r.name)).map(x=>x.r); }
+/* the library search behind the picker: the club's own courses first when nothing is typed, then the tenant's region */
+async function searchLibrary(q,limit){ const s=libSearchTerm(q); if(!libOnline()) return {rows:[],total:0};
+  if(!s){ const r=await libSearch({limit:limit||40,tees:true}); r.rows.sort((a,b)=>(b.tenant?1:0)-(a.tenant?1:0)||a.name.localeCompare(b.name)); return r; }
+  return libSearch({q:s,limit:limit||40,tees:true}); }
 /* ---------- the course editor: one drawer for the hub (a club's own course) and the portal (the library) ----------
    course = the document shape; onSave(course) decides where it goes. */
 function courseEditorDrawer(course,opt){ opt=opt||{}; const c=course?clone(course):{id:'',name:'',club:(CLUB&&CLUB.name)||'',city:'',state:'',holes:18,par:{M:Array(18).fill(4),W:[]},hcp:{M:[...Array(18).keys()].map(i=>i+1),W:[]},tees:[{name:'White',rating:{M:{},W:{}},yards:null}]};   // women's rows start blank = the men's
@@ -83,7 +87,7 @@ function courseEditorDrawer(course,opt){ opt=opt||{}; const c=course?clone(cours
 }
 /* the hub saves a club's own course to the courses table (the whole club sees it) when it can, else into this document */
 async function saveClubCourse(out,existing){ const row={id:out.id,tenant:TENANT,name:out.name,club:out.club||'',city:out.city||'',state:out.state||'',holes:18,data:{par:out.par,hcp:out.hcp,tees:out.tees},source:'club',verified:false,status:'live',updated_at:new Date().toISOString(),updated_by:(ACCESS&&ACCESS.email)||''};
-  if(CLOUD&&sessionOK&&!KEYMODE&&TENANCY&&typeof iAmStaff==='function'&&iAmStaff()){ const r=await sb.from('courses').upsert(row); if(r.error){ toast('Kept in this hub only — '+r.error.message); } else { LIB.courses=(LIB.courses||[]).filter(x=>x.id!==row.id).concat([row]); } }
+  if(CLOUD&&sessionOK&&!KEYMODE&&TENANCY&&typeof iAmStaff==='function'&&iAmStaff()){ const r=await sb.from('courses').upsert(row); if(r.error){ toast('Kept in this hub only — '+r.error.message); } else { row.country=row.country||'US'; libCache([row]); libForget(null); } }
   const g=golfData(); const i=g.courses.findIndex(x=>x.id===out.id); const doc=Object.assign({},out,{lib:TENANCY?out.id:undefined}); if(i>=0) Object.assign(g.courses[i],doc); else { g.courses=g.courses.filter(x=>!x.placeholder); g.courses.push(doc); }
   golfData().events.forEach(e=>{ if(e.groups.some(gr=>gr.course===out.id)) publishEvent(e); }); view.gcourse=out.id; }
 
@@ -224,6 +228,7 @@ function gCourses(el){
   if(!c){ el.innerHTML='<div class="empty"><b>No courses yet</b><span>Add one from the library or set up your own.</span></div>'; return; }
   const nine=(arr,a,b)=>arr.slice(a,b);
   const rowH=(label,vals,cls='',tot=true)=>`<tr class="${cls}"><th scope="row">${label}</th>${nine(vals,0,9).map(v=>`<td>${v}</td>`).join('')}<td class="st">${tot?G_SUM(nine(vals,0,9)):''}</td>${nine(vals,9,18).map(v=>`<td>${v}</td>`).join('')}<td class="st">${tot?G_SUM(nine(vals,9,18)):''}</td><td class="st">${tot?G_SUM(vals):''}</td></tr>`;
+  libWarm(g.courses.map(x=>x.lib),()=>{ if(view.page==='golf'&&view.gtab==='courses') render(); });
   const used=g.events.filter(e=>e.groups.some(gr=>gr.course===c.id)).length, own=!!(c.lib&&libCourse(c.lib)&&libCourse(c.lib).tenant), fromLib=!!(c.lib&&libCourse(c.lib)&&!libCourse(c.lib).tenant);
   el.innerHTML=`<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;justify-content:space-between"><div class="seg">${g.courses.map(x=>`<button class="${x.id===c.id?'on':''}" data-gc="${x.id}">${esc(x.name)}</button>`).join('')}</div>
     <div class="actions"><button class="btn" id="gcAdd">${I.plus}Add from the library</button><button class="btn pri" id="gcNew">${I.plus}New course</button></div></div>

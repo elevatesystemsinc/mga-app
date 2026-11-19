@@ -234,7 +234,17 @@ Tournament = { id, name, season, days, startDate, field:[{id,memberId,team,paid,
   `geo` = hole centerlines for GameCast; `verified` = checked against the printed card / the USGA database; `source`. `tenants.courses`
   = the client's default course ids (`tenant_lookup` returns them; the portal's client record → **Choose courses**). core.js: `LIB`,
   `loadCourseLibrary()` (with the club document in `startCloud`; the portal loads it too), `libraryCourses()`, `libCourse(id)`,
-  `courseFromLib(row)`, `tenantCourseIds()`. golf.js: **a document keeps a copy of every course it uses** (`golf.courses`, `lib` = the
+  `courseFromLib(row)`, `tenantCourseIds()`. **The library is searched on the server, never downloaded whole** (Nov 19, after the
+  catalogue import put 20,000 rows in it — the old `select('*')` pulled 24 MB into every hub at start-up): `LIB.full` is the cache of
+  full rows (`libCourse(id)` is the sync read; `loadTenantCourses()` warms the tenant's defaults before the first render, `adoptCourse` /
+  `saveClubCourse` / the portal editor fill it), `libGet(id)` / `libGetMany(ids)` fetch on demand, `libWarm(ids, cb)` fetches once for a
+  synchronous renderer (`courseById`'s fallback, the Courses tab's badges) and calls back, `libSearch({q, country, state, owner, verified,
+  limit, offset, tees})` pages a filtered query (`name / club / city ilike`, `{count:'exact'}`, light columns + `tees:data->tees`), and
+  `libRegions()` reads **`course_regions()`** (`courses-search-setup.sql`: counts by country and region, `own`, `ver`). `COUNTRY_NAMES` /
+  `REGION_NAMES` (US, CA, AU) / `countryName` / `regionName` / `placeText` name places. The hub's `coursePickerInline` searches as you
+  type (debounced; the club's own courses first when the box is empty); the portal's **Courses** page is search + Country (with counts)
+  → Region (with counts) + All · Verified · Unverified · Clubs' own, 50 a page with Show more; `clientCoursesDrawer` searches the same
+  way. The fake emulates `in` / `not` / `or` / `ilike`, the count and `course_regions`. golf.js: **a document keeps a copy of every course it uses** (`golf.courses`, `lib` = the
   library id, same ids) so events, phones and PDFs never read the table — `defaultCourses()` seeds a new document from the tenant's
   defaults (Walnut Creek's two without tenancy; a stand-in "Home course" card when a client has no defaults, flagged on the Courses
   tab), `adoptCourse(row)` copies a library course in, `courseById(id)` falls back to the library, `homeCourseId()` replaces every
@@ -256,7 +266,7 @@ Tournament = { id, name, season, days, startDate, field:[{id,memberId,team,paid,
   and counted) and `push` sends them 200 at a time to the Edge Function **`courses-import`** (`supabase/functions/courses-import`): it
   writes the library with the service role, never touches a verified row or a club's own course, and is guarded by a key whose SHA-256
   sits in `app_secrets` (`name 'courses_import'`; a table only the service role reads — delete the row when no import is running). The
-  working files under `tools/courses/catalogue/` are git-ignored. The
+  working files under `tools/courses/catalogue/` are git-ignored. GolfCourseAPI's "daily usage limit" is a rolling one, not a UTC day. The
   library started with Walnut Creek's Oak and Pecan (verified, with hole lines), Creighton Farms (verified against the VSGA listing),
   San Juan Country Club (yardages match the club's site; ratings unverified) and the Bushwood demo's two (owned by that tenant).
   `tests/test_courses.py` covers defaults → document, the picker, the published card and geometry, the Courses tab, the stand-in, a
