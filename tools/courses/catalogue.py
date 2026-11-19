@@ -12,7 +12,7 @@ library with the service role and never touches a verified row or a club's own c
   python3 tools/courses/catalogue.py enumerate     # → catalogue/ids.json      (resumable: known queries are kept)
   python3 tools/courses/catalogue.py fetch         # → catalogue/details.jsonl (resumable: fetched ids are skipped)
   python3 tools/courses/catalogue.py rows          # → catalogue/rows.jsonl + a report of what was skipped
-  python3 tools/courses/catalogue.py push          # → the library, 400 rows a call; catalogue/pushed.json remembers what went up
+  python3 tools/courses/catalogue.py push          # → the library, 200 rows a call; catalogue/pushed.json remembers what went up
   python3 tools/courses/catalogue.py all           # the four in a row
 
 Everything lands unverified. Non-US rows get the country code in front of the id (gb-…, ca-…); US ids stay as before
@@ -136,8 +136,8 @@ def push_rows():
     f=os.path.join(OUT,'pushed.json'); pushed=set(json.load(open(f))) if os.path.exists(f) else set()
     rows=[json.loads(l) for l in open(os.path.join(OUT,'rows.jsonl'))]; todo=[r for r in rows if r['id'] not in pushed]
     print(len(todo),'rows to push,',len(pushed),'already up',file=sys.stderr); tot={'upserted':0,'verified':0,'owned':0}
-    for i in range(0,len(todo),400):
-        chunk=todo[i:i+400]; body=json.dumps({'rows':chunk}).encode()
+    for i in range(0,len(todo),200):
+        chunk=todo[i:i+200]; body=json.dumps({'rows':chunk}).encode()
         for t in range(4):
             try:
                 req=urllib.request.Request(FN,data=body,headers={'Content-Type':'application/json','x-import-key':IMPORT_KEY},method='POST')

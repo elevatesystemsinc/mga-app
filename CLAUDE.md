@@ -252,7 +252,7 @@ Tournament = { id, name, season, days, startDate, field:[{id,memberId,team,paid,
   endpoint and its search is a substring match capped at 25 with no paging, so `enumerate` refines every full query by one character until
   every query comes back short (checkpointed every 1,500 queries), `fetch` pulls each card once into `catalogue/details.jsonl`, `rows`
   builds library rows (non-US ids carry the country code; a slug collision gets the API id as a suffix; 9-hole and odd cards are skipped
-  and counted) and `push` sends them 400 at a time to the Edge Function **`courses-import`** (`supabase/functions/courses-import`): it
+  and counted) and `push` sends them 200 at a time to the Edge Function **`courses-import`** (`supabase/functions/courses-import`): it
   writes the library with the service role, never touches a verified row or a club's own course, and is guarded by a key whose SHA-256
   sits in `app_secrets` (`name 'courses_import'`; a table only the service role reads — delete the row when no import is running). The
   working files under `tools/courses/catalogue/` are git-ignored. The
