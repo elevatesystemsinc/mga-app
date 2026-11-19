@@ -14,10 +14,14 @@ Y=[412,538,398,176,441,387,164,551,409,433,372,191,527,446,418,158,401,544]
 def course():
     return {'id':'bushwood','tenant':None,'name':'Bushwood Course','club':'Bushwood Country Club','city':'Bushwood','state':'IL','country':'US','holes':18,'status':'live','verified':True,'source':'scorecard','notes':None,'geo':None,
       'data':{'par':{'M':PAR,'W':PAR},'hcp':{'M':HCP,'W':HCP},'tees':[{'name':'Black','rating':{'M':{'cr':74.3,'slope':139}},'yards':Y},{'name':'Blue','rating':{'M':{'cr':72.0,'slope':133}},'yards':[int(y*0.955) for y in Y]},{'name':'White','rating':{'M':{'cr':69.9,'slope':128},'W':{'cr':75.6,'slope':137}},'yards':[int(y*0.905) for y in Y]}]}}
+# the Bushwood cast leads the field and the sponsor contacts, so every screen reads as fiction at a glance
+CAST=[('Ty','Webb'),('Al','Czervik'),('Danny','Noonan'),('Elihu','Smails'),('Carl','Spackler'),('Lou','Loomis'),('Fred','Pickering'),('Walter','Beeper'),('Chuck','Schick'),('Drew','Scott'),('Jimmy','Wang'),('Spalding','Smails'),('Tony','DAnnunzio'),('Joey','DAnnunzio'),('Harold','Havercamp'),('Lacey','Underall'),('Maggie','Shaughnessy'),('Judith','Smails'),('Gloria','Havercamp'),('Carla','Gatsby'),('Porterhouse','Cooper'),('Bishop','Pickering'),('Sandy','McFiddish'),('Jack','Hartigan')]
 def people():
-    out=[]; used=set()
+    out=[]; used=set(CAST)
     for i in range(72):
-        while True:
+        if i<len(CAST): f,l=CAST[i]
+        else:
+          while True:
             f,l=random.choice(FIRST),random.choice(LAST)
             if (f,l) not in used: used.add((f,l)); break
         out.append({'id':'m%02d'%i,'first':f,'last':l,'email':f.lower()+'@'+random.choice(COS).lower().replace(' ','')+'.com','status':'Active','hcp':str(round(random.uniform(2,22),1)),'city':random.choice(['Bushwood','Lakeview','Elmhurst','Glen Ellyn','Naperville','Oak Park','Evanston','Wheaton'])})
