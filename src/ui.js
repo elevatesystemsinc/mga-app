@@ -362,7 +362,7 @@ function editNewTournament(){
     save:()=>{
       const name=fv('nName'); if(!name){ toast('Give the tournament a name'); return false; }
       const days=+$('nDays').dataset.val||1; const src=db.tournaments.find(t=>t.id===fv('nCopy'));
-      let t=newTournament({season:Y(),name,days,startDate:fv('nStart'),venue:fv('nVenue'),entryFee:fnum('nFee'),skinsFee:fnum('nSkins'),plannedPlayers:fnum('nPlayers'),teamSize:+fv('nTeam'),ggEvent:fv('nGG'),features:readFeatures('nf'),hcpDiff:+fv('nDiff')||0});
+      let t=newTournament({season:(isClub()&&/^\d{4}-/.test(fv('nStart')))?fv('nStart').slice(0,4):Y(),name,days,startDate:fv('nStart'),venue:fv('nVenue'),entryFee:fnum('nFee'),skinsFee:fnum('nSkins'),plannedPlayers:fnum('nPlayers'),teamSize:+fv('nTeam'),ggEvent:fv('nGG'),features:readFeatures('nf'),hcpDiff:+fv('nDiff')||0});
       if(src) copyStructure(src,t);
       if(typeof isNonprofit==='function'&&isNonprofit()) t.features=Object.assign({},NONPROFIT_FEATURES,t.features.calcutta?{}:{});   // a charity tournament: gifts to the places, the 50/50, no Calcutta
       db.tournaments.push(t); if(typeof fundForTournament==='function'&&typeof fundOn==='function'&&fundOn()&&isNonprofit()) fundForTournament(t); view.tid=t.id; view.page='tournament'; view.ttab=t.features.meals?'meals':'field'; toast('Tournament created');
@@ -418,7 +418,7 @@ function editTournament(t){
       featuresHTML('ef',tFeatures(t))+field('Golf Genius event','eGG',t.ggEvent)+field('Notes','eNotes',t.notes,{type:'textarea'}),
     wire:r=>{ wireSeg(r,'eDays'); wireCourseSelect(r.querySelector('#eCourse')); },
     save:()=>{ Object.assign(t,{name:fv('eName')||t.name,days:+$('eDays').dataset.val||t.days,startDate:fv('eStart'),venue:fv('eVenue'),course:fv('eCourse')||t.course||'',entryFee:fnum('eFee'),skinsFee:fnum('eSkins'),
-      plannedPlayers:fnum('ePlayers'),budgetBasis:fv('eBasis'),teamSize:+fv('eTeam'),status:fv('eStatus'),goal:fnum('eGoal'),ggEvent:fv('eGG'),notes:fv('eNotes'),features:readFeatures('ef'),hcpDiff:+fv('eDiff')||0,placesPaid:fnum('ePlaces'),payoutNote:fv('ePayHow'),rules:fv('eRules'),tbdSeats:fv('eTbd')==='tbd'}); toast('Saved'); },
+      plannedPlayers:fnum('ePlayers'),budgetBasis:fv('eBasis'),teamSize:+fv('eTeam'),status:fv('eStatus'),goal:fnum('eGoal'),ggEvent:fv('eGG'),notes:fv('eNotes'),features:readFeatures('ef'),hcpDiff:+fv('eDiff')||0,placesPaid:fnum('ePlaces'),payoutNote:fv('ePayHow'),rules:fv('eRules'),tbdSeats:fv('eTbd')==='tbd'}); if(isClub()&&/^\d{4}-/.test(t.startDate)) t.season=t.startDate.slice(0,4); toast('Saved'); },
     del:()=>{ if(!confirm(`Delete ${t.name} and everything in it?`)) return false; const i=db.tournaments.indexOf(t), copy=clone(t);
       db.tournaments.splice(i,1); view.page='tournaments'; toast('Tournament deleted',()=>{db.tournaments.splice(i,0,copy);persist();render();}); },delLabel:'Delete tournament'});
 }

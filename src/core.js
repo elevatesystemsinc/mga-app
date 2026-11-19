@@ -79,6 +79,7 @@ function normalize(d,meta){
     t.actuals=Object.assign({entryFees:0,skins:0,skinsPaid:0},t.actuals||{}); if(!t.budgetBasis) t.budgetBasis='planned';
     if(!t.features) t.features={meals:true,sponsors:true,budget:true,checklist:true,calcutta:true,raffle:true};   // tournaments from before the toggles keep every tab
     (t.dayItems||[]).forEach(d=>(d||[]).forEach(it=>{ if(it.menu) it.menu.svcPct=0; }));
+    if(d.kind==='club'&&t.startDate&&/^\d{4}-/.test(t.startDate)) t.season=t.startDate.slice(0,4);   // the club tier runs on calendar years: a tournament's year is the year it is played
     if(!d.seasons[t.season]) d.seasons[t.season]=newSeason();
   }
   return d;
@@ -135,7 +136,11 @@ function tcalc(t){
 /* A tournament counts as past once it's marked Complete or its last day is behind us. */
 function tEnd(t){ const d=parseD(t.startDate); return d?addDays(d,(t.days||1)-1):null; }
 function isPast(t){ if(t.status==='Complete') return true; const e=tEnd(t); if(!e) return false; const now=new Date(); now.setHours(0,0,0,0); return e<now; }
-function seasonTournaments(y){ return db.tournaments.filter(t=>t.season===y).sort((a,b)=>(a.startDate||'9').localeCompare(b.startDate||'9')); }
+/* the year a tournament belongs to: an association's season as typed; on the club tier (a club, a nonprofit — calendar years, no seasons)
+   the year it is played, from its start date (the owner, Nov 19: "for nonprofits… what they are is fundraising years… tie tournaments to
+   fundraising events, as well as filter year by year") — a 2027 tournament set up in 2026 is a 2027 program */
+const tYear=t=>(isClub()&&t.startDate&&/^\d{4}/.test(t.startDate))?t.startDate.slice(0,4):String(t.season||'');
+function seasonTournaments(y){ return db.tournaments.filter(t=>tYear(t)===String(y)).sort((a,b)=>(a.startDate||'9').localeCompare(b.startDate||'9')); }
 function scalc(y){
   const s=db.seasons[y]||newSeason(), ts=seasonTournaments(y).map(t=>({t,c:tcalc(t)}));
   const active=members().filter(m=>m.status!=='Inactive').length;

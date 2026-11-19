@@ -143,6 +143,13 @@ async def main():
         r=await p1.evaluate("""async()=>{ const doc=await budgetPDF(Y(),{returnDoc:true}); const n=doc?doc.getNumberOfPages():0; const e=fundData().events.find(x=>x.name==='Battle of the Nines'); go('fundev',{fid:e.id,ftab:'sponsors'}); await new Promise(r=>setTimeout(r,300)); const tabs=[...document.querySelectorAll('[data-ft]')].map(b=>b.dataset.ft); const txt=document.getElementById('main').textContent;
           return {n, tabs, linked:/are the tournament’s/.test(txt)&&!!document.getElementById('spAdd')&&/Acme/.test(txt), levels:fundPub(e).levels.length}; }""")
         bad+=check('the Budget vs actual PDF builds; a golf-day event leads with Sponsors · Budget · Money and its Sponsors tab is the tournament’s list (Acme on it)',r['n']>=1 and r['tabs'][:4]==['overview','sponsors','budget','money'] and r['linked'],r)
+        # fundraising years: a tournament's year is the year it is played, the Fundraising page shows one year at a time
+        r=await p1.evaluate("""async()=>{ const ny=String(+Y()+1); const t=newTournament({season:Y(),name:'Next Year Open',days:1,startDate:ny+'-05-05',venue:'',teamSize:4}); db.tournaments.push(t); normalize(db,CLUB_META);
+          const nowList=seasonTournaments(Y()).some(x=>x.id===t.id), nextList=seasonTournaments(ny).some(x=>x.id===t.id);
+          go('fund'); await new Promise(r=>setTimeout(r,200)); const here=document.getElementById('main').textContent.includes('Next Year Open');
+          view.year=ny; render(); await new Promise(r=>setTimeout(r,200)); const txt=document.getElementById('main').textContent; const there=txt.includes('Next Year Open')&&txt.includes('not part of a fundraising event'), galaThere=txt.includes('Harvest Gala');
+          view.year=null; render(); return {season:t.season, nowList, nextList, here, there, galaThere}; }""")
+        bad+=check('a tournament dated next year is a next-year program: its season follows the start date, it is listed under next year only, and the Fundraising page for next year shows it as a tournament without an event while this year’s gala stays in this year',r['season']==str(int(__import__('datetime').date.today().year)+1) and not r['nowList'] and r['nextList'] and not r['here'] and r['there'] and not r['galaThere'],r)
         await ca.close(); await cb.close(); await c2.close(); await b.close()
     print('ALL OK' if not bad else f'{bad} FAILED'); sys.exit(1 if bad else 0)
 asyncio.run(main())

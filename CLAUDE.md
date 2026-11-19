@@ -271,6 +271,15 @@ Tournament = { id, name, season, days, startDate, field:[{id,memberId,team,paid,
   is up (the page then loads the real rows); and a loader called while its load is in flight returns `PENDING` (a promise
   that never settles) — a second `.then(render)` on an immediately-resolved early return re-rendered, called the loader
   again and spun a microtask loop that starved the fetch and froze the page. Keep both for any new loader.
+- **A club-tier tournament's year is the year it is played** (`tYear(t)` in core.js; the owner, Nov 19, on DCO's 2027 tournament
+  sitting under 2026: "for nonprofits… what they are is fundraising years… tie tournaments to fundraising events, as well as filter
+  year by year"): `seasonTournaments(y)` matches the start date's year on the club tier (an association's `season` as before),
+  `normalize` writes that year back into `t.season` for club documents, and the Tournament details / New tournament drawers keep it in
+  step, so a 2027 tournament set up in 2026 is a 2027 program on the Budget page, in Treasury, on the dashboard and on the
+  **Fundraising page, which shows one fundraising year at a time** (the year bar): the events dated in it, the year's tournaments not
+  yet part of an event (`loose`, from `seasonTournaments`), the thermometers and the year's KPIs; an undated event stays with the year on
+  screen; the empty state names the other years. An event card for a golf day reads the linked tournament's players (`fieldSeats`) and
+  sponsors. `tests/test_fund.py` ends with the next-year tournament case.
 - **The club runs on calendar years, not seasons** (the owner, Oct 2026: "turn the season functionality off on the club
   side… annual revenue, annual profits, as well as quarterly reports"; associations and groups keep their seasons).
   `Y()` for the club = `view.year` or the current year (a `db.seasons[y]` the club has not seen yet is created on the

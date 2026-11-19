@@ -574,7 +574,10 @@ One-time: Supabase → SQL Editor → run `golf-setup.sql`. Upload `score.html` 
 
 ## For a nonprofit: galas, auctions and raffles
 
-A nonprofit client starts with **Fundraising** at the top of its rail and the golf tournament under Golf, Tournaments. An
+A nonprofit client starts with **Fundraising** at the top of its rail and the golf tournament under Golf, Tournaments. The
+Fundraising page shows one **fundraising year** at a time (‹ 2027 ›): the year's events, any tournament of that year not yet part of
+an event (one click makes it one), the thermometers and the year's planned and actual net. A tournament belongs to the year it is
+played — set up the 2027 open in 2026 and it is a 2027 program everywhere: Fundraising, the Annual budget, Treasury, the dashboard. An
 event holds everything for the night: ticket types with their fair market value, tables and the guest list (guests hold
 paddle numbers), sponsors and levels, the **silent auction**, the **live auction**, **raffles**, **checkout** and the money.
 
