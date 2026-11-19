@@ -204,7 +204,7 @@ function vGolf(m){
   golfData();
   if(view.geid&&GEV()) return vGolfEvent(m,GEV());
   view.geid=null;
-  m.innerHTML=head('Golf','Live scoring and leaderboards for Walnut Creek’s Oak and Pecan courses.',btn('New scoring event','gNew','pri',I.plus))+
+  m.innerHTML=head('Golf','Live scoring and leaderboards on '+(golfData().courses.filter(c=>!c.placeholder).map(c=>c.name).slice(0,3).join(', ')||'your courses')+'.',btn('New scoring event','gNew','pri',I.plus))+
     `<div class="tabs">${[['events','Scoring events'],['courses','Courses']].map(([k,l])=>`<button class="tab${view.gtab===k?' on':''}" data-gt="${k}">${l}</button>`).join('')}</div><div id="gbody" style="display:flex;flex-direction:column;gap:20px"></div>`;
   m.querySelectorAll('[data-gt]').forEach(b=>b.onclick=()=>{ view.gtab=b.dataset.gt; render(); });
   $('gNew').onclick=()=>editEvent(null);

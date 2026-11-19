@@ -3484,7 +3484,7 @@ function scorecardHTML(pub,g,scores,opt){
   }).join(opt.split?'<div style="height:8px"></div>':'');
   const status=pub.status==='final'?'<span class="wc-final">FINAL</span>':'';
   const key=`<div class="wc-key"><span><span class="wc-s b">3</span>Birdie</span><span><span class="wc-s e">2</span>Eagle</span><span><span class="wc-s o">5</span>Bogey</span><span><span class="wc-s d">6</span>Double+</span><span><em>3</em>Net where a stroke is given</span>${TEAM&&eventFormats(pub).some(f=>(FORMATS[f]||{}).entry==='player')?`<span><i></i>Ball that counted</span>`:''}${eventFormats(pub).some(f=>(FORMATS[f]||{}).entry==='team')?'<span><b class="wc-xk"></b>Team plays one ball</span>':''}</div>`;
-  return `<div class="wc" style="--wc-accent:${accent}"><div class="wc-top"><div><div class="nm">${E(c.name)}</div><small>Walnut Creek Country Club · Mansfield, Texas</small></div><div class="ev"><b>${E(pub.name)}</b>${E([pub.date?new Date(pub.date+'T12:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}):'',g.label,formatSummary(pub)].filter(Boolean).join(' · '))}<br>${status}</div></div>${tables}${key}<div class="wc-sign"><span>Scorer ________________</span><span>Attest ________________</span></div></div>`;
+  return `<div class="wc" style="--wc-accent:${accent}"><div class="wc-top"><div><div class="nm">${E(c.name)}</div><small>${E([c.club,[c.city,c.state].filter(Boolean).join(', ')].filter(Boolean).join(' · ')||'')}</small></div><div class="ev"><b>${E(pub.name)}</b>${E([pub.date?new Date(pub.date+'T12:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}):'',g.label,formatSummary(pub)].filter(Boolean).join(' · '))}<br>${status}</div></div>${tables}${key}<div class="wc-sign"><span>Scorer ________________</span><span>Attest ________________</span></div></div>`;
 }
 
 /* ---------- formats per nine + USGA handicap allowances ----------
@@ -4286,7 +4286,7 @@ function vGolf(m){
   golfData();
   if(view.geid&&GEV()) return vGolfEvent(m,GEV());
   view.geid=null;
-  m.innerHTML=head('Golf','Live scoring and leaderboards for Walnut Creek’s Oak and Pecan courses.',btn('New scoring event','gNew','pri',I.plus))+
+  m.innerHTML=head('Golf','Live scoring and leaderboards on '+(golfData().courses.filter(c=>!c.placeholder).map(c=>c.name).slice(0,3).join(', ')||'your courses')+'.',btn('New scoring event','gNew','pri',I.plus))+
     `<div class="tabs">${[['events','Scoring events'],['courses','Courses']].map(([k,l])=>`<button class="tab${view.gtab===k?' on':''}" data-gt="${k}">${l}</button>`).join('')}</div><div id="gbody" style="display:flex;flex-direction:column;gap:20px"></div>`;
   m.querySelectorAll('[data-gt]').forEach(b=>b.onclick=()=>{ view.gtab=b.dataset.gt; render(); });
   $('gNew').onclick=()=>editEvent(null);
@@ -9804,7 +9804,7 @@ async function resultsPDF(t,opt){
   doc.setFillColor(...GOLD); doc.roundedRect(L,32,R2-L,bandH+4,8,8,'F'); doc.setFillColor(...NAVY); doc.roundedRect(L,32,R2-L,bandH,8,8,'F'); doc.rect(L,32+bandH-12,R2-L,8,'F');
   const lw=drawCrest(doc,crest,L+16,42,54), TX=L+16+(lw||45)+15;
   font('PublicSansXB','normal',6.8,GOLDL); doc.text(`${(orgName()||'').toUpperCase()} · ${t.season||''}`,TX,56,{charSpace:1.2});
-  font('Cormorant','bold',24,[255,255,255]); doc.text(`${t.name} — ${R.final?'Final Results':'Results'}`,TX,80);
+  { const title=`${t.name} — ${R.final?'Final Results':'Results'}`; let fs=24; font('Cormorant','bold',fs,[255,255,255]); while(fs>13&&doc.getTextWidth(title)>R2-TX-10){ fs-=1; doc.setFontSize(fs); } doc.text(title,TX,80); }   // a long name shrinks to fit the band
   font('PublicSans','normal',8.4,[214,218,220]); doc.text(sub,TX,96);
   let y=32+bandH+26;
   const flights=[...new Set(R.list.map(u=>u.flight))].sort((a,b)=>(a||'~').localeCompare(b||'~'));
@@ -9908,7 +9908,7 @@ function wireSignupCard(t){
    page counts, and a reload is tried once per build — if the page that comes back is still the old one, the CDN
    hasn't caught up; wait a while before trying that build again. */
 (function(){
-  const ME='20261119155931', KEY='au_tried', RETRY=10*60*1000; let ready=false, lastCheck=0;
+  const ME='20261119162733', KEY='au_tried', RETRY=10*60*1000; let ready=false, lastCheck=0;
   const typing=()=>{ const a=document.activeElement; return a&&/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)&&a.value&&a.type!=='search'; };
   const safe=()=>!typing()&&(typeof window.__canReload!=='function'||window.__canReload());
   const tried=()=>{ try{ const [b,t]=(sessionStorage.getItem(KEY)||'').split('|'); return b?{build:b,at:+t||0}:null; }catch(_){ return null; } };

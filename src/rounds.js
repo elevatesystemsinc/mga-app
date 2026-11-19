@@ -251,7 +251,7 @@ async function resultsPDF(t,opt){
   doc.setFillColor(...GOLD); doc.roundedRect(L,32,R2-L,bandH+4,8,8,'F'); doc.setFillColor(...NAVY); doc.roundedRect(L,32,R2-L,bandH,8,8,'F'); doc.rect(L,32+bandH-12,R2-L,8,'F');
   const lw=drawCrest(doc,crest,L+16,42,54), TX=L+16+(lw||45)+15;
   font('PublicSansXB','normal',6.8,GOLDL); doc.text(`${(orgName()||'').toUpperCase()} · ${t.season||''}`,TX,56,{charSpace:1.2});
-  font('Cormorant','bold',24,[255,255,255]); doc.text(`${t.name} — ${R.final?'Final Results':'Results'}`,TX,80);
+  { const title=`${t.name} — ${R.final?'Final Results':'Results'}`; let fs=24; font('Cormorant','bold',fs,[255,255,255]); while(fs>13&&doc.getTextWidth(title)>R2-TX-10){ fs-=1; doc.setFontSize(fs); } doc.text(title,TX,80); }   // a long name shrinks to fit the band
   font('PublicSans','normal',8.4,[214,218,220]); doc.text(sub,TX,96);
   let y=32+bandH+26;
   const flights=[...new Set(R.list.map(u=>u.flight))].sort((a,b)=>(a||'~').localeCompare(b||'~'));

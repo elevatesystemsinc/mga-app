@@ -332,7 +332,7 @@ function scorecardHTML(pub,g,scores,opt){
   }).join(opt.split?'<div style="height:8px"></div>':'');
   const status=pub.status==='final'?'<span class="wc-final">FINAL</span>':'';
   const key=`<div class="wc-key"><span><span class="wc-s b">3</span>Birdie</span><span><span class="wc-s e">2</span>Eagle</span><span><span class="wc-s o">5</span>Bogey</span><span><span class="wc-s d">6</span>Double+</span><span><em>3</em>Net where a stroke is given</span>${TEAM&&eventFormats(pub).some(f=>(FORMATS[f]||{}).entry==='player')?`<span><i></i>Ball that counted</span>`:''}${eventFormats(pub).some(f=>(FORMATS[f]||{}).entry==='team')?'<span><b class="wc-xk"></b>Team plays one ball</span>':''}</div>`;
-  return `<div class="wc" style="--wc-accent:${accent}"><div class="wc-top"><div><div class="nm">${E(c.name)}</div><small>Walnut Creek Country Club · Mansfield, Texas</small></div><div class="ev"><b>${E(pub.name)}</b>${E([pub.date?new Date(pub.date+'T12:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}):'',g.label,formatSummary(pub)].filter(Boolean).join(' · '))}<br>${status}</div></div>${tables}${key}<div class="wc-sign"><span>Scorer ________________</span><span>Attest ________________</span></div></div>`;
+  return `<div class="wc" style="--wc-accent:${accent}"><div class="wc-top"><div><div class="nm">${E(c.name)}</div><small>${E([c.club,[c.city,c.state].filter(Boolean).join(', ')].filter(Boolean).join(' · ')||'')}</small></div><div class="ev"><b>${E(pub.name)}</b>${E([pub.date?new Date(pub.date+'T12:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}):'',g.label,formatSummary(pub)].filter(Boolean).join(' · '))}<br>${status}</div></div>${tables}${key}<div class="wc-sign"><span>Scorer ________________</span><span>Attest ________________</span></div></div>`;
 }
 
 /* ---------- formats per nine + USGA handicap allowances ----------
@@ -1094,7 +1094,7 @@ window.__canReload=()=>true;
    page counts, and a reload is tried once per build — if the page that comes back is still the old one, the CDN
    hasn't caught up; wait a while before trying that build again. */
 (function(){
-  const ME='20261119155931', KEY='au_tried', RETRY=10*60*1000; let ready=false, lastCheck=0;
+  const ME='20261119162733', KEY='au_tried', RETRY=10*60*1000; let ready=false, lastCheck=0;
   const typing=()=>{ const a=document.activeElement; return a&&/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)&&a.value&&a.type!=='search'; };
   const safe=()=>!typing()&&(typeof window.__canReload!=='function'||window.__canReload());
   const tried=()=>{ try{ const [b,t]=(sessionStorage.getItem(KEY)||'').split('|'); return b?{build:b,at:+t||0}:null; }catch(_){ return null; } };
