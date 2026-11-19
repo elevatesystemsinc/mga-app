@@ -208,11 +208,11 @@ function vGolf(m){
 }
 function evStatusChip(e){ return e.status==='live'?'<span class="chip ok">● Live</span>':e.status==='final'?'<span class="chip navy">Final</span>':'<span class="chip">Draft</span>'; }
 function gEvents(el){
-  const evs=golfData().events.slice().sort((a,b)=>(b.date||'').localeCompare(a.date||''));
+  const yr=String(Y()), evs=golfData().events.filter(e=>!e.date||String(e.date).slice(0,4)===yr||isLiveNow(e)).sort((a,b)=>(b.date||'').localeCompare(a.date||''));   // the rail's year, plus anything undated or live right now
   const cols='grid-template-columns:minmax(0,1.6fr) 110px minmax(0,1fr) 110px 100px';
   el.innerHTML=`<div class="card" style="overflow:hidden">${evs.length?`<div class="tw"><div class="t" style="min-width:720px"><div class="tr th" style="${cols}"><span>Event</span><span>Date</span><span>Courses</span><span>Field</span><span>Status</span></div>
     ${evs.map(e=>`<div class="tr click" data-ge="${e.id}" style="${cols}"><div class="cell2"><b class="trunc" style="color:var(--navy)">${esc(e.name)}</b><small class="trunc">${esc(scoringLink(e).replace(/^https?:\/\//,''))}</small></div><span class="num">${e.date?shortDate(e.date):'—'}</span><span class="muted trunc">${[...new Set(e.groups.map(g=>courseById(g.course)?.name.replace(' Course','')))].join(' + ')||'—'}</span><span class="num">${e.groups.length} group${e.groups.length===1?'':'s'} · ${sum(e.groups,g=>g.players.length)}</span><span>${evStatusChip(e)}</span></div>`).join('')}</div></div>`
-    :`<div class="empty"><b>No scoring events yet</b><span>Create one, add groups with their own group IDs, then share the link. Players open it on their phones and enter their group ID to keep score.</span><button class="btn pri" id="gNew2">${I.plus}New scoring event</button></div>`}</div>`;
+    :`<div class="empty"><b>No scoring events in ${Y()}</b><span>${golfData().events.length?'Other years have some — the year in the rail moves the whole hub. ':''}Create one, add groups with their own group IDs, then share the link. Players open it on their phones and enter their group ID to keep score.</span><button class="btn pri" id="gNew2">${I.plus}New scoring event</button></div>`}</div>`;
   el.querySelectorAll('[data-ge]').forEach(r=>r.onclick=()=>{ view.geid=r.dataset.ge; view.getab='field'; render(); loadScores(GEV()); });
   const n2=$('gNew2'); if(n2) n2.onclick=()=>editEvent(null);
 }

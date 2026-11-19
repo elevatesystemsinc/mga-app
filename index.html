@@ -55,9 +55,13 @@ body{font-variant-numeric:lining-nums}
 .orgcard:hover{border-color:var(--gold);box-shadow:0 2px 10px rgba(15,42,56,.08)}
 .orgcard .crest{width:40px;height:52px;object-fit:contain} .orgcard .mono{background:var(--navy)} .orgcard .cell2{flex:1;min-width:0} .orgcard b{font-size:16px;color:var(--navy)} .orgcard svg{width:18px;height:18px;color:var(--muted)}
 .tr .crest.sm,.tr .mono.sm{justify-self:start}
-.season{padding:18px 8px 10px}
-.season label{font-size:12px;font-weight:600;color:#A9A595}
-.season select{margin-top:6px;width:100%;height:38px;border-radius:8px;border:1px solid rgba(216,183,95,.4);background:var(--deep);color:#fff;padding:0 10px;font-weight:600}
+/* the year in the rail — one control for the whole hub: an association's season, a club's or a nonprofit's year */
+.season{padding:14px 10px 8px}
+.season label{display:block;font-size:10.5px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:#C7A13A;margin:0 0 6px 2px}
+.ypick{display:flex;align-items:center;gap:2px;border:1px solid rgba(216,183,95,.45);border-radius:12px;background:var(--deep);padding:3px}
+.ypick select{flex:1;min-width:0;height:36px;border:0;border-radius:8px;background:transparent;color:#fff;font-family:var(--serif);font-size:21px;font-weight:600;text-align:center;text-align-last:center;padding:0 4px;cursor:pointer;-webkit-appearance:none;appearance:none;font-variant-numeric:lining-nums tabular-nums}
+.ypick select:focus{outline:2px solid rgba(216,183,95,.6);outline-offset:-2px}
+.ypick .yb{width:32px;height:34px;border:0;border-radius:9px;background:transparent;color:#D8B75F;font-size:22px;line-height:1;cursor:pointer;display:grid;place-items:center} .ypick .yb:hover{background:rgba(255,255,255,.07);color:#fff} .ypick .yb:disabled{opacity:.3;cursor:default}
 .navlist{display:flex;flex-direction:column;gap:3px;margin-top:8px;flex:none}
 .nav{display:flex;align-items:center;gap:12px;padding:9px 12px;border-radius:8px;color:#C9C5B8;text-decoration:none;font-weight:500;border:none;background:none;text-align:left;width:100%;font-size:14.5px}
 .nav:hover{color:#fff;background:rgba(255,255,255,.05)}
@@ -468,7 +472,7 @@ textarea.inp{height:auto;min-height:84px;padding:10px 12px;resize:vertical}
   <aside class="side" id="side">
     <div class="brand"><div class="fs"><img src="flagstick-crest-light.svg" alt=""><div><b>FLAGSTICK</b><small>GOLF SOFTWARE</small></div></div></div>
     <div class="org"><div id="brandText" style="min-width:0"><b id="brandName">Walnut Creek Country Club</b><small id="brandSub"></small></div></div>
-    <div class="season" id="seasonBox"><label for="seasonSel">Season</label><select id="seasonSel"></select></div>
+    <div class="season" id="seasonBox"><label for="seasonSel" id="seasonLbl">Season</label><div class="ypick"><button type="button" class="yb" id="yearPrev" aria-label="Previous year">‹</button><select id="seasonSel" aria-label="Year"></select><button type="button" class="yb" id="yearNext" aria-label="Next year">›</button></div></div>
     <nav class="navlist" id="nav" aria-label="Main"></nav>
     <div class="sidefoot">
       <p id="who" hidden style="margin:0;font-size:12px;color:#C9C5B8"></p>
@@ -1156,8 +1160,16 @@ let view={page:'dash',tid:null,ttab:'budget',mfilter:'All',mq:'',tfilter:'All'};
    (annual revenue, quarterly reports) — view.year moves it, and a year the club has not seen yet is set up on the fly */
 const Y=()=>{ if(!db) return String(new Date().getFullYear()); if(!isClub()) return db.activeSeason; const y=view.year||String(new Date().getFullYear()); if(!db.seasons[y]) db.seasons[y]=newSeason(); return y; };
 /* the club's year bar: ‹ 2026 › and, where a page reports by quarter, Q1–Q4 / Year */
-function yearBar(quarters){ const y=+Y(); return `<div class="seg ybar"><button data-yb="${y-1}">‹</button><button class="on">${y}</button><button data-yb="${y+1}">›</button></div>${quarters?`<div class="seg ybar">${[['','Year'],['1','Q1'],['2','Q2'],['3','Q3'],['4','Q4']].map(([k,l])=>`<button class="${(view.q||'')===k?'on':''}" data-yq="${k}">${l}</button>`).join('')}</div>`:''}`; }
-function wireYearBar(m){ m.querySelectorAll('[data-yb]').forEach(b=>b.onclick=()=>{ view.year=b.dataset.yb; render(); }); m.querySelectorAll('[data-yq]').forEach(b=>b.onclick=()=>{ view.q=b.dataset.yq; render(); }); }
+/* The year lives in the rail (the owner, Nov 19: "a global filter that lives in the nav rail… when the nav rail is set to 2027, the
+   dashboard, the tournaments, the events and live scoring, everything is the instance of that year"): `yearBar` only adds the quarter
+   switch a page asks for; `setYear` moves the whole hub. */
+function yearBar(quarters){ return quarters?`<div class="seg ybar">${[['','Year'],['1','Q1'],['2','Q2'],['3','Q3'],['4','Q4']].map(([k,l])=>`<button class="${(view.q||'')===k?'on':''}" data-yq="${k}">${l}</button>`).join('')}</div>`:''; }
+function wireYearBar(m){ m.querySelectorAll('[data-yb]').forEach(b=>b.onclick=()=>setYear(b.dataset.yb)); m.querySelectorAll('[data-yq]').forEach(b=>b.onclick=()=>{ view.q=b.dataset.yq; render(); }); }
+function setYear(y){ y=String(y); if(!/^\d{4}$/.test(y)) return; if(isClub()){ view.year=y; view.q=''; } else { if(!db.seasons[y]) return; db.activeSeason=y; persist(); } if(view.page==='tournament') view.page='tournaments'; if(view.page==='fundev') view.page='fund'; render(); window.scrollTo(0,0); }
+/* the years the rail offers: on the club tier every year with a tournament, an event or a season, plus this year and the next two */
+function hubYears(){ const now=new Date().getFullYear(); if(!isClub()) return Object.keys(db.seasons).sort((a,b)=>b-a);
+  const ys=new Set([String(now-1),String(now),String(now+1),String(now+2)]); Object.keys(db.seasons).forEach(y=>ys.add(y)); (db.tournaments||[]).forEach(t=>{ const y=tYear(t); if(/^\d{4}$/.test(y)) ys.add(y); });
+  if(typeof fundOn==='function'&&fundOn()) fundData().events.forEach(e=>{ const y=String(e.date||'').slice(0,4); if(/^\d{4}$/.test(y)) ys.add(y); }); ys.add(Y()); return [...ys].filter(y=>/^\d{4}$/.test(y)).sort((a,b)=>b-a); }
 const T=()=>db.tournaments.find(t=>t.id===view.tid);
 function go(page,extra){ view=Object.assign(view,{page},extra||{}); $('side').classList.remove('open'); render(); window.scrollTo(0,0); }
 
@@ -1240,9 +1252,10 @@ function renderInner(){
   const lc=$('loginClub'); if(lc) lc.textContent=TENANT_INFO&&TENANT_INFO.name||clubName;   // the sign-in card names the tenant, even before its document is open
   if(!db){ $('nav').innerHTML=''; $('seasonBox').hidden=true; (setupNeeded?vSetup:SCOPED&&cloudReady&&(ORG_ID==='club'||!allowedOrg(ORG_ID))?vNotYours:vPicker)($('main')); return; }
   if(!isClub()&&!hasModule(db.kind==='group'?'groups':'associations')){ $('nav').innerHTML=''; $('seasonBox').hidden=true; vLocked($('main'),db.kind); return; }
-  $('seasonBox').hidden=isClub();   // the club has no seasons: it reports by year and quarter
-  const ys=Object.keys(db.seasons).sort((a,b)=>b-a);
-  $('seasonSel').innerHTML=ys.map(y=>`<option value="${y}"${y===Y()?' selected':''}>${y} season</option>`).join('')+'<option value="__new">+ New season…</option>';
+  $('seasonBox').hidden=false; const club=isClub(), ys=hubYears(), cur=Y(), yi=ys.indexOf(cur);
+  $('seasonLbl').textContent=club?(typeof isNonprofit==='function'&&isNonprofit()?'Fundraising year':'Year'):'Season';
+  $('seasonSel').innerHTML=ys.map(y=>`<option value="${y}"${y===cur?' selected':''}>${y}</option>`).join('')+(club?'':'<option value="__new">+ New season…</option>');
+  $('yearPrev').disabled=club?false:yi<0||yi>=ys.length-1; $('yearNext').disabled=club?false:yi<=0;   // the list runs newest first
   const live=typeof liveEvents==='function'?liveEvents():[];
   const items=navItems(); if(view.page!=='pick'&&!items.some(([k])=>(NAV_OWNS[k]||[k]).includes(view.page))) view.page='dash';
   $('nav').innerHTML=navHTML(items,live);
@@ -2171,7 +2184,9 @@ function wireChrome(){
   $('btnMenu').onclick=()=>$('side').classList.toggle('open');
   $('dClose').onclick=closeDrawer; $('scrim').onclick=closeDrawer;
   document.addEventListener('keydown',e=>{ if(e.key==='Escape'&&drawerOpen()) closeDrawer(); });
-  $('seasonSel').onchange=e=>{ if(e.target.value==='__new'){ e.target.value=Y(); newSeasonPrompt(); return; } db.activeSeason=e.target.value; persist(); go(view.page==='tournament'?'tournaments':view.page); };
+  $('seasonSel').onchange=e=>{ if(e.target.value==='__new'){ e.target.value=Y(); newSeasonPrompt(); return; } setYear(e.target.value); };
+  $('yearPrev').onclick=()=>{ if(isClub()) setYear(+Y()-1); else { const ys=hubYears(), i=ys.indexOf(Y()); if(i>=0&&i<ys.length-1) setYear(ys[i+1]); } };
+  $('yearNext').onclick=()=>{ if(isClub()) setYear(+Y()+1); else { const ys=hubYears(), i=ys.indexOf(Y()); if(i>0) setYear(ys[i-1]); } };
   $('syncErr').onclick=()=>{ if(!CLOUD||!sessionOK) return; if(!cloudReady) startCloud(); else pushAll(); };
   $('btnSignOut').onclick=async()=>{ if(KEYMODE){ if(!confirm('Leave this hub? You will need the admin link again to come back.')) return; dropKey(); location.reload(); return; } await sb.auth.signOut(); location.reload(); };
 }
@@ -4205,11 +4220,11 @@ function vGolf(m){
 }
 function evStatusChip(e){ return e.status==='live'?'<span class="chip ok">● Live</span>':e.status==='final'?'<span class="chip navy">Final</span>':'<span class="chip">Draft</span>'; }
 function gEvents(el){
-  const evs=golfData().events.slice().sort((a,b)=>(b.date||'').localeCompare(a.date||''));
+  const yr=String(Y()), evs=golfData().events.filter(e=>!e.date||String(e.date).slice(0,4)===yr||isLiveNow(e)).sort((a,b)=>(b.date||'').localeCompare(a.date||''));   // the rail's year, plus anything undated or live right now
   const cols='grid-template-columns:minmax(0,1.6fr) 110px minmax(0,1fr) 110px 100px';
   el.innerHTML=`<div class="card" style="overflow:hidden">${evs.length?`<div class="tw"><div class="t" style="min-width:720px"><div class="tr th" style="${cols}"><span>Event</span><span>Date</span><span>Courses</span><span>Field</span><span>Status</span></div>
     ${evs.map(e=>`<div class="tr click" data-ge="${e.id}" style="${cols}"><div class="cell2"><b class="trunc" style="color:var(--navy)">${esc(e.name)}</b><small class="trunc">${esc(scoringLink(e).replace(/^https?:\/\//,''))}</small></div><span class="num">${e.date?shortDate(e.date):'—'}</span><span class="muted trunc">${[...new Set(e.groups.map(g=>courseById(g.course)?.name.replace(' Course','')))].join(' + ')||'—'}</span><span class="num">${e.groups.length} group${e.groups.length===1?'':'s'} · ${sum(e.groups,g=>g.players.length)}</span><span>${evStatusChip(e)}</span></div>`).join('')}</div></div>`
-    :`<div class="empty"><b>No scoring events yet</b><span>Create one, add groups with their own group IDs, then share the link. Players open it on their phones and enter their group ID to keep score.</span><button class="btn pri" id="gNew2">${I.plus}New scoring event</button></div>`}</div>`;
+    :`<div class="empty"><b>No scoring events in ${Y()}</b><span>${golfData().events.length?'Other years have some — the year in the rail moves the whole hub. ':''}Create one, add groups with their own group IDs, then share the link. Players open it on their phones and enter their group ID to keep score.</span><button class="btn pri" id="gNew2">${I.plus}New scoring event</button></div>`}</div>`;
   el.querySelectorAll('[data-ge]').forEach(r=>r.onclick=()=>{ view.geid=r.dataset.ge; view.getab='field'; render(); loadScores(GEV()); });
   const n2=$('gNew2'); if(n2) n2.onclick=()=>editEvent(null);
 }
@@ -9010,7 +9025,7 @@ function vCalendar(m){ if(!bookOn()&&!staffOn()){ go('dash'); return; } const re
   m.querySelectorAll('[data-csh]').forEach(b=>b.onclick=()=>shiftDrawer(clubShifts().find(s=>s.id===b.dataset.csh))); m.querySelectorAll('[data-cbl]').forEach(b=>b.onclick=()=>{ const k=(BLK.rows||[]).find(x=>x.id===b.dataset.cbl); if(k) blockInfoDrawer(k,facOf(k.facility)); });
 }
 /* ---- events ---- */
-function vEvents(m){ if(!bookOn()&&!staffOn()){ go('dash'); return; } const E=clubEvents().slice().sort((a,b)=>a.date.localeCompare(b.date)||String(a.start||'').localeCompare(String(b.start||''))), today=todayISO(); const up=E.filter(e=>(e.end||e.date)>=today), past=E.filter(e=>(e.end||e.date)<today).reverse();
+function vEvents(m){ if(!bookOn()&&!staffOn()){ go('dash'); return; } const yr=String(Y()); const E=clubEvents().filter(e=>!e.date||String(e.date).slice(0,4)===yr).slice().sort((a,b)=>a.date.localeCompare(b.date)||String(a.start||'').localeCompare(String(b.start||''))), today=todayISO(); const up=E.filter(e=>(e.end||e.date)>=today), past=E.filter(e=>(e.end||e.date)<today).reverse();
   const row=e=>`<button class="tr" data-ev="${e.id}" style="grid-template-columns:120px minmax(0,1fr) 120px 90px;text-align:left;width:100%;background:none;border-left:none;border-right:none"><div class="cell2"><b>${dateTxt(e.date).replace(/, \d{4}$/,'')}${e.end&&e.end!==e.date?' – '+dateTxt(e.end).replace(/, \d{4}$/,''):''}</b><small>${e.start?t12(e.start)+(e.finish?'–'+t12(e.finish):''):'all day'}</small></div><div class="cell2"><b>${esc(e.name)}</b><small>${esc(e.where||'')}${e.descr?(e.where?' · ':'')+esc(e.descr.slice(0,90)):''}</small></div><span class="muted" style="font-size:12.5px">${esc(evDeptName(e.dept))}</span><span>${e.public===false?'<span class="chip">staff only</span>':'<span class="chip ev">members</span>'}</span></button>`;
   m.innerHTML=head('Events',`${esc(CLUB.name||CLUB_META.name)} · what the club puts on — the Boo Bash, movie night at the pool, the member-guest dinner. Public ones show in the member portal.`,btn('Calendar','evCal','')+btn('New event','evNew','pri',I.plus))+`
     <div class="card" style="overflow:hidden"><div class="cardhead"><h2 class="h2">Coming up</h2><span class="muted">${up.length} event${up.length===1?'':'s'}</span></div><div class="t fit">${up.map(row).join('')||'<div class="empty"><b>Nothing scheduled</b><span>Add the next club event; members see it in the portal.</span></div>'}</div></div>
@@ -9818,7 +9833,7 @@ function wireSignupCard(t){
    page counts, and a reload is tried once per build — if the page that comes back is still the old one, the CDN
    hasn't caught up; wait a while before trying that build again. */
 (function(){
-  const ME='20261119031337', KEY='au_tried', RETRY=10*60*1000; let ready=false, lastCheck=0;
+  const ME='20261119032702', KEY='au_tried', RETRY=10*60*1000; let ready=false, lastCheck=0;
   const typing=()=>{ const a=document.activeElement; return a&&/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)&&a.value&&a.type!=='search'; };
   const safe=()=>!typing()&&(typeof window.__canReload!=='function'||window.__canReload());
   const tried=()=>{ try{ const [b,t]=(sessionStorage.getItem(KEY)||'').split('|'); return b?{build:b,at:+t||0}:null; }catch(_){ return null; } };

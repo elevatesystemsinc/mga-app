@@ -73,8 +73,16 @@ let view={page:'dash',tid:null,ttab:'budget',mfilter:'All',mq:'',tfilter:'All'};
    (annual revenue, quarterly reports) — view.year moves it, and a year the club has not seen yet is set up on the fly */
 const Y=()=>{ if(!db) return String(new Date().getFullYear()); if(!isClub()) return db.activeSeason; const y=view.year||String(new Date().getFullYear()); if(!db.seasons[y]) db.seasons[y]=newSeason(); return y; };
 /* the club's year bar: ‹ 2026 › and, where a page reports by quarter, Q1–Q4 / Year */
-function yearBar(quarters){ const y=+Y(); return `<div class="seg ybar"><button data-yb="${y-1}">‹</button><button class="on">${y}</button><button data-yb="${y+1}">›</button></div>${quarters?`<div class="seg ybar">${[['','Year'],['1','Q1'],['2','Q2'],['3','Q3'],['4','Q4']].map(([k,l])=>`<button class="${(view.q||'')===k?'on':''}" data-yq="${k}">${l}</button>`).join('')}</div>`:''}`; }
-function wireYearBar(m){ m.querySelectorAll('[data-yb]').forEach(b=>b.onclick=()=>{ view.year=b.dataset.yb; render(); }); m.querySelectorAll('[data-yq]').forEach(b=>b.onclick=()=>{ view.q=b.dataset.yq; render(); }); }
+/* The year lives in the rail (the owner, Nov 19: "a global filter that lives in the nav rail… when the nav rail is set to 2027, the
+   dashboard, the tournaments, the events and live scoring, everything is the instance of that year"): `yearBar` only adds the quarter
+   switch a page asks for; `setYear` moves the whole hub. */
+function yearBar(quarters){ return quarters?`<div class="seg ybar">${[['','Year'],['1','Q1'],['2','Q2'],['3','Q3'],['4','Q4']].map(([k,l])=>`<button class="${(view.q||'')===k?'on':''}" data-yq="${k}">${l}</button>`).join('')}</div>`:''; }
+function wireYearBar(m){ m.querySelectorAll('[data-yb]').forEach(b=>b.onclick=()=>setYear(b.dataset.yb)); m.querySelectorAll('[data-yq]').forEach(b=>b.onclick=()=>{ view.q=b.dataset.yq; render(); }); }
+function setYear(y){ y=String(y); if(!/^\d{4}$/.test(y)) return; if(isClub()){ view.year=y; view.q=''; } else { if(!db.seasons[y]) return; db.activeSeason=y; persist(); } if(view.page==='tournament') view.page='tournaments'; if(view.page==='fundev') view.page='fund'; render(); window.scrollTo(0,0); }
+/* the years the rail offers: on the club tier every year with a tournament, an event or a season, plus this year and the next two */
+function hubYears(){ const now=new Date().getFullYear(); if(!isClub()) return Object.keys(db.seasons).sort((a,b)=>b-a);
+  const ys=new Set([String(now-1),String(now),String(now+1),String(now+2)]); Object.keys(db.seasons).forEach(y=>ys.add(y)); (db.tournaments||[]).forEach(t=>{ const y=tYear(t); if(/^\d{4}$/.test(y)) ys.add(y); });
+  if(typeof fundOn==='function'&&fundOn()) fundData().events.forEach(e=>{ const y=String(e.date||'').slice(0,4); if(/^\d{4}$/.test(y)) ys.add(y); }); ys.add(Y()); return [...ys].filter(y=>/^\d{4}$/.test(y)).sort((a,b)=>b-a); }
 const T=()=>db.tournaments.find(t=>t.id===view.tid);
 function go(page,extra){ view=Object.assign(view,{page},extra||{}); $('side').classList.remove('open'); render(); window.scrollTo(0,0); }
 
@@ -157,9 +165,10 @@ function renderInner(){
   const lc=$('loginClub'); if(lc) lc.textContent=TENANT_INFO&&TENANT_INFO.name||clubName;   // the sign-in card names the tenant, even before its document is open
   if(!db){ $('nav').innerHTML=''; $('seasonBox').hidden=true; (setupNeeded?vSetup:SCOPED&&cloudReady&&(ORG_ID==='club'||!allowedOrg(ORG_ID))?vNotYours:vPicker)($('main')); return; }
   if(!isClub()&&!hasModule(db.kind==='group'?'groups':'associations')){ $('nav').innerHTML=''; $('seasonBox').hidden=true; vLocked($('main'),db.kind); return; }
-  $('seasonBox').hidden=isClub();   // the club has no seasons: it reports by year and quarter
-  const ys=Object.keys(db.seasons).sort((a,b)=>b-a);
-  $('seasonSel').innerHTML=ys.map(y=>`<option value="${y}"${y===Y()?' selected':''}>${y} season</option>`).join('')+'<option value="__new">+ New season…</option>';
+  $('seasonBox').hidden=false; const club=isClub(), ys=hubYears(), cur=Y(), yi=ys.indexOf(cur);
+  $('seasonLbl').textContent=club?(typeof isNonprofit==='function'&&isNonprofit()?'Fundraising year':'Year'):'Season';
+  $('seasonSel').innerHTML=ys.map(y=>`<option value="${y}"${y===cur?' selected':''}>${y}</option>`).join('')+(club?'':'<option value="__new">+ New season…</option>');
+  $('yearPrev').disabled=club?false:yi<0||yi>=ys.length-1; $('yearNext').disabled=club?false:yi<=0;   // the list runs newest first
   const live=typeof liveEvents==='function'?liveEvents():[];
   const items=navItems(); if(view.page!=='pick'&&!items.some(([k])=>(NAV_OWNS[k]||[k]).includes(view.page))) view.page='dash';
   $('nav').innerHTML=navHTML(items,live);
@@ -1088,7 +1097,9 @@ function wireChrome(){
   $('btnMenu').onclick=()=>$('side').classList.toggle('open');
   $('dClose').onclick=closeDrawer; $('scrim').onclick=closeDrawer;
   document.addEventListener('keydown',e=>{ if(e.key==='Escape'&&drawerOpen()) closeDrawer(); });
-  $('seasonSel').onchange=e=>{ if(e.target.value==='__new'){ e.target.value=Y(); newSeasonPrompt(); return; } db.activeSeason=e.target.value; persist(); go(view.page==='tournament'?'tournaments':view.page); };
+  $('seasonSel').onchange=e=>{ if(e.target.value==='__new'){ e.target.value=Y(); newSeasonPrompt(); return; } setYear(e.target.value); };
+  $('yearPrev').onclick=()=>{ if(isClub()) setYear(+Y()-1); else { const ys=hubYears(), i=ys.indexOf(Y()); if(i>=0&&i<ys.length-1) setYear(ys[i+1]); } };
+  $('yearNext').onclick=()=>{ if(isClub()) setYear(+Y()+1); else { const ys=hubYears(), i=ys.indexOf(Y()); if(i>0) setYear(ys[i-1]); } };
   $('syncErr').onclick=()=>{ if(!CLOUD||!sessionOK) return; if(!cloudReady) startCloud(); else pushAll(); };
   $('btnSignOut').onclick=async()=>{ if(KEYMODE){ if(!confirm('Leave this hub? You will need the admin link again to come back.')) return; dropKey(); location.reload(); return; } await sb.auth.signOut(); location.reload(); };
 }

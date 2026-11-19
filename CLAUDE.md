@@ -280,6 +280,15 @@ Tournament = { id, name, season, days, startDate, field:[{id,memberId,team,paid,
   yet part of an event (`loose`, from `seasonTournaments`), the thermometers and the year's KPIs; an undated event stays with the year on
   screen; the empty state names the other years. An event card for a golf day reads the linked tournament's players (`fieldSeats`) and
   sponsors. `tests/test_fund.py` ends with the next-year tournament case.
+- **The year lives in the rail — one control for the whole hub** (the owner, Nov 19: "a global filter that lives in the nav rail…
+  when the nav rail is set to 2027, the dashboard, the tournaments, the events and live scoring, everything is the instance of that
+  year"): `#seasonBox` under the organization's name — ‹ year › with a select — reads **Season** on an association or a group
+  (`db.activeSeason`, shared through the document, "+ New season…" still there) and **Year** / **Fundraising year** on the club tier
+  (`view.year`, per device, remembered with the view). `setYear(y)` moves everything (`Y()`), leaving a tournament or event page for
+  its list; `hubYears()` offers every year with a season, a tournament or an event plus this year and the next two. `yearBar()` now only
+  adds a page's quarter switch (Reports); the dashboard, Budget, Treasury and Fundraising carry no year bar of their own. Pages that
+  follow the year: the dashboard, Tournaments (`seasonTournaments`), Events & live scoring (`gEvents`: the year's events, plus undated
+  or live-now ones), Games, Fundraising, Budget, Treasury, Reports, the club's Events page. The calendar keeps its own month.
 - **The club runs on calendar years, not seasons** (the owner, Oct 2026: "turn the season functionality off on the club
   side… annual revenue, annual profits, as well as quarterly reports"; associations and groups keep their seasons).
   `Y()` for the club = `view.year` or the current year (a `db.seasons[y]` the club has not seen yet is created on the
