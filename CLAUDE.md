@@ -589,8 +589,10 @@ Plain static pages, one stylesheet (`site/site.css`), real product screenshots i
 `golf.html` (tournaments, registration, pairings and cards, live scoring, GameCast, formats, the course library, associations, member
 games, cart games, budget and treasury), `club.html` (member accounts, the account, the member portal, point of sale, on the floor,
 tickets, bookings, staff, reports, the directory), `nonprofits.html`, `about.html`; `features.html` only redirects to `golf.html`. The
-header and footer markup is pasted into every page — keep the five in step. Screenshots came from the DCO scramble staged on the fake
-(`tests/` harness) and the Bushwood seed run in local mode; re-capture with the same tools when a screen changes. Hosted separately from
+header and footer markup is pasted into every page — keep the five in step. **No real club or client appears on the website** (the owner, Nov 19: "no actual club information or client information"): the tournament
+screenshots come from a fictional charity scramble, the **Bushwood Caddie Classic** (a nonprofit tenant "Bushwood Caddie Scholarship Fund", made-up
+sponsors and people, Bushwood's own course) staged on the fake by `tools/site/stage_demo.py` (`OUT=<dir>`; downscale the PNGs to the sizes in
+`site/img/`), and the club screens from the Bushwood seed run in local mode; re-capture with the same tools when a screen changes. Hosted separately from
 the app (`docs/tenancy.md`): `flagstickhub.com` and `www` point at wherever this folder is served.
 
 ### Supabase objects
