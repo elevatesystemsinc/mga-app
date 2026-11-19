@@ -583,6 +583,16 @@ Tournament = { id, name, season, days, startDate, field:[{id,memberId,team,paid,
 - **Device-local, never in the shared doc:** cashier/check-in link status (`SHARE_ST`, `CKI_ST`), the cashier-link merge base (`localStorage mga_cbase_<tid>`), check-in base (`mga_ckibase_<tid>`).
   Putting status/timestamps in `db` causes background saves that ping every device — don't.
 
+### The marketing website (`site/`)
+Plain static pages, one stylesheet (`site/site.css`), real product screenshots in `site/img/` (JPEG, 1600 px wide; phones 600 px):
+`index.html` (the three offerings, a tournament day, the hub tree, the feature tiles, the demo form → a mailto to hello@flagstickhub.com),
+`golf.html` (tournaments, registration, pairings and cards, live scoring, GameCast, formats, the course library, associations, member
+games, cart games, budget and treasury), `club.html` (member accounts, the account, the member portal, point of sale, on the floor,
+tickets, bookings, staff, reports, the directory), `nonprofits.html`, `about.html`; `features.html` only redirects to `golf.html`. The
+header and footer markup is pasted into every page — keep the five in step. Screenshots came from the DCO scramble staged on the fake
+(`tests/` harness) and the Bushwood seed run in local mode; re-capture with the same tools when a screen changes. Hosted separately from
+the app (`docs/tenancy.md`): `flagstickhub.com` and `www` point at wherever this folder is served.
+
 ### Supabase objects
 | object | purpose |
 |---|---|
