@@ -1,6 +1,6 @@
 """A cart game: five players, nothing in the pots, one group — the side game is set up on the phones. Run: python3 tests/test_cartgame.py
-The hub (local mode) makes the game through the quick setup's "Just a cart game"; the five land in one group; the game page and the
-share step say what a cart game is; the sheet PDF still builds; Same as last time makes another cart game. The phone (against the fake)
+The hub (local mode) makes the game in the designer with no competitions; the five land in one group; the game page says
+what a cart game is; the sheet PDF still builds; the next New game starts empty of players. The phone (against the fake)
 joins the cart: no Finish tab (nothing to pay out), the side-game prompt, Banker allowed for five, the robin not; and moving ahead over
 an untouched hole writes no scores (the Misfits' phantom pars, Nov 13) while a hole with one score entered still fills the rest with
 par, and Save & next fills an untouched hole on purpose."""
@@ -19,22 +19,22 @@ async def main():
     await hub.evaluate("()=>{ CLUB.orgs.push({id:'misfits',kind:'group',name:'The Misfits',short:'Misfits'}); ['Ann Able 4.1','Bo Baker 12.0','Cy Cole 20.3','Di Dunn 8.8','Ed Eng 15.0','Flo Fox 9.0'].forEach((x,i)=>{ const [f,l,h]=x.split(' '); CLUB.members.push({id:'p'+i,first:f,last:l,hcp:h,status:'Active'}); }); persist(); }")
     await hub.goto(page('index.html')+'?org=misfits'); await hub.wait_for_timeout(500)
     await hub.evaluate("()=>{ ['p0','p1','p2','p3','p4','p5'].forEach(id=>upsertMember(id,{status:'Active'},{noBill:true})); go('games'); }")
-    # --- the quick setup: five players → Just a cart game → create
-    r=await hub.evaluate("""()=>{ quickGame(); QG.picked={}; QG.guests=[]; render(); ['p0','p1','p2','p3','p4'].forEach(id=>document.querySelector('[data-qp="'+id+'"]').click());
-      document.getElementById('qgNext').click(); const before=document.getElementById('qgCreate').disabled, cartOpt=document.querySelector('[data-qs="cart"]'), optText=cartOpt&&cartOpt.textContent;
-      cartOpt.click(); const after=document.getElementById('qgCreate').disabled, summary=document.querySelector('.qbar').previousElementSibling.previousElementSibling.textContent;
-      document.getElementById('qgCreate').click(); const g=gamesData().find(x=>x.id===QG.gameId), ev=gameEvent(g);
-      return {before, optText, after, summary, cart:g.cart, pots:g.pots.length, players:g.players.length, groups:ev.groups.map(x=>x.players.length), live:ev.status, share:document.body.innerText.includes('The cart game:')&&document.body.innerText.includes('a cart game — no pots'), sub:document.querySelector('.qstep .sub').textContent}; }""")
-    check('step 2: Create is off until something is picked, the cart option says one group for five, Create comes on',r['before'] and 'Everyone plays as one group' in r['optText'] and not r['after'] and 'A cart game' in r['summary'] and 'one group' in r['summary'],json.dumps(r)[:300])
-    check('the game: cart, no pots, five players in ONE group, scoring live, the share step explains the cart game',r['cart'] and r['pots']==0 and r['players']==5 and r['groups']==[5] and r['live']=='live' and r['share'],json.dumps(r)[:300])
-    r2=await hub.evaluate("""async()=>{ document.getElementById('qgOpen').click(); const g=GAME(), t=document.body.innerText; const chip=[...document.querySelectorAll('.chip')].some(c=>c.textContent==='Cart game · no pots');
+    # --- the designer: five players, no competitions → Save → a cart game
+    hub.on('dialog',lambda d:asyncio.ensure_future(d.accept()))
+    r=await hub.evaluate("""()=>{ designGame(null); GD.draft.players=[]; GD.draft.pots=[]; ['p0','p1','p2','p3','p4'].forEach(id=>addPlayer(GD.draft,{memberId:id})); render();
+      const rows=document.querySelectorAll('[data-gdpx]').length, empty=/A cart game — nothing in the pots|No competitions — a cart game/.test(document.body.innerText); document.getElementById('gdName').value='Cart Thursday'; document.getElementById('gdSave').click();
+      const g=gamesData().find(x=>x.name==='Cart Thursday'), ev=g&&gameEvent(g);
+      return {rows, empty, cart:g&&g.cart, pots:g&&g.pots.length, players:g&&g.players.length, groups:ev&&ev.groups.map(x=>x.players.length), live:ev&&ev.status, onGame:view.gameId===(g&&g.id)}; }""")
+    check('the designer with five players and no competitions says cart game; Save makes it one',r['rows']==5 and r['empty'] and r['cart'] and r['pots']==0,json.dumps(r)[:300])
+    check('the game: cart, no pots, five players in ONE group, scoring live, the game page opens',r['players']==5 and r['groups']==[5] and r['live']=='live' and r['onGame'],json.dumps(r)[:300])
+    r2=await hub.evaluate("""async()=>{ const g=GAME(), t=document.body.innerText; const chip=[...document.querySelectorAll('.chip')].some(c=>c.textContent==='Cart game · no pots');
       const doc=await gameSheetPDF(g,{returnDoc:true}); const pages=doc?doc.getNumberOfPages():0;
       const list=(()=>{ view.gameId=null; render(); const row=document.querySelector('[data-game="'+g.id+'"]'); return row&&row.textContent; })();
       designGame(g); const des={cart:GD.draft.cart, empty:document.body.innerText.includes('A cart game — nothing in the pots')}; GD=null; view.gdesign=null;
-      const n=gamesData().length; quickGame(true); const g2=gamesData().find(x=>x.id===QG.gameId), ev2=gameEvent(g2); QG=null; view.gquick=null; render();
-      return {chip, cartCard:t.includes('A cart game')&&t.includes('Side games in the carts'), noKpi:!t.includes('In the pots'), pages, list, des, again:{n:gamesData().length-n, cart:!!g2.cart, pots:g2.pots.length, groups:ev2.groups.map(x=>x.players.length)}}; }""")
+      designGame(null); const next={players:GD.draft.players.length, pots:GD.draft.pots.length, course:GD.draft.course===g.course}; GD=null; view.gdesign=null; render();
+      return {chip, cartCard:t.includes('A cart game')&&t.includes('Side games in the carts'), noKpi:!t.includes('In the pots'), pages, list, des, next}; }""")
     check('the game page: the Cart game chip, the explainer, no pot KPIs; the sheet PDF builds; the list says cart game',r2['chip'] and r2['cartCard'] and r2['noKpi'] and r2['pages']>=1 and 'Cart game' in (r2['list'] or ''),json.dumps(r2)[:400])
-    check('Design opens on a cart game; Same as last time makes another cart game of five in one group',r2['des']['cart'] and r2['des']['empty'] and r2['again']=={'n':1,'cart':True,'pots':0,'groups':[5]},json.dumps(r2['again']))
+    check('Design opens on a cart game; the next New game starts from its day with nobody in it and no pots',r2['des']['cart'] and r2['des']['empty'] and r2['next']=={'players':0,'pots':0,'course':True},json.dumps(r2['next']))
     # --- the phone: the event published to the fake
     pub=await hub.evaluate("()=>{ const g=seasonGames()[0], ev=gameEvent(g); return {id:ev.id, slug:ev.slug, pub:publicEvent(ev), codes:Object.fromEntries(ev.groups.map(x=>[x.code,x.id]))}; }")
     fdb._rows('golf_events').append(copy.deepcopy({'id':pub['id'],'slug':pub['slug'],'public':pub['pub'],'codes':pub['codes']}))
