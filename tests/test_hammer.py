@@ -103,6 +103,13 @@ async def main():
     check('an eagle triples: the others win the lone wolf\'s 2x × 3 = $30 each, the lone wolf −$90','The others win' in st and 'eagle ×3' in st and m['money']=={'p4':-90,'p1':30,'p2':30,'p3':30},(st,m))
     await B.click('#sgTab'); await B.wait_for_selector('#sgEdit')
     txt=await B.evaluate("()=>document.body.innerText")
+    # the layer on a forfeited hammer (the owner, Nov 20): an eagle against birdies still triples; only a tie of the level shaves it
+    lay=await A.evaluate("""()=>{ const ids=['m','z','c','n','w']; const g={id:'g',course:Object.keys(pub.courses)[0],startHole:1,players:ids.map(i=>({id:i,name:i,ch:0,ph:0,set:'M'}))}; const P={groups:[g],courses:pub.courses,allow:{'*':100}};
+      const side=ham=>({game:'hammer',order:ids,stakes:{small:6,large:4},birdies:'gross',scoring:'gross',holes:{1:{mult:1,pick:'z',hammers:ham?[{by:'S',who:'n',resp:'decline'}]:[]}}});
+      const par=P.courses[g.course].par.M[0]; const run=(S,L,ham)=>{ const sc={}; ids.forEach(i=>sc[i]={1:['m','z'].includes(i)?par+S:par+L}); const x=sideLedger(P,g,sc,side(ham)).holes[0]; return [x.forfeit?'f':'p',x.bonus.txt||'x1',x.money.m,x.money.c]; };
+      return {eb:run(-2,-1,true), bb:run(-1,-1,true), ee:run(-2,-2,true), bp:run(-1,0,true), ep:run(-2,0,false), pb:run(0,-1,true)}; }""")
+    check('the layer on a forfeit: eagle v birdies ×3, birdie v birdies shaved, eagle v eagles shaved, birdie v pars ×2, decliners\' better ball no bonus',
+      lay=={'eb':['f','eagle ×3',18,-12],'bb':['f','x1',6,-4],'ee':['f','x1',6,-4],'bp':['f','birdie ×2',12,-8],'ep':['p','eagle ×3',18,-12],'pb':['f','x1',6,-4]},lay)
     check('hammer ledger: the hammer rule, ×4 hammer, the forfeit, the shaved birdie, eagle ×3',all(x in txt for x in ['Hammer','the hammer doubles the hole each time it is accepted','×4 hammer','declined, the wolf side forfeit','birdie ×2','eagle ×3','4 of 18 holes settled']),txt[:400])
     sd=fdb._rows('golf_side')[0]['data']; sc={'p1':{1:par1},'p2':{1:par1+1},'p3':{1:par1+1},'p4':{1:par1+1}}
     r=await hub.evaluate("""()=>{ const sd=%s; SIDE['ev1']={sig:'h',rows:[{group_id:'g1',data:sd}]}; golfScores['ev1']=%s; const d=document.createElement('div'); d.innerHTML=sideGamesCard(window.EV); return d.innerText; }"""%(json.dumps(sd),json.dumps(sc)))

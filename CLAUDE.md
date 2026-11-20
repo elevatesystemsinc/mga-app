@@ -550,9 +550,12 @@ Tournament = { id, name, season, days, startDate, field:[{id,memberId,team,paid,
     (`x.hammerOpen`) holds the hole's money; a declined one ends the hole (`x.forfeit = {by, to, at}`): the side that declined
     forfeits it to the hammering side at the bet before that hammer, the scores still decide the birdie layer, and *undo* takes the
     last hammer back. **Birdies double, eagles triple, and a layer is shaved** (`sideLevel` 0 / 1 / 2, `sideBonus(win, lose) →
-    {mult, txt}` = 1 + max(0, the winning ball's level − the losing side's best ball's level), used by every side game; the owner:
-    "if the other team runs in a birdie, but then we also run in a birdie, we shave the birdies double aspect"): a birdie against a
-    par ×2, an eagle ×3, an eagle against a birdie ×2, a birdie against a birdie nothing; in a robin match a hole counts 1 + that. **Banker** (Nov 7, `bankerOn` / `bankerHole`, `bankerStrip` / `renderBankerSetup` / `renderBankerLedger`):
+    {mult, txt}` = 1 + the winning ball's level unless the losing side's best ball is at that level or better, used by every side game;
+    the owner, Nov 7: "if the other team runs in a birdie, but then we also run in a birdie, we shave the birdies double aspect", and
+    Nov 20, on a hammer declined against an eagle: "that eagle triples even though everyone else birdies" — only a tie of the level
+    shaves): a birdie against a par ×2, an eagle ×3, **an eagle against a birdie ×3**, a birdie against a birdie nothing, an eagle
+    against an eagle nothing; in a robin match a hole counts 1 + that. On a forfeited hammer the layer rides on the hammering side's
+    ball the same way. **Banker** (Nov 7, `bankerOn` / `bankerHole`, `bankerStrip` / `renderBankerSetup` / `renderBankerLedger`):
     `side = {game:'banker', stakes:{min,max,step,start:{min,max}}, bank:'winner'|'order', order, holes:{[h]:{banker?, range:{min,max},
     rangeBy, bets:{[id]:amt}}}}` — one player banks the hole and plays each of the others one-on-one. **The banker names the range on
     every tee** (the owner, Nov 7: "the banker gets to set his range… I would have an allowable range of $1 to $100… $5 increments is
