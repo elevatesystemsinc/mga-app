@@ -173,7 +173,7 @@
 </footer>
 <script>
 /* Demo requests: until a form backend exists, the request opens the visitor's mail client addressed to DEMO_TO. */
-const DEMO_TO='hello@flagstickhub.com';
+const DEMO_TO='info@flagstickhub.com';
 document.getElementById('demoForm').addEventListener('submit',function(e){ e.preventDefault();
   const v=id=>document.getElementById(id).value.trim();
   const body=['Name: '+v('dName'),'Role: '+v('dRole'),'Club: '+v('dClub'),'E-mail: '+v('dEmail'),'','Please book me a Flagstick demo.'].join('\n');
