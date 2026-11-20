@@ -495,7 +495,11 @@ Tournament = { id, name, season, days, startDate, field:[{id,memberId,team,paid,
     Groups · Leaderboard), `syncGameEvent` leaves `flight` empty, and the boards / GameCast only speak of flights when
     an event carries them (tournament rounds, Golf events).
   - **Groups & handicaps** (`gameGroupsCard`/`wireGameGroups` on the game page): per group the course, starting hole
-    and tee time; per player an index for the day (`p.index` on the event player, blank = the directory index), the
+    and tee time (**typed**, `parseTeeTime`: "8:30", "830", "8:30a", "1:10 pm", "13:10"; no am/pm and 1–6 reads as the afternoon;
+    read when the box is left or on Enter — the native time box re-rendered on the first keystroke and lost the cursor; every
+    control in the card carries an id so a background render keeps the cursor); **players drag between groups** (`wireGroupDrag`,
+    pointer events: the mouse drags the name, a finger drags the ⋮⋮ handle so the list still scrolls; the target group's rows light
+    up `.dropto`; the Group column still works); per player an index for the day (`p.index` on the event player, blank = the directory index), the
     tee, and CH / PH from `playerHcp`; a Group select moves a player (or starts a new group). **All of it works
     mid-round**: every change goes through `golfSave` (persist + `publishEvent`), and the scoring page re-reads the
     event every 30 s and on returning to the foreground (`loadEvent`/`refresh` in score_src.html — it used to load the
@@ -585,7 +589,17 @@ Tournament = { id, name, season, days, startDate, field:[{id,memberId,team,paid,
     groups on **page 2**, always fitted to that one page (2 columns, then 3, rows shrinking to 9.2pt) as cards (number,
     code, tee time, each player's strokes / scratch / gives n / no index; an empty group reads "Open — tee time held for
     extras"). `sheetImage(g,pageNo)` renders a page to PNG through pdf.js (cdnjs, `loadPdfJs`) — the game page's
-    "Rules image" / "Groups image" buttons, for BAND.
+    "Rules image" / "Groups image" buttons, for BAND. **The live scoring ID is the loudest thing on the sheet** (the owner, Nov 20:
+    "the live scoring ID needs to be more prominent… these images get posted on BAND, so they need to be very viewable"): page 1 carries
+    a **LIVE SCORING** block under the band — the link in bold, a QR of it, and every group's ID as a large chip (Cormorant 24, with
+    the group number, tee time and first names; more than eight groups → "the IDs are on the groups sheet"); page 2 repeats the link
+    with a QR and each group card leads with its ID at 22pt; the images are rendered at scale 3 and `cropBlank` cuts the page's empty
+    foot off so the content fills a phone screen. **A QR sheet per group** (`gameSheetPDF(g,{group})` / `{groups:[…]}`; the owner:
+    "each group's printable QR… lives on the rule sheet… hand it to whoever's going to do the scoring and they can just scan it"): one
+    page per group — the band, then that group's own block (a 132pt QR of `groupLink(ev,grp)`, which opens the scoring page already
+    joined to the group, the ID at 46pt, the tee time, the players, the link as text), then the game and house rules; the game page's
+    Live scoring card has **QR sheet** on every group and **QR sheets** for all of them. **Copy link & IDs**
+    (`groupIdsText`, on the game page) copies the link and every group's ID with its players as text for the chat.
 - Arrays of objects carry stable `id`s — the merge (§3) matches by id. Keep it that way for anything new.
 - `_rev` (revision), `_w` (writer/client id), `_at` are bookkeeping, excluded from comparisons.
 - **Device-local, never in the shared doc:** cashier/check-in link status (`SHARE_ST`, `CKI_ST`), the cashier-link merge base (`localStorage mga_cbase_<tid>`), check-in base (`mga_ckibase_<tid>`).
