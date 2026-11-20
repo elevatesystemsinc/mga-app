@@ -77,6 +77,19 @@ own hub. An organization's **Members** page is the club members who belong to it
 the organization's own list (club members are matched and joined; new people are added to the directory too), and keep
 status, join date, notes and dues per organization. Editing a person's details anywhere updates the directory.
 
+## Companies: sponsors, vendors, partners and their people
+
+**Companies** sits right after the directory on the club hub, a nonprofit's hub and every association's hub — one list for the whole club.
+A company has its details, a dated log of notes (calls, meetings, who said what) and its **people**: anyone on the directory can carry a
+company, a **title** and **contact types** (decision maker, golfer, billing, marketing, assistant, owner, volunteer, sponsor contact — tick
+all that apply) from the person editor, the company record or a spreadsheet import with Company and Title columns. When you add a sponsor to
+a tournament or a fundraising event, the Company box searches the list as you type (a new name becomes a company on Save) and the Contact
+box suggests that company's people; the contact you name lands on the directory as the company's sponsor contact. The company record then
+shows **every sponsorship** the company has bought, across every tournament and event the hub can see — the level, what was pledged, what
+has come in and whether it is paid — with this year's level and status as a chip at the top. Sponsors entered before Companies existed match
+by name; one tap on *Link them* makes each a company. The Companies page filters to this year's sponsors, past sponsors and companies not
+yet sponsoring, and searches by company, city or a person's name.
+
 ## Live scoring, always
 
 Every tournament round and every small-group game has an open scoring event the moment it exists — nothing to switch
