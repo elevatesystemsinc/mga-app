@@ -127,18 +127,15 @@ format's team score and handicap math, with worked examples.
 
 ## Small groups
 
-**Setting up a game from a phone.** New game is three steps. *Who's playing*: tap the names — the group's members,
-anyone who has played before, anyone else at the club through the search box, guests by name; last time's players
-come already ticked. *What are we playing*: **Same as last time**, one of the group's other past games, or build it
-from the starters in plain words (skins, stroke play, blind-draw partners, quota, team Nassau, dots — tap all that
-apply); the day's name, date, course and tee sit in one line behind Change. *Share*: the scoring link with Send and
-Copy, a QR code, the groups with their IDs, the sheet images. Everything else — the payout split, handicaps, pops on
-par 3s, house rules, who is in which competition — has a sensible default and lives behind **More options**, which
-opens the full designer with the same game in it. **Same as last time** on the Games page creates today's game in one
-tap.
+**Setting up a game.** New game opens the designer with the last game's day already filled in (name, course, tee, tee
+time, house rules) and its competitions as a starting point, and nobody in it. *Who's in*: type a name — the search looks
+across the whole club directory, the group's own members first — and tap to add; guests by name. Change, add or remove
+competitions, set the entries and the payout split, tick who is in which pot, save. The game page then carries the
+scoring link with Copy, the leaderboard screen and GameCast, the groups with their IDs, and the sheet images for the
+group chat.
 
 **Just a cart game.** Five of you, nothing in the pots, playing banker (or wolf, hammer, flip, a round robin) in the cart:
-in *What are we playing* tap **Just a cart game**. The game has no competitions, up to five play as one group under one
+save the game with no competitions and it is a cart game. It has no competitions, up to five play as one group under one
 Group ID, and the phones do the rest — the first one to join is asked "Playing a game in your cart?", picks the game, who
 they are, the stakes and the order, and every other phone in the cart picks it up. The money settles hole by hole on the
 phones and shows on the game page under *Side games in the carts*; there is nothing to pay out from the hub and no Finish
