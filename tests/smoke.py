@@ -362,6 +362,17 @@ async def main():
       const shown=q(`[data-gidx="${gp('gp_p0')}"]`).value; return {before, after, idx:p0.index, ch1:h1.ch, ph1:h1.ph, tee:p0.tee, ch2:h2.ch, shown}; }""")
     ok=ok and r5['before']==[4,2] and r5['after']==[5,1] and r5['idx']=='10.0' and r5['ch1'] is not None and r5['ph1'] is not None and r5['tee']=='Gold' and r5['ch2']>r5['ch1'] and r5['shown']=='10.0'
     print('groups & handicaps', r5, 'OK' if r5['after']==[5,1] and r5['tee']=='Gold' and r5['ch2']>r5['ch1'] else 'FAIL')
+    # drag a name onto another group (the mouse drags the name; a finger drags the ⋮⋮ handle); a tee time is typed, in any of the usual forms
+    r6=await pg.evaluate("""()=>{ const g=GAME(), ev=gameEvent(g); view.gameId=g.id; go('games'); const p=ev.groups[0].players[0]; const el=document.querySelector(`[data-drag="${p.id}"].gname`); el.scrollIntoView({block:'center'}); const a=el.getBoundingClientRect(); const to=document.querySelector(`.tr.ghd[data-ggrp="${ev.groups[1].id}"]`); const t=to.getBoundingClientRect();
+      return {pid:p.id, before:ev.groups.map(x=>x.players.length), from:[a.x+40,a.y+a.height/2], to:[t.x+60,t.y+t.height/2], inView:t.y>60&&t.y<innerHeight-20}; }""")
+    await pg.mouse.move(*r6['from']); await pg.mouse.down(); await pg.mouse.move(r6['from'][0]+10,r6['from'][1]+10,steps=3); await pg.mouse.move(*r6['to'],steps=3); await pg.wait_for_timeout(50)
+    hl=await pg.evaluate("()=>document.querySelectorAll('.tr.dropto').length"); await pg.mouse.up(); await pg.wait_for_timeout(200)
+    r7=await pg.evaluate("""([pid])=>{ const g=GAME(), ev=gameEvent(g); const after=ev.groups.map(x=>x.players.length), landed=ev.groups[1].players.some(p=>p.id===pid);
+      const i=document.querySelector(`[data-gtime="${ev.groups[1].id}"]`); i.value='1:10p'; i.dispatchEvent(new Event('change')); const t=ev.groups[1].teeTime, shown=document.querySelector(`[data-gtime="${ev.groups[1].id}"]`).value;
+      const back=ev.groups[1].players.find(p=>p.id===pid); if(back){ ev.groups[1].players=ev.groups[1].players.filter(p=>p!==back); ev.groups[0].players.unshift(back); } ev.groups[1].teeTime=''; golfSave(ev); render();   // the later checks count on the groups as they were
+      return {after, landed, t, shown, parse:[parseTeeTime('830'),parseTeeTime('8:30'),parseTeeTime('12:05'),parseTeeTime('7'),parseTeeTime('2'),parseTeeTime('13:10'),parseTeeTime('12 am'),parseTeeTime('x')]}; }""",[r6['pid']])
+    ok6=r6['inView'] and hl>0 and r7['landed'] and r7['after']==[r6['before'][0]-1,r6['before'][1]+1] and r7['t']=='13:10' and r7['shown']=='1:10 PM' and r7['parse']==['08:30','08:30','12:05','07:00','14:00','13:10','00:00',None]
+    ok=ok and ok6; print('drag a player to another group; typed tee time', r6['before'], hl, r7, 'OK' if ok6 else 'FAIL')
     # a challenge added mid-round: group v group reverse-waltz Nassau, teams = the groups, stakes 5/5/10, settled by segment
     r6=await pg.evaluate("""()=>{ const g=GAME(), ev=gameEvent(g); const pot=newPot('waltz321',g,{entry:20}); pot.rules.teamSize=3; g.pots.push(pot); const gp=id=>g.players.find(p=>p.id===id).gpid;
       // 3 v 3: Ann, Bo, Cy (group 1) against Di, Ed, Gus (groups 1/2) — teams by hand here, as the drawer's "Teams = the groups" would do by group
