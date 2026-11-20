@@ -538,6 +538,7 @@ class FakeDB:
             self._rows('acct_items').append(it); return it['id']
         def member():
             me=next((u for u in self.auth_users if u['id']==self.me),None); em=(me or {}).get('email','').lower(); club=self.get('mga_hub','club',tn) or {}
+            if b.get('as') and staff: return next((x for x in club.get('members',[]) if x.get('id')==b['as']),None)
             return next((x for x in club.get('members',[]) if str(x.get('email','')).lower()==em),None) if em else None
         def user_row(mid):
             rows=self._rows('member_users'); u=next((r for r in rows if r['tenant']==tn and r['member_id']==mid),None)

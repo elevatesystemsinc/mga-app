@@ -968,8 +968,9 @@ read one place); `setup` = wallet_add + autopay_on. **Statements** show each mon
 Open · Past due — `paidAfter(s)`: payments and credits posted after the period end against the closing) and a *Pay* button for the open
 amount. `member_portal_doc(tenant, member, club)` builds the document for `member_me()` (now with `wallet`, `autopay_method`, `dueDays`,
 `online` from `pay_online()`) and for **`member_me_as(tenant, member)`** — staff only — behind **View portal as member** on the account page
-(`member.html?as=<id>`, the hub's session carries over on the same origin): `ME.staffView` puts a *Staff view* banner up, drops every
-pay / wallet / autopay control and turns Sign out into Close. **Every member gets a login**: Member accounts → *Invite N to the portal*
+(`member.html?as=<id>`, the hub's session carries over on the same origin): `ME.staffView` puts a *Staff view* banner up and turns Sign out into Close; **every control stays live** (the owner: "I don't want the staff view
+to gate saving payment information or making a payment") — the portal sends `as` with each call and the function resolves the member through
+`member_me_as` when the caller is staff, so the payment, card or autopay change lands on that member. **Every member gets a login**: Member accounts → *Invite N to the portal*
 (`invitePortal`: every active member with an e-mail who has never signed in gets the portal link through `sendMail`; signing in is the
 one-time e-mail link, no password); the account page's chip reads *Portal · signed in / never signed in / No e-mail — no portal* and lists
 the wallet. The fake emulates the wallet actions and `member_me_as`; `tests/test_payments.py` covers the wallet, the staff view and the invitations.

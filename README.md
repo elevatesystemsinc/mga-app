@@ -265,7 +265,7 @@ hub under **Member accounts** (staff logins only, once the billing module is on)
   statement's balance is paid from the default. Each month's statement shows its closing balance, due date and whether it is paid.
   **Every member gets a login**: Member accounts → *Invite to the portal* e-mails the link to everyone with an e-mail who has not signed
   in yet (sign-in is a one-time e-mail link, no password). Staff open **View portal as member** from a member's account page to see the
-  portal exactly as that member sees it, read-only.
+  portal exactly as that member sees it, and can pay, save a card or set autopay on the member's behalf from there.
 
 ## Point of sale
 
