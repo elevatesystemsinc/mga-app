@@ -945,9 +945,16 @@ in `pos_src.html`) is the one modal with the hosted form → the token → `sale
 (`member_src.html`): `pay_online` after `member_me` sets `ME.online`; the pay sheet asks the amount and *save this card*, then shows the form;
 *Set up autopay* shows it with no amount. **The webhook** verifies `x-dpp-signature` (HMAC-SHA256 hex of the raw body with the club's secret),
 marks the sale's status, logs sales made outside Flagstick (`ref 'external'`), posts a refund made from the Deluxe portal, and **voids the
-account payment when the bank returns an ACH** (autopay off for that member); a *Merchant Loaded* payload is kept on the account row. The DPP
-paths and the reading of a response sit in `DPP` / `readSale` at the top of the function — the sandbox has not been exercised yet (no credentials
-on Nov 20), so a difference is a one-line fix there. The fake (`_payments` in `_harness.py`) answers as the sandbox would (a token ending 0005
+account payment when the bank returns an ACH** (autopay off for that member); a *Merchant Loaded* payload is kept on the account row. **Verified against the
+sandbox the same night with Bushwood's credentials** (the shapes are in the function's header comment): `amount` is an object, a token rides as
+`paymentMethod.token {token, expiry 'MM/YY'}`, a vaulted card as `paymentMethod.vault {paymentMethodId, customerId (a number)}`,
+`paymentType` is 'Credit' | 'Debit', `customData` is an array of {name, value}; a sale answers `responseCode` 0 = approved (10 = error, with
+`responseMessage` as a list), `paymentId`, `customerId`, `paymentMethodId`; a refund the same day is refused ("not settled") so the function
+voids the whole payment through `/payments/cancel` instead and logs it as kind `void`; the hosted form renders with the **Partner Token** as
+`xtoken` (the function falls back to it when no HPF token is saved) and answers `{type:'Token', status:'success', data:{token, expDate,
+cardType, maskedPan, nameOnCard}}` — the browsers send that object on whole (`hpfToken`), the function reads it with `tokenOf`. Still
+unseen: an approved sale and ACH's `paymentType` — the sandbox merchant TMG set up is a fleet merchant ("Merchant not enabled for Credit"; the
+vault form shows odometer and driver's ID), so ask Deluxe to enable Credit and ACH on it. The fake (`_payments` in `_harness.py`) answers as the sandbox would (a token ending 0005
 or `tok_decline` is declined) and `HPF_STUB` stands in for the hosted form (`.hpf-stub`, `#hpfGo`). docs/tenancy.md §8 has the per-client steps.
 
 ### Point of sale (`pos.js`, `pos-setup.sql`, module `pos`) and Bookings (`bookings.js`, `booking-setup.sql`, module `club`)

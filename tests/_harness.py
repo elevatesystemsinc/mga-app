@@ -534,6 +534,7 @@ class FakeDB:
             return u
         def balance(mid): return round(sum((float(i['amount']) if i['kind']=='charge' else -float(i['amount'])) for i in self._rows('acct_items') if i.get('tenant','wccc')==tn and i['member_id']==mid and not i.get('void_at')),2)
         def sale(token=None,method_id=None,amount=0,descr='',ref='',mid='',save=False):
+            if isinstance(token,dict): token=token.get('token')
             amount=round(float(amount or 0),2)
             if amount<1: raise ValueError('The minimum online payment is $1.00')
             if not token and not method_id: raise ValueError('No card to charge')
@@ -561,7 +562,7 @@ class FakeDB:
             if act in ('pay','setup'):
                 m=member()
                 if not m: return er('Your e-mail is not on the club\'s directory')
-                u=user_row(m['id']); token=str(b.get('token') or '')
+                u=user_row(m['id']); token=b.get('token'); token=(token.get('token') if isinstance(token,dict) else token) or ''
                 if not token: return er('The card was not tokenized')
                 if act=='setup':
                     u.update({'autopay':True,'pay_provider':'deluxe','pay_customer':u.get('pay_customer') or 'cus_'+m['id'],'pay_method':'pm_'+token,'pm_label':'Visa ·4242'}); log(kind='vault',payment_id='pm_'+token,amount=0,status='stored',method='card',label='Visa ·4242',member_id=m['id'],ref='autopay',descr='Card kept for autopay',response={})
@@ -677,7 +678,7 @@ class FakeDB:
 
 HPF_STUB='''window.HostedForm={init:(o,cb)=>Promise.resolve({renderHpf(){ const d=document.getElementById(o.containerId); if(!d) return; d.innerHTML='<div class="hpf-stub" data-xrtype="'+o.xrtype+'" data-amount="'+(o.xAmount||0)+'"><input id="hpfCard" placeholder="Card number" value="4242424242424242"><button type="button" id="hpfGo">'+(o.xbtntext||'Generate')+'</button></div>';
   d.querySelector('#hpfGo').onclick=()=>{ const n=d.querySelector('#hpfCard').value.replace(/\\s/g,''); if(n.length<12) return cb.onInvalid({type:'Token',success:false,errors:['Card number is not valid'],data:null}); if(n.endsWith('0002')) return cb.onFailure({type:'Token',success:false,errors:['Do not honor'],data:null});
-    cb.onSuccess(o.xrtype==='Create Vault'?{type:'Vault',success:true,errors:[],data:{customerId:'cus_stub',vaultId:'v_stub'}}:{type:'Token',success:true,errors:[],data:{token:(n.endsWith('0005')?'tok_decline':'tok_'+n.slice(-4)+'_'+Date.now())}}); }; }, destroy(){ const d=document.getElementById(o.containerId); if(d) d.innerHTML=''; }})};'''
+    cb.onSuccess(o.xrtype==='Create Vault'?{type:'Vault',status:'success',data:{customerId:'cus_stub',vaultId:'v_stub'}}:{type:'Token',status:'success',data:{token:(n.endsWith('0005')?'tok_decline':'tok_'+n.slice(-4)+'_'+Date.now()),nameOnCard:'CardHolder',expDate:'12/30',maskedPan:n.slice(0,6)+'******'+n.slice(-4),cardType:'Visa'}}); }; }, destroy(){ const d=document.getElementById(o.containerId); if(d) d.innerHTML=''; }})};'''
 async def cloud(ctx,fdb,no_session=False):
     """a browser context whose pages talk to `fdb` as if it were Supabase (signed in as the board unless no_session)"""
     await ctx.expose_binding('__fdb',fdb.handle)
