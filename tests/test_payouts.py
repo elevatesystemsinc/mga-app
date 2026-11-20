@@ -54,5 +54,17 @@ async def main():
     await pg.screenshot(path=os.devnull+'.png' if False else '/tmp/'+'po.png',full_page=True)
     async with pg.expect_download() as dl: await pg.click('#ccExp')
     await (await dl.value).save_as('/tmp/po_test.xlsx'); print('export saved')
+    # payout exports: spreadsheet, payouts PDF (with money), winners PDF (no money anywhere)
+    import zipfile,subprocess,re
+    OUT=os.environ.get('PO_OUT','/tmp')
+    async with pg.expect_download() as dl: await pg.click('#poXlsx')
+    await (await dl.value).save_as(OUT+'/po_payouts.xlsx'); z=zipfile.ZipFile(OUT+'/po_payouts.xlsx'); wbx=z.read('xl/workbook.xml').decode()
+    print('payout xlsx sheets:',re.findall(r'name="([^"]+)"',wbx))
+    for bid,name in [('#poPdf','po_payouts.pdf'),('#poPdfNames','po_winners.pdf')]:
+        async with pg.expect_download() as dl: await pg.click(bid)
+        await (await dl.value).save_as(OUT+'/'+name)
+    txt=lambda f:subprocess.run(['pdftotext','-layout',OUT+'/'+f,'-'],capture_output=True,text=True).stdout
+    pay,win=txt('po_payouts.pdf'),txt('po_winners.pdf'); first=(P['people'][0][0] if isinstance(P['people'][0],list) else P['people'][0]['name'])
+    print('payouts pdf: has money',('$' in pay),'| names',first in pay,'| winners pdf: no money',('$' not in win),'| names',first in win,'| cashier line','see the cashier' in win.lower())
     print('errors',errs); await b.close()
 asyncio.run(main())

@@ -39,9 +39,15 @@ function budgetLines(y){
     if(n0(t.skinsFee)) out.push({g,v:`${t.id}|skinsPaid|`,l:'Skins / day money paid out',dir:'out'});
     t.lines.forEach(l=>out.push({g,v:`${t.id}|line|${l.id}`,l:(l.group?l.group+': ':'')+l.desc,dir:'out'}));
   }
-  (db.seasons[y].lines||[]).forEach(l=>out.push({g:'MGA-level',v:`|${l.type==='Income'?'mgaInc':'mgaExp'}|${l.id}`,l:l.desc,dir:l.type==='Income'?'in':'out'}));
+  for(const e of yearEvents(y)){ const g=e.name+(e.date?' ('+shortD(e.date)+')':''), t=fundTournament(e);
+    FUND_STREAMS.filter(([k])=>k!=='golf'&&(k!=='sponsors'||!t)).forEach(([k,l])=>out.push({g,v:`fund:${e.id}|fstream|${k}`,l,dir:'in'}));
+    e.expenses.forEach(x=>out.push({g,v:`fund:${e.id}|fexp|${x.id}`,l:x.name,dir:'out'})); }
+  (db.seasons[y].lines||[]).forEach(l=>out.push({g:orgLevel()+'-level',v:`|${l.type==='Income'?'mgaInc':'mgaExp'}|${l.id}`,l:l.desc,dir:l.type==='Income'?'in':'out'}));
   return out;
 }
+/* "Organization" on the club tier (a club, a nonprofit), the short name on an association or a group — the label on the lines that
+   belong to no tournament or event */
+const orgLevel=()=>isClub()?'Organization':orgShort();
 function linkLabel(y,L){
   if(!L||!L.k) return 'Uncategorized';
   const hit=budgetLines(y).find(o=>o.v===`${L.t||''}|${L.k}|${L.id||''}`);
@@ -55,7 +61,11 @@ function bookEntries(y){
   for(const t of seasonTournaments(y)) for(const sp of t.sponsors) for(const p of sp.payments||[])
     out.push({key:'sp:'+p.id,src:'sponsor',ref:{t,sp,p},date:isoDate(p.date,y),amount:n0(p.amount),dir:'in',desc:sp.company,payee:'',method:p.method||'',checkNo:p.checkNo||'',line:`${t.name} · Sponsors`});
   for(const p of s.duesPayments){ const m=memberById(p.memberId);
-    out.push({key:'du:'+p.id,src:'dues',ref:{p,m},date:isoDate(p.date,y),amount:n0(p.amount),dir:'in',desc:(m?memberName(m):'Member')+' — dues',payee:'',method:p.method||'',checkNo:'',line:'MGA · Dues'}); }
+    out.push({key:'du:'+p.id,src:'dues',ref:{p,m},date:isoDate(p.date,y),amount:n0(p.amount),dir:'in',desc:(m?memberName(m):'Member')+' — dues',payee:'',method:p.method||'',checkNo:'',line:orgShort()+' · Dues'}); }
+  // a fundraising event's money: what checkout took by paddle, and what its own sponsors paid (a linked tournament's sponsors are above)
+  for(const e of yearEvents(y)){
+    for(const p of e.payments) out.push({key:'fp:'+p.id,src:'fund',ref:{e,p},date:String(p.at||'').slice(0,10),amount:n0(p.amount),dir:'in',desc:`${paddleName(e,p.paddle)} — ${e.name}`,payee:'',method:p.method||'',checkNo:p.ref||'',line:`${e.name} · Checkout`});
+    for(const sp of e.sponsors) for(const p of sp.payments||[]) out.push({key:'fs:'+p.id,src:'fundsp',ref:{e,sp,p},date:isoDate(p.date,y),amount:n0(p.amount),dir:'in',desc:sp.name,payee:'',method:p.method||'',checkNo:p.checkNo||'',line:`${e.name} · Sponsors`}); }
   return out;
 }
 function matchedKeys(y){ const set=new Map(); for(const b of db.seasons[y].bank) if(b.status==='matched') for(const k of b.matched||[]) set.set(k,b); return set; }
@@ -68,7 +78,7 @@ function editTxn(x,prefill,onSaved){
   const optHTML=d=>{ const groups=[...new Set(lines.map(o=>o.g))];
     return `<option value="">Uncategorized</option>`+groups.map(g=>`<optgroup label="${esc(g)}">${lines.filter(o=>o.g===g&&(o.dir===d||o.v===curLink)).map(o=>`<option value="${esc(o.v)}"${o.v===curLink?' selected':''}>${esc(o.l)}</option>`).join('')}</optgroup>`).join(''); };
   const bankMatch=x&&matchedKeys(y).get('tx:'+x.id);
-  openDrawer({kicker:y+' season · Treasury',title:x?(x.dir==='in'?'Edit income':'Edit expense'):(dir==='in'?'Record income':'Record expense'),
+  openDrawer({kicker:y+(isClub()?'':' season')+' · Treasury',title:x?(x.dir==='in'?'Edit income':'Edit expense'):(dir==='in'?'Record income':'Record expense'),
     body:`<div class="fld"><span class="lbl">Type</span>${seg('xDir',[['out','Money out'],['in','Money in']],dir)}</div>`+
       pair(field('Date','xDate',cur.date||todayISO(),{type:'date'}),field('Amount $','xAmt',cur.amount??'',{type:'number'}))+
       field(dir==='in'?'Received from':'Paid to','xPayee',cur.payee||'',{ph:dir==='in'?'e.g. WCCC, Calcutta':'e.g. WCCC, Backroads band'})+
@@ -90,7 +100,7 @@ function editTxn(x,prefill,onSaved){
 /* ---------- Treasury page ---------- */
 function vTreasury(m){
   const tabs=[['ledger','Ledger'],['bva','Budget vs actual'],['rec','Reconcile']];
-  m.innerHTML=head('Treasury',`Every dollar in and out for the ${Y()} season, checked against the bank.`,btn('Record income','xIn','',I.plus)+btn('Record expense','xOut','pri',I.plus))+
+  m.innerHTML=head('Treasury',`Every dollar in and out for ${isClub()?Y():'the '+Y()+' season'}, checked against the bank.`,(isClub()?yearBar(false):'')+btn('Record income','xIn','',I.plus)+btn('Record expense','xOut','pri',I.plus))+
     `<div class="tabs">${tabs.map(([k,l])=>`<button class="tab${view.xtab===k?' on':''}" data-x="${k}">${l}</button>`).join('')}</div><div id="xbody" style="display:flex;flex-direction:column;gap:20px"></div>`;
   m.querySelectorAll('[data-x]').forEach(b=>b.onclick=()=>{ view.xtab=b.dataset.x; render(); });
   $('xIn').onclick=()=>editTxn(null,{dir:'in'}); $('xOut').onclick=()=>editTxn(null,{dir:'out'});
@@ -113,7 +123,7 @@ function xLedger(el){
     <div class="seg">${['All','Money in','Money out','Not cleared','Uncategorized'].map(x=>`<button class="${f===x?'on':''}" data-lf="${x}">${x}</button>`).join('')}</div>
     <button class="btn sm" id="lCsv" style="margin-left:auto">${I.down}Export CSV</button></div>
   <div class="card" style="overflow:hidden">${list.length?`<div class="tw"><div class="t" style="min-width:860px"><div class="tr th" style="${cols}"><span>Date</span><span>Description</span><span>Budget line</span><span>Method</span><span class="r">Amount</span><span>Bank</span></div>
-    ${list.map(e=>`<div class="tr num click" data-le="${e.key}" style="${cols}"><span class="muted">${shortD(e.date)}</span><div class="cell2"><b class="trunc">${esc(e.payee||e.desc)}</b><small class="trunc">${esc(e.payee&&e.desc!==e.payee?e.desc:'')}${e.src!=='ledger'?(e.payee?' · ':'')+(e.src==='sponsor'?'Sponsor payment':'Dues payment'):''}</small></div><span class="trunc ${e.line==='Uncategorized'?'neg':'muted'}">${esc(e.line)}</span><span class="muted trunc">${esc(e.method)}${e.checkNo?' #'+esc(e.checkNo):''}</span><b class="r ${e.dir==='in'?'pos':''}">${e.dir==='in'?'+':'−'}${fmt2(e.amount).replace('$','$')}</b><span>${mk.has(e.key)?'<span class="chip ok">Cleared</span>':'<span class="chip">Open</span>'}</span></div>`).join('')}</div></div>`
+    ${list.map(e=>`<div class="tr num click" data-le="${e.key}" style="${cols}"><span class="muted">${shortD(e.date)}</span><div class="cell2"><b class="trunc">${esc(e.payee||e.desc)}</b><small class="trunc">${esc(e.payee&&e.desc!==e.payee?e.desc:'')}${e.src!=='ledger'?(e.payee?' · ':'')+(BOOK_SRC[e.src]||''):''}</small></div><span class="trunc ${e.line==='Uncategorized'?'neg':'muted'}">${esc(e.line)}</span><span class="muted trunc">${esc(e.method)}${e.checkNo?' #'+esc(e.checkNo):''}</span><b class="r ${e.dir==='in'?'pos':''}">${e.dir==='in'?'+':'−'}${fmt2(e.amount).replace('$','$')}</b><span>${mk.has(e.key)?'<span class="chip ok">Cleared</span>':'<span class="chip">Open</span>'}</span></div>`).join('')}</div></div>`
     :`<div class="empty"><b>${all.length?'Nothing matches':'No money recorded yet'}</b><span>${all.length?'Try another filter.':'Record expenses and income here, or from any line on Budget vs actual. Sponsor payments and dues show up automatically.'}</span></div>`}</div>`;
   const qi=$('lq'); qi.oninput=()=>{ view.lq=qi.value; const p=qi.selectionStart; render(); const n=$('lq'); n.focus(); n.setSelectionRange(p,p); };
   el.querySelectorAll('[data-lf]').forEach(b=>b.onclick=()=>{ view.lfilter=b.dataset.lf; render(); });
@@ -121,42 +131,76 @@ function xLedger(el){
   $('lCsv').onclick=()=>{ const rows=[['Date','Direction','Amount','Payee','Description','Budget line','Method','Check #','Source','Cleared bank','Bank date','Bank description']];
     all.sort((a,b)=>(a.date||'').localeCompare(b.date||'')).forEach(e=>{ const b=mk.get(e.key); rows.push([e.date,e.dir==='in'?'In':'Out',(e.dir==='in'?1:-1)*e.amount,e.payee,e.desc,e.line,e.method,e.checkNo,e.src,b?'Yes':'No',b?b.date:'',b?b.desc:'']); });
     const csv=rows.map(r=>r.map(v=>{v=String(v??'');return /[",\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v;}).join(',')).join('\r\n');
-    dl(csv,'text/csv',`mga_ledger_${y}.csv`); toast('Ledger exported'); };
+    dl(csv,'text/csv',`${slugify(orgShort())}-ledger-${y}.csv`); toast('Ledger exported'); };
 }
 function openBook(e){
   if(e.src==='ledger') return editTxn(e.ref);
   if(e.src==='sponsor') return editSponsor(e.ref.t,e.ref.sp);
   if(e.src==='dues'&&e.ref.m) return editMember(e.ref.m);
+  if(e.src==='fund') return checkoutDrawer(e.ref.e,e.ref.p.paddle);
+  if(e.src==='fundsp') return sponsorDrawer(e.ref.e,e.ref.sp);
 }
+const BOOK_SRC={sponsor:'Sponsor payment',dues:'Dues payment',fund:'Checkout payment',fundsp:'Sponsor payment'};
 
-/* Budget vs actual — every line, every tournament; add money straight from a line */
-function xBva(el){
-  const y=Y(), sc=scalc(y), IX=ledgerIndex(y);
-  const cols='grid-template-columns:minmax(0,1.6fr) 110px 110px 110px 70px 40px';
-  const row=(name,sub,bud,act,isInc,v,count)=>{ const variance=isInc?act-bud:bud-act;
-    return `<div class="tr num" style="${cols}"><div class="cell2"><span class="trunc" style="font-weight:500">${esc(name)}</span>${sub?`<small class="trunc">${esc(sub)}</small>`:''}</div><span class="r">${fmt(bud)}</span><span class="r">${act?fmt(act):'—'}</span><b class="r ${act?(variance>=0?'pos':'neg'):'muted'}">${act?fmtS(variance):''}</b><span class="r muted" style="font-size:12px">${count?count+' entr'+(count===1?'y':'ies'):''}</span>${v?`<button class="ib" data-bx="${esc(v)}" data-bd="${isInc?'in':'out'}" aria-label="Record money for ${esc(name)}">${I.plus}</button>`:'<span></span>'}</div>`; };
-  const cnt=(tid,k,id)=>(IX[(tid||'')+'|'+k+'|'+(id||'')]||{}).n||0;
-  const card=(title,sub,net,netA,body)=>`<div class="card" style="overflow:hidden"><div class="cardhead"><div><h2 class="h2">${title}</h2><span class="muted">${sub}</span></div><div class="num" style="text-align:right"><div class="lbl">Budget net / actual net</div><b>${fmtS(net)}</b> <span class="muted">/</span> <b class="${netCls(netA)}">${fmtS(netA)}</b></div></div><div class="tw"><div class="t" style="min-width:720px"><div class="tr th" style="${cols}"><span>Line</span><span class="r">Budget</span><span class="r">Actual</span><span class="r">Variance</span><span></span><span></span></div>${body}</div></div></div>`;
-  const gh=t=>`<div class="gh"><b>${t}</b><span></span></div>`;
-  el.innerHTML=`<p class="hint" style="margin:0">Green variance is good (under budget on spending, over budget on income). Use <b>+</b> on any line to record money against it — the entry becomes that line’s actual.</p>`+
-  sc.ts.map(({t,c})=>{ const A=(k,id,m)=>actualOf(IX,t.id,k,id,m);
+/* Budget vs actual — every line of every program of the year (tournaments, fundraising events, the organization's own lines).
+   `budgetRows(y)` is the one source: the screen below, the branded PDF and the CSV all read it. A row: {name, sub, bud, act,
+   isInc, v (the link key a ledger entry can be recorded against, '' when the actual is computed), count (entries linked)}. */
+function budgetRows(y){
+  const sc=scalc(y), IX=ledgerIndex(y), cnt=(tid,k,id)=>(IX[(tid||'')+'|'+k+'|'+(id||'')]||{}).n||0, row=(name,sub,bud,act,isInc,v,count)=>({name,sub:sub||'',bud:n0(bud),act:n0(act),isInc,v:v||'',count:count||0});
+  const secs=sc.ts.map(({t,c})=>{ const A=(k,id,m)=>actualOf(IX,t.id,k,id,m);
     const inc=[row('Entry fees',`${c.players} × ${fmt(t.entryFee)}`,c.entryFees,A('entry','',t.actuals.entryFees),true,`${t.id}|entry|`,cnt(t.id,'entry'))]
       .concat(c.skins?[row('Skins / day money collected','',c.skins,A('skins','',t.actuals.skins),true,`${t.id}|skins|`,cnt(t.id,'skins'))]:[])
-      .concat([row('Sponsors',`${t.sponsors.length} sponsors · payments logged on the Sponsors tab`,c.pledged,c.received,true,'',0)])
+      .concat([row('Sponsors',`${t.sponsors.length} sponsor${t.sponsors.length===1?'':'s'} · payments logged on the Sponsors tab`,c.pledged,c.received,true,'',0)])
       .concat(t.income.map(i=>row(i.desc,i.source==='raffle'?'Season 50/50 raffle':'',i.budget,A('inc',i.id,i.actual),true,`${t.id}|inc|${i.id}`,cnt(t.id,'inc',i.id))));
     const exp=[0,1,2].slice(0,t.days).flatMap(di=>t.dayItems[di].map(it=>row(it.item,dayLabel(t,di).split(' · ')[0],itemTotal(t,it),A('item',it.id,it.actual),false,`${t.id}|item|${it.id}`,cnt(t.id,'item',it.id))))
       .concat(t.perPlayer.map(p=>row(p.desc,`${c.players} × ${fmt(p.perPlayer)}`,c.players*n0(p.perPlayer),A('pp',p.id,p.actual),false,`${t.id}|pp|${p.id}`,cnt(t.id,'pp',p.id))))
       .concat(c.skinsPayout?[row('Skins / day money paid out','',c.skinsPayout,A('skinsPaid','',t.actuals.skinsPaid),false,`${t.id}|skinsPaid|`,cnt(t.id,'skinsPaid'))]:[])
       .concat(t.lines.map(l=>row(l.desc,l.group||'',l.budget,A('line',l.id,l.actual),false,`${t.id}|line|${l.id}`,cnt(t.id,'line',l.id))));
-    return card(esc(t.name),`${dateRange(t)}${isPast(t)?' · complete — actuals count in the season projection':''}`,c.net,c.netA,gh('Income')+inc.join('')+gh('Expenses')+exp.join(''));
-  }).join('')+
-  card('MGA-level',`Dues and anything not tied to a tournament`,sc.duesBudget+sum(sc.s.lines,l=>(l.type==='Income'?1:-1)*n0(l.budget)),sc.duesActual+sum(sc.s.lines,l=>(l.type==='Income'?1:-1)*actualOf(IX,'',l.type==='Income'?'mgaInc':'mgaExp',l.id,l.actual)),
-    row('Annual dues',`${sc.active} active × ${fmt(sc.s.dues.amount)} · recorded on each member`,sc.duesBudget,sc.duesActual,true,'',0)+
-    sc.s.lines.map(l=>{ const k=l.type==='Income'?'mgaInc':'mgaExp'; return row(l.desc,l.type,l.budget,actualOf(IX,'',k,l.id,l.actual),l.type==='Income',`|${k}|${l.id}`,cnt('',k,l.id)); }).join('')+
-    `<div class="tr"><button class="btn sm" id="bvaMga">${I.plus}Add MGA-level line</button></div>`);
+    return {kind:'tournament',id:t.id,title:t.name,sub:`${dateRange(t)}${isPast(t)?' · played — actuals count in the projection':' · upcoming — the budget counts'}`,net:c.net,netA:c.netA,inc,exp}; });
+  for(const {e,P,S} of sc.es){ const t=fundTournament(e), fid='fund:'+e.id, A=(id,m)=>actualOf(IX,fid,'fexp',id,m);
+    const inc=FUND_STREAMS.filter(([k])=>k!=='golf'&&(k!=='sponsors'||!t)).map(([k,l])=>row(l,k==='sponsors'?`${e.sponsors.length} sponsor${e.sponsors.length===1?'':'s'} · pledged; payments on the Sponsors tab`:k==='tickets'?ticketBasis(e):'',n0((e.budget.streams||{})[k]),S[k],true,'',0));
+    const exp=e.expenses.map(x=>row(x.name,x.note||'',x.budget,A(x.id,x.actual),false,`${fid}|fexp|${x.id}`,cnt(fid,'fexp',x.id)));
+    secs.push({kind:'event',id:e.id,title:e.name,sub:`${e.date?dateTxt(e.date):'no date'} · fundraising event${t?` · its golf tournament, ${t.name}, is above`:''}${S.past?' · past — actuals count in the projection':' · upcoming — the plan counts'}`,net:P.net,netA:S.net,inc,exp}); }
+  const lines=sc.s.lines, orgInc=(isClub()?[]:[row('Annual dues',`${sc.active} active × ${fmt(sc.s.dues.amount)} · recorded on each member`,sc.duesBudget,sc.duesActual,true,'',0)])
+    .concat(lines.filter(l=>l.type==='Income').map(l=>row(l.desc,l.type,l.budget,actualOf(IX,'','mgaInc',l.id,l.actual),true,`|mgaInc|${l.id}`,cnt('','mgaInc',l.id))));
+  const orgExp=lines.filter(l=>l.type!=='Income').map(l=>row(l.desc,l.type,l.budget,actualOf(IX,'','mgaExp',l.id,l.actual),false,`|mgaExp|${l.id}`,cnt('','mgaExp',l.id)));
+  const netOf=(inc,exp,k)=>sum(inc,r=>r[k])-sum(exp,r=>r[k]);
+  secs.push({kind:'org',id:'',title:orgLevel()+'-level',sub:isClub()?'Anything not tied to a tournament or an event':'Dues and anything not tied to a tournament',net:netOf(orgInc,orgExp,'bud'),netA:netOf(orgInc,orgExp,'act'),inc:orgInc,exp:orgExp});
+  return {sc,secs}; }
+function xBva(el){
+  const y=Y(), {sc,secs}=budgetRows(y);
+  const cols='grid-template-columns:minmax(0,1.6fr) 110px 110px 110px 70px 40px';
+  const row=r=>{ const variance=r.isInc?r.act-r.bud:r.bud-r.act;
+    return `<div class="tr num" style="${cols}"><div class="cell2"><span class="trunc" style="font-weight:500">${esc(r.name)}</span>${r.sub?`<small class="trunc">${esc(r.sub)}</small>`:''}</div><span class="r">${fmt(r.bud)}</span><span class="r">${r.act?fmt(r.act):'—'}</span><b class="r ${r.act?(variance>=0?'pos':'neg'):'muted'}">${r.act?fmtS(variance):''}</b><span class="r muted" style="font-size:12px">${r.count?r.count+' entr'+(r.count===1?'y':'ies'):''}</span>${r.v?`<button class="ib" data-bx="${esc(r.v)}" data-bd="${r.isInc?'in':'out'}" aria-label="Record money for ${esc(r.name)}">${I.plus}</button>`:'<span></span>'}</div>`; };
+  const card=(sec,extra)=>`<div class="card" style="overflow:hidden"><div class="cardhead"><div><h2 class="h2">${esc(sec.title)}</h2><span class="muted">${esc(sec.sub)}</span></div><div class="num" style="text-align:right"><div class="lbl">Budget net / actual net</div><b>${fmtS(sec.net)}</b> <span class="muted">/</span> <b class="${netCls(sec.netA)}">${fmtS(sec.netA)}</b></div></div><div class="tw"><div class="t" style="min-width:720px"><div class="tr th" style="${cols}"><span>Line</span><span class="r">Budget</span><span class="r">Actual</span><span class="r">Variance</span><span></span><span></span></div>${gh('Income')}${sec.inc.map(row).join('')||'<div class="tr"><span class="muted">No income lines.</span></div>'}${gh('Expenses')}${sec.exp.map(row).join('')||'<div class="tr"><span class="muted">No expense lines.</span></div>'}${extra||''}</div></div></div>`;
+  const gh=t=>`<div class="gh"><b>${t}</b><span></span></div>`;
+  el.innerHTML=`<div class="grid g4">${kpi('Budgeted net',fmtS(sc.net),`${fmt(sc.revenue)} in · ${fmt(sc.expenses)} out`,netCls(sc.net))}${kpi('Actual net so far',fmtS(sc.netA),`${fmt(sc.revenueA)} in · ${fmt(sc.expensesA)} out`,netCls(sc.netA))}${kpi('Projected net',fmtS(sc.projected),`actuals for ${sc.past.length+sc.ePast.length} past, budget for ${sc.upcoming.length+sc.eUp.length} to come`,netCls(sc.projected))}${kpi('Sponsors',fmt(sc.received),`of ${fmt(sc.pledged)} pledged`)}</div>
+    <div class="toolbar"><p class="hint" style="margin:0;flex:1">Green variance is good (under budget on spending, over budget on income). Use <b>+</b> on any line to record money against it — the entry becomes that line’s actual.</p><button class="btn sm" id="bvaPdf">${I.down}Budget vs actual PDF</button><button class="btn sm" id="bvaCsv">CSV</button></div>`+
+    secs.map(sec=>card(sec,sec.kind==='org'?`<div class="tr"><button class="btn sm" id="bvaMga">${I.plus}Add ${esc(orgLevel())}-level line</button></div>`:'')).join('');
   el.querySelectorAll('[data-bx]').forEach(b=>b.onclick=()=>{ const [t,k,id]=b.dataset.bx.split('|'); editTxn(null,{dir:b.dataset.bd,link:{t,k,id}}); });
-  $('bvaMga').onclick=()=>editSeasonLine(null);
+  $('bvaMga').onclick=()=>editSeasonLine(null); $('bvaPdf').onclick=()=>budgetPDF(y); $('bvaCsv').onclick=()=>budgetCSV(y);
 }
+/* the year's budget against the actual, on letterhead: the summary, then every program with its lines and variance */
+async function budgetPDF(y,opt){ opt=opt||{}; try{ await loadJsPDF(); }catch(e){ toast(e.message); return null; } const {sc,secs}=budgetRows(y); const crest=await crestPNG().catch(()=>null), doc=new window.jspdf.jsPDF({unit:'pt',format:'letter'}); bcFonts(doc);
+  const NAVY=[15,42,56],GOLD=[199,161,58],GOLDL=[216,183,95],GOLDDK=[126,95,26],IVORY=[251,250,245],INK=[20,34,43],MUTED=[86,98,106],POS=[31,107,74],NEG=[181,68,58]; const L=40,R=572,W=612,H=792, font=(f,s,z,c)=>{ doc.setFont(f,s); doc.setFontSize(z); doc.setTextColor(...c); };
+  const title=`${isClub()?'Annual':'Season'} budget vs actual · ${y}`, sub=`${orgName()} · printed ${new Date().toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'})}`;
+  doc.setFillColor(...IVORY); doc.rect(0,0,W,H,'F'); doc.setFillColor(...GOLD); doc.roundedRect(L,32,R-L,82,8,8,'F'); doc.setFillColor(...NAVY); doc.roundedRect(L,32,R-L,78,8,8,'F'); doc.rect(L,98,R-L,8,'F'); const lw=drawCrest(doc,crest,L+16,42,54), TX=L+16+(lw||45)+15;
+  font('PublicSansXB','normal',6.8,GOLDL); doc.text(String(brandName()).toUpperCase(),TX,56,{charSpace:1.2}); font('Cormorant','bold',24,[255,255,255]); doc.text(title,TX,80); font('PublicSans','normal',8.4,[214,218,220]); doc.text(sub,TX,94);
+  let y0=136; const C=[L,R-300,R-200,R-100,R], page=()=>{ if(y0>H-64){ doc.addPage(); doc.setFillColor(...IVORY); doc.rect(0,0,W,H,'F'); y0=56; } };
+  const sec=t=>{ page(); font('PublicSansXB','normal',7.4,GOLDDK); doc.text(t.toUpperCase(),L,y0,{charSpace:1.1}); y0+=6; doc.setDrawColor(...GOLD); doc.setLineWidth(1); doc.line(L,y0,R,y0); y0+=14; };
+  const head4=()=>{ page(); font('PublicSansXB','normal',6.6,MUTED); doc.text('LINE',C[0],y0); doc.text('BUDGET',C[2],y0,{align:'right'}); doc.text('ACTUAL',C[3],y0,{align:'right'}); doc.text('VARIANCE',C[4],y0,{align:'right'}); y0+=11; };
+  const line4=(k,sub,b,a,v,bold,color)=>{ page(); font('PublicSans',bold?'bold':'normal',bold?9.6:9,INK); doc.text(doc.splitTextToSize(k,C[2]-C[0]-80)[0],C[0],y0); if(sub){ font('PublicSans','normal',7.2,MUTED); doc.text(doc.splitTextToSize(sub,120)[0],C[1]-40,y0); } font('PublicSans',bold?'bold':'normal',bold?9.6:9,INK); doc.text(b,C[2],y0,{align:'right'}); doc.text(a,C[3],y0,{align:'right'}); if(v!=null){ font('PublicSans','bold',9,color||INK); doc.text(v,C[4],y0,{align:'right'}); } y0+=13; };
+  sec('The year'); const kv=(k,v,b,c)=>{ page(); font('PublicSans',b?'bold':'normal',b?10.5:9.5,c||INK); doc.text(k,L,y0); doc.text(v,R,y0,{align:'right'}); y0+=14; };
+  kv('Budgeted revenue',fmt(sc.revenue)); kv('Budgeted expenses',fmt(sc.expenses)); kv('Budgeted net',fmtS(sc.net),true); kv('Actual revenue so far',fmt(sc.revenueA)); kv('Actual expenses so far',fmt(sc.expensesA)); kv('Actual net so far',fmtS(sc.netA),true,sc.netA<0?NEG:POS);
+  kv(`Projected net (actuals for ${sc.past.length+sc.ePast.length} past, budget for ${sc.upcoming.length+sc.eUp.length} to come)`,fmtS(sc.projected),true,sc.projected<0?NEG:POS); kv('Sponsors received of pledged',`${fmt(sc.received)} of ${fmt(sc.pledged)}`); y0+=8;
+  for(const S of secs){ sec(S.title+(S.sub?' — '+S.sub.split(' · ')[0]:'')); head4();
+    const put=(rows,label)=>{ if(!rows.length) return; font('PublicSansXB','normal',6.6,GOLDDK); page(); doc.text(label.toUpperCase(),C[0],y0,{charSpace:.8}); y0+=11; rows.forEach(r=>{ const v=r.isInc?r.act-r.bud:r.bud-r.act; line4(r.name,r.sub,fmt(r.bud),r.act?fmt(r.act):'—',r.act?fmtS(v):'',false,r.act?(v>=0?POS:NEG):INK); }); };
+    put(S.inc,'Income'); put(S.exp,'Expenses'); line4('Net',`budget / actual`,fmtS(S.net),fmtS(S.netA),fmtS(S.netA-S.net),true,S.netA-S.net>=0?POS:NEG); y0+=8; }
+  const n=doc.getNumberOfPages(); for(let i=1;i<=n;i++){ doc.setPage(i); font('PublicSans','normal',7,MUTED); doc.text(`${brandName()} · ${title} · page ${i} of ${n}`,W/2,H-28,{align:'center'}); }
+  const name=`budget-${y}.pdf`; if(opt.returnDoc) return doc; if(typeof deliverFile==='function') await deliverFile(doc.output('blob'),name,'Budget vs actual'); else doc.save(name); return doc; }
+function budgetCSV(y){ const {secs}=budgetRows(y), qq=v=>'"'+String(v??'').replace(/"/g,'""')+'"', rows=[['Program','Kind','Line','Basis','Budget','Actual','Variance'].map(qq).join(',')];
+  secs.forEach(S=>{ S.inc.forEach(r=>rows.push([S.title,'Income',r.name,r.sub,r.bud.toFixed(2),r.act.toFixed(2),(r.act-r.bud).toFixed(2)].map(qq).join(','))); S.exp.forEach(r=>rows.push([S.title,'Expense',r.name,r.sub,r.bud.toFixed(2),r.act.toFixed(2),(r.bud-r.act).toFixed(2)].map(qq).join(','))); rows.push([S.title,'Net','','',S.net.toFixed(2),S.netA.toFixed(2),(S.netA-S.net).toFixed(2)].map(qq).join(',')); });
+  dl(rows.join('\n'),'text/csv',`budget-${y}.csv`); toast('Budget exported'); }
 
 /* ---------- bank statement import ---------- */
 const BANK_COLS={date:/^(post(ing|ed)? ?date|trans(action)?\.? ?date|date( posted)?|effective date)$/, desc:/^(description|payee|name|transaction|merchant|narrative)( description)?$/, memo:/^(memo|notes?|extended description|additional info)$/,

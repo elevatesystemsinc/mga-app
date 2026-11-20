@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Flagstick · Golf management: tournaments, live scoring, associations and member games</title>
+<meta name="description" content="Tournaments from registration to the results sheet, live scoring on every phone with the TV and GameCast keeping up, every format scored for you, a library of 20,000 courses, hubs of their own for associations and member games, cart games settled hole by hole.">
+<link rel="icon" href="favicon.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,600;0,700;1,500&family=Public+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="site.css">
+<style>
+.fmts{display:flex;flex-wrap:wrap;gap:8px}.fmts span{padding:8px 14px;border-radius:999px;border:1px solid var(--line);font-size:13px;font-weight:600;background:#fff}.fmts span.on{background:var(--navy);color:#fff;border-color:var(--navy)}
+.jump{display:flex;gap:10px;flex-wrap:wrap}.jump a{text-decoration:none;font-weight:700;font-size:14px;color:#fff;border:1px solid rgba(255,255,255,.25);border-radius:999px;padding:8px 16px}.jump a:hover{border-color:#D8B75F;color:#D8B75F}
+</style>
+</head>
+<body>
+<header>
+  <div class="wrap">
+    <a class="brand" href="index.html" aria-label="Flagstick home"><img src="flagstick-crest-light.svg" alt=""><span><b>FLAGSTICK</b><small>GOLF SOFTWARE</small></span></a>
+    <nav class="nav" aria-label="Site"><a href="golf.html" class="on">Golf</a><a href="club.html">Club management</a><a href="nonprofits.html">Nonprofits</a><a href="about.html">About</a><a href="https://app.flagstickhub.com" style="color:#D8B75F">Sign in</a></nav>
+    <a class="btn gold top" href="index.html#demo" style="height:44px;padding:0 20px;font-size:15px">Book a demo</a>
+    <button class="burger" type="button" aria-label="Open menu" aria-expanded="false" aria-controls="mnav" onclick="var m=document.getElementById('mnav');var o=m.classList.toggle('open');this.setAttribute('aria-expanded',o);this.classList.toggle('x',o)"><span></span><span></span><span></span></button>
+  </div>
+  <nav id="mnav" class="mnav" aria-label="Menu"><a href="index.html">Home</a><a href="golf.html">Golf</a><a href="club.html">Club management</a><a href="nonprofits.html">Nonprofits</a><a href="about.html">About</a><a href="index.html#demo">Book a demo</a><a href="https://app.flagstickhub.com">Sign in</a></nav>
+</header>
+
+<section class="phero dark hero">
+  <div class="wrap">
+    <span class="kicker">Golf management</span>
+    <h1>Everything a golf season needs.<br>Already connected.</h1>
+    <p class="lede">The pro shop runs the club’s events. Every association and every regular game runs its own, inside the same system. Scoring is live on every phone, the math is exact for every format, and the results go straight to the books.</p>
+    <div class="jump"><a href="#tournaments">Tournaments</a><a href="#scoring">Live scoring</a><a href="#formats">Formats</a><a href="#courses">Courses</a><a href="#associations">Associations</a><a href="#groups">Member games</a><a href="#cart">Cart games</a><a href="#money">Budget &amp; treasury</a></div>
+  </div>
+</section>
+
+<div class="wrap">
+  <section class="feat" id="tournaments" style="border-top:none">
+    <div class="copy"><span class="kicker">Tournaments</span><h2>From sign-up to printed cards in one afternoon.</h2>
+      <ul><li>A public registration page: players find their name, add partners or ask the shop to pair them</li><li>Teams by hand, a roster import, or sponsor packages that carry a foursome, with TBD seats counted</li><li>Flights by handicap with a partner cap, whole groups kept together; pairings by standings on day two</li><li>Shotgun or tee times, one tap; every group gets a group ID</li><li>Sponsors, meals, budget, checklist, Calcutta and the 50/50 on the same event</li><li>A schedule that spans the reception the night before and the dinner after</li></ul></div>
+    <div class="shot"><img src="img/t-overview.jpg" alt="A tournament's overview: budget, players, sponsors, the schedule across two days, the rules" loading="lazy" width="1600" height="1000"></div>
+  </section>
+
+  <section class="feat flip">
+    <div class="copy"><span class="kicker">Registration &amp; check-in</span><h2>The field fills itself.</h2>
+      <p>The registration page shows the day as it will run: the schedule, how the format is scored, the handicap allowance, what the places win. Entries land in the field as teams. On the morning, the table checks players in from a phone, alphabetical and searchable, with every check-in showing up everywhere within seconds.</p>
+      <ul><li>Names only on the public page, never e-mails or handicaps</li><li>A private check-in link for the table, no board password</li><li>Field questions, a note for the shop, open spots marked for pairing</li></ul></div>
+    <div class="shot"><img src="img/t-register.jpg" alt="The public registration page: the tournament, schedule, how it is played, payouts, and Enter" loading="lazy" width="1600" height="1000"></div>
+  </section>
+
+  <section class="feat">
+    <div class="copy"><span class="kicker">Pairings &amp; scorecards</span><h2>Groups built, cards printed, codes on every one.</h2>
+      <ul><li>Build groups from the field or from the flights; teams stay together</li><li>Branded scorecards with the strokes dotted on the holes, signature lines and a QR that opens live scoring with the group already joined</li><li>One card per team or per group, two to a page for the cart</li><li>Groups stay editable mid-round; a corrected index reaches every phone</li></ul></div>
+    <div class="shot"><img src="img/t-card.jpg" alt="A printed team scorecard with the tournament band, shotgun hole, group ID, the hole grid and signature lines" loading="lazy" width="1400" height="1017"></div>
+  </section>
+
+  <section class="feat flip" id="scoring">
+    <div class="copy"><span class="kicker">Live scoring</span><h2>Phones in the carts. A board in the lounge.</h2>
+      <ul><li>Players join with a group ID or the QR on the card, or from the Flagstick app on iOS and Android</li><li>One score per team for a scramble, one per player otherwise; scores save offline and send when signal returns</li><li>Leaderboards to par, gross or net, by flight and by competition</li><li>A full-screen board for the clubhouse TV that refreshes itself</li><li>A name on any board opens the full scorecard; the committee corrects a card in place</li></ul></div>
+    <div class="phones"><div class="phone"><img src="img/p-score.jpg" alt="Scoring hole 16 on a phone" loading="lazy" width="600" height="1299"></div><div class="phone"><img src="img/p-board.jpg" alt="The phone's leaderboard" loading="lazy" width="600" height="1299"></div><div class="phone"><img src="img/p-card.jpg" alt="The phone's scorecard" loading="lazy" width="600" height="1299"></div></div>
+  </section>
+
+  <section class="feat">
+    <div class="copy"><span class="kicker">GameCast</span><h2>A page for the gallery.</h2>
+      <p>Read-only, so it can never disturb a round. The course with every cart on the hole it is playing, a live feed of birdies, eagles and lead changes, a hole panel, the board per competition. Follow one player, or put it on the big screen at the reception. Courses with mapped hole lines draw on an aerial map.</p></div>
+    <div class="shot"><img src="img/t-gamecast.jpg" alt="GameCast: the course grid with each team on its hole, the live feed, the leaderboard" loading="lazy" width="1600" height="1000"></div>
+  </section>
+
+  <section class="feat flip" id="formats">
+    <div class="copy"><span class="kicker">Every format</span><h2>Pick the game. The math is done.</h2>
+      <ul><li>Stroke, stableford, modified stableford, quota, par/bogey, match play, Nassau</li><li>Scramble, shamble, best ball, aggregate, alternate shot, greensome, split days</li><li>One, two or three balls counting, rotating patterns, every ball on 9 and 18</li><li>Handicap allowances by format, a partner cap, no pops on par 3s, adjustable points per score</li><li>Skins by pot or by hole, validation on the next hole, gross beats net</li><li>Results totalled across rounds, ranked overall and by flight, as a branded PDF</li></ul>
+      <div class="fmts"><span class="on">Scramble</span><span>Best ball</span><span>Shamble</span><span>Stableford</span><span>Quota</span><span>Match play</span><span>Nassau</span><span>Skins</span><span>Alternate shot</span><span>Waltz</span><span>Split front / back</span></div></div>
+    <div class="shot"><img src="img/t-scorecard.jpg" alt="A team's scorecard opened from the leaderboard: birdies and eagles marked, net where a stroke is given, Correct scores" loading="lazy" width="1600" height="1000"></div>
+  </section>
+
+  <section class="feat" id="courses">
+    <div class="copy"><span class="kicker">Course library</span><h2>Twenty thousand courses. Yours on top.</h2>
+      <p>Every card, tee box and rating in one library, searchable by course, club or city and browsable by country and region. A club’s own courses sit beside it, visible only to that club. A tournament at another course is one pick away: the round, the flights, the printed cards and the phones all read the right card.</p>
+      <ul><li>Your defaults first everywhere a course is chosen</li><li>Paste a card in from the scorecard, with the tees, ratings and yardages checked</li><li>Hole lines for GameCast’s map where they are mapped</li></ul></div>
+    <div class="shot"><img src="img/lib.jpg" alt="The course library: search, country and region filters, courses listed by club with tees and status" loading="lazy" width="1600" height="1067"></div>
+  </section>
+
+  <section class="feat flip" id="associations">
+    <div class="copy"><span class="kicker">Associations</span><h2>A hub for every board. Their own money.</h2>
+      <ul><li>Men’s, ladies’, senior: each with a schedule, board, season and treasury</li><li>Season budget against actuals, per-event P&amp;L, bank import, the treasurer’s report as a PDF</li><li>Dues billed by the association, collected by the club, credited back</li><li>Board logins see their board, nothing else; boards invite their own members</li><li>Anonymous member surveys with results the board can act on</li><li>Handed to next year’s board intact</li></ul></div>
+    <div class="shot"><img src="img/m-dash.jpg" alt="An association's season dashboard: net projected, next up, sponsor money, the tournaments and the board" loading="lazy" width="1600" height="1000"></div>
+  </section>
+
+  <section class="feat" id="groups">
+    <div class="copy"><span class="kicker">Member games</span><h2>The Thursday game runs itself.</h2>
+      <ul><li>New game on a phone in three taps: who’s playing, what we’re playing, share the link</li><li>Any number of pots on one round: stroke play, skins, best ball, dots, a team Nassau, by hand</li><li>Blind-draw partners staged on screen; skins called out hole by hole after the round</li><li>The players close the round, draw and record the payouts from their phones</li><li>A season ledger of who is up, who owes, and the fewest payments to settle</li><li>An organizer link: no pro shop login needed, ever</li></ul></div>
+    <div class="shot"><img src="img/g-game.jpg" alt="A group's game page: skins, stroke play and best ball pots with their payouts, the players and the balance" loading="lazy" width="1600" height="1000"></div>
+  </section>
+
+  <section class="feat flip" id="cart">
+    <div class="copy"><span class="kicker">Cart games</span><h2>Wolf, hammer, banker, flip, the robin.</h2>
+      <p>Five in a cart and no big game? Set up a cart game on the scoring page. The strip on every hole names the wolf, takes the pick, shows the sides’ best balls and settles the money net zero hole by hole. A second phone in the cart picks up the same game. Big Lou at 16. Birdies double, eagles triple. The hub’s game page shows the ledger when you are done.</p></div>
+    <div class="phones"><div class="phone"><img src="img/p-wolf2.jpg" alt="The wolf strip on a phone: the wolf picks a partner" loading="lazy" width="600" height="1299"></div><div class="phone"><img src="img/p-wolf.jpg" alt="The wolf strip after a lone wolf wins the hole, with everyone's money so far" loading="lazy" width="600" height="1299"></div></div>
+  </section>
+
+  <section class="feat" id="money">
+    <div class="copy"><span class="kicker">Budget &amp; treasury</span><h2>The treasurer’s report writes itself.</h2>
+      <ul><li>A season budget by program: every tournament, every event, the organization’s own lines</li><li>Actuals as they land: entries, sponsor payments, the 50/50, the Calcutta, expenses</li><li>Budget vs actual on one page, as a PDF and a CSV</li><li>A ledger with bank import and reconciliation</li><li>One year filter in the rail moves the whole hub: 2027 on the rail is 2027 everywhere</li></ul></div>
+    <div class="shot"><img src="img/m-budget.jpg" alt="An association's season budget: revenue, expenses and net by tournament with actuals" loading="lazy" width="1600" height="1000"></div>
+  </section>
+</div>
+
+<section class="cta dark">
+  <div class="wrap"><h2>See it on your own event.</h2><p class="lede" style="text-align:center">Thirty minutes, your formats, the pro and a board member.</p><a class="btn gold" href="index.html#demo">Book a demo</a></div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <a class="brand" href="index.html" aria-label="Flagstick home"><img src="flagstick-crest-light.svg" alt="" style="width:30px;height:30px"><span><b style="font-size:14px">FLAGSTICK</b><small style="font-size:8px">GOLF SOFTWARE</small></span></a>
+    <nav aria-label="Footer"><a href="golf.html">Golf</a><a href="club.html">Club management</a><a href="nonprofits.html">Nonprofits</a><a href="about.html">About</a><a href="index.html#demo">Book a demo</a><a href="https://app.flagstickhub.com">Sign in</a></nav>
+    <span style="font-size:13px;color:#8FA0AA">© 2026 Flagstick</span>
+  </div>
+</footer>
+</body>
+</html>
