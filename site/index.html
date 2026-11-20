@@ -158,7 +158,9 @@
       </div>
       <div class="fld"><label for="dClub">Club or organization</label><input class="inp" id="dClub" name="club" type="text" required></div>
       <div class="fld"><label for="dEmail">E-mail</label><input class="inp" id="dEmail" name="email" type="email" required></div>
-      <button type="submit" class="btn gold" style="margin-top:4px">Request a demo</button>
+      <div class="fld"><label for="dMsg">Anything we should know? <span style="color:#8FA0AA;font-weight:400">(optional)</span></label><textarea class="inp" id="dMsg" name="message" rows="3" style="resize:vertical"></textarea></div>
+      <div class="fld" style="position:absolute;left:-9999px" aria-hidden="true"><label for="dWeb">Website</label><input id="dWeb" name="website" type="text" tabindex="-1" autocomplete="off"></div>
+      <button type="submit" class="btn gold" id="demoBtn" style="margin-top:4px">Request a demo</button>
       <p id="demoNote" style="font-size:12.5px;color:#56626A">We answer the same day.</p>
     </form>
   </div>
@@ -172,13 +174,22 @@
   </div>
 </footer>
 <script>
-/* Demo requests: until a form backend exists, the request opens the visitor's mail client addressed to DEMO_TO. */
-const DEMO_TO='info@flagstickhub.com';
-document.getElementById('demoForm').addEventListener('submit',function(e){ e.preventDefault();
-  const v=id=>document.getElementById(id).value.trim();
-  const body=['Name: '+v('dName'),'Role: '+v('dRole'),'Club: '+v('dClub'),'E-mail: '+v('dEmail'),'','Please book me a Flagstick demo.'].join('\n');
-  location.href='mailto:'+DEMO_TO+'?subject='+encodeURIComponent('Flagstick demo — '+v('dClub'))+'&body='+encodeURIComponent(body);
-  document.getElementById('demoNote').textContent='Your mail app should open with the request filled in. If it did not, e-mail '+DEMO_TO+'.';
+/* Demo requests go to the demo-request function (Resend → DEMO_TO); if it cannot be reached, the visitor's mail client opens addressed to DEMO_TO instead. */
+const DEMO_TO='info@flagstickhub.com', DEMO_FN='https://yofqgrualjziexkfumkb.supabase.co/functions/v1/demo-request';
+document.getElementById('demoForm').addEventListener('submit',async function(e){ e.preventDefault();
+  const v=id=>document.getElementById(id).value.trim(), note=document.getElementById('demoNote'), btn=document.getElementById('demoBtn');
+  const d={name:v('dName'),role:v('dRole'),club:v('dClub'),email:v('dEmail'),message:v('dMsg'),website:v('dWeb')};
+  btn.disabled=true; note.textContent='Sending…';
+  try{
+    const r=await fetch(DEMO_FN,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(d)}); const out=await r.json();
+    if(!out.ok) throw new Error(out.error||'not sent');
+    this.reset(); note.textContent='Thanks — we have your request and will answer the same day. A copy is on its way to '+d.email+'.';
+  }catch(err){
+    const body=['Name: '+d.name,'Role: '+d.role,'Club: '+d.club,'E-mail: '+d.email,d.message?'\n'+d.message:'','','Please book me a Flagstick demo.'].join('\n');
+    location.href='mailto:'+DEMO_TO+'?subject='+encodeURIComponent('Flagstick demo — '+d.club)+'&body='+encodeURIComponent(body);
+    note.textContent='Your mail app should open with the request filled in. If it did not, e-mail '+DEMO_TO+'.';
+  }
+  btn.disabled=false;
 });
 </script>
 </body>

@@ -591,7 +591,7 @@ Tournament = { id, name, season, days, startDate, field:[{id,memberId,team,paid,
 
 ### The marketing website (`site/`)
 Plain static pages, one stylesheet (`site/site.css`), real product screenshots in `site/img/` (JPEG, 1600 px wide; phones 600 px):
-`index.html` (the three offerings, a tournament day, the hub tree, the feature tiles, the demo form → a mailto to info@flagstickhub.com),
+`index.html` (the three offerings, a tournament day, the hub tree, the feature tiles, the demo form → the Edge Function **`demo-request`** (`supabase/functions/demo-request`, no JWT: Resend → `DEMO_TO`, default info@flagstickhub.com, reply-to the visitor, an acknowledgement to them, a honeypot field; the page falls back to a mailto when the function cannot be reached — it needs `RESEND_API_KEY` / `MAIL_FROM` in the project's Edge Function secrets),
 `golf.html` (tournaments, registration, pairings and cards, live scoring, GameCast, formats, the course library, associations, member
 games, cart games, budget and treasury), `club.html` (member accounts, the account, the member portal, point of sale, on the floor,
 tickets, bookings, staff, reports, the directory), `nonprofits.html`, `about.html`; `features.html` only redirects to `golf.html`. The
