@@ -276,5 +276,5 @@ Deno.serve(async (req) => {
       return json({ ok: true, refund_id: s.id, amount });
     }
     return json({ error: "Unknown action" });
-  } catch (e) { return json({ error: String((e as Error)?.message || e) }, 500); }
+  } catch (e) { return json({ error: String((e as Error)?.message || e) }); }   // a 200 with the message: the clients show it (supabase-js hides the body of a non-2xx answer)
 });
