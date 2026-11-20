@@ -122,7 +122,9 @@ Deno.serve(async (req) => {
       const { data: had } = await admin.from("acct_items").select("id").eq("tenant", tenant).eq("ref", ref).maybeSingle(); if (had) return had.id;
       const { data } = await admin.from("acct_items").insert({ tenant, member_id, kind: "payment", source: "manual", item: "payment", ref, descr, amount: r2(amount), method, reference, posted: today(), created_by: who }).select("id").maybeSingle(); return data?.id;
     };
-    const memberMe = async () => { const mine = createClient(url, anon, { global: { headers: { Authorization: auth } }, auth: { persistSession: false, autoRefreshToken: false } }); const { data } = await mine.rpc("member_me", { p_tenant: tenant }); return data?.member || null; };
+    const memberMe = async () => { const mine = createClient(url, anon, { global: { headers: { Authorization: auth } }, auth: { persistSession: false, autoRefreshToken: false } });
+      if (b.as && staff) { const { data } = await mine.rpc("member_me_as", { p_tenant: tenant, p_member: String(b.as) }); return data?.member || null; }   // staff acting for a member from "View portal as member"
+      const { data } = await mine.rpc("member_me", { p_tenant: tenant }); return data?.member || null; };
     const customerFor = async (member: { id: string; first?: string; last?: string; email?: string }, u: Record<string, unknown> | null) => {
       if (u?.pay_customer) return String(u.pay_customer);
       const r = await dpp(acct!, "POST", DPP.customers, { firstName: member.first || "", lastName: member.last || "", email: member.email || "" });
