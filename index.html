@@ -8376,14 +8376,16 @@ async function chargeCardOnFile(p){ const bal=balanceOf(p.id); const amt=prompt(
 /* ---------- the card sheet: Deluxe's hosted form in a modal, a token, then the sale through the function ---------- */
 /* what the hosted form hands back on success: {type:'Token', status:'success', data:{token, expDate, cardType, maskedPan, nameOnCard}} — sent on whole */
 const hpfToken=r=>{ const d=r&&r.data; if(!d) return null; if(typeof d==='string') return {token:d}; return d.token?d:null; };
-function loadHPF(src){ if(window.HostedForm) return Promise.resolve(); if(PAY.script) return PAY.script; PAY.script=new Promise((res,rej)=>{ const sc=document.createElement('script'); sc.src=src; sc.onload=()=>res(); sc.onerror=()=>{ PAY.script=null; rej(new Error('Couldn’t load the Deluxe payment form — check the connection')); }; document.head.appendChild(sc); }); return PAY.script; }
+/* Deluxe's deluxe.js declares `const HostedForm` at the top level — a global binding, not a window property — so it is read bare */
+const hpfLib=()=>typeof HostedForm!=='undefined'?HostedForm:window.HostedForm;
+function loadHPF(src){ if(hpfLib()) return Promise.resolve(); if(PAY.script) return PAY.script; PAY.script=new Promise((res,rej)=>{ const sc=document.createElement('script'); sc.src=src; sc.onload=()=>res(); sc.onerror=()=>{ PAY.script=null; rej(new Error('Couldn’t load the Deluxe payment form — check the connection')); }; document.head.appendChild(sc); }); return PAY.script; }
 /* cardSheet({amount, descr, ref, member_id}) → {payment_id, label, method, amount} once the sale is approved, null when closed */
 function cardSheet(o){ return new Promise(async resolve=>{ const cfg=await payFn({action:'hpf'}); if(cfg.error){ toast(payMsg(cfg.error)); resolve(null); return; }
   const d=document.createElement('div'); d.className='scrim show paysheet'; d.style.cssText='display:flex;align-items:center;justify-content:center;z-index:60';
   d.innerHTML=`<div class="card pad" style="width:min(460px,94vw);max-height:92vh;overflow:auto;display:flex;flex-direction:column;gap:12px"><div><h2 class="h2" style="margin:0">Card payment · ${fmt2(o.amount)}</h2><span class="muted" style="font-size:13px">${esc(o.descr||'')}${cfg.env==='sandbox'?' · <b>sandbox</b>':''}</span></div><div id="payHpf" style="min-height:120px"><p class="muted" style="margin:0">Loading the secure form…</p></div><p class="hint" id="payHpfMsg" style="margin:0">The card details go straight to Deluxe; Flagstick never sees them.</p><div class="actions" style="justify-content:flex-end"><button class="btn" id="payHpfX">Cancel</button></div></div>`;
   document.body.appendChild(d); let done=false; const finish=v=>{ if(done) return; done=true; try{ if(d._inst&&d._inst.destroy) d._inst.destroy(); }catch(_){ } d.remove(); resolve(v); }; d.querySelector('#payHpfX').onclick=()=>finish(null);
   try{ await loadHPF(cfg.script); d.querySelector('#payHpf').innerHTML='';
-    const inst=await window.HostedForm.init({containerId:'payHpf',xtoken:cfg.xtoken,xrtype:'Generate Token',xpm:'0',xAmount:o.amount,xcheckSurcharge:true,xbtntext:'Pay '+fmt2(o.amount)},{
+    const inst=await hpfLib().init({containerId:'payHpf',xtoken:cfg.xtoken,xrtype:'Generate Token',xpm:'0',xAmount:o.amount,xcheckSurcharge:true,xbtntext:'Pay '+fmt2(o.amount)},{
       onSuccess:async r=>{ const token=hpfToken(r); if(!token){ d.querySelector('#payHpfMsg').textContent='The form did not return a token — try again.'; return; } d.querySelector('#payHpfMsg').textContent='Charging…';
         const s=await payFn({action:'sale',token,amount:o.amount,ref:o.ref||'sale',descr:o.descr||'',member_id:o.member_id||''}); if(s.error){ d.querySelector('#payHpfMsg').textContent=s.error; toast(s.error); return; } finish({payment_id:s.payment_id,label:s.label,method:s.method,amount:s.amount}); },
       onFailure:r=>{ d.querySelector('#payHpfMsg').textContent=(r&&r.errors&&r.errors.join(' ')||'The card was not accepted'); },
@@ -10276,7 +10278,7 @@ function wireSignupCard(t){
    page counts, and a reload is tried once per build — if the page that comes back is still the old one, the CDN
    hasn't caught up; wait a while before trying that build again. */
 (function(){
-  const ME='20261120025509', KEY='au_tried', RETRY=10*60*1000; let ready=false, lastCheck=0;
+  const ME='20261120030043', KEY='au_tried', RETRY=10*60*1000; let ready=false, lastCheck=0;
   const typing=()=>{ const a=document.activeElement; return a&&/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)&&a.value&&a.type!=='search'; };
   const safe=()=>!typing()&&(typeof window.__canReload!=='function'||window.__canReload());
   const tried=()=>{ try{ const [b,t]=(sessionStorage.getItem(KEY)||'').split('|'); return b?{build:b,at:+t||0}:null; }catch(_){ return null; } };
