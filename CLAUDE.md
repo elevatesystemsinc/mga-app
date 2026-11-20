@@ -1303,7 +1303,8 @@ groups, printed scorecards — the printed cards include a live-scoring QR that 
 
 ### Git
 - Repo: `github.com/elevatesystemsinc/mga-app`. Work on **`main`**; confirm with `git branch --show-current` before
-  committing. Always push explicitly: `git push origin main`. Touch `Hub` only for a season bug fix, and port the
+  committing. Always push explicitly: `git push origin main`. **No side branches or pull requests unless the owner asks** (Nov 20, 2026:
+  "stop building on side branches, I'll tell you when") — Render deploys only `main`, so work on a branch is invisible to him. Touch `Hub` only for a season bug fix, and port the
   same fix here. Commit messages: say what changed ("Calcutta: split Results and Payouts tabs"), not "update".
 
 ## 7. Working with the owner
