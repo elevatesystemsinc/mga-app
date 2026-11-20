@@ -114,7 +114,7 @@ python3 tests/test_hammer.py  # Hammer in a cart: thrown, accepted (×2, the ham
 python3 tests/test_cartgame.py # a cart game: five players, no pots, one group, the phone offers the side games and has no Finish tab; browsing ahead writes no pars
 python3 tests/test_sponsorteam.py # a sponsor tier that includes a team: TBD seats in the field, counted as players, named one by one, dropped with the package
 python3 tests/test_schedule.py # a tournament's schedule across the days before and after the golf, sorted by time, on the registration copy
-python3 tests/test_payments.py # online payments through Deluxe against the fake: credentials → connected, the portal's hosted form → a payment posted once, a declined card, autopay, refund, charge card on file, the hub register and a station's card sheet
+python3 tests/test_payments.py # online payments through Deluxe against the fake: credentials → connected, the portal's hosted form → a payment posted once, a declined card, autopay, refund, charge card on file, the hub register and a station's card sheet, the wallet, the staff view, the invitations
 python3 tests/test_crm.py     # companies & contacts: a company and its people, a sponsor picked from the list (its contact onto the directory), the record, the MGA's link-by-name, one write, a scoped login reads only; a nonprofit's Contacts (household, individual sponsor, billing contact, named seats → golfers, tags, person record, vendor)
 git add -A && git commit && git push origin main  # Render deploys main to app.wcccmga.org
 ```
@@ -956,6 +956,23 @@ cardType, maskedPan, nameOnCard}}` — the browsers send that object on whole (`
 unseen: an approved sale and ACH's `paymentType` — the sandbox merchant TMG set up is a fleet merchant ("Merchant not enabled for Credit"; the
 vault form shows odometer and driver's ID), so ask Deluxe to enable Credit and ACH on it. The fake (`_payments` in `_harness.py`) answers as the sandbox would (a token ending 0005
 or `tok_decline` is declined) and `HPF_STUB` stands in for the hosted form (`.hpf-stub`, `#hpfGo`). docs/tenancy.md §8 has the per-client steps.
+**The member portal, second pass (`portal-wallet-setup.sql`; the owner, Nov 20: "every member should have a login… add payment information,
+settle open balances… see each month's statement and their full balance owed… set up autopay… I should also be able to masquerade as any
+member"):** the **wallet** is `member_payment_methods` (one row per card or bank account in Deluxe's vault: `method_id`, `customer_id`, `kind`,
+`label`, `nickname`, `exp`, `is_default`, `removed_at`; staff read it, the function writes it) — the portal's *Payment methods* card (Add →
+the hosted form → `wallet_add {token, nickname, make_default}`; Make default → `wallet_default`; Remove → `wallet_remove`, which PATCHes the
+vault method inactive); the pay sheet offers the wallet as chips (default on) and pays with `pay {amount, method_id}` in one tap, or *New card
+or bank account* → the form → `pay {token, save, make_default}`; **autopay runs on the wallet's default** (`autopay_on` / `autopay_off`;
+`syncAutopay` keeps `member_users.autopay / pay_method / pm_label` = the default, so `autopay_run`, the hub's chips and *Charge card on file*
+read one place); `setup` = wallet_add + autopay_on. **Statements** show each month's closing balance with a status (Nothing due · Paid ·
+Open · Past due — `paidAfter(s)`: payments and credits posted after the period end against the closing) and a *Pay* button for the open
+amount. `member_portal_doc(tenant, member, club)` builds the document for `member_me()` (now with `wallet`, `autopay_method`, `dueDays`,
+`online` from `pay_online()`) and for **`member_me_as(tenant, member)`** — staff only — behind **View portal as member** on the account page
+(`member.html?as=<id>`, the hub's session carries over on the same origin): `ME.staffView` puts a *Staff view* banner up, drops every
+pay / wallet / autopay control and turns Sign out into Close. **Every member gets a login**: Member accounts → *Invite N to the portal*
+(`invitePortal`: every active member with an e-mail who has never signed in gets the portal link through `sendMail`; signing in is the
+one-time e-mail link, no password); the account page's chip reads *Portal · signed in / never signed in / No e-mail — no portal* and lists
+the wallet. The fake emulates the wallet actions and `member_me_as`; `tests/test_payments.py` covers the wallet, the staff view and the invitations.
 
 ### Point of sale (`pos.js`, `pos-setup.sql`, module `pos`) and Bookings (`bookings.js`, `booking-setup.sql`, module `club`)
 - **POS** (`posOn()`, staff only): `CLUB.pos = {outlets:[{id,name,kind fnb|proshop,item (the billing item it charges as)}],
