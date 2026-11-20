@@ -77,6 +77,18 @@ own hub. An organization's **Members** page is the club members who belong to it
 the organization's own list (club members are matched and joined; new people are added to the directory too), and keep
 status, join date, notes and dues per organization. Editing a person's details anywhere updates the directory.
 
+## Contacts (nonprofits): people, companies and households, and what they did
+
+A nonprofit's rail has **Contacts** in place of a directory: everyone the organization knows — donors, sponsors and their people, guests,
+players, vendors, volunteers — and the **companies and households** they belong to. The Walls family is a household with its family members
+under it, exactly as Acme Bank is a company with its contacts; either can sponsor an event, and so can an individual on their own. A
+sponsorship names its sponsor (a company, a household or a person) and its cast: the **primary contact**, the **billing contact** and the
+golfers who play under it — name a seat on the sponsor's team and that golfer joins the company as one of its people, typed Golfer.
+**Tags** are earned, not typed: someone who paid at an event is a donor, someone on a guest list a guest, someone in a field a player, a
+company named on an expense a vendor; add your own tags on top. A person's record shows their company and role, every sponsorship they have
+a part in, the events they came to with their paddle and what they paid, and the notes; a company's record shows its people, its
+sponsorships with the team, what it has been paid for, and the notes. Clubs and associations keep the simpler **Companies** page below.
+
 ## Companies: sponsors, vendors, partners and their people
 
 **Companies** sits right after the directory on the club hub, a nonprofit's hub and every association's hub — one list for the whole club.

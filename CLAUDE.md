@@ -58,7 +58,8 @@ src/
   payouts.js           Calcutta payouts math (calcPayouts, ties) + Results / Payouts sub-tabs
   surveys.js           Surveys: anonymous member surveys (sections → questions, public link, results, CSV)
   signup.js            Player registration: a tournament's public sign-up page (the Field tab's card, the published copy, entries → the field)
-  crm.js               Companies — the CRM layer: CLUB.companies, contacts (a person's company / title / contact types), sponsorships by company, notes
+  crm.js               Contacts — the CRM layer: companies & households (CLUB.companies), people with a company / title / role / tags, sponsorships by
+                       party (company, household or individual) with their cast, derived relationship tags, notes; the nonprofit's Contacts page
   billcore.js          the member statement PDF page (statementPage), shared by the hub and the member portal            [shared]
   billing.js           Member accounts & billing (module 'billing', club hub, staff only): classes, the monthly run, tax/service,
                        minimums, finance charges, aging, statements, GL export, Stripe Connect, the mail function
@@ -111,7 +112,7 @@ python3 tests/test_hammer.py  # Hammer in a cart: thrown, accepted (×2, the ham
 python3 tests/test_cartgame.py # a cart game: five players, no pots, one group, the phone offers the side games and has no Finish tab; browsing ahead writes no pars
 python3 tests/test_sponsorteam.py # a sponsor tier that includes a team: TBD seats in the field, counted as players, named one by one, dropped with the package
 python3 tests/test_schedule.py # a tournament's schedule across the days before and after the golf, sorted by time, on the registration copy
-python3 tests/test_crm.py     # companies: a company and its contacts, a sponsor picked from the list (its contact onto the directory), the record, the MGA's link-by-name, one write, a scoped login reads only
+python3 tests/test_crm.py     # companies & contacts: a company and its people, a sponsor picked from the list (its contact onto the directory), the record, the MGA's link-by-name, one write, a scoped login reads only; a nonprofit's Contacts (household, individual sponsor, billing contact, named seats → golfers, tags, person record, vendor)
 git add -A && git commit && git push origin main  # Render deploys main to app.wcccmga.org
 ```
 Tests need `pip install playwright && playwright install chromium` and `cd tests && npm i xlsx@0.18.5`.
@@ -774,7 +775,32 @@ spot (You, Player 2…): search the pool (two letters, people already entered or
 field questions yes / no per player; a note for the shop. `signup_submit` enforces the same (size, `need` = size − players, pool, no
 doubles, not already entered — in the field or pending) and a closed page. The fake emulates all four functions.
 
-### Companies — the CRM layer (`crm.js`, `crm-setup.sql`, `tests/test_crm.py`)
+### Contacts — the CRM layer (`crm.js`, `crm-setup.sql`, `tests/test_crm.py`)
+**The nonprofit pass (Nov 20; the owner: "a company that sponsors the event has a billing lady or an HR director who is the primary point of
+contact… but also four golfers playing with them as part of their sponsorship level… an individual becomes a sponsor, not tied to a company…
+households can be family grouped as one donor… Contacts works fine for the name… let's only work in the nonprofit section"):** on a nonprofit
+(`contactsOn()` = `crmOn()` + `isNonprofit()`) one rail entry **Contacts** (section Contacts) replaces Donors & guests and Companies — `vContacts`
+with a **People / Companies & households** switch (`view.cseg`), the **tag filters** (`TAGS`: donor, sponsor, guest, player, vendor, volunteer,
+board, partner, media) and a search; the `members` page renders it too (`NAV_OWNS.contacts`, the page map). A record in `CLUB.companies` carries
+`kind` company | household (`orgKind`, `orgLabel`; "The Walls family", Known as, family roles `HOUSEHOLD_TYPES`; `companyDrawer(null,'household')`,
+the family member's last name prefilled); a person's `ctypes` are their **role** at the company (`CONTACT_TYPES`: primary contact, decision maker,
+billing, HR, golfer…), `tags` are added by hand, and **relationship tags are derived** by `contactIndex()` from what people and companies did —
+donor (paid at an event: `e.payments` by paddle through the guest's `personId`), guest (on a guest list), player (in a field), sponsor (on a
+sponsorship as the party, primary or billing contact), vendor (named on an event expense: `x.vendorId`, the expense drawer's Vendor box), volunteer
+/ board (the Users list) — `tagsOfP` / `tagsOfC`, `IX.given` (what a person paid at events and on their own sponsorships), `IX.guest`. **A
+sponsorship names its sponsor and its cast**: `s.companyId` (a company or household) **or `s.personId` (an individual)** — the Sponsor box
+(`companyPickHTML(…,{people:true})`) searches companies, households and people on a nonprofit —, `s.contactId` (the **Primary contact** box),
+`s.billingId` (the **Billing contact** box, `s.billing`), and the players are the field seats carrying `sponsorId`: `sponsorContactSync` puts both
+contacts on the company with their roles (an individual sponsor is their own contact unless one is named), `sponsorPlayersSync(t)` (the team editor's
+Save, the sponsor drawer, Link them) makes a named seat on a sponsor's team a person of the company typed **Golfer**. `personSponsorships(p)` =
+every row a person has a part in with `roles` (Sponsor · Primary contact · Billing · Player); `tRows` / `eRows` carry `team`, `players`, `tbd`,
+`billing`. **The person record** (`vContact`, `view.contactId`, from the People list or a company's People card): company · title (a chip that opens
+the company), roles, tags, lifetime given / this year / events, Sponsorships (with the part they play), Events (guest-list entries with ticket,
+table, paddle and what was paid, → the event's Guests tab), Notes (`p.log`), Edit → `editMember`. A company record adds **Paid to** (`vendorLines`)
+and the sponsorship rows read "Team 7: Ann, Bo, 2 TBD". Clubs and associations keep the Companies page as before (the same code without the people
+view and with the company-only picker). The first pass, below, still describes the shared machinery.
+
+### Companies — the CRM layer, first pass (`crm.js`, `crm-setup.sql`, `tests/test_crm.py`)
 The owner, Nov 20, 2026: "associations, golf shops and even course management have the need for some level of CRM functionality… companies
 purchase sponsorships… contacts within their company that should have different contact types — golfer, decision maker, their titles… DCO
 needs the ability to see the company, its contacts, the type of sponsorship level that company has paid for." **Companies** sits on the rail
