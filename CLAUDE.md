@@ -139,8 +139,23 @@ on `tenant_users`; a board login gets the club document cut down through `scoped
 `tenant_lookup(host)` → `TENANT` / `TENANT_INFO`, `tq(q)` / `trow(o)` on every row query, `checkAccess()` → `my_access()`
 after sign-in; `AUTH_HASH` + logins.js `authLanding()` handle invite / reset / one-click sign-in links. Until the
 migrations have run the RPCs are missing and the app behaves as before. Privileged account actions go through the Edge
-Function `supabase/functions/admin-users` (create with password, invite, set password, delete, `sso`); logins.js falls
-back to a side-client sign-up and reset e-mails when it is not deployed. **New tables get a `tenant` column and a
+Function `supabase/functions/admin-users` (create with password, invite, reinvite, accept, set password, delete, `sso`);
+logins.js falls back to a side-client sign-up and reset e-mails when it is not deployed.
+**Invitations (Nov 2026; the owner: "send an invite… from the Battle of the Nines hub, the DCO hub, San Juan Country Club")** never
+go through Supabase's own mailer (its default SMTP only delivers to the project's own team, a few an hour, and its links die after
+the one-hour OTP window): `invite` finds or creates the login (an existing login elsewhere is linked, never duplicated), links it,
+mints a 7-day token in **`login_invites`** (`login-invites-setup.sql`: SHA-256 of the token, service role only; `auth_user_by_email`
+for the function) and sends a branded e-mail through the **`mail`** function with the caller's session — the organization's own sender
+(`mail_settings`), else the club's, else Flagstick's `MAIL_FROM` — with the link `<hub>/#invite=TOKEN`. The result always carries
+the link: the hub's drawer shows it with **Copy** and, when the mailer answered an error (no `RESEND_API_KEY`), says so and hands the
+link over instead ("Invite ready — e-mail not sent"). `reinvite {user_id, tenant}` = **Resend the invite** / **Send a sign-in link**
+on every login's drawer (hub Logins page, Board page, portal client record). On arrival `authLanding` posts the token to **`accept`**
+(the one action without a session — the anon key carries the call), gets a one-time `token_hash` → `verifyOtp` → "choose your
+password" for someone who has never signed in, straight into the hub otherwise; a used or expired link says so on the sign-in card.
+`tests/test_tenants.py` covers the mail + link, resend, no mailer, an existing login linked, the arrival and the second use.
+**Flagstick's own team** (`flagstick_admins`, the portal's Team page) is admin everywhere by construction: `is_flagstick_admin()` is
+the first clause of every policy and RPC, `checkAccess` lets an admin into any hub, `iAmStaff` / `canManageLogins` / `can_staff`
+include it — nothing per client to set up. **New tables get a `tenant` column and a
 `can_org` policy; new features belong to a module and check `hasModule()` at their entry points; switching a module off
 never deletes data.** The portal (Flagstick admins only, `app.<domain>` or `?portal=1`; www and the bare domain are the
 marketing website): Clients by status → client record (subscription + boxes, details, contacts, staff logins, the
@@ -599,6 +614,7 @@ the app (`docs/tenancy.md`): `flagstickhub.com` and `www` point at wherever this
 | object | purpose |
 |---|---|
 | `tenants`, `tenant_users`, `flagstick_admins` + RPC `tenant_lookup(p_host)`, `my_access()` | clients, their board logins, Flagstick's admins (`tenants-setup.sql`); every table below has a `tenant` column |
+| `login_invites` + `auth_user_by_email(p_email)` (service role only) | invitations to a hub (`login-invites-setup.sql`): a 7-day, one-use token per invite, hashed; written and read by the Edge Function `admin-users` only |
 | `mga_hub` (tenant, id, data jsonb) | one row per organization per tenant: `club`, `mga`, `lga`, `smga`, `<group id>`. The rows `main` (the old MGA Hub's) and `sync:mga` are history, no code reads them. `hub-setup.sql`, `hub-fix-permissions.sql` |
 | `calcutta_share` (tid, token, name, doc, version) + RPC `calcutta_get(p_token)`, `calcutta_put(p_token,p_doc,p_version)` | token links for people without the board login: the **cashier** page (tid = tournament id) and the **registration/check-in** page (tid = tournament id + `:checkin`). `calcutta_put` is version-checked (conflict → retry). `calcutta-setup.sql` |
 | `golf_events` (+ `wrap`), `golf_scores` + RPC `golf_event`, `golf_join`, `golf_submit`, `golf_wrap`, `hub_key_wrap` | public live scoring (`golf-setup.sql`) and the Finish tab's wrap-up (`wrap-setup.sql`). `public.org` names the owning organization. |

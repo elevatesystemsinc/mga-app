@@ -96,11 +96,27 @@ its organizations, the Logins page is staff-only, the Board page carries the boa
 
 **Account actions** (logins.js → the Edge Function `supabase/functions/admin-users`, called with the caller's own
 session): create a login with a password the caller sets, invite by e-mail (they choose a password on arrival),
-set or reset a password, delete, and `sso` — a one-time link that signs a Flagstick admin straight into a client's
-hub ("Open hub" in the portal). The function checks the caller's scope the same way the policies do. Without the
-function the browser falls back to a side-client sign-up and reset e-mails and says so on screen (passwords can't be
-set for an existing login, one-click sign-in becomes a normal sign-in). Arriving by an invite or reset link shows
-"choose your password" before anything else (`authLanding()`, `setPasswordScreen()`).
+resend an invitation or a sign-in link, set or reset a password, delete, and `sso` — a one-time link that signs a
+Flagstick admin straight into a client's hub ("Open hub" in the portal). The function checks the caller's scope the
+same way the policies do. Without the function the browser falls back to a side-client sign-up and reset e-mails and
+says so on screen (passwords can't be set for an existing login, one-click sign-in becomes a normal sign-in). Arriving
+by an invite or reset link shows "choose your password" before anything else (`authLanding()`, `setPasswordScreen()`).
+
+**Invitations** (`login-invites-setup.sql`, Nov 2026). Supabase's own invite e-mail is not used: its default SMTP only
+delivers to the project's own team members, a few an hour, and its links expire with the one-hour OTP window. Instead
+`invite` finds or creates the login (an existing login elsewhere — another club's staff, a Flagstick person — is linked
+to the new club, never duplicated), mints a token kept hashed in `login_invites` (7 days, one use) and sends a branded
+e-mail through the `mail` function — the organization's own sender from Settings → Outgoing e-mail, else the club's,
+else Flagstick's `MAIL_FROM` through Resend. The link is `https://<slug>.flagstickhub.com/#invite=TOKEN` (the portal's
+Team invites land on `app.`). The hub always shows the link with a Copy button; if the mailer answered an error (no
+`RESEND_API_KEY`, a Resend refusal) the drawer says "Invite ready — e-mail not sent" and the link is sent by hand. Every
+login's drawer carries **Resend the invite** (never signed in) or **Send a sign-in link** (has a password) — from the
+club hub's Logins page, an association's Board page and the portal's client record. On arrival the hub posts the token
+to `accept` (the only action with no session; the anon key carries the call), gets a one-time `token_hash`, signs the
+person in with `verifyOtp` and asks for a password if they have never signed in. A used or expired link says so on
+the sign-in card. Who may invite whom is unchanged: Flagstick anyone, a club's staff anyone in their club, a board
+administrator their own board. Flagstick's team (`flagstick_admins`) is admin in every hub by construction —
+`is_flagstick_admin()` leads every policy and RPC — nothing per client to set up.
 
 ## 5. The portal (`src/portal.js`)
 
@@ -127,6 +143,9 @@ and RLS enforces the same on the tables.
 2. **Supabase → Edge Functions → Deploy new function**, name `admin-users`, paste `supabase/functions/admin-users/index.ts`
    (or `supabase functions deploy admin-users` with the CLI). It uses the project's service role key from the
    environment; nothing to configure. Without it the portal still works with the fallbacks described in §4.
+   Invitations need `login-invites-setup.sql` (applied Nov 20, 2026, with version 2 of the function) and, for the
+   e-mail to go out, the `mail` function with `RESEND_API_KEY` + `MAIL_FROM` (step 8) — without them the hub hands over
+   the invite link to copy instead.
 2b. **Supabase → Authentication**: Providers → Email → **Confirm email off** (sign-up fallback and invites); URL
    configuration → Site URL `https://app.flagstickhub.com`, Redirect URLs `https://*.flagstickhub.com/**` and
    `https://app.wcccmga.org/**` (invite and reset links land on the club's own address).

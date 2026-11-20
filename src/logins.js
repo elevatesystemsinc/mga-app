@@ -5,7 +5,12 @@
    (club hub → Logins); a board administrator manages their own board's (association hub → Board).
    Privileged steps (a login with a password someone sets, an invite e-mail, a password reset, deleting) run in the
    Edge Function admin-users with the caller's own session; without it the browser falls back to a side-client
-   sign-up (needs "Confirm email" off in Supabase) and reset e-mails. Shared by the hub pages here and portal.js. */
+   sign-up (needs "Confirm email" off in Supabase) and reset e-mails. Shared by the hub pages here and portal.js.
+   Invitations (Nov 2026, the owner: "send an invite… from the Battle of the Nines hub, the DCO hub, San Juan…"): the
+   function finds or creates the login, links it, mints a 7-day token (login_invites) and e-mails it through the club's
+   own mailer (the `mail` function); the result always carries the link, so the hub shows it to copy when the mailer is
+   not set up. The e-mail lands on <hub>/#invite=TOKEN → authLanding → 'accept' (no sign-in) → a one-time sign-in →
+   "choose your password" for someone who has never signed in. Resend / a sign-in link from any login's drawer. */
 let FN_STATE=null;   // null unknown · true deployed · false missing
 const genPassword=()=>{ const a='abcdefghjkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789'; const u=new Uint32Array(14); crypto.getRandomValues(u); return [...u].map(n=>a[n%a.length]).join('').replace(/(.{5})(?=.)/g,'$1-'); };
 const fwhen=d=>d?new Date(d).toLocaleString('en-US',{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'}):'—';
@@ -52,10 +57,25 @@ async function createLogin(o){
   try{ const r=await adminFn('create',Object.assign({password},base)); return Object.assign({},r,{password}); }
   catch(e){ if(e.message!=='FN_MISSING') throw e; const u=await signUpSide(email,password,o.name); await linkUser(u.id,base); return Object.assign(u,{password,fallback:true}); }
 }
+/* the link box of an invitation: the 7-day link to copy, whatever the mailer did */
+const inviteLinkHTML=(r,id)=>r.link?`<div class="fld" style="margin-top:8px"><span class="lbl">Invite link · works for 7 days</span><div style="display:flex;gap:8px;align-items:center"><input class="inp" id="${id}L" readonly value="${esc(r.link)}" style="flex:1;min-width:0;font-size:12.5px"><button class="btn" id="${id}C" type="button">Copy</button></div></div>`:'';
+function inviteResultHTML(r,url,id){
+  if(r.fallback) return `<p>${esc(r.email)} will receive an e-mail to set a password; the link opens ${esc(url)} where they choose it.</p>${fnNote()}`;
+  const what=r.signedIn?'a link that opens the hub — their usual password works there':'a link to '+esc(url)+' where they choose their password';
+  return (r.sent?`<p>${esc(r.email)} will receive an e-mail${r.from==='m365'?' from the club’s Microsoft 365':''} with ${what}. The link works for 7 days; after that, send a new one from their login.</p>`
+    :`<div class="banner" style="flex-direction:column;align-items:flex-start"><b>The e-mail could not go out</b><small>${esc(r.mailError||'the mailer is not set up')} — copy the link below and send it yourself. It works for 7 days.</small></div>`)+inviteLinkHTML(r,id);
+}
+const wireInviteCopy=(root,id)=>{ const b=root.querySelector('#'+id+'C'), i=root.querySelector('#'+id+'L'); if(b&&i) b.onclick=async()=>{ try{ await navigator.clipboard.writeText(i.value); }catch(_){ i.select(); try{ document.execCommand('copy'); }catch(__){} } toast('Link copied'); }; };
 function loginResult(r,url){
-  openDrawer({kicker:'Login',title:r.invited?'Invite sent':'Login created',body:r.invited
-    ?`<p>${esc(r.email)} will receive an e-mail${r.fallback?' to set a password':' with an invitation'}; the link opens ${esc(url)} where they choose their password.</p>`
-    :`<div class="banner" style="flex-direction:column;align-items:flex-start"><b>${esc(r.email)}</b><span>Password: <code style="font-size:15px">${esc(r.password)}</code></span><small>Copy it now — it is not shown again. They sign in at ${esc(url)}.</small></div>${r.fallback?fnNote():''}`});
+  openDrawer({kicker:'Login',title:r.invited?(r.sent||r.fallback?'Invite sent':'Invite ready — e-mail not sent'):'Login created',body:r.invited?inviteResultHTML(r,url,'lr')
+    :`<div class="banner" style="flex-direction:column;align-items:flex-start"><b>${esc(r.email)}</b><span>Password: <code style="font-size:15px">${esc(r.password)}</code></span><small>Copy it now — it is not shown again. They sign in at ${esc(url)}.</small></div>${r.fallback?fnNote():''}`,
+    wire:root=>wireInviteCopy(root,'lr')});
+}
+/* a fresh invitation (never signed in) or a sign-in link (has a password already) for an existing login, from its drawer */
+async function resendInvite(u,tenant,redirect,msg){
+  msg.innerHTML='<p class="hint">Sending…</p>';
+  try{ const r=await adminFn('reinvite',{user_id:u.user_id,tenant:tenant||null,redirect}); msg.innerHTML=`<div style="margin-top:8px">${inviteResultHTML(Object.assign({email:u.email||r.email},r),redirect,'rs')}</div>`; wireInviteCopy(msg,'rs'); }
+  catch(e){ msg.innerHTML=e.message==='FN_MISSING'?fnNote():`<p class="hint" style="color:var(--neg)">${esc(e.message)}</p>`; }
 }
 /* ---------- the hub side: staff manage board logins; a board administrator manages their own board's ---------- */
 const HL={rows:null,auth:{},busy:false};
@@ -79,7 +99,7 @@ function loginsCard(m,orgId,opt){
       <div style="padding:10px 22px 16px"><p class="hint" style="margin:0">A board login sees ${esc(o.short||o.name)} only: its tournaments, money and members, the club directory read-only. Tick <b>board administrator</b> to let someone invite and remove the board’s logins themselves.</p>${fnNote()}</div>`;
     box.querySelector('#lgInv_'+orgId).onclick=()=>loginEditor(null,orgId,paintAll);
     box.querySelectorAll('[data-lu]').forEach(r=>r.onclick=()=>loginEditor(HL.rows.find(u=>u.user_id===r.dataset.lu),orgId,paintAll)); };
-  const paintAll=async()=>{ await loadLogins(); paint(); };
+  const paintAll=async()=>{ await loadLogins(); if(box.isConnected) paint(); else render(); };   // the page may have re-rendered since this card was drawn
   paint(); if(!HL.rows) paintAll();
 }
 /* the club hub's Logins page (staff): the staff list, then every organization's board logins */
@@ -101,7 +121,7 @@ function staffLoginDrawer(u,init){ init=init||{}; const a=u?(HL.auth[u.user_id]|
        :pair(field('E-mail','suE',init.email||'',{type:'email',ph:'name@example.org'}),field('Name','suN',init.name||'')))+
       `<p class="hint">A login sees everything in this hub${typeof isNonprofit==='function'&&isNonprofit()?': the fundraising events, the tournament, the register, donors and settings':''}.</p>`+
       (u?`<div class="fld" style="margin-top:6px"><span class="lbl">Password</span><div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center"><input class="inp" id="suPw" placeholder="New password (8+ characters)" style="flex:1;min-width:200px" autocomplete="new-password"><button class="btn" id="suGen" type="button">Generate</button><button class="btn" id="suSet" type="button">Set password</button></div>
-          <div class="actions" style="margin-top:8px"><button class="btn" id="suReset" type="button">E-mail a reset link</button></div><div id="suMsg"></div>${fnNote()}</div>`
+          <div class="actions" style="margin-top:8px"><button class="btn" id="suResend" type="button">${a.last_sign_in_at?'Send a sign-in link':'Resend the invite'}</button><button class="btn" id="suReset" type="button">E-mail a reset link</button></div><div id="suMsg"></div>${fnNote()}</div>`
         :`<div class="fld"><span class="lbl">Password</span>${seg('suMode',[['set','Set a password now'],['invite','E-mail an invite']],'set')}
           <div id="suSetBox" style="display:flex;gap:8px;align-items:center;margin-top:8px"><input class="inp" id="suPw" placeholder="Type one, or leave blank to generate" style="flex:1" autocomplete="new-password"><button class="btn" id="suGen" type="button">Generate</button></div>
           <p class="hint">Set now: the password is shown once after the login is created and you hand it over. Invite: they get an e-mail with a link to ${esc(SITE_BASE)} and choose their own.</p>${fnNote()}</div>`),
@@ -109,6 +129,7 @@ function staffLoginDrawer(u,init){ init=init||{}; const a=u?(HL.auth[u.user_id]|
     wire:r=>{ wireSeg(r,'suMode',v=>{ const b=r.querySelector('#suSetBox'); if(b) b.style.display=v==='set'?'flex':'none'; }); const g=r.querySelector('#suGen'); if(g) g.onclick=()=>{ r.querySelector('#suPw').value=genPassword(); };
       if(u){ const msg=r.querySelector('#suMsg');
         r.querySelector('#suSet').onclick=async()=>{ const pw=r.querySelector('#suPw').value; if(pw.length<8){ toast('8 characters or more'); return; } try{ await adminFn('set_password',{user_id:u.user_id,password:pw,tenant:TENANT}); msg.innerHTML=`<div class="banner" style="margin-top:8px">Password set for ${esc(u.email||'')}: <code>${esc(pw)}</code> — copy it now.</div>`; }catch(e){ msg.innerHTML=e.message==='FN_MISSING'?fnNote():`<p class="hint" style="color:var(--neg)">${esc(e.message)}</p>`; } };
+        r.querySelector('#suResend').onclick=()=>resendInvite(u,TENANT,SITE_BASE,msg);
         r.querySelector('#suReset').onclick=async()=>{ const {error}=await sb.auth.resetPasswordForEmail(u.email||a.email,{redirectTo:SITE_BASE}); msg.innerHTML=error?`<p class="hint" style="color:var(--neg)">${esc(error.message)}</p>`:`<div class="banner" style="margin-top:8px">Reset e-mail sent to ${esc(u.email||a.email||'')}.</div>`; }; } },
     save:()=>{ const name=fv('suN');
       if(u){ (async()=>{ const {error}=await sb.from('tenant_users').update({name}).eq('user_id',u.user_id).eq('tenant',TENANT); if(error){ toast(error.message); return; } toast('Saved'); done(); })(); return; }
@@ -134,13 +155,14 @@ function loginEditor(u,orgId,done){
         `<label class="check"><input type="checkbox" id="lgMan"${u&&u.manage?' checked':''}>Board administrator — may invite and remove ${esc(o?(o.short||o.name):'this board')}’s logins</label>`+
         (otherOrgs.length?`<p class="hint">Also has: ${otherOrgs.map(esc).join(', ')}.</p>`:'')+
         (u?'':`<div class="fld" style="margin-top:6px"><span class="lbl">How they get in</span>${seg('lgMode',[['invite','E-mail an invite'],['set','Set a password now']],'invite')}<div id="lgSetBox" style="display:none;gap:8px;align-items:center;margin-top:8px"><input class="inp" id="lgPw" placeholder="Leave blank to generate one" style="flex:1" autocomplete="new-password"><button class="btn" id="lgGen">Generate</button></div><p class="hint">Invite: they get an e-mail with a link to ${esc(SITE_BASE)} and choose their password. Set now: the password is shown once and you hand it over.</p>${fnNote()}</div>`)+
-        (u?`<div class="fld" style="margin-top:6px"><span class="lbl">Password</span><div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center"><input class="inp" id="lgPw" placeholder="New password (8+ characters)" style="flex:1;min-width:200px" autocomplete="new-password"><button class="btn" id="lgGen">Generate</button><button class="btn" id="lgSet">Set password</button></div><div class="actions" style="margin-top:8px"><button class="btn" id="lgReset">E-mail a reset link</button></div><div id="lgMsg"></div>${fnNote()}</div>`:'')),
+        (u?`<div class="fld" style="margin-top:6px"><span class="lbl">Password</span><div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center"><input class="inp" id="lgPw" placeholder="New password (8+ characters)" style="flex:1;min-width:200px" autocomplete="new-password"><button class="btn" id="lgGen">Generate</button><button class="btn" id="lgSet">Set password</button></div><div class="actions" style="margin-top:8px"><button class="btn" id="lgResend">${a.last_sign_in_at?'Send a sign-in link':'Resend the invite'}</button><button class="btn" id="lgReset">E-mail a reset link</button></div><div id="lgMsg"></div>${fnNote()}</div>`:'')),
     del:u&&!isStaff?()=>{ (async()=>{ const rest=(u.orgs||[]).filter(x=>x!==orgId);
         const r=rest.length?await sb.from('tenant_users').update({orgs:rest}).eq('user_id',u.user_id).eq('tenant',TENANT):await sb.from('tenant_users').delete().eq('user_id',u.user_id).eq('tenant',TENANT);
         if(r.error){ toast(r.error.message); return; } toast('Removed from '+(o?(o.short||o.name):'the board')); done&&done(); })(); }:null, delLabel:'Remove from this board',
     wire:r=>{ wireSeg(r,'lgMode',v=>{ r.querySelector('#lgSetBox').style.display=v==='set'?'flex':'none'; }); const g=r.querySelector('#lgGen'); if(g) g.onclick=()=>{ r.querySelector('#lgPw').value=genPassword(); };
       if(u&&!isStaff){ const msg=r.querySelector('#lgMsg');
         r.querySelector('#lgSet').onclick=async()=>{ const pw=r.querySelector('#lgPw').value; if(pw.length<8){ toast('8 characters or more'); return; } try{ await adminFn('set_password',{user_id:u.user_id,password:pw,tenant:TENANT}); msg.innerHTML=`<div class="banner" style="margin-top:8px">Password set for ${esc(u.email||'')}: <code>${esc(pw)}</code> — copy it now.</div>`; }catch(e){ msg.innerHTML=e.message==='FN_MISSING'?fnNote():`<p class="hint" style="color:var(--neg)">${esc(e.message)}</p>`; } };
+        r.querySelector('#lgResend').onclick=()=>resendInvite(u,TENANT,SITE_BASE,msg);
         r.querySelector('#lgReset').onclick=async()=>{ const {error}=await sb.auth.resetPasswordForEmail(u.email||a.email,{redirectTo:SITE_BASE}); msg.innerHTML=error?`<p class="hint" style="color:var(--neg)">${esc(error.message)}</p>`:`<div class="banner" style="margin-top:8px">Reset e-mail sent to ${esc(u.email||a.email||'')}.</div>`; }; } },
     save:()=>{ const name=fv('lgN');
       if(u){ (async()=>{ const rec=isStaff?{name}:{name,manage:$('lgMan').checked}; const {error}=await sb.from('tenant_users').update(rec).eq('user_id',u.user_id).eq('tenant',TENANT); if(error){ toast(error.message); return; } toast('Saved'); done&&done(); })(); return; }
@@ -158,6 +180,15 @@ async function authLanding(){
   const m=AUTH_HASH.match(/[#&]sso=([A-Za-z0-9_.-]+)/);
   if(m){ try{ history.replaceState(null,'',location.href.split('#')[0]); }catch(_){}
     const {error}=await sb.auth.verifyOtp({token_hash:decodeURIComponent(m[1]),type:'magiclink'}); if(error) $('loginErr').textContent='That sign-in link is no longer valid — sign in below.'; return; }
+  const inv=AUTH_HASH.match(/[#&]invite=([A-Za-z0-9_-]{20,})/);
+  if(inv){ try{ history.replaceState(null,'',location.href.split('#')[0]); }catch(_){}
+    // an invitation: the token becomes a one-time sign-in through the function (no session yet — the anon key carries the call),
+    // then someone who has never signed in chooses a password; the hub opens from the session like any other sign-in
+    try{ const r=await adminFn('accept',{token:inv[1]}); if(!r||!r.token_hash) throw new Error('That invitation link is no longer valid — ask for a new one.');
+      const {error}=await sb.auth.verifyOtp({token_hash:r.token_hash,type:'magiclink'}); if(error) throw new Error('That invitation link is no longer valid — ask for a new one.');
+      if(r.fresh) await setPasswordScreen(); }
+    catch(e){ $('loginErr').textContent=e.message==='FN_MISSING'?'Invitations need the admin-users function — sign in below.':e.message; }   // boot shows the sign-in card when there is no session
+    return; }
   if(/type=(invite|recovery|signup|magiclink)/.test(AUTH_HASH)||/[#&]access_token=/.test(AUTH_HASH)){
     // supabase-js consumes the hash itself; wait for the session it creates, then ask for a password
     let s=null; for(let i=0;i<24&&!s;i++){ s=(await sb.auth.getSession()).data.session; if(!s) await new Promise(r=>setTimeout(r,250)); }
