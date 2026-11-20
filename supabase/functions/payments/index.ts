@@ -66,7 +66,8 @@ async function dpp(a: Acct, method: string, path: string, body?: unknown): Promi
   const res = await fetch(DPP.host(a.env) + DPP.base + path, { method, headers: { Authorization: "Bearer " + bearer, PartnerToken: a.partner_token || "", "Content-Type": "application/json", Accept: "application/json" }, body: body === undefined ? undefined : JSON.stringify(body) });
   const text = await res.text(); let data: Record<string, unknown> = {}; try { data = text ? JSON.parse(text) : {}; } catch { data = { raw: text }; }
   if (res.status === 401) { tokens.delete(a.tenant + ":" + a.env); }
-  if (!res.ok) throw new Error(String(data.message || data.error_description || data.error || data.responseMessage || `Deluxe answered HTTP ${res.status}`));
+  const er = (data.errors || {}) as Record<string, unknown>;   // the gateway's errors: {errors:{message:'Bad Request', details:'/paymentType … is not a valid enum value'}}
+  if (!res.ok) throw new Error(String(er.details || er.message || data.message || data.error_description || data.error || data.responseMessage || `Deluxe answered HTTP ${res.status}`));
   return data;
 }
 /* what a sale answered: the processor's id, whether it was approved, the card on the slip, the vault ids when a card was kept */
