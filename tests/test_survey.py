@@ -1,7 +1,7 @@
 """Surveys against the fake database. Run: python3 tests/test_survey.py
 The board builds the member survey from the template and opens it; a member answers on the public page without a
 sign-in; the hub reads the results; the response holds nothing about who sent it; closing the survey closes the link."""
-import asyncio,sys,json
+import asyncio,sys,os,tempfile,json
 from playwright.async_api import async_playwright
 from _harness import seed_from_main, FakeDB,cloud,page
 from test_sync import seed_main,open_hub,settled
@@ -80,7 +80,7 @@ async def main():
     check('results before the session settles: loading, then the real count','Loading' in r['early'] and not r['cachedEmpty'] and r['n']==2 and r['kpi']=='2',json.dumps(r))
     # the results PDF: every question, every count, every written word — the thing the board reads or hands over for analysis
     r=await hub.evaluate("""async()=>{ const s=db.surveys[0]; const doc=await surveyPDF(s,SV_R[s.id],{returnDoc:true}); window.__spdf=doc.output('datauristring'); return {pages:doc.getNumberOfPages(), len:window.__spdf.length}; }""")
-    import base64,subprocess,os; pdfp='/tmp/claude-0/-home-user-mga-app/63b75e30-a124-565b-b1a4-06911e16cfbc/scratchpad/survey-results.pdf'
+    import base64,subprocess,os; pdfp=os.path.join(tempfile.gettempdir(),'survey-results.pdf')
     open(pdfp,'wb').write(base64.b64decode((await hub.evaluate("()=>window.__spdf")).split(',',1)[1]))
     txt=subprocess.run(['pdftotext','-layout',pdfp,'-'],capture_output=True,text=True).stdout
     check('results pdf: title, a question, the comment, the section suggestion, the anonymity note, no names',r['pages']>=2 and 'Results' in txt and 'Thursday nights this season' in txt and 'More tacos' in txt and 'Start at 5:30' in txt and 'Anonymous survey' in txt and 'board@test' not in txt and 'Ann' not in txt.replace('Annonymous',''),json.dumps(r))

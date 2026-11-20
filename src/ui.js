@@ -174,7 +174,7 @@ function renderInner(){
   $('nav').innerHTML=navHTML(items,live);
   $('nav').querySelectorAll('[data-go]').forEach(b=>b.onclick=()=>navGo(b.dataset.go)); $('nav').querySelectorAll('[data-sec]').forEach(b=>b.onclick=()=>toggleNavSec(b.dataset.sec));
   const m=$('main');
-  ({dash:vDash,tournaments:vTournaments,tournament:vTournament,members:vMembers,board:vBoard,budget:vBudget,treasury:vTreasury,golf:vGolf,orgs:vOrgs,pick:vPicker,collections:vCollections,games:vGames,ledger:vLedger,library:vLibrary,logins:vLogins,surveys:vSurveys,accounts:vAccounts,account:vAccount,billsetup:vBillSetup,pos:vPos,postickets:vPosTickets,closeout:vCloseout,fund:vFund,fundev:vFundEvent,possetup:vPosSetup,bookings:vBookings,booksetup:vBookSetup,settings:vSettings,reports:vReports,staff:vStaff,calendar:vCalendar,events:vEvents}[view.page]||vDash)(m);
+  ({dash:vDash,tournaments:vTournaments,tournament:vTournament,members:vMembers,board:vBoard,budget:vBudget,treasury:vTreasury,golf:vGolf,orgs:vOrgs,pick:vPicker,collections:vCollections,games:vGames,ledger:vLedger,library:vLibrary,logins:vLogins,surveys:vSurveys,accounts:vAccounts,account:vAccount,billsetup:vBillSetup,pos:vPos,postickets:vPosTickets,closeout:vCloseout,fund:vFund,fundev:vFundEvent,possetup:vPosSetup,bookings:vBookings,booksetup:vBookSetup,settings:vSettings,reports:vReports,staff:vStaff,calendar:vCalendar,events:vEvents,companies:vCompanies,company:vCompany}[view.page]||vDash)(m);
   if(isClub()) wireYearBar(m);
   if(view.page==='board'&&!isClub()&&typeof loginsCard==='function') loginsCard(m,ORG_ID);
   if(!isClub()&&((db.kind==='group'&&view.page==='members')||(db.kind!=='group'&&view.page==='board'))) adminLinksCard(m,curOrg());
@@ -601,21 +601,23 @@ function editSponsor(t,s){
   const payHTML=()=>pays.map((p,i)=>`<div class="mr num" style="grid-template-columns:86px minmax(0,1fr) 72px 76px 28px"><input class="inp r" data-pi="${i}" data-k="amount" inputmode="decimal" value="${esc(p.amount)}" aria-label="Payment amount"><select class="inp" data-pi="${i}" data-k="method" aria-label="Payment method">${['Check','Zelle','CC','Cash','Other'].map(o=>`<option${o===p.method?' selected':''}>${o}</option>`).join('')}</select><input class="inp" data-pi="${i}" data-k="checkNo" value="${esc(p.checkNo||'')}" placeholder="Chk #" aria-label="Check number"><input class="inp" data-pi="${i}" data-k="date" value="${esc(p.date)}" placeholder="Date" aria-label="Payment date"><button class="ib" data-pdel="${i}" aria-label="Remove payment">${I.x}</button></div>`).join('')||'<div class="mr"><span class="muted">No payments logged.</span></div>';
   const tierOpts=[['','— None —']].concat(t.tiers.map(x=>[x.name,x.name]));
   openDrawer({kicker:t.name+' · Sponsor',title:s?s.company:'Add sponsor',
-    body:field('Company','sCo',s?.company||'')+pair(field('Tier','sTier',s?.tier||'',{type:'select',options:tierOpts}),field('Pledged $','sPl',s?.pledged??'',{type:'number'}))+
-      pair(field('Contact','sCt',s?.contact||''),field('Committee','sCm',s?.committee||'',{ph:'Initials'}))+pair(field('Phone','sPh',s?.phone||''),field('Email','sEm',s?.email||''))+
+    body:(crmOn()?companyPickHTML('sCo',{companyId:s?.companyId||'',name:s?.company||''}):field('Company','sCo',s?.company||''))+pair(field('Tier','sTier',s?.tier||'',{type:'select',options:tierOpts}),field('Pledged $','sPl',s?.pledged??'',{type:'number'}))+
+      pair(crmOn()?contactPickHTML('sCt',s?.contact||'',s?.companyId||''):field('Contact','sCt',s?.contact||''),field('Committee','sCm',s?.committee||'',{ph:'Initials'}))+pair(field('Phone','sPh',s?.phone||''),field('Email','sEm',s?.email||''))+
+      (crmOn()&&s&&s.companyId&&companyById(s.companyId)?`<p class="hint" style="margin:-6px 0 0"><a href="#" id="sCoOpen">Open ${esc(companyById(s.companyId).name)}</a> — its people, every sponsorship, notes.</p>`:'')+
       `<p class="hint" id="sSpots" style="margin:-6px 0 0"></p><div class="fld"><div style="display:flex;justify-content:space-between;align-items:center"><span class="lbl">Payments received</span><button class="btn sm" id="pAdd" type="button">${I.plus}Log payment</button></div><div class="mini"><div id="pRows">${payHTML()}</div></div><p class="hint" id="pSum"></p></div>`+
       field('Notes','sNt',s?.notes||'',{type:'textarea'}),
     wire:r=>{ const sumTxt=()=>{ r.querySelector('#pSum').textContent=`${fmt(sum(pays,p=>p.amount))} received of ${fmt(fnum('sPl'))} pledged`; };
       const bind=()=>{ r.querySelectorAll('[data-pi]').forEach(e=>e.oninput=e.onchange=()=>{ pays[+e.dataset.pi][e.dataset.k]=e.value; sumTxt(); });
         r.querySelectorAll('[data-pdel]').forEach(b=>b.onclick=()=>{ pays.splice(+b.dataset.pdel,1); r.querySelector('#pRows').innerHTML=payHTML(); bind(); sumTxt(); }); };
       bind(); sumTxt(); r.querySelector('#sPl').oninput=sumTxt;
+      if(crmOn()){ wireCompanyPick(r,'sCo',c=>{ const dl=r.querySelector('#sCtDL'); if(dl) dl.innerHTML=contactOptions(c?c.id:''); }); const op=r.querySelector('#sCoOpen'); if(op) op.onclick=e=>{ e.preventDefault(); closeDrawer(); go('company',{companyId:s.companyId}); }; }
       const spotsTxt=()=>{ const tr=tierOf(t,r.querySelector('#sTier').value), n=+((tr||{}).spots||0), team=s?sponsorTeamOf(t,s):[], named=team.filter(p=>!p.tbd).length; r.querySelector('#sSpots').innerHTML=n?`This package includes <b>${n} player${n===1?'':'s'}</b>${team.length?` — Team ${team[0].team} in the field, ${named} of ${n} named${named<n?', the rest TBD':''}`:' — a team of TBDs goes into the field on Save; name them from the Field tab as they come in'}.`:''; };
       r.querySelector('#sTier').onchange=e=>{ const tr=t.tiers.find(x=>x.name===e.target.value); if(tr&&n0(tr.amt)&&!fnum('sPl')){ r.querySelector('#sPl').value=tr.amt; sumTxt(); } spotsTxt(); }; spotsTxt();
       r.querySelector('#pAdd').onclick=()=>{ const left=Math.max(0,fnum('sPl')-sum(pays,p=>p.amount)); const d=new Date(); pays.push({id:uid(),amount:left||'',method:'Check',date:(d.getMonth()+1)+'/'+d.getDate()}); r.querySelector('#pRows').innerHTML=payHTML(); bind(); sumTxt(); }; },
-    save:()=>{ const co=fv('sCo'); if(!co){ toast('Company name is required'); return false; }
-      const data={company:co,tier:fv('sTier'),pledged:fnum('sPl'),contact:fv('sCt'),committee:fv('sCm'),phone:fv('sPh'),email:fv('sEm'),notes:fv('sNt'),
+    save:()=>{ const co=fv('sCo'); if(!co){ toast('Company name is required'); return false; } const pk=crmOn()?readCompanyPick('sCo'):{company:null,name:co,companyId:s?.companyId||''};
+      const data={company:pk.name||co,companyId:pk.companyId,tier:fv('sTier'),pledged:fnum('sPl'),contact:fv('sCt'),committee:fv('sCm'),phone:fv('sPh'),email:fv('sEm'),notes:fv('sNt'),
         payments:pays.filter(p=>n0(p.amount)).map(p=>({id:p.id||uid(),amount:n0(p.amount),method:p.method||'Check',date:p.date||'',checkNo:p.checkNo||''}))};
-      if(s) Object.assign(s,data); else { s=Object.assign({id:uid()},data); t.sponsors.push(s); } sponsorTeamSync(t,s); },
+      if(s) Object.assign(s,data); else { s=Object.assign({id:uid()},data); t.sponsors.push(s); } sponsorTeamSync(t,s); if(crmEdit()&&pk.company) sponsorContactSync(s,pk.company); },
     del:s?()=>{ const i=t.sponsors.indexOf(s); t.sponsors.splice(i,1); const seats=t.field.filter(p=>p.sponsorId===s.id&&p.tbd); t.field=t.field.filter(p=>!seats.includes(p)); toast('Sponsor removed',()=>{t.sponsors.splice(i,0,s);t.field=t.field.concat(seats);persist();render();}); }:null});
 }
 function editTiers(t){
@@ -708,7 +710,7 @@ function vMembers(m){
   let list=members().sort((a,b)=>(a.last||'').localeCompare(b.last||'')||(a.first||'').localeCompare(b.first||''));
   const total=list.length, active=list.filter(x=>x.status!=='Inactive').length;
   const q=view.mq.toLowerCase();
-  if(q) list=list.filter(x=>[memberName(x),x.email,x.phone,x.memberNo,x.ghin,x.city].join(' ').toLowerCase().includes(q));
+  if(q) list=list.filter(x=>[memberName(x),x.email,x.phone,x.memberNo,x.ghin,x.city,companyName(x.company),x.title].join(' ').toLowerCase().includes(q));
   const filters=simple?['All','Active','Inactive']:['All','Active','Board','Dues unpaid','Inactive'];
   if(!filters.includes(view.mfilter)) view.mfilter='All';
   const f=view.mfilter;
@@ -720,7 +722,7 @@ function vMembers(m){
   const rowOf=x=>{ const br=boardOf(x.id), paid=memberDues(y,x.id), pend=memberCharges(y,x.id).filter(c=>c.status!=='collected');
     const du=x.status==='Inactive'?['—','']:paid>=amt?['Paid '+fmt(paid),'ok']:pend.length?[`Billed ${fmt(sum(pend,c=>c.amount))} · ${pend.some(c=>c.status==='charged')?'on club account':'with club'}`,'gold']:paid>0?[fmt(paid)+' of '+fmt(amt),'gold']:s.duesPayments.length?['Unpaid','warn']:['Not recorded',''];
     const mid=np?`<span class="muted trunc">${esc(x.city||'')}</span><span class="muted">${x.joined?esc(String(x.joined).slice(0,4)):''}</span>`:simple?`<span class="muted">${esc(x.memberNo||'')}</span><span class="muted">${esc(x.ghin||'')}</span>`:`<span>${br.map(r=>`<span class="chip navy">${esc(r)}</span>`).join(' ')}</span><span><span class="chip ${du[1]}">${du[0]}</span></span>`;
-    return `<div class="tr num click" data-m="${x.id}" style="${cols}"><span class="av">${initials(x)}</span><div class="cell2"><b class="trunc">${esc(memberName(x))}</b>${!simple&&(x.ghin||x.memberNo)?`<small>${x.ghin?'GHIN '+esc(x.ghin):'#'+esc(x.memberNo)}</small>`:''}</div><span class="trunc muted">${esc(x.email||'')}</span><span class="muted">${esc(x.phone||'')}</span><span>${esc(x.hcp??'')}</span>${mid}<span><span class="chip ${x.status==='Inactive'?'':'ok'}">${esc(x.status||'Active')}</span></span><span class="ib">${I.edit}</span></div>`; };
+    return `<div class="tr num click" data-m="${x.id}" style="${cols}"><span class="av">${initials(x)}</span><div class="cell2"><b class="trunc">${esc(memberName(x))}</b>${x.company&&companyName(x.company)?`<small class="trunc">${esc([companyName(x.company),x.title].filter(Boolean).join(' · '))}</small>`:!simple&&(x.ghin||x.memberNo)?`<small>${x.ghin?'GHIN '+esc(x.ghin):'#'+esc(x.memberNo)}</small>`:''}</div><span class="trunc muted">${esc(x.email||'')}</span><span class="muted">${esc(x.phone||'')}</span><span>${esc(x.hcp??'')}</span>${mid}<span><span class="chip ${x.status==='Inactive'?'':'ok'}">${esc(x.status||'Active')}</span></span><span class="ib">${I.edit}</span></div>`; };
   m.innerHTML=head(np?'Donors & guests':club?'Directory':'Members',np?`Everyone ${esc(CLUB.name||CLUB_META.name)} knows — donors, guests, sponsors’ people and players. Event guest lists and tournament fields are picked from here; nobody is a “member”.`:club?`Every member of ${esc(CLUB.name||CLUB_META.name)}. Associations and small groups pick their members from this list.`:`Everyone in the ${esc(short)}. Board seats and tournament fields are picked from this list.`,
       (simple?'':btn('Dues settings','mDues','')+btn('Bill dues','mBill',''))+(KEYMODE||SCOPED?'':btn(np?'Import a list':club?'Import club roster':'Import member list','mCsv','',I.down))+btn(np?'Add a person':'Add member','mAdd','pri',I.plus))+`
   <div class="toolbar"><div class="search">${I.search}<input class="inp" id="mq" placeholder="${np?'Search name, email, phone or city':'Search name, email, phone, member # or GHIN'}" value="${esc(view.mq)}" aria-label="Search members"></div>
@@ -750,18 +752,20 @@ function editMember(mm){
       (locked?'<p class="hint" style="margin-top:0">Directory details are kept by the club — ask the club to change them.</p>':'')+
       pair(field('First name','mfF',mm?.first||'',L),field('Last name','mfL',mm?.last||'',L))+pair(field('Email','mfE',mm?.email||'',L),field('Phone','mfP',mm?.phone||'',L))+
       pair(field('Handicap index','mfH',mm?.hcp??'',L),field('GHIN','mfG',mm?.ghin||'',L))+(np?field('Address','mfA',mm?.address1||'',L)+`<input type="hidden" id="mfNo" value="${esc(mm?.memberNo||'')}">`:pair(field('Member #','mfNo',mm?.memberNo||'',L),field('Address','mfA',mm?.address1||'',L)))+`<div style="display:grid;grid-template-columns:minmax(0,2fr) 70px minmax(0,1fr);gap:12px">${field('City','mfC',mm?.city||'',L)}${field('State','mfSt',mm?.state||'',L)}${field('Zip','mfZ',mm?.zip||'',L)}</div>`+
+      (locked?'':crmPersonFields(mm))+
       pair(field(np?'Status':club?'Club status':short+' status','mfS',mm?.status||'Active',{type:'select',options:['Active','Inactive']}),field(np?'Known since':'Joined','mfJ',mm?.joined||'',{type:'date'}))+
       (club&&typeof acctOn==='function'&&acctOn()&&!locked?`<p class="lbl" style="margin-top:4px">Billing</p>`+membershipFields(mm||{}):'')+
       (simple?'':`<div class="fld"><div style="display:flex;justify-content:space-between;align-items:center"><span class="lbl">${y} dues · ${fmt(s.dues.amount)}, not prorated</span><button class="btn sm" id="dAdd" type="button">${I.plus}Record payment</button></div><div class="mini"><div id="dRows">${payHTML()}</div></div></div>`)+
       (mm&&mm.ggId?`<p class="hint">Golf Genius ID ${esc(mm.ggId)}${mm.memberType?' · member type '+esc(mm.memberType):''}</p>`:'')+(inT.length?`<div class="fld"><span class="lbl">Tournaments</span><span>${inT.map(t=>esc(t.name)+' ('+t.season+')').join(', ')}</span></div>`:'')+field('Notes','mfNt',mm?.notes||'',{type:'textarea'}),
     wire:r=>{ const bind=()=>{ r.querySelectorAll('[data-di]').forEach(e=>e.oninput=()=>pays[+e.dataset.di][e.dataset.k]=e.value); r.querySelectorAll('[data-ddel]').forEach(b=>b.onclick=()=>{pays.splice(+b.dataset.ddel,1);r.querySelector('#dRows').innerHTML=payHTML();bind();}); };
-      bind(); const da=r.querySelector('#dAdd'); if(da) da.onclick=()=>{ const inst=n0(s.dues.amount)/Math.max(1,n0(s.dues.installments)); const d=new Date(); pays.push({id:uid(),amount:inst,date:(d.getMonth()+1)+'/'+d.getDate()}); r.querySelector('#dRows').innerHTML=payHTML(); bind(); };
+      bind(); if(!locked) wireCrmPersonFields(r); const da=r.querySelector('#dAdd'); if(da) da.onclick=()=>{ const inst=n0(s.dues.amount)/Math.max(1,n0(s.dues.installments)); const d=new Date(); pays.push({id:uid(),amount:inst,date:(d.getMonth()+1)+'/'+d.getDate()}); r.querySelector('#dRows').innerHTML=payHTML(); bind(); };
       const pk=r.querySelector('#mfPick'); if(pk){ const L=r.querySelector('#mfPickL'), who=r.querySelector('#mfPicked'); L.style.display='none';
         pk.oninput=()=>{ L.innerHTML=candHTML(pk.value); L.style.display=L.innerHTML?'':'none'; L.querySelectorAll('[data-pk]').forEach(b=>b.onclick=()=>{ const p=personById(b.dataset.pk); pickedId=p.id;
           [['mfF','first'],['mfL','last'],['mfE','email'],['mfP','phone'],['mfH','hcp'],['mfG','ghin'],['mfNo','memberNo'],['mfA','address1'],['mfC','city'],['mfSt','state'],['mfZ','zip']].forEach(([id,k])=>{ r.querySelector('#'+id).value=p[k]??''; });
           who.innerHTML=`Adding <b>${esc(memberName(p))}</b> from the directory to the ${esc(short)}.`; L.style.display='none'; pk.value=''; }); }; } },
     save:()=>{ const first=fv('mfF'), last=fv('mfL'); if(!first&&!last){ toast('Enter a name'); return false; }
       const data=locked?{status:fv('mfS'),joined:fv('mfJ'),notes:fv('mfNt')}:{first,last,email:fv('mfE'),phone:fv('mfP'),hcp:fv('mfH'),ghin:fv('mfG'),memberNo:fv('mfNo'),address1:fv('mfA'),city:fv('mfC'),state:fv('mfSt'),zip:fv('mfZ'),status:fv('mfS'),joined:fv('mfJ'),notes:fv('mfNt')};
+      if(!locked) Object.assign(data,readCrmPersonFields());   // company, title, contact types (crm.js)
       const p=upsertMember(pickedId||null,data); if(club&&typeof acctOn==='function'&&acctOn()&&!locked&&$('bmC')) readMembership(p);
       if(!club) s.duesPayments=s.duesPayments.filter(x=>x.memberId!==p.id).concat(pays.filter(x=>n0(x.amount)).map(x=>({id:x.id||uid(),memberId:p.id,amount:n0(x.amount),date:x.date||''}))); },
     del:mm?()=>{ if(inT.length&&!confirm(`${memberName(mm)} is in ${inT.length} tournament field(s). Remove anyway?`)) return false;
@@ -884,7 +888,7 @@ function previewField(t,res,fname){
       const next=[];
       for(const r of rows){
         let m=r.m;
-        if(!m){ if(!chk('fiAdd')) continue; const d={status:'Inactive',joined:'',notes:'Added from the '+t.name+' roster',source:'field-roster'}; ROSTER_FIELDS.forEach(([k])=>{ if(k!=='ggId') d[k]=r.p[k]||''; }); if(r.p.hcp) d.hcpAt=res.fileDate; m=upsertMember(null,d); }
+        if(!m){ if(!chk('fiAdd')) continue; const d={status:'Inactive',joined:'',notes:'Added from the '+t.name+' roster',source:'field-roster'}; ROSTER_FIELDS.forEach(([k])=>{ if(k!=='ggId') rosterSet(d,k,r.p[k]||''); }); if(r.p.hcp) d.hcpAt=res.fileDate; m=upsertMember(null,d); }
         else if(upd){ if(newerHcp(r)){ m.hcp=r.p.hcp; m.hcpAt=res.fileDate; } ['phone','email','ghin','address1','city','state','zip'].forEach(k=>{ if(r.p[k]&&!m[k]) m[k]=r.p[k]; }); }
         const prev=inField.get(m.id)||{};
         const answers=Object.assign({},prev.answers||{}); qs.forEach(l=>{ answers[keyOf(l)]=r.p.answers[l]||''; });
@@ -907,7 +911,7 @@ function loadXLSX(){ if(window.XLSX) return Promise.resolve();
 const ROSTER_COLS={
   ggId:/^(id\b|id \(|golf ?genius( player)? id)/, email:/^e-?mail( address)?$/, first:/^first( name)?$/, last:/^last( name)?$/,
   full:/^(full ?name|name|player|golfer)$/, handle:/^handle$/, phone:/(cell|mobile)( phone)?$|^phone( number)?$/, hcp:/^(index|handicap( index)?|hcp|hi)$/,
-  ghin:/^ghin( ?(id|#|no\.?|number))?$/, memberNo:/^member ?(#|no\.?|number|id)$/, addr1:/^address ?1?$/, addr2:/^address ?2$/, city:/^city$/, state:/^state$/,
+  ghin:/^ghin( ?(id|#|no\.?|number))?$/, memberNo:/^member ?(#|no\.?|number|id)$/, company:/^(company|organi[sz]ation|employer|business|firm)( name)?$/, title:/^(job )?title$|^position$/, addr1:/^address ?1?$/, addr2:/^address ?2$/, city:/^city$/, state:/^state$/,
   zip:/^(zip|zip ?code|postal( code)?)$/, team:/^team( ?(id|#|no\.?|number))?$/, entryNo:/^entry( ?(#|no\.?|number))?$/, dob:/(date of )?birth|^dob$/, memberType:/^member ?type$/, mg:/member or guest|^guest$/, gender:/^gender$/
 };
 async function readRosterFile(f){
@@ -936,13 +940,16 @@ function mapRoster(rows){
     if(!first&&!last){ if(r.some(c=>c)) skippedBlank++; continue; }
     if(/guest/i.test(g('mg'))){ skippedGuests++; continue; }
     people.push({ggId:g('ggId').replace(/\D/g,'')?g('ggId'):'',first,last,email:g('email').toLowerCase(),phone:g('phone'),hcp:g('hcp'),ghin:g('ghin'),memberNo:g('memberNo'),
-      address1:g('addr1'),address2:g('addr2'),city:g('city'),state:g('state'),zip:g('zip'),dob:g('dob'),memberType:g('memberType'),
+      address1:g('addr1'),address2:g('addr2'),city:g('city'),state:g('state'),zip:g('zip'),dob:g('dob'),memberType:g('memberType'),company:g('company'),title:g('title'),
       team:g('team'),entryNo:g('entryNo'),answers:Object.fromEntries(questions.map(q=>[q.label,(r[q.ci]||'').trim()]))});
   }
   return {people,skippedGuests,skippedBlank,columns:Object.keys(map),questions:questions.map(q=>q.label),fileDate};
 }
 const ROSTER_FIELDS=[['first','First name'],['last','Last name'],['email','Email'],['phone','Phone'],['hcp','Handicap'],['ghin','GHIN'],['memberNo','Member #'],['ggId','Golf Genius ID'],
-  ['address1','Address'],['address2','Address 2'],['city','City'],['state','State'],['zip','Zip'],['dob','Date of birth'],['memberType','Member type']];
+  ['address1','Address'],['address2','Address 2'],['city','City'],['state','State'],['zip','Zip'],['dob','Date of birth'],['memberType','Member type'],['title','Title'],['company','Company']];
+/* a file names a company; a person carries its id (crm.js) — the planner compares names and the import makes the company */
+const rosterVal=(m,k)=>k==='company'?companyName(m.company):(m[k]??'');
+const rosterSet=(m,k,v)=>{ if(k==='company'){ const c=v?companyFor(v,{create:true}):null; m.company=c?c.id:''; } else m[k]=v; };
 /* match a row from a file to someone already in the club directory: member number → Golf Genius ID → GHIN → email → name */
 function matchPerson(p,used,noGG){
   const key=x=>(x||'').toLowerCase().replace(/[^a-z]/g,'');
@@ -954,7 +961,7 @@ function matchPerson(p,used,noGG){
 function matchMember(p,used,noGG){ const r=matchPerson(p,used,noGG); return r?r.m:null; }
 function planRoster(people,fileDate){
   const used=new Set(), plan={add:[],join:[],update:[],same:[],conflict:[]}, club=isClub();
-  const changesFor=(m,p)=>ROSTER_FIELDS.filter(([k])=>p[k]&&String(m[k]??'')!==p[k]&&!(k==='hcp'&&m.hcpAt&&fileDate<m.hcpAt)).map(([k,l])=>({k,l,from:m[k]??'',to:p[k]}));
+  const changesFor=(m,p)=>ROSTER_FIELDS.filter(([k])=>p[k]&&String(rosterVal(m,k))!==p[k]&&!(k==='hcp'&&m.hcpAt&&fileDate<m.hcpAt)).map(([k,l])=>({k,l,from:rosterVal(m,k),to:p[k]}));
   for(const p of people){
     const r=matchPerson(p,used);
     if(!r){ plan.add.push(p); continue; }
@@ -1001,8 +1008,8 @@ function previewRoster(res,fname){
       const inact=$('rosterInact')&&$('rosterInact').checked;
       if(!nChanges&&!inact){ toast('Nothing to change — the hub already matches this file'); return; }
       const before=memberSnapshot();
-      const addPerson=p=>{ const d={status:'Active',joined:'',notes:'',source:'roster'}; ROSTER_FIELDS.forEach(([k])=>{ d[k]=p[k]||''; }); if(p.hcp) d.hcpAt=res.fileDate; upsertMember(null,d,{noBill:true}); };
-      const apply=u=>{ u.changes.forEach(c=>{ if(c.k==='status') return; u.m[c.k]=c.to; if(c.k==='hcp') u.m.hcpAt=res.fileDate; }); upsertMember(u.m.id,{status:'Active'},{noBill:true}); };
+      const addPerson=p=>{ const d={status:'Active',joined:'',notes:'',source:'roster'}; ROSTER_FIELDS.forEach(([k])=>{ rosterSet(d,k,p[k]||''); }); if(p.hcp) d.hcpAt=res.fileDate; upsertMember(null,d,{noBill:true}); };
+      const apply=u=>{ u.changes.forEach(c=>{ if(c.k==='status') return; rosterSet(u.m,c.k,c.to); if(c.k==='hcp') u.m.hcpAt=res.fileDate; }); upsertMember(u.m.id,{status:'Active'},{noBill:true}); };
       plan.add.forEach(addPerson); plan.join.forEach(apply); plan.update.forEach(apply);
       let asNew=0; plan.conflict.forEach((c,i)=>{ const v=(document.querySelector(`input[name=cf${i}]:checked`)||{}).value; if(v==='new'){ addPerson(c.p); asNew++; } else apply(c); });
       if(inact) plan.missing.forEach(x=>upsertMember(x.id,{status:'Inactive'}));
