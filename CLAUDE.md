@@ -364,32 +364,19 @@ Tournament = { id, name, season, days, startDate, field:[{id,memberId,team,paid,
   → 'par'/'netpar'). There is no distinguished main game. Money: a player's in = Σ entries of the pots they are in
   (+ extras), out = Σ payouts across pots (`gpIn`/`gpOut`); `settlement(g)` gives per-player in/out/net and
   `settleUp()` the fewest payments for net settlement; the Ledger's net = out − in + adjustments.
-  - **Quick setup — New game on a phone** (`quickGame(again)` → `vQuick`, draft in `QG`, `view.gquick`; the owner, Oct 2026:
-    "replace it is the way we want for the new game, and have the more options button"): **New game** is three steps —
-    *Who's playing* (tap the names: the group's members, people who have played before, anyone at the club through a
-    search, guests by name; last game's players come pre-ticked), *What are we playing* (**Same as last time** and up
-    to three other past games with a different set of competitions, `pastSets()`; or build it from `STARTERS` in plain
-    words — skins, stroke play, blind-draw partners, quota, team Nassau, dots — tap all that apply; or **Just a cart game**,
-    below; the day's name, date, course and tee sit in one row behind Change), *Share* (`vQuickShare`: the scoring link, Send… / Copy, a QR
-    through `loadQR`, the groups with their IDs, the sheet images, Open the game). Everything the full designer asks
-    for is a default: today, last game's course / tee / rules / timing, after the round, pot settlement, full
-    handicaps, the usual split. **More options** opens the designer with the same draft (`quickBuild()` →
-    `GD`). **Same as last time** on the Games page (`quickGame(true)`) creates the game in one tap and lands on the
-    share step. `draftFromLast(opt)` / `copyPots` / `commitGameDraft(d, existing)` are shared with the designer.
-    **A cart game** (the owner, Nov 13: "it's just five of us, so we're in a single group… we're just playing banker"): step 2's
-    **Just a cart game** (`Q.set='cart'`) makes a game with **no pots** (`g.cart=true`; `isCartGame(g)` = the flag or an empty
-    `pots`) — the money is the side game the cart sets up on the scoring page (wolf, hammer, banker, flip, the robin). Up to five
-    play as **one group** (`syncGameEvent` fills a cart game's group to 5, the side games' limit; six or more go in fours), the
-    share step and the Send text say how the cart sets it up, the game page leads with "A cart game" (the sheet / image buttons
-    there, no pot KPIs, the Side games in the carts card next, the who's-in grid without pot columns), the Games list reads "Cart
-    game — no pots", the designer saves a cart game with zero competitions (adding one makes it an ordinary game), and **Same as
-    last time** after a cart game makes another. The phone shows no Finish tab for it (`isGame()` = the event has comps).
-    `tests/test_cartgame.py` runs it on the hub and a phone. The
-    half-done setup survives a reload (`_qg` in `rememberView`) and blocks the auto-update like the designer.
-  - **Designer** (`designGame(g|null)` → `vGameDesign`, draft in `GD`; reached from the game page's Design and from
-    More options — no longer the New game button): the day (name, date, course, pay timing,
-    settlement), competitions (`newPot(catalogId,g)` + per-kind rule panels), who's in (member picker, guests, the
-    players × pots checkbox grid). A new game starts from the last one (players + competitions). One-ball games
+  - **The quick setup is gone** (the owner, Nov 20: "scrap the idea of the easy game creation on a mobile device… way too long of a
+    list of names… the game changes every day, as well as the players"): `quickGame` / `vQuick` / `QG` / `STARTERS` / `pastSets` and
+    the Games page's **Same as last time** were removed; **New game** opens the designer. **A cart game** is a game saved with no
+    competitions (`g.cart=true`; `isCartGame(g)` = the flag or an empty `pots`; Save asks before making one) — the money is the side
+    game the cart sets up on the scoring page. Up to five play as **one group** (`syncGameEvent` fills a cart game's group to 5, the
+    side games' limit; six or more go in fours), the game page leads with "A cart game" (the sheet / image buttons there, no pot
+    KPIs, the Side games in the carts card next, the who's-in grid without pot columns), the Games list reads "Cart game — no pots",
+    and the designer opened on one shows "A cart game — nothing in the pots". The phone shows no Finish tab for it (`isGame()` = the
+    event has comps). `tests/test_cartgame.py` runs it on the hub and a phone.
+  - **Designer** (`designGame(g|null)` → `vGameDesign`, draft in `GD`; **New game** and the game page's Design): the day (name,
+    date, course, pay timing, settlement), competitions (`newPot(catalogId,g)` + per-kind rule panels), who's in (a **search box**
+    over `gamePool()` — eight hits as you type, never a list of every name —, guests by name, the players × pots checkbox grid).
+    A new game starts from the last one's day and competitions (`draftFromLast({players:false})`) with **nobody in it**. One-ball games
     (scramble/foursomes/greensome) cannot share a round with own-ball competitions.
   - **Game page** (`vGame`): after-the-round games lead with competitions + settlement, before-the-round games with
     the who's-in grid; each competition card shows live standings (`potStandingsHTML` via `potPub(g,pot)` — the event
@@ -606,7 +593,7 @@ Tournament = { id, name, season, days, startDate, field:[{id,memberId,team,paid,
 
 ### The marketing website (`site/`)
 Plain static pages, one stylesheet (`site/site.css`), real product screenshots in `site/img/` (JPEG, 1600 px wide; phones 600 px):
-`index.html` (the three offerings, a tournament day, the hub tree, the feature tiles, the demo form → a mailto to hello@flagstickhub.com),
+`index.html` (the three offerings, a tournament day, the hub tree, the feature tiles, the demo form → the Edge Function **`demo-request`** (`supabase/functions/demo-request`, no JWT: Resend → `DEMO_TO`, default info@flagstickhub.com, reply-to the visitor, an acknowledgement to them, a honeypot field; the page falls back to a mailto when the function cannot be reached — it needs `RESEND_API_KEY` / `MAIL_FROM` in the project's Edge Function secrets),
 `golf.html` (tournaments, registration, pairings and cards, live scoring, GameCast, formats, the course library, associations, member
 games, cart games, budget and treasury), `club.html` (member accounts, the account, the member portal, point of sale, on the floor,
 tickets, bookings, staff, reports, the directory), `nonprofits.html`, `about.html`; `features.html` only redirects to `golf.html`. The
@@ -964,13 +951,15 @@ marks the sale's status, logs sales made outside Flagstick (`ref 'external'`), p
 account payment when the bank returns an ACH** (autopay off for that member); a *Merchant Loaded* payload is kept on the account row. **Verified against the
 sandbox the same night with Bushwood's credentials** (the shapes are in the function's header comment): `amount` is an object, a token rides as
 `paymentMethod.token {token, expiry 'MM/YY'}`, a vaulted card as `paymentMethod.vault {paymentMethodId, customerId (a number)}`,
-`paymentType` is 'Credit' | 'Debit', `customData` is an array of {name, value}; a sale answers `responseCode` 0 = approved (10 = error, with
-`responseMessage` as a list), `paymentId`, `customerId`, `paymentMethodId`; a refund the same day is refused ("not settled") so the function
+**`paymentType` is 'Sale' for a card sale** ('Credit' / 'Debit' are the ACH directions — the first probes sent 'Credit' and
+Deluxe answered "Merchant not enabled for Credit", which read as a merchant problem until the owner's virtual-terminal sale showed
+`paymentType: SALE` in `/payments/search`; a card, a form token and a vaulted card all approved with 'Sale' that night), `customData` is an
+array of {name, value}; a sale answers `responseCode` 0 = approved (10 = error, with `responseMessage` as a list), `paymentId`, `authResponse`
+(the approval code), `amountApproved`; `isSavePaymentMethod` on a sale returns no vault ids, so the wallet is filled through `/paymentmethods`; a refund the same day is refused ("not settled") so the function
 voids the whole payment through `/payments/cancel` instead and logs it as kind `void`; the hosted form renders with the **Partner Token** as
 `xtoken` (the function falls back to it when no HPF token is saved) and answers `{type:'Token', status:'success', data:{token, expDate,
 cardType, maskedPan, nameOnCard}}` — the browsers send that object on whole (`hpfToken`), the function reads it with `tokenOf`. Still
-unseen: an approved sale and ACH's `paymentType` — the sandbox merchant TMG set up is a fleet merchant ("Merchant not enabled for Credit"; the
-vault form shows odometer and driver's ID), so ask Deluxe to enable Credit and ACH on it. The fake (`_payments` in `_harness.py`) answers as the sandbox would (a token ending 0005
+unseen: an ACH sale (sent as 'Debit' with the form's aba / dda token) and the webhook's real payloads. The fake (`_payments` in `_harness.py`) answers as the sandbox would (a token ending 0005
 or `tok_decline` is declined) and `HPF_STUB` stands in for the hosted form (`.hpf-stub`, `#hpfGo`). docs/tenancy.md §8 has the per-client steps.
 **The member portal, second pass (`portal-wallet-setup.sql`; the owner, Nov 20: "every member should have a login… add payment information,
 settle open balances… see each month's statement and their full balance owed… set up autopay… I should also be able to masquerade as any
@@ -1166,8 +1155,7 @@ groups, printed scorecards — the printed cards include a live-scoring QR that 
 
 - **Built Oct 2026 (the Finish tab):** `wrap-setup.sql` (applied to the project) + the scoring page's Finish tab + the hub's
   `wrapSync`: the players close scoring, call out the skins, draw and record the payouts from their phones (§2, small groups).
-  Then the **phone-first game setup** (quick setup, §2): New game = three steps, Same as last time = one tap, the full
-  designer behind More options.
+  (The phone-first quick setup built then — three steps, Same as last time — was scrapped on Nov 20, 2026: New game is the designer.)
 - **Built Oct 2026 (surveys):** `src/surveys.js` + `survey.html` + `survey-setup.sql` (applied to the project); the MGA's first
   survey comes from `memberSurveyTemplate()`.
 - **Built Oct 2026 (tenants, portal, logins):** `tenants-setup.sql` + `portal-setup.sql`, `src/portal.js` (the client

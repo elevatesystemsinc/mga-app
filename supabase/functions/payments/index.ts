@@ -24,14 +24,16 @@
 // /secservices/oauth2/v2/token (Basic client_id:client_secret, grant_type=client_credentials, expires_in 3600), then every call with
 // Authorization: Bearer + PartnerToken headers under /dpp/v1/gateway (GET / answers the gateway's version). A sale is
 // POST /payments {amount:{amount,currency}, paymentMethod:{token:{token,expiry 'MM/YY'}} | {vault:{paymentMethodId (uuid), customerId (number)}}
-// | {card:{card,expiry,cvv,nameOnCard}}, paymentType:'Credit'|'Debit', orderData:{orderId}, customData:[{name,value}], isSavePaymentMethod}
-// → {paymentId, responseCode (0 = approved; 10 = error), responseMessage:[…], amountApproved, authResponse, customerId, paymentMethodId,
-// token, batchNumber}. Refund: POST /refunds {paymentId, amount:{amount,currency}} — "Transaction has not settled" the same day, when
-// POST /payments/cancel {paymentId} voids it instead. Vault: POST /customers {firstName,lastName,email} → {customerId (number)};
-// POST /paymentmethods {customerId, paymentMethod:{token|card}} → {paymentMethodId}; GET /customers/{id} lists the vaults. The Hosted
-// Payment Form renders with the PARTNER TOKEN as xtoken and answers {type:'Token', status:'success', data:{token, expDate, maskedPan,
-// cardType, nameOnCard}}; its ACH form posts aba / dda fields. Not yet seen: an approved sale (the sandbox merchant TMG set up is a
-// FLEET merchant — "Merchant not enabled for Credit" — ask Deluxe to enable Credit and ACH on it) and ACH's paymentType value.
+// | {card:{card,expiry,cvv,nameOnCard}}, paymentType:'Sale' (a card sale — 'Credit' / 'Debit' are the ACH directions, so 'Credit' answered
+// "Merchant not enabled for Credit"), orderData:{orderId}, customData:[{name,value}]} → {paymentId, responseCode (0 = approved; 10 = error),
+// responseMessage:[…] | null, amountApproved, authResponse (the approval code), batchNumber, token}. APPROVED on the sandbox with a card, a
+// form token and a vaulted card (Nov 20). isSavePaymentMethod on a sale returns no vault ids: the vault is filled through
+// POST /paymentmethods {customerId, paymentMethod:{token|card}} → {paymentMethodId} after POST /customers {firstName,lastName,email} →
+// {customerId (number)}; GET /customers/{id} lists the vaults. Refund: POST /refunds {paymentId, amount:{amount,currency}} once settled;
+// the same day POST /payments/cancel {paymentId} voids it (approved). POST /payments/search {startDate,endDate 'MM/DD/YYYY'} lists
+// payments with payment.paymentType SALE | ACH/EFT - DEBIT, card.card (last 4), billingAddress.paymentOrigin. The Hosted Payment Form
+// renders with the PARTNER TOKEN as xtoken and answers {type:'Token', status:'success', data:{token, expDate, maskedPan, cardType,
+// nameOnCard}}; its ACH form posts aba / dda fields (an ACH token sale is sent as paymentType 'Debit' — not yet exercised).
 import { createClient } from "npm:@supabase/supabase-js@2.45.4";
 
 const cors = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type", "Access-Control-Allow-Methods": "POST, OPTIONS" };
@@ -146,11 +148,12 @@ Deno.serve(async (req) => {
     const keepCard = async (member_id: string, customerId: string, methodId: string, label: string) => {
       await admin.from("member_users").update({ autopay: true, pay_provider: "deluxe", pay_customer: customerId, pay_method: methodId, pm_label: label }).eq("tenant", tenant).eq("member_id", member_id);
     };
-    const sale = async (o: { token?: unknown; methodId?: string; customerId?: string; amount: number; descr: string; ref: string; member_id?: string; save?: boolean; customer?: Record<string, unknown> }) => {
+    const sale = async (o: { token?: unknown; methodId?: string; customerId?: string; ach?: boolean; amount: number; descr: string; ref: string; member_id?: string; save?: boolean; customer?: Record<string, unknown> }) => {
       if (!acct?.status?.ok) throw new Error("This club does not take payments online yet");
       const amount = r2(o.amount); if (amount < 1) throw new Error("The minimum online payment is $1.00"); if (amount > 25000) throw new Error("That amount is too large for an online payment");
       const tk = tokenOf(o.token);
-      const body: Record<string, unknown> = { amount: { amount, currency: "USD" }, paymentType: "Credit", orderData: { orderId: o.ref.slice(0, 50) }, customData: [{ name: "tenant", value: tenant }, { name: "ref", value: o.ref }, { name: "member", value: o.member_id || "" }, { name: "descr", value: o.descr.slice(0, 120) }] };
+      const ach = o.methodId ? !!o.ach : tk.card ? (!!tk.card.aba || !!tk.card.dda || /ach|bank|check/i.test(String(tk.card.type || tk.card.cardType || ""))) : false;
+      const body: Record<string, unknown> = { amount: { amount, currency: "USD" }, paymentType: ach ? "Debit" : "Sale", orderData: { orderId: o.ref.slice(0, 50) }, customData: [{ name: "tenant", value: tenant }, { name: "ref", value: o.ref }, { name: "member", value: o.member_id || "" }, { name: "descr", value: o.descr.slice(0, 120) }] };
       if (o.methodId) { body.paymentMethod = { vault: { paymentMethodId: o.methodId, customerId: Number(o.customerId) || o.customerId } }; }
       else if (tk.token) { body.paymentMethod = { token: { token: tk.token, expiry: tk.expiry } }; if (o.save) { body.isSavePaymentMethod = true; if (o.customerId) body.customerId = Number(o.customerId) || o.customerId; } }
       else throw new Error("No card to charge");
@@ -219,7 +222,7 @@ Deno.serve(async (req) => {
       let s: Awaited<ReturnType<typeof sale>>, kept = false;
       if (b.method_id) {
         const { data: w } = await admin.from("member_payment_methods").select("*").eq("tenant", tenant).eq("member_id", m.id).eq("id", String(b.method_id)).is("removed_at", null).maybeSingle(); if (!w) return json({ error: "That payment method is not in your wallet" });
-        s = await sale({ methodId: w.method_id, customerId: w.customer_id, amount: Number(b.amount), descr: `${t.name} — member account payment`, ref: "acct", member_id: m.id });
+        s = await sale({ methodId: w.method_id, customerId: w.customer_id, ach: w.kind === "ach", amount: Number(b.amount), descr: `${t.name} — member account payment`, ref: "acct", member_id: m.id });
         s.label = [w.nickname, w.label].filter(Boolean).join(" · ") || s.label;
       } else {
         if (!tk.token) return json({ error: "The card was not tokenized" });
@@ -239,7 +242,8 @@ Deno.serve(async (req) => {
     if (action === "charge_vault" || action === "autopay_run") {
       if (!staff) return json({ error: "Staff only" }, 403);
       const run = async (u: Record<string, unknown>, amount: number, descr: string) => {
-        const s = await sale({ methodId: String(u.pay_method), customerId: String(u.pay_customer || ""), amount, descr, ref: "autopay", member_id: String(u.member_id) });
+        const { data: wm } = await admin.from("member_payment_methods").select("kind").eq("tenant", tenant).eq("method_id", String(u.pay_method)).is("removed_at", null).maybeSingle();
+        const s = await sale({ methodId: String(u.pay_method), customerId: String(u.pay_customer || ""), ach: wm?.kind === "ach", amount, descr, ref: "autopay", member_id: String(u.member_id) });
         const itemId = await postPayment(String(u.member_id), s.amount, "deluxe:" + s.id, descr, s.method, s.id); if (itemId) await admin.from("payments").update({ acct_item: itemId }).eq("id", s.logId); return s;
       };
       const balance = async (member_id: string) => { const { data: items } = await admin.from("acct_items").select("kind, amount").eq("tenant", tenant).eq("member_id", member_id).is("void_at", null); return r2((items || []).reduce((s: number, i: { kind: string; amount: number }) => s + (i.kind === "charge" ? Number(i.amount) : -Number(i.amount)), 0)); };
@@ -276,5 +280,5 @@ Deno.serve(async (req) => {
       return json({ ok: true, refund_id: s.id, amount });
     }
     return json({ error: "Unknown action" });
-  } catch (e) { return json({ error: String((e as Error)?.message || e) }, 500); }
+  } catch (e) { return json({ error: String((e as Error)?.message || e) }); }   // a 200 with the message: the clients show it (supabase-js hides the body of a non-2xx answer)
 });

@@ -73,7 +73,7 @@ end $$;
 revoke all on function public.member_me(text) from public;
 grant execute on function public.member_me(text) to authenticated;
 
--- staff see any member's portal exactly as the member does (read-only in the page: no paying on their behalf)
+-- staff see any member's portal exactly as the member does (the page stays live: a payment or card change made from it lands on that member)
 create or replace function public.member_me_as(p_tenant text, p_member text) returns jsonb
 language plpgsql security definer set search_path = public as $$
 declare m jsonb; club jsonb;
