@@ -58,9 +58,13 @@ src/
   payouts.js           Calcutta payouts math (calcPayouts, ties) + Results / Payouts sub-tabs
   surveys.js           Surveys: anonymous member surveys (sections → questions, public link, results, CSV)
   signup.js            Player registration: a tournament's public sign-up page (the Field tab's card, the published copy, entries → the field)
+  crm.js               Contacts — the CRM layer: companies & households (CLUB.companies), people with a company / title / role / tags, sponsorships by
+                       party (company, household or individual) with their cast, derived relationship tags, notes; the nonprofit's Contacts page
   billcore.js          the member statement PDF page (statementPage), shared by the hub and the member portal            [shared]
   billing.js           Member accounts & billing (module 'billing', club hub, staff only): classes, the monthly run, tax/service,
                        minimums, finance charges, aging, statements, GL export, Stripe Connect, the mail function
+  pay.js               Online payments through Deluxe: the club's credentials (Billing setup), payFn → the `payments` function, cardSheet (the hosted form),
+                       refunds and cards on file on the account page, autopay for Run statements
   pos.js               Point of sale (module 'pos'): outlets, products & stock, the register, tickets to accounts or cash / card
   poslib.js            the item libraries: the club F&B menu with modifiers (FNB_LIBRARY), the golf shop (SHOP_LIBRARY), the racket shop (RACKET_LIBRARY) → posLibraryDrawer
   bookings.js          Bookings (module 'club'): the tee sheet, courts, cabanas, pool, lessons — the sheet, check-in, fees, blocked times, the printed sheet
@@ -110,6 +114,8 @@ python3 tests/test_hammer.py  # Hammer in a cart: thrown, accepted (×2, the ham
 python3 tests/test_cartgame.py # a cart game: five players, no pots, one group, the phone offers the side games and has no Finish tab; browsing ahead writes no pars
 python3 tests/test_sponsorteam.py # a sponsor tier that includes a team: TBD seats in the field, counted as players, named one by one, dropped with the package
 python3 tests/test_schedule.py # a tournament's schedule across the days before and after the golf, sorted by time, on the registration copy
+python3 tests/test_payments.py # online payments through Deluxe against the fake: credentials → connected, the portal's hosted form → a payment posted once, a declined card, autopay, refund, charge card on file, the hub register and a station's card sheet, the wallet, the staff view, the invitations
+python3 tests/test_crm.py     # companies & contacts: a company and its people, a sponsor picked from the list (its contact onto the directory), the record, the MGA's link-by-name, one write, a scoped login reads only; a nonprofit's Contacts (household, individual sponsor, billing contact, named seats → golfers, tags, person record, vendor)
 git add -A && git commit && git push origin main  # Render deploys main to app.wcccmga.org
 ```
 Tests need `pip install playwright && playwright install chromium` and `cd tests && npm i xlsx@0.18.5`.
@@ -572,7 +578,7 @@ Tournament = { id, name, season, days, startDate, field:[{id,memberId,team,paid,
 
 ### The marketing website (`site/`)
 Plain static pages, one stylesheet (`site/site.css`), real product screenshots in `site/img/` (JPEG, 1600 px wide; phones 600 px):
-`index.html` (the three offerings, a tournament day, the hub tree, the feature tiles, the demo form → a mailto to hello@flagstickhub.com),
+`index.html` (the three offerings, a tournament day, the hub tree, the feature tiles, the demo form → the Edge Function **`demo-request`** (`supabase/functions/demo-request`, no JWT: Resend → `DEMO_TO`, default info@flagstickhub.com, reply-to the visitor, an acknowledgement to them, a honeypot field; the page falls back to a mailto when the function cannot be reached — it needs `RESEND_API_KEY` / `MAIL_FROM` in the project's Edge Function secrets),
 `golf.html` (tournaments, registration, pairings and cards, live scoring, GameCast, formats, the course library, associations, member
 games, cart games, budget and treasury), `club.html` (member accounts, the account, the member portal, point of sale, on the floor,
 tickets, bookings, staff, reports, the directory), `nonprofits.html`, `about.html`; `features.html` only redirects to `golf.html`. The
@@ -595,11 +601,13 @@ the app (`docs/tenancy.md`): `flagstickhub.com` and `www` point at wherever this
 | `acct_items`, `acct_statements` + `can_staff(p_tenant)` | member accounts & billing (`billing-setup.sql`): the club's ledger, staff only. |
 | `member_users`, `tenants.stripe_account/stripe_status` + RPC `member_me(p_tenant)`, `member_autopay_off(p_tenant)` | the member portal and online payments (`member-setup.sql`); Edge Functions `mail`, `stripe`, `stripe-webhook`. |
 | `pos_tickets` | point of sale tickets (`pos-setup.sql`), staff only. |
+| `payment_accounts` (tenant, env, client_id, client_secret, partner_token, hpf_token, webhook_secret, status), `payments` (the log), `member_users.pay_*`, `tenants.pay_status` + RPC `pay_online(p_tenant)` | online payments through Deluxe (`payments-setup.sql`): the credentials table has no policies (service role only); the log is readable by staff; Edge Functions `payments` and `payments-webhook`. |
 | `mail_settings` (tenant, org) | each organization's outgoing e-mail sender and provider (`mail-setup.sql`); RLS `can_org`. |
 | `pos_stations`, `pos_fires`, `pos_tickets` (+ station, table_no, server…) + RPC `pos_boot/pin/members/checks/check_put/fire/close/void/expo/bump` | registers and kitchen screens on the floor (`pos-stations-setup.sql`): token-keyed security-definer functions, like admin links. |
 | `bookings` + RPC `member_id_of`, `member_slots`, `member_book`, `member_cancel` | bookings (`booking-setup.sql`): staff on the sheet, members through the security-definer functions that enforce the facility's rules. |
 | `booking_blocks` | closed times on a sheet (`blocks-setup.sql`, which also teaches `member_slots` / `member_book` about them and `member_me` about events). |
 | `staff_clock`, `pos_stations.dept` + RPC `staff_clock`, `club_staff`, `station_dept`, `staff_fits` | the time clock and the club-wide staff list behind the registers (`staff-setup.sql`). |
+| `crm-setup.sql` | `scoped_read` with `companies` — a board login's cut-down club document carries the company list (read-only). |
 | `hub_keys` (org_id, key_hash, label, revoked_at) + RPC `hub_key_org/read/write/people/golf_event/golf_delete/score/share` | admin links (`admin-links-setup.sql`): security-definer functions that act for exactly one organization. |
 | `mm_tournament` | the retired Member-Member app's row (`supabase-setup.sql`). Archive only — no hub code reads or writes it. |
 | `service-role-grants.sql` | the service role's select / insert / update / delete on every public table (and on tables created later). The Edge Functions run as the service role; on Nov 19, 2026 it had lost those rights on every table, so `admin-users` could not read `flagstick_admins` and the portal said "Your login may not manage these logins" (and Open hub's one-click sign-in failed the same way). Run it again if a function starts answering 403 / empty reads. |
@@ -758,6 +766,55 @@ spot (You, Player 2…): search the pool (two letters, people already entered or
 field questions yes / no per player; a note for the shop. `signup_submit` enforces the same (size, `need` = size − players, pool, no
 doubles, not already entered — in the field or pending) and a closed page. The fake emulates all four functions.
 
+### Contacts — the CRM layer (`crm.js`, `crm-setup.sql`, `tests/test_crm.py`)
+**The nonprofit pass (Nov 20; the owner: "a company that sponsors the event has a billing lady or an HR director who is the primary point of
+contact… but also four golfers playing with them as part of their sponsorship level… an individual becomes a sponsor, not tied to a company…
+households can be family grouped as one donor… Contacts works fine for the name… let's only work in the nonprofit section"):** on a nonprofit
+(`contactsOn()` = `crmOn()` + `isNonprofit()`) one rail entry **Contacts** (section Contacts) replaces Donors & guests and Companies — `vContacts`
+with a **People / Companies & households** switch (`view.cseg`), the **tag filters** (`TAGS`: donor, sponsor, guest, player, vendor, volunteer,
+board, partner, media) and a search; the `members` page renders it too (`NAV_OWNS.contacts`, the page map). A record in `CLUB.companies` carries
+`kind` company | household (`orgKind`, `orgLabel`; "The Walls family", Known as, family roles `HOUSEHOLD_TYPES`; `companyDrawer(null,'household')`,
+the family member's last name prefilled); a person's `ctypes` are their **role** at the company (`CONTACT_TYPES`: primary contact, decision maker,
+billing, HR, golfer…), `tags` are added by hand, and **relationship tags are derived** by `contactIndex()` from what people and companies did —
+donor (paid at an event: `e.payments` by paddle through the guest's `personId`), guest (on a guest list), player (in a field), sponsor (on a
+sponsorship as the party, primary or billing contact), vendor (named on an event expense: `x.vendorId`, the expense drawer's Vendor box), volunteer
+/ board (the Users list) — `tagsOfP` / `tagsOfC`, `IX.given` (what a person paid at events and on their own sponsorships), `IX.guest`. **A
+sponsorship names its sponsor and its cast**: `s.companyId` (a company or household) **or `s.personId` (an individual)** — the Sponsor box
+(`companyPickHTML(…,{people:true})`) searches companies, households and people on a nonprofit —, `s.contactId` (the **Primary contact** box),
+`s.billingId` (the **Billing contact** box, `s.billing`), and the players are the field seats carrying `sponsorId`: `sponsorContactSync` puts both
+contacts on the company with their roles (an individual sponsor is their own contact unless one is named), `sponsorPlayersSync(t)` (the team editor's
+Save, the sponsor drawer, Link them) makes a named seat on a sponsor's team a person of the company typed **Golfer**. `personSponsorships(p)` =
+every row a person has a part in with `roles` (Sponsor · Primary contact · Billing · Player); `tRows` / `eRows` carry `team`, `players`, `tbd`,
+`billing`. **The person record** (`vContact`, `view.contactId`, from the People list or a company's People card): company · title (a chip that opens
+the company), roles, tags, lifetime given / this year / events, Sponsorships (with the part they play), Events (guest-list entries with ticket,
+table, paddle and what was paid, → the event's Guests tab), Notes (`p.log`), Edit → `editMember`. A company record adds **Paid to** (`vendorLines`)
+and the sponsorship rows read "Team 7: Ann, Bo, 2 TBD". Clubs and associations keep the Companies page as before (the same code without the people
+view and with the company-only picker). The first pass, below, still describes the shared machinery.
+
+### Companies — the CRM layer, first pass (`crm.js`, `crm-setup.sql`, `tests/test_crm.py`)
+The owner, Nov 20, 2026: "associations, golf shops and even course management have the need for some level of CRM functionality… companies
+purchase sponsorships… contacts within their company that should have different contact types — golfer, decision maker, their titles… DCO
+needs the ability to see the company, its contacts, the type of sponsorship level that company has paid for." **Companies** sits on the rail
+right after the Directory / Donors & guests / Members (club, nonprofit and association hubs; `crmOn()` — never an admin link; a scoped board
+login reads and cannot change, `crmEdit()`). The list is club-wide like the directory: `CLUB.companies = [{id, name, industry, website, phone,
+email, address1, city, state, zip, notes, log:[{id, at, by, text}], createdAt}]` (`companies()` reads without touching the document; `companiesW()`
+for writers; `companyFor(name,{create})` matches by name, case-insensitive). **A person carries `company` (the id), `title` and `ctypes`**
+(`CONTACT_TYPES`: Decision maker, Golfer, Billing, Marketing, Assistant, Owner, Volunteer, Sponsor contact — chips, several at once) — in
+`PERSON_KEYS`, on the Directory editor (`crmPersonFields`), the directory rows ("Acme Bank · President" under the name, searchable) and the
+roster import (Company / Title columns; a company named in a file is made on import, `rosterSet` / `rosterVal`). **A sponsorship carries
+`companyId` and `contactId`**: the tournament sponsor drawer and the fundraising event's sponsor drawer take the company through
+`companyPickHTML` / `wireCompanyPick` / `readCompanyPick` (search as you type; a new name becomes a company on Save; `s.company` / `s.name` stay
+the company's name) and the contact through `contactPickHTML` (the company's people as suggestions); `sponsorContactSync` puts the contact on
+the directory (matched by name, else added as a `memberType:'Contact'` person with the Sponsor contact type) so DCO's sponsor contact is a
+person of that company at once. `sponsorshipsOf(c)` is every sponsor row the hub can see that carries the company's id **or matches its
+name** (older rows): the hub's own tournaments, on the club tier every organization's tournaments (read-only, named by organization) and the
+fundraising events — each with level, pledged, received and status (`spStatus`); the Companies page offers **Link them** (`linkSponsors`)
+for rows without an id. **The record** (`vCompany`, `view.companyId`): chips (this year's level · status, industry, site, phone, place),
+KPIs (lifetime, the year, contacts), People (→ `contactDrawer`: name, title, company, types, e-mail, phone; the full directory record is a
+link on the club tier), Notes (`companyNoteDrawer`: dated, signed), Sponsorships (tap an own row → that tournament's / event's Sponsors tab).
+Deleting a company keeps its people (without a company) and its sponsor rows (without the link). `crm-setup.sql` teaches `scoped_read` to
+hand the companies to a board login.
+
 ### Surveys (`surveys.js`, `survey_src.html` → `survey.html?k=TOKEN`, `survey-setup.sql`)
 Any organization's hub (and the club) has **Surveys**: `db.surveys = [{id, title, intro, status:'draft'|'open'|'closed', token,
 sections:[{id, title, intro, comments (an open box at the end), questions:[{id, type:'rating'|'slider'|'choice'|'multi'|'yesno'|'text',
@@ -852,6 +909,60 @@ localStorage. `acctPost(o)` is the one way anything lands on an account.
   `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `RESEND_API_KEY`, `MAIL_FROM` (docs/tenancy.md §6). Without the keys the
   functions answer "not configured" and the hub / portal say so; the fake (`_harness.py`) emulates `member_me`,
   `member_autopay_off`, a `mail` that records what it sent and a `stripe` that is never configured.
+
+### Online payments — Deluxe (`pay.js`, `payments-setup.sql`, `supabase/functions/payments`, `supabase/functions/payments-webhook`, `tests/test_payments.py`)
+The owner, Nov 20, 2026, with the Deluxe solution guide for Flagstick: "start building the entire payment integration… use it in our demo
+client, Bushwood, and then as a template for other clients." Deluxe Payments Platform on the club's OWN merchant account (Trinity Merchant Group
+onboards it; Deluxe e-mails the credentials); the Stripe Connect path is retired (functions still deployed, nothing calls them). **Card data
+never touches Flagstick**: Deluxe's **Hosted Payment Form** (`https://hostedform2.deluxe.com/V2/deluxe.js`, `HostedForm.init({containerId,
+xtoken, xrtype:'Generate Token', xpm, xAmount, xcheckSurcharge, xbtntext}, {onSuccess, onFailure, onInvalid}).then(i=>i.renderHpf())`) turns the
+card or bank account into a **token** in the browser; the Edge Function **`payments`** charges the token (or a card kept in Deluxe's vault) and
+posts the payment once (ref `deluxe:<payment id>`). **Per club** (`payment_accounts`, service role only; `payConfigureDrawer` in Billing setup →
+*Set up Deluxe*: env sandbox | production, Client ID, Client Secret, Partner Token, HPF token, webhook secret; *Save & check* = `configure` →
+an OAuth client-credentials token at `/secservices/oauth2/v2/token` + the gateway health call; the webhook URL shown is
+`…/functions/v1/payments-webhook?tenant=<slug>`). `acctSettings().online = {provider:'deluxe', ok, connected, env, at, message}`
+(`payState`; `charges_enabled` kept as an alias), `payOn()`, `payFn(body)`. **Actions**: `configure` / `status` / `transactions` (staff), `hpf`
+(what the form needs), `pay {token, amount, save}` / `setup {token}` (the member, by the directory e-mail; `save` keeps the card → `member_users
+.pay_customer / pay_method / pm_label`, autopay on), `sale {token, amount, ref, descr, member_id?}` (staff, or a **station by its key**),
+`refund {payment_id, amount, reason}` (the reversal posts on the account, "Online payment refunded · reason"), `charge_vault {member_id, amount}`,
+`autopay_run`. Every processor call is logged in **`payments`** (kind sale | refund | vault, the processor's id, status, label "Visa ·4242",
+`ref` = acct | autopay | pos:<ticket> | fund:<event>:<paddle>, `acct_item`). **`cardSheet({amount, descr, ref, member_id})`** (pay.js; the same
+in `pos_src.html`) is the one modal with the hosted form → the token → `sale`; used by the hub register's Card (`t.card`), a station's Card
+(`B.pay` from `pay_online`, the label on the payment), and the fund checkout's *Charge a card now* (`e.payments[].pid`). The portal
+(`member_src.html`): `pay_online` after `member_me` sets `ME.online`; the pay sheet asks the amount and *save this card*, then shows the form;
+*Set up autopay* shows it with no amount. **The webhook** verifies `x-dpp-signature` (HMAC-SHA256 hex of the raw body with the club's secret),
+marks the sale's status, logs sales made outside Flagstick (`ref 'external'`), posts a refund made from the Deluxe portal, and **voids the
+account payment when the bank returns an ACH** (autopay off for that member); a *Merchant Loaded* payload is kept on the account row. **Verified against the
+sandbox the same night with Bushwood's credentials** (the shapes are in the function's header comment): `amount` is an object, a token rides as
+`paymentMethod.token {token, expiry 'MM/YY'}`, a vaulted card as `paymentMethod.vault {paymentMethodId, customerId (a number)}`,
+**`paymentType` is 'Sale' for a card sale** ('Credit' / 'Debit' are the ACH directions — the first probes sent 'Credit' and
+Deluxe answered "Merchant not enabled for Credit", which read as a merchant problem until the owner's virtual-terminal sale showed
+`paymentType: SALE` in `/payments/search`; a card, a form token and a vaulted card all approved with 'Sale' that night), `customData` is an
+array of {name, value}; a sale answers `responseCode` 0 = approved (10 = error, with `responseMessage` as a list), `paymentId`, `authResponse`
+(the approval code), `amountApproved`; `isSavePaymentMethod` on a sale returns no vault ids, so the wallet is filled through `/paymentmethods`; a refund the same day is refused ("not settled") so the function
+voids the whole payment through `/payments/cancel` instead and logs it as kind `void`; the hosted form renders with the **Partner Token** as
+`xtoken` (the function falls back to it when no HPF token is saved) and answers `{type:'Token', status:'success', data:{token, expDate,
+cardType, maskedPan, nameOnCard}}` — the browsers send that object on whole (`hpfToken`), the function reads it with `tokenOf`. Still
+unseen: an ACH sale (sent as 'Debit' with the form's aba / dda token) and the webhook's real payloads. The fake (`_payments` in `_harness.py`) answers as the sandbox would (a token ending 0005
+or `tok_decline` is declined) and `HPF_STUB` stands in for the hosted form (`.hpf-stub`, `#hpfGo`). docs/tenancy.md §8 has the per-client steps.
+**The member portal, second pass (`portal-wallet-setup.sql`; the owner, Nov 20: "every member should have a login… add payment information,
+settle open balances… see each month's statement and their full balance owed… set up autopay… I should also be able to masquerade as any
+member"):** the **wallet** is `member_payment_methods` (one row per card or bank account in Deluxe's vault: `method_id`, `customer_id`, `kind`,
+`label`, `nickname`, `exp`, `is_default`, `removed_at`; staff read it, the function writes it) — the portal's *Payment methods* card (Add →
+the hosted form → `wallet_add {token, nickname, make_default}`; Make default → `wallet_default`; Remove → `wallet_remove`, which PATCHes the
+vault method inactive); the pay sheet offers the wallet as chips (default on) and pays with `pay {amount, method_id}` in one tap, or *New card
+or bank account* → the form → `pay {token, save, make_default}`; **autopay runs on the wallet's default** (`autopay_on` / `autopay_off`;
+`syncAutopay` keeps `member_users.autopay / pay_method / pm_label` = the default, so `autopay_run`, the hub's chips and *Charge card on file*
+read one place); `setup` = wallet_add + autopay_on. **Statements** show each month's closing balance with a status (Nothing due · Paid ·
+Open · Past due — `paidAfter(s)`: payments and credits posted after the period end against the closing) and a *Pay* button for the open
+amount. `member_portal_doc(tenant, member, club)` builds the document for `member_me()` (now with `wallet`, `autopay_method`, `dueDays`,
+`online` from `pay_online()`) and for **`member_me_as(tenant, member)`** — staff only — behind **View portal as member** on the account page
+(`member.html?as=<id>`, the hub's session carries over on the same origin): `ME.staffView` puts a *Staff view* banner up and turns Sign out into Close; **every control stays live** (the owner: "I don't want the staff view
+to gate saving payment information or making a payment") — the portal sends `as` with each call and the function resolves the member through
+`member_me_as` when the caller is staff, so the payment, card or autopay change lands on that member. **Every member gets a login**: Member accounts → *Invite N to the portal*
+(`invitePortal`: every active member with an e-mail who has never signed in gets the portal link through `sendMail`; signing in is the
+one-time e-mail link, no password); the account page's chip reads *Portal · signed in / never signed in / No e-mail — no portal* and lists
+the wallet. The fake emulates the wallet actions and `member_me_as`; `tests/test_payments.py` covers the wallet, the staff view and the invitations.
 
 ### Point of sale (`pos.js`, `pos-setup.sql`, module `pos`) and Bookings (`bookings.js`, `booking-setup.sql`, module `club`)
 - **POS** (`posOn()`, staff only): `CLUB.pos = {outlets:[{id,name,kind fnb|proshop,item (the billing item it charges as)}],
@@ -1205,7 +1316,8 @@ groups, printed scorecards — the printed cards include a live-scoring QR that 
 
 ### Git
 - Repo: `github.com/elevatesystemsinc/mga-app`. Work on **`main`**; confirm with `git branch --show-current` before
-  committing. Always push explicitly: `git push origin main`. Touch `Hub` only for a season bug fix, and port the
+  committing. Always push explicitly: `git push origin main`. **No side branches or pull requests unless the owner asks** (Nov 20, 2026:
+  "stop building on side branches, I'll tell you when") — Render deploys only `main`, so work on a branch is invisible to him. Touch `Hub` only for a season bug fix, and port the
   same fix here. Commit messages: say what changed ("Calcutta: split Results and Payouts tabs"), not "update".
 
 ## 7. Working with the owner

@@ -16,7 +16,7 @@ async def local(pg):
 def page(name): return 'file://'+os.path.join(ROOT,name)
 
 class FakeDB:
-    def __init__(self): self.rows={}; self.writes=collections.Counter(); self.reads=0; self.tenancy=False; self.admin=False; self.user_tenants=['wccc']; self.grants=None; self.me='u-board'; self.auth_users=[]; self.fn=True; self.mails=[]
+    def __init__(self): self.rows={}; self.writes=collections.Counter(); self.reads=0; self.tenancy=False; self.admin=False; self.user_tenants=['wccc']; self.grants=None; self.me='u-board'; self.auth_users=[]; self.fn=True; self.mails=[]; self.payaccts={}; self.paylog=[]; self.payn=0; self.deluxe_decline=False
     # portal-setup.sql: a login (auth user + tenant_users row). role 'staff' | 'org'; orgs; manage
     def seed_login(self,email,tenant=None,role='staff',orgs=(),manage=False,name='',admin=False):
         uid='u-'+email; self.auth_users.append({'id':uid,'email':email,'password':'pw','created_at':'2026-01-01T00:00:00Z','last_sign_in_at':None,'confirmed':True,'name':name})
@@ -26,7 +26,7 @@ class FakeDB:
     def _my_grant(self,tenant):
         return next((g for g in (self.grants if self.grants is not None else [r for r in self._rows('tenant_users') if r['user_id']==self.me]) if g['tenant']==tenant),None)
     def _cut_club(self,d,orgs):
-        return {'id':'club','kind':'club','name':d.get('name'),'short':d.get('short'),'members':d.get('members',[]),'games':d.get('games',{}),'_rev':d.get('_rev'),'orgs':[o for o in d.get('orgs',[]) if o.get('id') in orgs]}
+        return {'id':'club','kind':'club','name':d.get('name'),'short':d.get('short'),'members':d.get('members',[]),'games':d.get('games',{}),'companies':d.get('companies',[]),'_rev':d.get('_rev'),'orgs':[o for o in d.get('orgs',[]) if o.get('id') in orgs]}
     def _k(self,table,id,tenant='wccc'): return (table,id) if tenant=='wccc' else (table,tenant+'/'+id)
     def seed(self,table,id,data,tenant='wccc'): self.rows[self._k(table,id,tenant)]={'table':table,'id':id,'tenant':tenant,'data':copy.deepcopy(data)}
     def get(self,table,id,tenant='wccc'): r=self.rows.get(self._k(table,id,tenant)); return copy.deepcopy(r['data']) if r else None
@@ -87,6 +87,8 @@ class FakeDB:
                 if r.get('status','live')!='live': continue
                 k=(r.get('country') or 'US',r.get('state') or ''); x=agg.setdefault(k,{'country':k[0],'state':k[1],'n':0,'own':0,'ver':0}); x['n']+=1; x['own']+=1 if r.get('tenant') else 0; x['ver']+=1 if r.get('verified') else 0
             return json.dumps({'data':list(agg.values()),'error':None})
+        if fn=='pay_online':
+            t=next((t for t in self._rows('tenants') if t['slug']==a.get('p_tenant')),None); return json.dumps({'data':bool(t and (t.get('pay_status') or {}).get('ok')),'error':None})
         if fn=='tenant_lookup':
             if not self.tenancy: return json.dumps({'data':None,'error':{'message':'Could not find the function public.tenant_lookup(p_host) in the schema cache','code':'PGRST202'}})
             h=str(a.get('p_host') or '').lower().split(':')[0]
@@ -96,20 +98,31 @@ class FakeDB:
             grants=self.grants if self.grants is not None else [{'tenant':r['tenant'],'role':r['role'],'orgs':r['orgs'],'manage':r.get('manage',False),'name':r.get('name','')} for r in self._rows('tenant_users') if r['user_id']==self.me]
             tenants=sorted({g['tenant'] for g in grants}|set(self.user_tenants)) if self.grants is None and not self._rows('tenant_users') else sorted({g['tenant'] for g in grants})
             return json.dumps({'data':{'admin':self.admin,'tenants':tenants,'grants':grants,'user_id':self.me,'email':'board@test'},'error':None})
-        if fn=='member_me':
+        if fn in ('member_me','member_me_as'):
             me=next((u for u in self.auth_users if u['id']==self.me),None); em=(me or {}).get('email','').lower()
             club=self.get('mga_hub','club',a['p_tenant']) or {}
-            m=next((x for x in club.get('members',[]) if str(x.get('email','')).lower()==em),None)
-            if not em or not m: return json.dumps({'data':{'member':None,'reason':'not a member' if em else 'not signed in','club':club.get('name')},'error':None})
+            if fn=='member_me_as':
+                g=self._my_grant(a['p_tenant'])
+                if not (self.admin or (g and g['role']=='staff')): return err('not allowed')
+                m=next((x for x in club.get('members',[]) if x.get('id')==a.get('p_member')),None)
+                if not m: return json.dumps({'data':{'member':None,'reason':'not a member','club':club.get('name')},'error':None})
+                u0=next((r for r in self._rows('member_users') if r['tenant']==a['p_tenant'] and r['member_id']==m['id']),None)
+                d=json.loads(self._rpc('member_me',dict(a,_as=m)))['data']; d['staffView']=True; d['signedIn']=(u0 or {}).get('last_seen') or ''; return json.dumps({'data':d,'error':None})
+            if a.get('_as'): m=a['_as']
+            else: m=next((x for x in club.get('members',[]) if str(x.get('email','')).lower()==em),None)
+            if (not em and not a.get('_as')) or not m: return json.dumps({'data':{'member':None,'reason':'not a member' if em else 'not signed in','club':club.get('name')},'error':None})
             rows=self._rows('member_users'); u=next((r for r in rows if r['tenant']==a['p_tenant'] and r['member_id']==m['id']),None)
-            if not u: u={'tenant':a['p_tenant'],'member_id':m['id'],'email':em,'user_id':self.me,'autopay':False,'stripe_customer':None,'stripe_pm':None,'pm_label':None,'created_at':'2026-10-26T00:00:00Z','last_seen':None}; rows.append(u)
-            u['last_seen']='2026-10-26T12:00:00Z'
+            if not u:
+                if a.get('_as'): u={'autopay':False,'pm_label':None,'pay_method':None}
+                else: u={'tenant':a['p_tenant'],'member_id':m['id'],'email':em,'user_id':self.me,'autopay':False,'stripe_customer':None,'stripe_pm':None,'pm_label':None,'pay_method':None,'created_at':'2026-10-26T00:00:00Z','last_seen':None}; rows.append(u)
+            if not a.get('_as'): u['last_seen']='2026-10-26T12:00:00Z'
+            wallet=[{k:w.get(k) for k in ('id','kind','label','nickname','exp','is_default','created_at')} for w in sorted([w for w in self._rows('member_payment_methods') if w['tenant']==a['p_tenant'] and w['member_id']==m['id'] and not w.get('removed_at')],key=lambda w:(not w.get('is_default'),w.get('created_at','')))]
             items=sorted([i for i in self._rows('acct_items') if i.get('tenant','wccc')==a['p_tenant'] and i['member_id']==m['id'] and not i.get('void_at')],key=lambda i:(i.get('posted',''),i.get('created_at','')))
             st=sorted([x for x in self._rows('acct_statements') if x.get('tenant','wccc')==a['p_tenant'] and x['member_id']==m['id']],key=lambda x:x['period_end'],reverse=True)
             t=next((t for t in self._rows('tenants') if t['slug']==a['p_tenant']),{})
             facs=[f for f in ((club.get('booking') or {}).get('facilities') or []) if f.get('members',True)]
             bks=sorted([b for b in self._rows('bookings') if b.get('tenant','wccc')==a['p_tenant'] and b['member_id']==m['id'] and b['status'] in ('booked','checked_in') and b['date']>=datetime.date.today().isoformat()],key=lambda b:(b['date'],b['time']))
-            return json.dumps({'data':{'member':{k:m.get(k) for k in ('id','first','last','memberNo','email','address1','city','state','zip','status')},'club':club.get('name'),'message':(club.get('billing') or {}).get('message'),'items':items,'statements':st,'facilities':facs,'bookings':bks,'events':sorted([e for e in (club.get('events') or []) if e.get('public',True) and (e.get('end') or e['date'])>=datetime.date.today().isoformat()],key=lambda e:(e['date'],e.get('start') or '')),'brand':(club.get('brand') or {}).get('logo'),'autopay':u['autopay'],'pm_label':u['pm_label'],'online':bool(t.get('stripe_account')) and bool((t.get('stripe_status') or {}).get('charges_enabled'))},'error':None})
+            return json.dumps({'data':{'member':{k:m.get(k) for k in ('id','first','last','memberNo','email','address1','city','state','zip','status')},'club':club.get('name'),'message':(club.get('billing') or {}).get('message'),'items':items,'statements':st,'facilities':facs,'bookings':bks,'events':sorted([e for e in (club.get('events') or []) if e.get('public',True) and (e.get('end') or e['date'])>=datetime.date.today().isoformat()],key=lambda e:(e['date'],e.get('start') or '')),'brand':(club.get('brand') or {}).get('logo'),'autopay':u.get('autopay',False),'pm_label':u.get('pm_label'),'autopay_method':u.get('pay_method'),'wallet':wallet,'online':bool((t.get('pay_status') or {}).get('ok')) or (bool(t.get('stripe_account')) and bool((t.get('stripe_status') or {}).get('charges_enabled')))},'error':None})
         if fn.startswith('pos_') or fn=='staff_clock':
             key=a.get('p_key') or ''; h=hashlib.sha256(key.encode()).hexdigest() if key else None
             st=next((r for r in self._rows('pos_stations') if r['key_hash']==h and not r.get('revoked_at')),None) if len(key)>=16 else None
@@ -278,7 +291,7 @@ class FakeDB:
             return json.dumps({'data':True,'error':None})
         if fn=='member_autopay_off':
             for r in self._rows('member_users'):
-                if r['tenant']==a['p_tenant'] and r.get('user_id')==self.me: r['autopay']=False; r['stripe_pm']=None; r['pm_label']=None
+                if r['tenant']==a['p_tenant'] and r.get('user_id')==self.me: r['autopay']=False; r['stripe_pm']=None; r['pay_method']=None; r['pm_label']=None
             return json.dumps({'data':True,'error':None})
         if fn=='scoped_read':
             g=self._my_grant(a['p_tenant']); d=self.get('mga_hub',a['p_id'],a['p_tenant'])
@@ -503,10 +516,149 @@ class FakeDB:
             return json.dumps({'data':True,'error':None})
         if fn in('hub_key_golf_event','hub_key_golf_delete','hub_key_score','hub_key_share'): return json.dumps({'data':True,'error':None})
         return err('unknown function '+fn)
+    def _payments(self,b):   # supabase/functions/payments, in miniature (the Deluxe adapter answers as the sandbox would)
+        ok=lambda d:json.dumps({'data':d,'error':None}); er=lambda m:json.dumps({'data':{'error':m},'error':None})
+        tn=b.get('tenant'); act=b.get('action'); t=next((t for t in self._rows('tenants') if t['slug']==tn),None)
+        if not t: return er('Unknown club')
+        station=None
+        if b.get('key'):
+            h=hashlib.sha256(str(b['key']).encode()).hexdigest(); station=next((r for r in self._rows('pos_stations') if r['key_hash']==h and not r.get('revoked_at') and r['tenant']==tn),None)
+        g=self._my_grant(tn); staff=self.admin or bool(g and g['role']=='staff'); who=('station:'+station['name']) if station else ('u:'+self.me)
+        acct=self.payaccts.get(tn); webhook='https://fake.local/functions/v1/payments-webhook?tenant='+tn
+        def redacted(a): return {'provider':'deluxe','env':a['env'],'client_id':(a.get('client_id') or '')[:4]+'…' if a.get('client_id') else '','has_secret':bool(a.get('client_secret')),'partner_token':'…'+(a.get('partner_token') or '')[-6:] if a.get('partner_token') else '','hpf_token':'…'+(a.get('hpf_token') or '')[-6:] if a.get('hpf_token') else '','has_webhook_secret':bool(a.get('webhook_secret')),'status':a.get('status')}
+        def check(a):
+            good=bool(a.get('client_id') and a.get('client_secret') and a.get('partner_token')) and a.get('client_secret')!='bad'
+            a['status']={'at':'2026-11-20T00:00:00Z','ok':good,'message':'Connected' if good else ('Deluxe did not accept the credentials' if a.get('client_secret') else 'not configured: the Deluxe client id and secret are missing')}
+            t['pay_status']={'ok':good,'env':a['env'],'at':a['status']['at'],'message':a['status']['message']}; return a['status']
+        def log(**row): self.payn+=1; row.setdefault('id','pl_%d'%self.payn); row.update({'tenant':tn,'provider':'deluxe','env':acct['env'] if acct else None,'created_at':'2026-11-20T00:00:%02dZ'%(self.payn%60),'created_by':who}); self.paylog.append(row); return row
+        def post_payment(mid,amount,ref,descr,method,reference):
+            had=next((i for i in self._rows('acct_items') if i.get('tenant','wccc')==tn and i.get('ref')==ref),None)
+            if had: return had['id']
+            it={'id':str(uuid.uuid4()),'tenant':tn,'member_id':mid,'kind':'payment','source':'manual','item':'payment','gl':'','ref':ref,'descr':descr,'amount':round(amount,2),'tax':0,'svc':0,'method':method,'reference':reference,'posted':datetime.date.today().isoformat(),'void_at':None,'void_reason':None,'created_at':'2026-11-20T00:00:00Z','created_by':who}
+            self._rows('acct_items').append(it); return it['id']
+        def member():
+            me=next((u for u in self.auth_users if u['id']==self.me),None); em=(me or {}).get('email','').lower(); club=self.get('mga_hub','club',tn) or {}
+            if b.get('as') and staff: return next((x for x in club.get('members',[]) if x.get('id')==b['as']),None)
+            return next((x for x in club.get('members',[]) if str(x.get('email','')).lower()==em),None) if em else None
+        def user_row(mid):
+            rows=self._rows('member_users'); u=next((r for r in rows if r['tenant']==tn and r['member_id']==mid),None)
+            if not u: u={'tenant':tn,'member_id':mid,'email':'','user_id':self.me,'autopay':False,'stripe_customer':None,'stripe_pm':None,'pm_label':None,'pay_provider':None,'pay_customer':None,'pay_method':None,'created_at':'2026-11-20T00:00:00Z','last_seen':None}; rows.append(u)
+            return u
+        def balance(mid): return round(sum((float(i['amount']) if i['kind']=='charge' else -float(i['amount'])) for i in self._rows('acct_items') if i.get('tenant','wccc')==tn and i['member_id']==mid and not i.get('void_at')),2)
+        def sale(token=None,method_id=None,amount=0,descr='',ref='',mid='',save=False):
+            if isinstance(token,dict): token=token.get('token')
+            amount=round(float(amount or 0),2)
+            if amount<1: raise ValueError('The minimum online payment is $1.00')
+            if not token and not method_id: raise ValueError('No card to charge')
+            if (token=='tok_decline') or self.deluxe_decline:
+                log(kind='sale',payment_id=None,amount=amount,status='declined',member_id=mid or None,ref=ref,descr=descr,response={'responseCode':'05'}); raise ValueError('The card was declined: Do not honor')
+            self.payn+=1; pid='dpp_%d'%self.payn; row=log(kind='sale',payment_id=pid,amount=amount,status='approved',method='card',label='Visa ·4242',member_id=mid or None,ref=ref,descr=descr,response={'paymentId':pid,'responseCode':'0','token':token})
+            return {'id':pid,'label':'Visa ·4242','method':'card','amount':amount,'customerId':'cus_'+(mid or 'x'),'methodId':('pm_'+pid) if save else '','row':row}
+        if act=='configure':
+            if not staff: return er('Only the club\'s staff may set up payments')
+            cur=acct or {}; keep=lambda k:(b.get(k) or cur.get(k) or None)
+            acct={'tenant':tn,'provider':'deluxe','env':'production' if b.get('env')=='production' else 'sandbox','client_id':keep('client_id'),'client_secret':keep('client_secret'),'partner_token':keep('partner_token'),'hpf_token':keep('hpf_token'),'webhook_secret':keep('webhook_secret'),'status':None}
+            self.payaccts[tn]=acct; check(acct); return ok({'ok':True,'account':redacted(acct),'webhook':webhook})
+        if act=='status':
+            if not staff: return er('Staff only')
+            if not acct: return ok({'ok':True,'configured':False,'account':None,'webhook':webhook})
+            check(acct); return ok({'ok':True,'configured':True,'account':redacted(acct),'webhook':webhook})
+        if act=='transactions':
+            if not staff: return er('Staff only')
+            return ok({'ok':True,'rows':[{k:r.get(k) for k in ('id','kind','payment_id','parent_id','amount','status','method','label','member_id','ref','descr','created_at','created_by')} for r in reversed([r for r in self.paylog if r['tenant']==tn])]})
+        if not acct or not (acct.get('status') or {}).get('ok'): return er('This club does not take payments online yet: check the connection in Billing setup' if acct else 'not configured: set up Deluxe in Billing setup')
+        def wallet(mid): return sorted([w for w in self._rows('member_payment_methods') if w['tenant']==tn and w['member_id']==mid and not w.get('removed_at')],key=lambda w:(not w.get('is_default'),w.get('created_at','')))
+        def sync_autopay(mid):
+            u=user_row(mid); w=wallet(mid); d=next((x for x in w if x.get('is_default')),w[0] if w else None)
+            u.update({'pay_provider':'deluxe','pay_customer':d['customer_id'] if d else None,'pay_method':(d['method_id'] if (d and u.get('autopay')) else None),'pm_label':(' · '.join(x for x in (d.get('nickname'),d.get('label')) if x) if d else None),'autopay':bool(u.get('autopay') and d)})
+        def wallet_add(mid,token,nickname,make_default):
+            self.payn+=1; w=wallet(mid); first=not w
+            if make_default or first:
+                for x in w: x['is_default']=False
+            row={'id':'w_%d'%self.payn,'tenant':tn,'member_id':mid,'provider':'deluxe','customer_id':'cus_'+mid,'method_id':'pm_'+str(token),'kind':'card','label':'Visa ·4242','nickname':nickname or None,'exp':'12/30','is_default':bool(make_default or first),'created_at':'2026-11-20T00:00:%02dZ'%(self.payn%60),'removed_at':None}
+            self._rows('member_payment_methods').append(row); log(kind='vault',payment_id=row['method_id'],amount=0,status='stored',method='card',label='Visa ·4242',member_id=mid,ref='wallet',descr='Kept in the wallet',response={}); sync_autopay(mid); return row
+        if act in ('wallet_add','wallet_remove','wallet_default','autopay_on','autopay_off'):
+            m=member()
+            if not m: return er('Your e-mail is not on the club\'s directory')
+            mid=m['id']; token=b.get('token'); token=(token.get('token') if isinstance(token,dict) else token) or ''
+            if act=='wallet_add':
+                if not token: return er('The card was not tokenized')
+                row=wallet_add(mid,token,str(b.get('nickname') or ''),bool(b.get('make_default'))); return ok({'ok':True,'id':row['id'],'label':row['label']})
+            if act=='wallet_remove':
+                w=next((x for x in wallet(mid) if x['id']==b.get('id')),None)
+                if not w: return er('That payment method is not in your wallet')
+                w['removed_at']='2026-11-20T00:00:00Z'; wasd=w['is_default']; w['is_default']=False; left=wallet(mid)
+                if wasd and left: left[0]['is_default']=True
+                sync_autopay(mid); return ok({'ok':True})
+            if act in ('wallet_default','autopay_on'):
+                if b.get('id'):
+                    w=next((x for x in wallet(mid) if x['id']==b.get('id')),None)
+                    if not w: return er('That payment method is not in your wallet')
+                    for x in wallet(mid): x['is_default']=False
+                    w['is_default']=True
+                if act=='autopay_on':
+                    if not wallet(mid): return er('Add a card or bank account first')
+                    user_row(mid)['autopay']=True
+                sync_autopay(mid); return ok({'ok':True})
+            if act=='autopay_off': u=user_row(mid); u['autopay']=False; u['pay_method']=None; return ok({'ok':True})
+        if act=='hpf':
+            if not acct.get('hpf_token'): return er('The Hosted Payment Form token is missing — add it in Billing setup')
+            return ok({'ok':True,'script':'https://hostedform2.deluxe.com/V2/deluxe.js','xtoken':acct['hpf_token'],'env':acct['env']})
+        try:
+            if act in ('pay','setup'):
+                m=member()
+                if not m: return er('Your e-mail is not on the club\'s directory')
+                u=user_row(m['id']); token=b.get('token'); token=(token.get('token') if isinstance(token,dict) else token) or ''
+                if act=='setup':
+                    if not token: return er('The card was not tokenized')
+                    row=wallet_add(m['id'],token,'',True); u['autopay']=True; sync_autopay(m['id']); return ok({'ok':True,'label':row['label']})
+                kept=False
+                if b.get('method_id'):
+                    w=next((x for x in wallet(m['id']) if x['id']==b.get('method_id')),None)
+                    if not w: return er('That payment method is not in your wallet')
+                    s=sale(method_id=w['method_id'],amount=b.get('amount'),descr=t['name']+' — member account payment',ref='acct',mid=m['id']); s['label']=' · '.join(x for x in (w.get('nickname'),w.get('label')) if x) or s['label']
+                else:
+                    if not token: return er('The card was not tokenized')
+                    s=sale(token=token,amount=b.get('amount'),descr=t['name']+' — member account payment',ref='acct',mid=m['id'])
+                    if b.get('save'): wallet_add(m['id'],token,str(b.get('nickname') or ''),bool(b.get('make_default'))); kept=True
+                iid=post_payment(m['id'],s['amount'],'deluxe:'+s['id'],'Online payment'+(' (card kept in the wallet)' if kept else ''),'card',s['id']); s['row']['acct_item']=iid
+                return ok({'ok':True,'payment_id':s['id'],'amount':s['amount'],'label':s['label'],'kept':kept})
+            if act=='sale':
+                if not staff and not station: return er('Staff or a register only')
+                s=sale(token=str(b.get('token') or ''),amount=b.get('amount'),descr=str(b.get('descr') or t['name']),ref=str(b.get('ref') or 'sale'),mid=str(b.get('member_id') or ''))
+                return ok({'ok':True,'payment_id':s['id'],'amount':s['amount'],'label':s['label'],'method':'card'})
+            if act in ('charge_vault','autopay_run'):
+                if not staff: return er('Staff only')
+                def run(u,amount,descr):
+                    s=sale(method_id=u['pay_method'],amount=amount,descr=descr,ref='autopay',mid=u['member_id']); iid=post_payment(u['member_id'],s['amount'],'deluxe:'+s['id'],descr,'card',s['id']); s['row']['acct_item']=iid; return s
+                if act=='charge_vault':
+                    u=next((r for r in self._rows('member_users') if r['tenant']==tn and r['member_id']==b.get('member_id')),None)
+                    if not u or not u.get('pay_method'): return er('No card on file for this member')
+                    s=run(u,float(b.get('amount') or 0) or balance(u['member_id']),str(b.get('descr') or 'Card on file — charged by the office')); return ok({'ok':True,'payment_id':s['id'],'amount':s['amount'],'label':s['label']})
+                out=[]
+                for u in [r for r in self._rows('member_users') if r['tenant']==tn and r.get('autopay') and r.get('pay_method')]:
+                    bal=balance(u['member_id'])
+                    if bal<1: continue
+                    try: s=run(u,bal,'Autopay — card on file'); out.append({'member_id':u['member_id'],'amount':s['amount'],'ok':True})
+                    except ValueError as e: out.append({'member_id':u['member_id'],'amount':bal,'ok':False,'error':str(e)})
+                return ok({'ok':True,'results':out})
+            if act=='refund':
+                if not staff: return er('Staff only')
+                pid=str(b.get('payment_id') or ''); orig=next((r for r in self.paylog if r['tenant']==tn and r['kind']=='sale' and r.get('payment_id')==pid),None)
+                if not orig: return er('That payment is not in the log')
+                done=round(sum(float(r['amount']) for r in self.paylog if r['tenant']==tn and r['kind']=='refund' and r.get('parent_id')==pid and r['status']=='approved'),2); amount=round(float(b.get('amount') or 0) or (float(orig['amount'])-done),2)
+                if amount<=0 or amount>float(orig['amount'])-done+0.004: return er('Up to %.2f can still be refunded'%(float(orig['amount'])-done))
+                self.payn+=1; rid='rf_%d'%self.payn; log(kind='refund',payment_id=rid,parent_id=pid,amount=amount,status='approved',method='card',label=orig.get('label'),member_id=orig.get('member_id'),ref=orig.get('ref'),descr=str(b.get('reason') or 'Refund'),response={})
+                if orig.get('member_id') and orig.get('acct_item'):
+                    self._rows('acct_items').append({'id':str(uuid.uuid4()),'tenant':tn,'member_id':orig['member_id'],'kind':'charge','source':'manual','item':'other','gl':'','ref':'refund:%s:%s'%(pid,rid),'descr':'Online payment refunded'+(' · '+str(b['reason']) if b.get('reason') else ''),'amount':amount,'tax':0,'svc':0,'method':None,'reference':None,'posted':datetime.date.today().isoformat(),'void_at':None,'void_reason':None,'created_at':'2026-11-20T00:00:00Z','created_by':who})
+                return ok({'ok':True,'refund_id':rid,'amount':amount})
+        except ValueError as e: return er(str(e))
+        return er('Unknown action')
     def _fn(self,name,b):   # supabase/functions/admin-users, in miniature; mail records what was sent; stripe is never configured here
         if name=='mail' and self.fn:
             self.mails.append(b); return json.dumps({'data':{'ok':True,'id':'m-'+str(len(self.mails))},'error':None})
         if name=='stripe' and self.fn: return json.dumps({'data':{'error':'not configured: set STRIPE_SECRET_KEY'},'error':None})
+        if name=='payments' and self.fn: return self._payments(b)
         if name!='admin-users' or not self.fn: return json.dumps({'data':None,'error':{'name':'FunctionsFetchError','message':'Failed to send a request to the Edge Function'}})
         act=b.get('action'); email=str(b.get('email','')).strip().lower()
         is_admin=self.admin; g=self._my_grant(b.get('tenant')) if b.get('tenant') else None
@@ -576,6 +728,9 @@ class FakeDB:
             return json.dumps({'data':None,'error':None})
         return json.dumps({'data':None,'error':{'message':'unknown op '+op}})
 
+HPF_STUB='''const HostedForm={init:(o,cb)=>Promise.resolve({renderHpf(){ const d=document.getElementById(o.containerId); if(!d) return; d.innerHTML='<div class="hpf-stub" data-xrtype="'+o.xrtype+'" data-amount="'+(o.xAmount||0)+'"><input id="hpfCard" placeholder="Card number" value="4242424242424242"><button type="button" id="hpfGo">'+(o.xbtntext||'Generate')+'</button></div>';
+  d.querySelector('#hpfGo').onclick=()=>{ const n=d.querySelector('#hpfCard').value.replace(/\\s/g,''); if(n.length<12) return cb.onInvalid({type:'Token',success:false,errors:['Card number is not valid'],data:null}); if(n.endsWith('0002')) return cb.onFailure({type:'Token',success:false,errors:['Do not honor'],data:null});
+    cb.onSuccess(o.xrtype==='Create Vault'?{type:'Vault',status:'success',data:{customerId:'cus_stub',vaultId:'v_stub'}}:{type:'Token',status:'success',data:{token:(n.endsWith('0005')?'tok_decline':'tok_'+n.slice(-4)+'_'+Date.now()),nameOnCard:'CardHolder',expDate:'12/30',maskedPan:n.slice(0,6)+'******'+n.slice(-4),cardType:'Visa'}}); }; }, destroy(){ const d=document.getElementById(o.containerId); if(d) d.innerHTML=''; }})};'''
 async def cloud(ctx,fdb,no_session=False):
     """a browser context whose pages talk to `fdb` as if it were Supabase (signed in as the board unless no_session)"""
     await ctx.expose_binding('__fdb',fdb.handle)
@@ -583,6 +738,7 @@ async def cloud(ctx,fdb,no_session=False):
     await ctx.route('**/supabase.min.js',lambda r:r.fulfill(path=FAKE,content_type='text/javascript'))
     await ctx.route('**/fonts.googleapis.com/**',lambda r:r.fulfill(body='',content_type='text/css'))
     if os.path.exists(XLSX): await ctx.route('**/xlsx.full.min.js',lambda r:r.fulfill(path=XLSX,content_type='text/javascript'))
+    await ctx.route('**/hostedform2.deluxe.com/**',lambda r:r.fulfill(body=HPF_STUB,content_type='text/javascript'))
 
 def seed_from_main(fdb,main,tenant='wccc'):
     """the club row (directory) and the MGA row (memberships + everything else) from a document in the old MGA Hub shape"""

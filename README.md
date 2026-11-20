@@ -77,6 +77,31 @@ own hub. An organization's **Members** page is the club members who belong to it
 the organization's own list (club members are matched and joined; new people are added to the directory too), and keep
 status, join date, notes and dues per organization. Editing a person's details anywhere updates the directory.
 
+## Contacts (nonprofits): people, companies and households, and what they did
+
+A nonprofit's rail has **Contacts** in place of a directory: everyone the organization knows — donors, sponsors and their people, guests,
+players, vendors, volunteers — and the **companies and households** they belong to. The Walls family is a household with its family members
+under it, exactly as Acme Bank is a company with its contacts; either can sponsor an event, and so can an individual on their own. A
+sponsorship names its sponsor (a company, a household or a person) and its cast: the **primary contact**, the **billing contact** and the
+golfers who play under it — name a seat on the sponsor's team and that golfer joins the company as one of its people, typed Golfer.
+**Tags** are earned, not typed: someone who paid at an event is a donor, someone on a guest list a guest, someone in a field a player, a
+company named on an expense a vendor; add your own tags on top. A person's record shows their company and role, every sponsorship they have
+a part in, the events they came to with their paddle and what they paid, and the notes; a company's record shows its people, its
+sponsorships with the team, what it has been paid for, and the notes. Clubs and associations keep the simpler **Companies** page below.
+
+## Companies: sponsors, vendors, partners and their people
+
+**Companies** sits right after the directory on the club hub, a nonprofit's hub and every association's hub — one list for the whole club.
+A company has its details, a dated log of notes (calls, meetings, who said what) and its **people**: anyone on the directory can carry a
+company, a **title** and **contact types** (decision maker, golfer, billing, marketing, assistant, owner, volunteer, sponsor contact — tick
+all that apply) from the person editor, the company record or a spreadsheet import with Company and Title columns. When you add a sponsor to
+a tournament or a fundraising event, the Company box searches the list as you type (a new name becomes a company on Save) and the Contact
+box suggests that company's people; the contact you name lands on the directory as the company's sponsor contact. The company record then
+shows **every sponsorship** the company has bought, across every tournament and event the hub can see — the level, what was pledged, what
+has come in and whether it is paid — with this year's level and status as a chip at the top. Sponsors entered before Companies existed match
+by name; one tap on *Link them* makes each a company. The Companies page filters to this year's sponsors, past sponsors and companies not
+yet sponsoring, and searches by company, city or a person's name.
+
 ## Live scoring, always
 
 Every tournament round and every small-group game has an open scoring event the moment it exists — nothing to switch
@@ -228,8 +253,16 @@ hub under **Member accounts** (staff logins only, once the billing module is on)
 - **The member portal** (`member.html` on the club's address): a member signs in with a one-time e-mail link — the e-mail
   the club has on file — and sees their balance, activity and statements (PDF). With online payments switched on in
   Billing setup, members **pay online** by card or bank account straight into the club's own merchant account, and can turn
-  on **autopay** so each statement is paid for them. Flagstick never holds the money. **Payments are moving to Trinity Merchant
-  Group's integrated processing** (the owner, Nov 2026); the Stripe Connect path in the code is the placeholder until that is built.
+  on **autopay** so each statement is paid for them. Flagstick never holds the money. **Payments are processed by Deluxe** on the
+  club's own merchant account, set up through Trinity Merchant Group: the card or bank account is entered in Deluxe's secure form inside
+  the portal (never on a Flagstick page), the payment posts to the account at once, refunds post back, and the office can charge a card
+  on file. The same card sheet sits behind the registers' Card button and a fundraising checkout.
+- **The member's wallet**: on the portal a member keeps any number of cards and bank accounts (in Deluxe's vault, never on Flagstick),
+  names them, picks a default, pays an open statement or any amount in one tap from a saved method, and turns **autopay** on so each
+  statement's balance is paid from the default. Each month's statement shows its closing balance, due date and whether it is paid.
+  **Every member gets a login**: Member accounts → *Invite to the portal* e-mails the link to everyone with an e-mail who has not signed
+  in yet (sign-in is a one-time e-mail link, no password). Staff open **View portal as member** from a member's account page to see the
+  portal exactly as that member sees it, and can pay, save a card or set autopay on the member's behalf from there.
 
 ## Point of sale
 

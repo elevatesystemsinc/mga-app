@@ -1,5 +1,5 @@
 """Opens every page and every hub screen (club hub + an association) and fails on any script error. Run: python3 tests/smoke.py"""
-import asyncio,sys
+import asyncio,sys,os,tempfile
 from playwright.async_api import async_playwright
 from _harness import local,page
 T1="()=>{ db.tournaments.push(Object.assign({id:'T1',name:'Member-Member',season:Y(),days:3,field:[],sponsors:[],tiers:[],income:[],perPlayer:[],lines:[],dayItems:[[],[],[]],actuals:{},schedule:[],decisions:[]})); persist(); }"
@@ -120,7 +120,7 @@ async def main():
         # Di 8.8 + Cy 20.3 → Cy capped to 18.8; T1 (4.1+12.0=16.1) and T2 (8.8+18.8=27.6) in one flight; after R1 T1 leads → hole 1 on the shotgun
         ok=r['capped']==[True,20.3,18.8] and r['units']==[['T1',16.1],['T2',27.6]] and r['of']=={'T1':'A','T2':'A'} and r['flights']=='AAAA' and r['groups']==[[1,'T1T1T2T2']] and r['pdfLen']>20000
         print('partner cap, flights, pairing, pdf', r, 'OK' if ok else 'FAIL'); bad+=not ok
-        import base64; open('/tmp/claude-0/-home-user-mga-app/63b75e30-a124-565b-b1a4-06911e16cfbc/scratchpad/results.pdf','wb').write(base64.b64decode((await pg.evaluate("()=>window.__pdf")).split(',',1)[1]))
+        import base64; open(os.path.join(tempfile.gettempdir(),'results.pdf'),'wb').write(base64.b64decode((await pg.evaluate("()=>window.__pdf")).split(',',1)[1]))
         # a member added in the association lands in the club directory + this organization's memberships; the drawer opens on the view
         r=await pg.evaluate("""()=>{ const p=upsertMember(null,{first:'Ada',last:'Lovelace',email:'ada@x.org',status:'Active',joined:'2026-01-01',notes:'hi'}); persist();
           const v=memberById(p.id); go('members'); editMember(v); const open=drawerOpen(); closeDrawer();
