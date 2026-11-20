@@ -63,6 +63,8 @@ src/
   billcore.js          the member statement PDF page (statementPage), shared by the hub and the member portal            [shared]
   billing.js           Member accounts & billing (module 'billing', club hub, staff only): classes, the monthly run, tax/service,
                        minimums, finance charges, aging, statements, GL export, Stripe Connect, the mail function
+  pay.js               Online payments through Deluxe: the club's credentials (Billing setup), payFn → the `payments` function, cardSheet (the hosted form),
+                       refunds and cards on file on the account page, autopay for Run statements
   pos.js               Point of sale (module 'pos'): outlets, products & stock, the register, tickets to accounts or cash / card
   poslib.js            the item libraries: the club F&B menu with modifiers (FNB_LIBRARY), the golf shop (SHOP_LIBRARY), the racket shop (RACKET_LIBRARY) → posLibraryDrawer
   bookings.js          Bookings (module 'club'): the tee sheet, courts, cabanas, pool, lessons — the sheet, check-in, fees, blocked times, the printed sheet
@@ -112,6 +114,7 @@ python3 tests/test_hammer.py  # Hammer in a cart: thrown, accepted (×2, the ham
 python3 tests/test_cartgame.py # a cart game: five players, no pots, one group, the phone offers the side games and has no Finish tab; browsing ahead writes no pars
 python3 tests/test_sponsorteam.py # a sponsor tier that includes a team: TBD seats in the field, counted as players, named one by one, dropped with the package
 python3 tests/test_schedule.py # a tournament's schedule across the days before and after the golf, sorted by time, on the registration copy
+python3 tests/test_payments.py # online payments through Deluxe against the fake: credentials → connected, the portal's hosted form → a payment posted once, a declined card, autopay, refund, charge card on file, the hub register and a station's card sheet
 python3 tests/test_crm.py     # companies & contacts: a company and its people, a sponsor picked from the list (its contact onto the directory), the record, the MGA's link-by-name, one write, a scoped login reads only; a nonprofit's Contacts (household, individual sponsor, billing contact, named seats → golfers, tags, person record, vendor)
 git add -A && git commit && git push origin main  # Render deploys main to app.wcccmga.org
 ```
@@ -611,6 +614,7 @@ the app (`docs/tenancy.md`): `flagstickhub.com` and `www` point at wherever this
 | `acct_items`, `acct_statements` + `can_staff(p_tenant)` | member accounts & billing (`billing-setup.sql`): the club's ledger, staff only. |
 | `member_users`, `tenants.stripe_account/stripe_status` + RPC `member_me(p_tenant)`, `member_autopay_off(p_tenant)` | the member portal and online payments (`member-setup.sql`); Edge Functions `mail`, `stripe`, `stripe-webhook`. |
 | `pos_tickets` | point of sale tickets (`pos-setup.sql`), staff only. |
+| `payment_accounts` (tenant, env, client_id, client_secret, partner_token, hpf_token, webhook_secret, status), `payments` (the log), `member_users.pay_*`, `tenants.pay_status` + RPC `pay_online(p_tenant)` | online payments through Deluxe (`payments-setup.sql`): the credentials table has no policies (service role only); the log is readable by staff; Edge Functions `payments` and `payments-webhook`. |
 | `mail_settings` (tenant, org) | each organization's outgoing e-mail sender and provider (`mail-setup.sql`); RLS `can_org`. |
 | `pos_stations`, `pos_fires`, `pos_tickets` (+ station, table_no, server…) + RPC `pos_boot/pin/members/checks/check_put/fire/close/void/expo/bump` | registers and kitchen screens on the floor (`pos-stations-setup.sql`): token-keyed security-definer functions, like admin links. |
 | `bookings` + RPC `member_id_of`, `member_slots`, `member_book`, `member_cancel` | bookings (`booking-setup.sql`): staff on the sheet, members through the security-definer functions that enforce the facility's rules. |
@@ -918,6 +922,33 @@ localStorage. `acctPost(o)` is the one way anything lands on an account.
   `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `RESEND_API_KEY`, `MAIL_FROM` (docs/tenancy.md §6). Without the keys the
   functions answer "not configured" and the hub / portal say so; the fake (`_harness.py`) emulates `member_me`,
   `member_autopay_off`, a `mail` that records what it sent and a `stripe` that is never configured.
+
+### Online payments — Deluxe (`pay.js`, `payments-setup.sql`, `supabase/functions/payments`, `supabase/functions/payments-webhook`, `tests/test_payments.py`)
+The owner, Nov 20, 2026, with the Deluxe solution guide for Flagstick: "start building the entire payment integration… use it in our demo
+client, Bushwood, and then as a template for other clients." Deluxe Payments Platform on the club's OWN merchant account (Trinity Merchant Group
+onboards it; Deluxe e-mails the credentials); the Stripe Connect path is retired (functions still deployed, nothing calls them). **Card data
+never touches Flagstick**: Deluxe's **Hosted Payment Form** (`https://hostedform2.deluxe.com/V2/deluxe.js`, `HostedForm.init({containerId,
+xtoken, xrtype:'Generate Token', xpm, xAmount, xcheckSurcharge, xbtntext}, {onSuccess, onFailure, onInvalid}).then(i=>i.renderHpf())`) turns the
+card or bank account into a **token** in the browser; the Edge Function **`payments`** charges the token (or a card kept in Deluxe's vault) and
+posts the payment once (ref `deluxe:<payment id>`). **Per club** (`payment_accounts`, service role only; `payConfigureDrawer` in Billing setup →
+*Set up Deluxe*: env sandbox | production, Client ID, Client Secret, Partner Token, HPF token, webhook secret; *Save & check* = `configure` →
+an OAuth client-credentials token at `/secservices/oauth2/v2/token` + the gateway health call; the webhook URL shown is
+`…/functions/v1/payments-webhook?tenant=<slug>`). `acctSettings().online = {provider:'deluxe', ok, connected, env, at, message}`
+(`payState`; `charges_enabled` kept as an alias), `payOn()`, `payFn(body)`. **Actions**: `configure` / `status` / `transactions` (staff), `hpf`
+(what the form needs), `pay {token, amount, save}` / `setup {token}` (the member, by the directory e-mail; `save` keeps the card → `member_users
+.pay_customer / pay_method / pm_label`, autopay on), `sale {token, amount, ref, descr, member_id?}` (staff, or a **station by its key**),
+`refund {payment_id, amount, reason}` (the reversal posts on the account, "Online payment refunded · reason"), `charge_vault {member_id, amount}`,
+`autopay_run`. Every processor call is logged in **`payments`** (kind sale | refund | vault, the processor's id, status, label "Visa ·4242",
+`ref` = acct | autopay | pos:<ticket> | fund:<event>:<paddle>, `acct_item`). **`cardSheet({amount, descr, ref, member_id})`** (pay.js; the same
+in `pos_src.html`) is the one modal with the hosted form → the token → `sale`; used by the hub register's Card (`t.card`), a station's Card
+(`B.pay` from `pay_online`, the label on the payment), and the fund checkout's *Charge a card now* (`e.payments[].pid`). The portal
+(`member_src.html`): `pay_online` after `member_me` sets `ME.online`; the pay sheet asks the amount and *save this card*, then shows the form;
+*Set up autopay* shows it with no amount. **The webhook** verifies `x-dpp-signature` (HMAC-SHA256 hex of the raw body with the club's secret),
+marks the sale's status, logs sales made outside Flagstick (`ref 'external'`), posts a refund made from the Deluxe portal, and **voids the
+account payment when the bank returns an ACH** (autopay off for that member); a *Merchant Loaded* payload is kept on the account row. The DPP
+paths and the reading of a response sit in `DPP` / `readSale` at the top of the function — the sandbox has not been exercised yet (no credentials
+on Nov 20), so a difference is a one-line fix there. The fake (`_payments` in `_harness.py`) answers as the sandbox would (a token ending 0005
+or `tok_decline` is declined) and `HPF_STUB` stands in for the hosted form (`.hpf-stub`, `#hpfGo`). docs/tenancy.md §8 has the per-client steps.
 
 ### Point of sale (`pos.js`, `pos-setup.sql`, module `pos`) and Bookings (`bookings.js`, `booking-setup.sql`, module `club`)
 - **POS** (`posOn()`, staff only): `CLUB.pos = {outlets:[{id,name,kind fnb|proshop,item (the billing item it charges as)}],

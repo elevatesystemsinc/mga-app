@@ -256,8 +256,10 @@ hub under **Member accounts** (staff logins only, once the billing module is on)
 - **The member portal** (`member.html` on the club's address): a member signs in with a one-time e-mail link — the e-mail
   the club has on file — and sees their balance, activity and statements (PDF). With online payments switched on in
   Billing setup, members **pay online** by card or bank account straight into the club's own merchant account, and can turn
-  on **autopay** so each statement is paid for them. Flagstick never holds the money. **Payments are moving to Trinity Merchant
-  Group's integrated processing** (the owner, Nov 2026); the Stripe Connect path in the code is the placeholder until that is built.
+  on **autopay** so each statement is paid for them. Flagstick never holds the money. **Payments are processed by Deluxe** on the
+  club's own merchant account, set up through Trinity Merchant Group: the card or bank account is entered in Deluxe's secure form inside
+  the portal (never on a Flagstick page), the payment posts to the account at once, refunds post back, and the office can charge a card
+  on file. The same card sheet sits behind the registers' Card button and a fundraising checkout.
 
 ## Point of sale
 

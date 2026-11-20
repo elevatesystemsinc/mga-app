@@ -159,13 +159,19 @@ and RLS enforces the same on the tables.
    the **magic link** template (members sign in to `member.html` with it) and add `https://<slug>.flagstickhub.com/member.html`
    style redirects (the wildcard already covers it). Each club then connects its own Stripe account from Billing setup;
    until a key is set the hub and the portal say online payments aren't switched on.
-   **Decided Nov 2026: Flagstick will not use Stripe.** Online payments move to a direct, purpose-built integration with **Trinity
-   Merchant Group** (Fort Worth; a registered ISO of Fifth Third Bank; an in-house gateway with an XML API, subscriptions and ACH per
-   their site — the API documentation, sandbox and per-club merchant credentials come from TMG). The plan: one provider-neutral
-   `payments` Edge Function (tokenize at the gateway with hosted fields so card data never touches Flagstick, charge a token, ACH,
-   stored tokens for autopay, refunds, a webhook or a settlement poll) behind which `stripe` / `stripe-webhook` are retired once TMG
-   is live; the hub and the portal already talk to one function and post payments once by `ref`, so the UI changes are the
-   Billing setup card and the portal's pay sheet. Nothing on the marketing site names Stripe any more.
+   **Decided Nov 2026: Flagstick will not use Stripe — payments are processed by DELUXE (Deluxe Payments Platform, DPP) on the club's own
+   merchant account, onboarded through Trinity Merchant Group** (the Deluxe solution guide for Flagstick, Nov 19, 2026). Built Nov 20
+   (`payments-setup.sql`, the Edge Functions **`payments`** and **`payments-webhook`** (the webhook with **verify JWT off**), `src/pay.js`,
+   `tests/test_payments.py`): no Flagstick-wide key — each club's credentials live in `payment_accounts` (service role only). **Per client:**
+   (1) TMG submits the merchant application to Deluxe (FirstOnBoard); Deluxe e-mails the **Client ID**, **Client Secret**, **Partner Token**
+   and the **Hosted Payment Form token** (sandbox credentials come from the Deluxe sales rep first). (2) The club's staff open **Billing setup →
+   Set up Deluxe**, pick Sandbox or Production, paste the four values and **Save & check** — the function fetches an OAuth token and calls the
+   gateway; the card reads *Connected*. (3) Copy the **webhook URL** shown there (`…/functions/v1/payments-webhook?tenant=<slug>`) into the
+   DPP Developer Portal → Webhooks for payment completed, refund processed, ACH reject and merchant loaded, with a secret; paste that secret
+   into the same drawer. (4) Members pay on the portal (card or bank account through Deluxe's hosted form; "save this card" turns autopay on),
+   Run statements charges autopay members, the account page refunds and charges cards on file, the registers' Card button and a fundraising
+   checkout's *Charge a card now* use the same sheet. Switch to Production in the drawer when Deluxe says the merchant is live. The `stripe` /
+   `stripe-webhook` functions and columns stay deployed but unused; `pay_online()` still honours a connected Stripe account.
 9a. **Client types and the nonprofit set** (`client-kinds-setup.sql`, `fund-setup.sql`, `fund-cashier-setup.sql`, all applied): New client asks the type;
    a nonprofit starts with Golf management + Fundraising events. Nothing else to configure on Flagstick's side.
 9. **Restaurant stations** (`pos-stations-setup.sql`, `pos-split-setup.sql`, `pos-reopen-setup.sql`, `pos-tips-setup.sql` and `pos-closeout-setup.sql` (check numbers, the `slips` bucket, `pos_days`), all applied): nothing to configure on Flagstick's side — the club makes
