@@ -26,7 +26,7 @@ class FakeDB:
     def _my_grant(self,tenant):
         return next((g for g in (self.grants if self.grants is not None else [r for r in self._rows('tenant_users') if r['user_id']==self.me]) if g['tenant']==tenant),None)
     def _cut_club(self,d,orgs):
-        return {'id':'club','kind':'club','name':d.get('name'),'short':d.get('short'),'members':d.get('members',[]),'games':d.get('games',{}),'_rev':d.get('_rev'),'orgs':[o for o in d.get('orgs',[]) if o.get('id') in orgs]}
+        return {'id':'club','kind':'club','name':d.get('name'),'short':d.get('short'),'members':d.get('members',[]),'games':d.get('games',{}),'companies':d.get('companies',[]),'_rev':d.get('_rev'),'orgs':[o for o in d.get('orgs',[]) if o.get('id') in orgs]}
     def _k(self,table,id,tenant='wccc'): return (table,id) if tenant=='wccc' else (table,tenant+'/'+id)
     def seed(self,table,id,data,tenant='wccc'): self.rows[self._k(table,id,tenant)]={'table':table,'id':id,'tenant':tenant,'data':copy.deepcopy(data)}
     def get(self,table,id,tenant='wccc'): r=self.rows.get(self._k(table,id,tenant)); return copy.deepcopy(r['data']) if r else None

@@ -58,6 +58,7 @@ src/
   payouts.js           Calcutta payouts math (calcPayouts, ties) + Results / Payouts sub-tabs
   surveys.js           Surveys: anonymous member surveys (sections → questions, public link, results, CSV)
   signup.js            Player registration: a tournament's public sign-up page (the Field tab's card, the published copy, entries → the field)
+  crm.js               Companies — the CRM layer: CLUB.companies, contacts (a person's company / title / contact types), sponsorships by company, notes
   billcore.js          the member statement PDF page (statementPage), shared by the hub and the member portal            [shared]
   billing.js           Member accounts & billing (module 'billing', club hub, staff only): classes, the monthly run, tax/service,
                        minimums, finance charges, aging, statements, GL export, Stripe Connect, the mail function
@@ -110,6 +111,7 @@ python3 tests/test_hammer.py  # Hammer in a cart: thrown, accepted (×2, the ham
 python3 tests/test_cartgame.py # a cart game: five players, no pots, one group, the phone offers the side games and has no Finish tab; browsing ahead writes no pars
 python3 tests/test_sponsorteam.py # a sponsor tier that includes a team: TBD seats in the field, counted as players, named one by one, dropped with the package
 python3 tests/test_schedule.py # a tournament's schedule across the days before and after the golf, sorted by time, on the registration copy
+python3 tests/test_crm.py     # companies: a company and its contacts, a sponsor picked from the list (its contact onto the directory), the record, the MGA's link-by-name, one write, a scoped login reads only
 git add -A && git commit && git push origin main  # Render deploys main to app.wcccmga.org
 ```
 Tests need `pip install playwright && playwright install chromium` and `cd tests && npm i xlsx@0.18.5`.
@@ -613,6 +615,7 @@ the app (`docs/tenancy.md`): `flagstickhub.com` and `www` point at wherever this
 | `bookings` + RPC `member_id_of`, `member_slots`, `member_book`, `member_cancel` | bookings (`booking-setup.sql`): staff on the sheet, members through the security-definer functions that enforce the facility's rules. |
 | `booking_blocks` | closed times on a sheet (`blocks-setup.sql`, which also teaches `member_slots` / `member_book` about them and `member_me` about events). |
 | `staff_clock`, `pos_stations.dept` + RPC `staff_clock`, `club_staff`, `station_dept`, `staff_fits` | the time clock and the club-wide staff list behind the registers (`staff-setup.sql`). |
+| `crm-setup.sql` | `scoped_read` with `companies` — a board login's cut-down club document carries the company list (read-only). |
 | `hub_keys` (org_id, key_hash, label, revoked_at) + RPC `hub_key_org/read/write/people/golf_event/golf_delete/score/share` | admin links (`admin-links-setup.sql`): security-definer functions that act for exactly one organization. |
 | `mm_tournament` | the retired Member-Member app's row (`supabase-setup.sql`). Archive only — no hub code reads or writes it. |
 | `service-role-grants.sql` | the service role's select / insert / update / delete on every public table (and on tables created later). The Edge Functions run as the service role; on Nov 19, 2026 it had lost those rights on every table, so `admin-users` could not read `flagstick_admins` and the portal said "Your login may not manage these logins" (and Open hub's one-click sign-in failed the same way). Run it again if a function starts answering 403 / empty reads. |
@@ -770,6 +773,30 @@ spot (You, Player 2…): search the pool (two letters, people already entered or
 **Need help finding a 2nd / 3rd player — the golf shop will pair me**; the Enter button waits until every spot is a person or asked for;
 field questions yes / no per player; a note for the shop. `signup_submit` enforces the same (size, `need` = size − players, pool, no
 doubles, not already entered — in the field or pending) and a closed page. The fake emulates all four functions.
+
+### Companies — the CRM layer (`crm.js`, `crm-setup.sql`, `tests/test_crm.py`)
+The owner, Nov 20, 2026: "associations, golf shops and even course management have the need for some level of CRM functionality… companies
+purchase sponsorships… contacts within their company that should have different contact types — golfer, decision maker, their titles… DCO
+needs the ability to see the company, its contacts, the type of sponsorship level that company has paid for." **Companies** sits on the rail
+right after the Directory / Donors & guests / Members (club, nonprofit and association hubs; `crmOn()` — never an admin link; a scoped board
+login reads and cannot change, `crmEdit()`). The list is club-wide like the directory: `CLUB.companies = [{id, name, industry, website, phone,
+email, address1, city, state, zip, notes, log:[{id, at, by, text}], createdAt}]` (`companies()` reads without touching the document; `companiesW()`
+for writers; `companyFor(name,{create})` matches by name, case-insensitive). **A person carries `company` (the id), `title` and `ctypes`**
+(`CONTACT_TYPES`: Decision maker, Golfer, Billing, Marketing, Assistant, Owner, Volunteer, Sponsor contact — chips, several at once) — in
+`PERSON_KEYS`, on the Directory editor (`crmPersonFields`), the directory rows ("Acme Bank · President" under the name, searchable) and the
+roster import (Company / Title columns; a company named in a file is made on import, `rosterSet` / `rosterVal`). **A sponsorship carries
+`companyId` and `contactId`**: the tournament sponsor drawer and the fundraising event's sponsor drawer take the company through
+`companyPickHTML` / `wireCompanyPick` / `readCompanyPick` (search as you type; a new name becomes a company on Save; `s.company` / `s.name` stay
+the company's name) and the contact through `contactPickHTML` (the company's people as suggestions); `sponsorContactSync` puts the contact on
+the directory (matched by name, else added as a `memberType:'Contact'` person with the Sponsor contact type) so DCO's sponsor contact is a
+person of that company at once. `sponsorshipsOf(c)` is every sponsor row the hub can see that carries the company's id **or matches its
+name** (older rows): the hub's own tournaments, on the club tier every organization's tournaments (read-only, named by organization) and the
+fundraising events — each with level, pledged, received and status (`spStatus`); the Companies page offers **Link them** (`linkSponsors`)
+for rows without an id. **The record** (`vCompany`, `view.companyId`): chips (this year's level · status, industry, site, phone, place),
+KPIs (lifetime, the year, contacts), People (→ `contactDrawer`: name, title, company, types, e-mail, phone; the full directory record is a
+link on the club tier), Notes (`companyNoteDrawer`: dated, signed), Sponsorships (tap an own row → that tournament's / event's Sponsors tab).
+Deleting a company keeps its people (without a company) and its sponsor rows (without the link). `crm-setup.sql` teaches `scoped_read` to
+hand the companies to a board login.
 
 ### Surveys (`surveys.js`, `survey_src.html` → `survey.html?k=TOKEN`, `survey-setup.sql`)
 Any organization's hub (and the club) has **Surveys**: `db.surveys = [{id, title, intro, status:'draft'|'open'|'closed', token,

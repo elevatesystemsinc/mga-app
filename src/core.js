@@ -190,7 +190,7 @@ const initials=m=>m?((m.first||'?')[0]+((m.last||'')[0]||'')).toUpperCase():'—
 const isClub=()=>!!db&&db===CLUB;
 const persons=()=>CLUB?CLUB.members:[];
 const personById=id=>persons().find(p=>p.id===id);
-const PERSON_KEYS=['first','last','email','phone','hcp','hcpAt','ghin','memberNo','ggId','address1','address2','city','state','zip','dob','memberType','gender','source'];
+const PERSON_KEYS=['first','last','email','phone','hcp','hcpAt','ghin','memberNo','ggId','address1','address2','city','state','zip','dob','memberType','gender','source','company','title','ctypes'];   // company = CLUB.companies id, title + ctypes (contact types) — crm.js
 function memberView(p,ms){
   const v=Object.assign({},p);
   if(!isClub()) Object.assign(v,{status:ms?(ms.status||'Active'):'Inactive',joined:ms?(ms.joined||''):'',notes:ms?(ms.notes||''):''});
