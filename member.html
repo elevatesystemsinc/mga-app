@@ -198,9 +198,11 @@ function bookSheet(f,t,u){ const me=[ME.member.first,ME.member.last].filter(Bool
     const {data,error}=await sb.rpc('member_book',{p_tenant:TENANT,p_facility:f.id,p_date:BKV.date,p_time:t,p_unit:u,p_players:players,p_note:d.querySelector('#bkN').value.trim()}); BKV.busy=false;
     if(error){ toast(error.message.replace(/^.*?: /,'')); return; } d.remove(); toast('Booked'); BKV.slots=null; await load(); }; }
 /* the pay sheet: the amount, then Deluxe's hosted payment form (the card goes straight to Deluxe as a token; the `payments` function charges it) */
-let HPF=null, LASTERR=''; function loadHPF(src){ if(window.HostedForm) return Promise.resolve(); if(HPF) return HPF; HPF=new Promise((res,rej)=>{ const sc=document.createElement('script'); sc.src=src; sc.onload=()=>res(); sc.onerror=()=>{ HPF=null; rej(new Error('Couldn’t load the secure payment form — check the connection')); }; document.head.appendChild(sc); }); return HPF; }
+/* Deluxe's deluxe.js declares `const HostedForm` at the top level — a global binding, not a window property — so it is read bare */
+const hpfLib=()=>typeof HostedForm!=='undefined'?HostedForm:window.HostedForm;
+let HPF=null, LASTERR=''; function loadHPF(src){ if(hpfLib()) return Promise.resolve(); if(HPF) return HPF; HPF=new Promise((res,rej)=>{ const sc=document.createElement('script'); sc.src=src; sc.onload=()=>res(); sc.onerror=()=>{ HPF=null; rej(new Error('Couldn’t load the secure payment form — check the connection')); }; document.head.appendChild(sc); }); return HPF; }
 async function hostedForm(d,o){ const cfg=await fn({action:'hpf'}); if(!cfg) return; const box=d.querySelector('#payHpf'); box.innerHTML='<p class="muted">Loading the secure form…</p>';
-  try{ await loadHPF(cfg.script); box.innerHTML=''; const inst=await window.HostedForm.init({containerId:'payHpf',xtoken:cfg.xtoken,xrtype:'Generate Token',xpm:'0',xAmount:o.amount||0,xcheckSurcharge:!!o.amount,xbtntext:o.button},{
+  try{ await loadHPF(cfg.script); box.innerHTML=''; const inst=await hpfLib().init({containerId:'payHpf',xtoken:cfg.xtoken,xrtype:'Generate Token',xpm:'0',xAmount:o.amount||0,xcheckSurcharge:!!o.amount,xbtntext:o.button},{
       onSuccess:r=>{ const dd=r&&r.data; const token=dd&&typeof dd==='string'?{token:dd}:dd&&dd.token?dd:null; if(!token){ d.querySelector('#payMsg').textContent='The form did not return a token — try again.'; return; } o.onToken(token); },
       onFailure:r=>{ d.querySelector('#payMsg').textContent=(r&&r.errors&&r.errors.join(' '))||'The card was not accepted'; }, onInvalid:r=>{ d.querySelector('#payMsg').textContent=(r&&r.errors&&r.errors.join(' '))||'Check the card details'; }});
     d._inst=inst; if(inst&&inst.renderHpf) inst.renderHpf(); }catch(e){ toast(e.message||String(e)); } }
@@ -238,7 +240,7 @@ boot();
    page counts, and a reload is tried once per build — if the page that comes back is still the old one, the CDN
    hasn't caught up; wait a while before trying that build again. */
 (function(){
-  const ME='20261120025353', KEY='au_tried', RETRY=10*60*1000; let ready=false, lastCheck=0;
+  const ME='20261120025915', KEY='au_tried', RETRY=10*60*1000; let ready=false, lastCheck=0;
   const typing=()=>{ const a=document.activeElement; return a&&/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)&&a.value&&a.type!=='search'; };
   const safe=()=>!typing()&&(typeof window.__canReload!=='function'||window.__canReload());
   const tried=()=>{ try{ const [b,t]=(sessionStorage.getItem(KEY)||'').split('|'); return b?{build:b,at:+t||0}:null; }catch(_){ return null; } };

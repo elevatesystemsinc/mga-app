@@ -728,7 +728,7 @@ class FakeDB:
             return json.dumps({'data':None,'error':None})
         return json.dumps({'data':None,'error':{'message':'unknown op '+op}})
 
-HPF_STUB='''window.HostedForm={init:(o,cb)=>Promise.resolve({renderHpf(){ const d=document.getElementById(o.containerId); if(!d) return; d.innerHTML='<div class="hpf-stub" data-xrtype="'+o.xrtype+'" data-amount="'+(o.xAmount||0)+'"><input id="hpfCard" placeholder="Card number" value="4242424242424242"><button type="button" id="hpfGo">'+(o.xbtntext||'Generate')+'</button></div>';
+HPF_STUB='''const HostedForm={init:(o,cb)=>Promise.resolve({renderHpf(){ const d=document.getElementById(o.containerId); if(!d) return; d.innerHTML='<div class="hpf-stub" data-xrtype="'+o.xrtype+'" data-amount="'+(o.xAmount||0)+'"><input id="hpfCard" placeholder="Card number" value="4242424242424242"><button type="button" id="hpfGo">'+(o.xbtntext||'Generate')+'</button></div>';
   d.querySelector('#hpfGo').onclick=()=>{ const n=d.querySelector('#hpfCard').value.replace(/\\s/g,''); if(n.length<12) return cb.onInvalid({type:'Token',success:false,errors:['Card number is not valid'],data:null}); if(n.endsWith('0002')) return cb.onFailure({type:'Token',success:false,errors:['Do not honor'],data:null});
     cb.onSuccess(o.xrtype==='Create Vault'?{type:'Vault',status:'success',data:{customerId:'cus_stub',vaultId:'v_stub'}}:{type:'Token',status:'success',data:{token:(n.endsWith('0005')?'tok_decline':'tok_'+n.slice(-4)+'_'+Date.now()),nameOnCard:'CardHolder',expDate:'12/30',maskedPan:n.slice(0,6)+'******'+n.slice(-4),cardType:'Visa'}}); }; }, destroy(){ const d=document.getElementById(o.containerId); if(d) d.innerHTML=''; }})};'''
 async def cloud(ctx,fdb,no_session=False):
