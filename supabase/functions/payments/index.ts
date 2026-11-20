@@ -9,8 +9,11 @@
 //   configure   {env, client_id, client_secret, partner_token, hpf_token, webhook_secret}   staff: save, then check the connection
 //   status                                      staff: check again (an OAuth token + the gateway health call), return the redacted account
 //   hpf                                         signed in or a station: what the Hosted Payment Form needs {script, xtoken, env}
-//   pay         {token, amount, save, descr}    member: a payment on their account; `save` keeps the card in the vault and turns autopay on
-//   setup       {token}                          member: keep the card in the vault for autopay, no charge
+//   pay         {amount, token | method_id, save, nickname}   member: a payment on their account — a fresh token from the form, or a card from their
+//               wallet; `save` keeps a fresh card in the wallet (and makes it the autopay card when autopay is on)
+//   wallet_add  {token, nickname, make_default}  member: keep a card / bank account in the vault (their wallet), no charge
+//   wallet_remove {id}  wallet_default {id}  autopay_on {id?}  autopay_off     member: the wallet and autopay
+//   setup       {token}                          member: wallet_add + autopay_on in one (the old portal call)
 //   sale        {token, amount, ref, descr, member_id?, key?}   staff or a station: a one-off card sale (a register ticket, a fund checkout)
 //   refund      {payment_id, amount}             staff: a full or partial refund of a sale (posts the reversal on the member's account)
 //   charge_vault {member_id, amount, descr}      staff: charge a member's card on file
@@ -126,6 +129,18 @@ Deno.serve(async (req) => {
       const id = String(r.customerId || r.id || ""); if (!id) throw new Error("Deluxe did not return a customer id");
       await admin.from("member_users").upsert({ tenant, member_id: member.id, email: member.email || "", pay_provider: "deluxe", pay_customer: id }, { onConflict: "tenant,member_id" }); return id;
     };
+    /* the wallet: one row per card or bank account in Deluxe's vault; the default is what autopay and "charge the card on file" use */
+    const walletOf = async (member_id: string) => { const { data } = await admin.from("member_payment_methods").select("*").eq("tenant", tenant).eq("member_id", member_id).is("removed_at", null).order("is_default", { ascending: false }).order("created_at"); return data || []; };
+    const walletAdd = async (member_id: string, customerId: string, methodId: string, s: { label: string; method: string }, exp: string, nickname: string, makeDefault: boolean) => {
+      const have = await walletOf(member_id); const first = !have.length;
+      if (makeDefault || first) await admin.from("member_payment_methods").update({ is_default: false }).eq("tenant", tenant).eq("member_id", member_id);
+      const { data } = await admin.from("member_payment_methods").insert({ tenant, member_id, provider: "deluxe", customer_id: customerId, method_id: methodId, kind: s.method, label: s.label, nickname: nickname || null, exp: exp || null, is_default: makeDefault || first }).select("*").maybeSingle();
+      await syncAutopay(member_id); return data;
+    };
+    /* member_users keeps the autopay flag and the method it charges (= the wallet's default) so autopay_run and the hub read one place */
+    const syncAutopay = async (member_id: string) => { const w = await walletOf(member_id); const d = w.find((x: Record<string, unknown>) => x.is_default) || w[0] || null;
+      const { data: u } = await admin.from("member_users").select("autopay").eq("tenant", tenant).eq("member_id", member_id).maybeSingle();
+      await admin.from("member_users").update({ pay_provider: "deluxe", pay_customer: d ? d.customer_id : null, pay_method: d && u?.autopay ? d.method_id : null, pm_label: d ? [d.nickname, d.label].filter(Boolean).join(" · ") : null, autopay: !!(u?.autopay && d) }).eq("tenant", tenant).eq("member_id", member_id); };
     const keepCard = async (member_id: string, customerId: string, methodId: string, label: string) => {
       await admin.from("member_users").update({ autopay: true, pay_provider: "deluxe", pay_customer: customerId, pay_method: methodId, pm_label: label }).eq("tenant", tenant).eq("member_id", member_id);
     };
@@ -168,23 +183,50 @@ Deno.serve(async (req) => {
       if (!xtoken) return json({ error: "The Hosted Payment Form token is missing — add it in Billing setup" });
       return json({ ok: true, script: DPP.hpfScript, xtoken, env: acct.env });
     }
-    if (action === "pay" || action === "setup") {
+    if (["pay", "setup", "wallet_add", "wallet_remove", "wallet_default", "autopay_on", "autopay_off"].includes(action)) {
       const m = await memberMe(); if (!m) return json({ error: "Your e-mail is not on the club's directory" });
       const { data: u } = await admin.from("member_users").select("*").eq("tenant", tenant).eq("member_id", m.id).maybeSingle();
-      const tk = tokenOf(b.token), token = b.token; if (!tk.token) return json({ error: "The card was not tokenized" });
-      if (action === "setup") {
+      const tk = tokenOf(b.token), token = b.token;
+      const vaultIn = async (nickname: string, makeDefault: boolean) => {   // a fresh token into the vault, then into the wallet
         const customerId = await customerFor(m, u);
-        const r = await dpp(acct, "POST", DPP.paymentMethods, { customerId: Number(customerId) || customerId, paymentMethod: { token: { token: tk.token, expiry: tk.expiry } }, accNickName: "Autopay" });
-        const s = readSale(r, tk.card); const methodId = s.methodId || String(r.id || ""); if (!methodId) return json({ error: "Deluxe did not return a payment method id" + (s.message ? ": " + s.message : "") });
-        await keepCard(m.id, customerId, methodId, s.label); await log({ kind: "vault", payment_id: methodId, amount: 0, status: "stored", method: s.method, label: s.label, member_id: m.id, ref: "autopay", descr: "Card kept for autopay", response: r });
-        return json({ ok: true, label: s.label });
+        const r = await dpp(acct!, "POST", DPP.paymentMethods, { customerId: Number(customerId) || customerId, paymentMethod: { token: { token: tk.token, expiry: tk.expiry } }, accNickName: nickname || "Wallet" });
+        const s = readSale(r, tk.card); const methodId = s.methodId || String(r.id || ""); if (!methodId) throw new Error("Deluxe did not keep the card" + (s.message ? ": " + s.message : ""));
+        const row = await walletAdd(m.id, customerId, methodId, s, tk.expiry, nickname, makeDefault);
+        await log({ kind: "vault", payment_id: methodId, amount: 0, status: "stored", method: s.method, label: s.label, member_id: m.id, ref: "wallet", descr: "Kept in the wallet", response: r }); return { row, s };
+      };
+      if (action === "wallet_add" || action === "setup") {
+        if (!tk.token) return json({ error: "The card was not tokenized" });
+        try { const { row, s } = await vaultIn(String(b.nickname || ""), !!b.make_default || action === "setup"); if (action === "setup") { await admin.from("member_users").update({ autopay: true }).eq("tenant", tenant).eq("member_id", m.id); await syncAutopay(m.id); } return json({ ok: true, id: row?.id, label: s.label }); }
+        catch (e) { return json({ error: String((e as Error).message) }); }
       }
-      const save = !!b.save; const customerId = save ? await customerFor(m, u) : "";
-      const s = await sale({ token, amount: Number(b.amount), save, customerId, customer: { firstName: m.first || "", lastName: m.last || "", email: m.email || "" }, descr: `${t.name} — member account payment`, ref: "acct", member_id: m.id });
-      const itemId = await postPayment(m.id, s.amount, "deluxe:" + s.id, save ? "Online payment (card saved for autopay)" : "Online payment", s.method, s.id);
+      if (action === "wallet_remove") {
+        const { data: w } = await admin.from("member_payment_methods").select("*").eq("tenant", tenant).eq("member_id", m.id).eq("id", String(b.id)).is("removed_at", null).maybeSingle(); if (!w) return json({ error: "That payment method is not in your wallet" });
+        try { await dpp(acct, "PATCH", DPP.paymentMethods + "/" + encodeURIComponent(w.method_id), { customerId: Number(w.customer_id) || w.customer_id, isActive: false }); } catch (_) { /* the vault keeps it; the wallet forgets it */ }
+        await admin.from("member_payment_methods").update({ removed_at: new Date().toISOString(), is_default: false }).eq("id", w.id);
+        const left = await walletOf(m.id); if (w.is_default && left[0]) await admin.from("member_payment_methods").update({ is_default: true }).eq("id", left[0].id);
+        await syncAutopay(m.id); return json({ ok: true });
+      }
+      if (action === "wallet_default" || action === "autopay_on") {
+        if (b.id) { const { data: w } = await admin.from("member_payment_methods").select("id").eq("tenant", tenant).eq("member_id", m.id).eq("id", String(b.id)).is("removed_at", null).maybeSingle(); if (!w) return json({ error: "That payment method is not in your wallet" });
+          await admin.from("member_payment_methods").update({ is_default: false }).eq("tenant", tenant).eq("member_id", m.id); await admin.from("member_payment_methods").update({ is_default: true }).eq("id", w.id); }
+        if (action === "autopay_on") { const w = await walletOf(m.id); if (!w.length) return json({ error: "Add a card or bank account first" }); await admin.from("member_users").upsert({ tenant, member_id: m.id, email: m.email || "", autopay: true }, { onConflict: "tenant,member_id" }); }
+        await syncAutopay(m.id); return json({ ok: true });
+      }
+      if (action === "autopay_off") { await admin.from("member_users").update({ autopay: false, pay_method: null }).eq("tenant", tenant).eq("member_id", m.id); return json({ ok: true }); }
+      // pay: a card from the wallet, or a fresh token (kept in the wallet when asked)
+      let s: Awaited<ReturnType<typeof sale>>, kept = false;
+      if (b.method_id) {
+        const { data: w } = await admin.from("member_payment_methods").select("*").eq("tenant", tenant).eq("member_id", m.id).eq("id", String(b.method_id)).is("removed_at", null).maybeSingle(); if (!w) return json({ error: "That payment method is not in your wallet" });
+        s = await sale({ methodId: w.method_id, customerId: w.customer_id, amount: Number(b.amount), descr: `${t.name} — member account payment`, ref: "acct", member_id: m.id });
+        s.label = [w.nickname, w.label].filter(Boolean).join(" · ") || s.label;
+      } else {
+        if (!tk.token) return json({ error: "The card was not tokenized" });
+        s = await sale({ token, amount: Number(b.amount), descr: `${t.name} — member account payment`, ref: "acct", member_id: m.id });
+        if (b.save) { try { await vaultIn(String(b.nickname || ""), !!b.make_default); kept = true; } catch (_) { kept = false; } }
+      }
+      const itemId = await postPayment(m.id, s.amount, "deluxe:" + s.id, "Online payment" + (kept ? " (card kept in the wallet)" : ""), s.method, s.id);
       if (itemId) await admin.from("payments").update({ acct_item: itemId }).eq("id", s.logId);
-      if (save && s.methodId) await keepCard(m.id, s.customerId || customerId, s.methodId, s.label);
-      return json({ ok: true, payment_id: s.id, amount: s.amount, label: s.label, autopay: save && !!s.methodId });
+      return json({ ok: true, payment_id: s.id, amount: s.amount, label: s.label, kept });
     }
     if (action === "sale") {
       if (!staff && !station) return json({ error: "Staff or a register only" }, 403);

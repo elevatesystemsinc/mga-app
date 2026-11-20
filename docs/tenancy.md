@@ -191,7 +191,9 @@ and RLS enforces the same on the tables.
    Run statements charges autopay members, the account page refunds and charges cards on file, the registers' Card button and a fundraising
    checkout's *Charge a card now* use the same sheet. Switch to Production in the drawer when Deluxe says the merchant is live. **Sandbox, Nov 20:** Bushwood's credentials connect (token, health,
    customers, vault, the hosted form with the Partner Token as its access token), but the sandbox merchant is a *fleet* merchant — every
-   sale answers "Merchant not enabled for Credit" — so ask TMG / Deluxe to enable Credit (and ACH) on it before a test sale can approve. The `stripe` /
+   sale answers "Merchant not enabled for Credit" — so ask TMG / Deluxe to enable Credit (and ACH) on it before a test sale can approve.
+   `portal-wallet-setup.sql` (applied) adds the member wallet (`member_payment_methods`), `member_me_as` for the hub's *View portal as member*
+   and the richer `member_me`; nothing to configure per client. The `stripe` /
    `stripe-webhook` functions and columns stay deployed but unused; `pay_online()` still honours a connected Stripe account.
 9a. **Client types and the nonprofit set** (`client-kinds-setup.sql`, `fund-setup.sql`, `fund-cashier-setup.sql`, all applied): New client asks the type;
    a nonprofit starts with Golf management + Fundraising events. Nothing else to configure on Flagstick's side.

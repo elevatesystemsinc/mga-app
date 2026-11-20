@@ -98,20 +98,31 @@ class FakeDB:
             grants=self.grants if self.grants is not None else [{'tenant':r['tenant'],'role':r['role'],'orgs':r['orgs'],'manage':r.get('manage',False),'name':r.get('name','')} for r in self._rows('tenant_users') if r['user_id']==self.me]
             tenants=sorted({g['tenant'] for g in grants}|set(self.user_tenants)) if self.grants is None and not self._rows('tenant_users') else sorted({g['tenant'] for g in grants})
             return json.dumps({'data':{'admin':self.admin,'tenants':tenants,'grants':grants,'user_id':self.me,'email':'board@test'},'error':None})
-        if fn=='member_me':
+        if fn in ('member_me','member_me_as'):
             me=next((u for u in self.auth_users if u['id']==self.me),None); em=(me or {}).get('email','').lower()
             club=self.get('mga_hub','club',a['p_tenant']) or {}
-            m=next((x for x in club.get('members',[]) if str(x.get('email','')).lower()==em),None)
-            if not em or not m: return json.dumps({'data':{'member':None,'reason':'not a member' if em else 'not signed in','club':club.get('name')},'error':None})
+            if fn=='member_me_as':
+                g=self._my_grant(a['p_tenant'])
+                if not (self.admin or (g and g['role']=='staff')): return err('not allowed')
+                m=next((x for x in club.get('members',[]) if x.get('id')==a.get('p_member')),None)
+                if not m: return json.dumps({'data':{'member':None,'reason':'not a member','club':club.get('name')},'error':None})
+                u0=next((r for r in self._rows('member_users') if r['tenant']==a['p_tenant'] and r['member_id']==m['id']),None)
+                d=json.loads(self._rpc('member_me',dict(a,_as=m)))['data']; d['staffView']=True; d['signedIn']=(u0 or {}).get('last_seen') or ''; return json.dumps({'data':d,'error':None})
+            if a.get('_as'): m=a['_as']
+            else: m=next((x for x in club.get('members',[]) if str(x.get('email','')).lower()==em),None)
+            if (not em and not a.get('_as')) or not m: return json.dumps({'data':{'member':None,'reason':'not a member' if em else 'not signed in','club':club.get('name')},'error':None})
             rows=self._rows('member_users'); u=next((r for r in rows if r['tenant']==a['p_tenant'] and r['member_id']==m['id']),None)
-            if not u: u={'tenant':a['p_tenant'],'member_id':m['id'],'email':em,'user_id':self.me,'autopay':False,'stripe_customer':None,'stripe_pm':None,'pm_label':None,'created_at':'2026-10-26T00:00:00Z','last_seen':None}; rows.append(u)
-            u['last_seen']='2026-10-26T12:00:00Z'
+            if not u:
+                if a.get('_as'): u={'autopay':False,'pm_label':None,'pay_method':None}
+                else: u={'tenant':a['p_tenant'],'member_id':m['id'],'email':em,'user_id':self.me,'autopay':False,'stripe_customer':None,'stripe_pm':None,'pm_label':None,'pay_method':None,'created_at':'2026-10-26T00:00:00Z','last_seen':None}; rows.append(u)
+            if not a.get('_as'): u['last_seen']='2026-10-26T12:00:00Z'
+            wallet=[{k:w.get(k) for k in ('id','kind','label','nickname','exp','is_default','created_at')} for w in sorted([w for w in self._rows('member_payment_methods') if w['tenant']==a['p_tenant'] and w['member_id']==m['id'] and not w.get('removed_at')],key=lambda w:(not w.get('is_default'),w.get('created_at','')))]
             items=sorted([i for i in self._rows('acct_items') if i.get('tenant','wccc')==a['p_tenant'] and i['member_id']==m['id'] and not i.get('void_at')],key=lambda i:(i.get('posted',''),i.get('created_at','')))
             st=sorted([x for x in self._rows('acct_statements') if x.get('tenant','wccc')==a['p_tenant'] and x['member_id']==m['id']],key=lambda x:x['period_end'],reverse=True)
             t=next((t for t in self._rows('tenants') if t['slug']==a['p_tenant']),{})
             facs=[f for f in ((club.get('booking') or {}).get('facilities') or []) if f.get('members',True)]
             bks=sorted([b for b in self._rows('bookings') if b.get('tenant','wccc')==a['p_tenant'] and b['member_id']==m['id'] and b['status'] in ('booked','checked_in') and b['date']>=datetime.date.today().isoformat()],key=lambda b:(b['date'],b['time']))
-            return json.dumps({'data':{'member':{k:m.get(k) for k in ('id','first','last','memberNo','email','address1','city','state','zip','status')},'club':club.get('name'),'message':(club.get('billing') or {}).get('message'),'items':items,'statements':st,'facilities':facs,'bookings':bks,'events':sorted([e for e in (club.get('events') or []) if e.get('public',True) and (e.get('end') or e['date'])>=datetime.date.today().isoformat()],key=lambda e:(e['date'],e.get('start') or '')),'brand':(club.get('brand') or {}).get('logo'),'autopay':u['autopay'],'pm_label':u['pm_label'],'online':bool(t.get('stripe_account')) and bool((t.get('stripe_status') or {}).get('charges_enabled'))},'error':None})
+            return json.dumps({'data':{'member':{k:m.get(k) for k in ('id','first','last','memberNo','email','address1','city','state','zip','status')},'club':club.get('name'),'message':(club.get('billing') or {}).get('message'),'items':items,'statements':st,'facilities':facs,'bookings':bks,'events':sorted([e for e in (club.get('events') or []) if e.get('public',True) and (e.get('end') or e['date'])>=datetime.date.today().isoformat()],key=lambda e:(e['date'],e.get('start') or '')),'brand':(club.get('brand') or {}).get('logo'),'autopay':u.get('autopay',False),'pm_label':u.get('pm_label'),'autopay_method':u.get('pay_method'),'wallet':wallet,'online':bool((t.get('pay_status') or {}).get('ok')) or (bool(t.get('stripe_account')) and bool((t.get('stripe_status') or {}).get('charges_enabled')))},'error':None})
         if fn.startswith('pos_') or fn=='staff_clock':
             key=a.get('p_key') or ''; h=hashlib.sha256(key.encode()).hexdigest() if key else None
             st=next((r for r in self._rows('pos_stations') if r['key_hash']==h and not r.get('revoked_at')),None) if len(key)>=16 else None
@@ -555,6 +566,40 @@ class FakeDB:
             if not staff: return er('Staff only')
             return ok({'ok':True,'rows':[{k:r.get(k) for k in ('id','kind','payment_id','parent_id','amount','status','method','label','member_id','ref','descr','created_at','created_by')} for r in reversed([r for r in self.paylog if r['tenant']==tn])]})
         if not acct or not (acct.get('status') or {}).get('ok'): return er('This club does not take payments online yet: check the connection in Billing setup' if acct else 'not configured: set up Deluxe in Billing setup')
+        def wallet(mid): return sorted([w for w in self._rows('member_payment_methods') if w['tenant']==tn and w['member_id']==mid and not w.get('removed_at')],key=lambda w:(not w.get('is_default'),w.get('created_at','')))
+        def sync_autopay(mid):
+            u=user_row(mid); w=wallet(mid); d=next((x for x in w if x.get('is_default')),w[0] if w else None)
+            u.update({'pay_provider':'deluxe','pay_customer':d['customer_id'] if d else None,'pay_method':(d['method_id'] if (d and u.get('autopay')) else None),'pm_label':(' · '.join(x for x in (d.get('nickname'),d.get('label')) if x) if d else None),'autopay':bool(u.get('autopay') and d)})
+        def wallet_add(mid,token,nickname,make_default):
+            self.payn+=1; w=wallet(mid); first=not w
+            if make_default or first:
+                for x in w: x['is_default']=False
+            row={'id':'w_%d'%self.payn,'tenant':tn,'member_id':mid,'provider':'deluxe','customer_id':'cus_'+mid,'method_id':'pm_'+str(token),'kind':'card','label':'Visa ·4242','nickname':nickname or None,'exp':'12/30','is_default':bool(make_default or first),'created_at':'2026-11-20T00:00:%02dZ'%(self.payn%60),'removed_at':None}
+            self._rows('member_payment_methods').append(row); log(kind='vault',payment_id=row['method_id'],amount=0,status='stored',method='card',label='Visa ·4242',member_id=mid,ref='wallet',descr='Kept in the wallet',response={}); sync_autopay(mid); return row
+        if act in ('wallet_add','wallet_remove','wallet_default','autopay_on','autopay_off'):
+            m=member()
+            if not m: return er('Your e-mail is not on the club\'s directory')
+            mid=m['id']; token=b.get('token'); token=(token.get('token') if isinstance(token,dict) else token) or ''
+            if act=='wallet_add':
+                if not token: return er('The card was not tokenized')
+                row=wallet_add(mid,token,str(b.get('nickname') or ''),bool(b.get('make_default'))); return ok({'ok':True,'id':row['id'],'label':row['label']})
+            if act=='wallet_remove':
+                w=next((x for x in wallet(mid) if x['id']==b.get('id')),None)
+                if not w: return er('That payment method is not in your wallet')
+                w['removed_at']='2026-11-20T00:00:00Z'; wasd=w['is_default']; w['is_default']=False; left=wallet(mid)
+                if wasd and left: left[0]['is_default']=True
+                sync_autopay(mid); return ok({'ok':True})
+            if act in ('wallet_default','autopay_on'):
+                if b.get('id'):
+                    w=next((x for x in wallet(mid) if x['id']==b.get('id')),None)
+                    if not w: return er('That payment method is not in your wallet')
+                    for x in wallet(mid): x['is_default']=False
+                    w['is_default']=True
+                if act=='autopay_on':
+                    if not wallet(mid): return er('Add a card or bank account first')
+                    user_row(mid)['autopay']=True
+                sync_autopay(mid); return ok({'ok':True})
+            if act=='autopay_off': u=user_row(mid); u['autopay']=False; u['pay_method']=None; return ok({'ok':True})
         if act=='hpf':
             if not acct.get('hpf_token'): return er('The Hosted Payment Form token is missing — add it in Billing setup')
             return ok({'ok':True,'script':'https://hostedform2.deluxe.com/V2/deluxe.js','xtoken':acct['hpf_token'],'env':acct['env']})
@@ -563,14 +608,20 @@ class FakeDB:
                 m=member()
                 if not m: return er('Your e-mail is not on the club\'s directory')
                 u=user_row(m['id']); token=b.get('token'); token=(token.get('token') if isinstance(token,dict) else token) or ''
-                if not token: return er('The card was not tokenized')
                 if act=='setup':
-                    u.update({'autopay':True,'pay_provider':'deluxe','pay_customer':u.get('pay_customer') or 'cus_'+m['id'],'pay_method':'pm_'+token,'pm_label':'Visa ·4242'}); log(kind='vault',payment_id='pm_'+token,amount=0,status='stored',method='card',label='Visa ·4242',member_id=m['id'],ref='autopay',descr='Card kept for autopay',response={})
-                    return ok({'ok':True,'label':'Visa ·4242'})
-                save=bool(b.get('save')); s=sale(token=token,amount=b.get('amount'),descr=t['name']+' — member account payment',ref='acct',mid=m['id'],save=save)
-                iid=post_payment(m['id'],s['amount'],'deluxe:'+s['id'],'Online payment (card saved for autopay)' if save else 'Online payment','card',s['id']); s['row']['acct_item']=iid
-                if save: u.update({'autopay':True,'pay_provider':'deluxe','pay_customer':s['customerId'],'pay_method':s['methodId'],'pm_label':s['label']})
-                return ok({'ok':True,'payment_id':s['id'],'amount':s['amount'],'label':s['label'],'autopay':save})
+                    if not token: return er('The card was not tokenized')
+                    row=wallet_add(m['id'],token,'',True); u['autopay']=True; sync_autopay(m['id']); return ok({'ok':True,'label':row['label']})
+                kept=False
+                if b.get('method_id'):
+                    w=next((x for x in wallet(m['id']) if x['id']==b.get('method_id')),None)
+                    if not w: return er('That payment method is not in your wallet')
+                    s=sale(method_id=w['method_id'],amount=b.get('amount'),descr=t['name']+' — member account payment',ref='acct',mid=m['id']); s['label']=' · '.join(x for x in (w.get('nickname'),w.get('label')) if x) or s['label']
+                else:
+                    if not token: return er('The card was not tokenized')
+                    s=sale(token=token,amount=b.get('amount'),descr=t['name']+' — member account payment',ref='acct',mid=m['id'])
+                    if b.get('save'): wallet_add(m['id'],token,str(b.get('nickname') or ''),bool(b.get('make_default'))); kept=True
+                iid=post_payment(m['id'],s['amount'],'deluxe:'+s['id'],'Online payment'+(' (card kept in the wallet)' if kept else ''),'card',s['id']); s['row']['acct_item']=iid
+                return ok({'ok':True,'payment_id':s['id'],'amount':s['amount'],'label':s['label'],'kept':kept})
             if act=='sale':
                 if not staff and not station: return er('Staff or a register only')
                 s=sale(token=str(b.get('token') or ''),amount=b.get('amount'),descr=str(b.get('descr') or t['name']),ref=str(b.get('ref') or 'sale'),mid=str(b.get('member_id') or ''))

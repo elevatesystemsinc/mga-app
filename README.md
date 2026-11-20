@@ -260,6 +260,12 @@ hub under **Member accounts** (staff logins only, once the billing module is on)
   club's own merchant account, set up through Trinity Merchant Group: the card or bank account is entered in Deluxe's secure form inside
   the portal (never on a Flagstick page), the payment posts to the account at once, refunds post back, and the office can charge a card
   on file. The same card sheet sits behind the registers' Card button and a fundraising checkout.
+- **The member's wallet**: on the portal a member keeps any number of cards and bank accounts (in Deluxe's vault, never on Flagstick),
+  names them, picks a default, pays an open statement or any amount in one tap from a saved method, and turns **autopay** on so each
+  statement's balance is paid from the default. Each month's statement shows its closing balance, due date and whether it is paid.
+  **Every member gets a login**: Member accounts → *Invite to the portal* e-mails the link to everyone with an e-mail who has not signed
+  in yet (sign-in is a one-time e-mail link, no password). Staff open **View portal as member** from a member's account page to see the
+  portal exactly as that member sees it, read-only.
 
 ## Point of sale
 
