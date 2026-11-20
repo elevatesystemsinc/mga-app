@@ -153,7 +153,7 @@ async def main():
     # the hub: Billing setup names the portal link and offers Connect with Stripe; the stripe function is not configured
     fdb.me='u-pro@wccc.org'
     r=await p1.evaluate("""async()=>{ go('billsetup'); await new Promise(r=>setTimeout(r,200)); const link=document.querySelector('#main .cardhead .muted b')?.textContent; const con=document.getElementById('bsCon')?.textContent; document.getElementById('bsSt').click(); await new Promise(r=>setTimeout(r,400)); return {link, con, toast:document.getElementById('toast').textContent, online:acctSettings().online}; }""")
-    bad+=check('Billing setup: the portal link, Connect with Stripe, a clear message while the function has no key',r['link'].endswith('member.html') and r['con']=='Connect with Stripe' and 'aren’t switched on' in r['toast'] and not r['online']['connected'],r)
+    bad+=check('Billing setup: the portal link, Set up Deluxe, a clear answer while no credentials are saved',r['link'].endswith('member.html') and r['con']=='Set up Deluxe' and 'Not connected' in r['toast'] and not r['online']['connected'] and not r['online']['ok'],r)
     # ---- 5d. point of sale: products, a grill ticket to Bo's account (service charge + tax), a cash ticket, a void, the day's tickets, stock
     r=await p1.evaluate("""async()=>{ go('possetup'); await new Promise(r=>setTimeout(r,200)); const nav=navItems().map(x=>x[0]);
       document.getElementById('pxNewP').click(); document.getElementById('pN').value='Club sandwich'; document.getElementById('pO').value='grill'; document.getElementById('pC').value='Food'; document.getElementById('pP').value='14'; document.getElementById('dSave').click(); await new Promise(r=>setTimeout(r,150));

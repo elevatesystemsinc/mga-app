@@ -1,0 +1,217 @@
+// Flagstick — online payments through the DELUXE PAYMENTS PLATFORM (DPP) on the club's own merchant account. Deploy as the
+// Edge Function `payments`. No Flagstick-wide secret: every club's credentials live in `payment_accounts` (service role only),
+// entered by its staff from Billing setup after Trinity Merchant Group has onboarded the merchant and Deluxe has e-mailed the
+// Client ID / Client Secret / Partner Token / HPF token. Card data never touches Flagstick: the browser tokenizes it in Deluxe's
+// Hosted Payment Form (hostedform2.deluxe.com) and this function charges the TOKEN, or a card kept in Deluxe's VAULT for autopay.
+//
+//   POST {tenant, action, …}  — the caller is a staff login (hub), a member (the portal, by the e-mail on the directory) or a
+//   register station (its link key, `key`); every action answers {ok, …} or {error}.
+//   configure   {env, client_id, client_secret, partner_token, hpf_token, webhook_secret}   staff: save, then check the connection
+//   status                                      staff: check again (an OAuth token + the gateway health call), return the redacted account
+//   hpf                                         signed in or a station: what the Hosted Payment Form needs {script, xtoken, env}
+//   pay         {token, amount, save, descr}    member: a payment on their account; `save` keeps the card in the vault and turns autopay on
+//   setup       {token}                          member: keep the card in the vault for autopay, no charge
+//   sale        {token, amount, ref, descr, member_id?, key?}   staff or a station: a one-off card sale (a register ticket, a fund checkout)
+//   refund      {payment_id, amount}             staff: a full or partial refund of a sale (posts the reversal on the member's account)
+//   charge_vault {member_id, amount, descr}      staff: charge a member's card on file
+//   autopay_run                                  staff: charge every autopay member's balance due (Run statements)
+//   transactions {limit?}                        staff: the log
+//
+// The DPP calls, as documented on developer.deluxe.com / Deluxe's portal (Nov 2026): OAuth2 client credentials at
+// /secservices/oauth2/v2/token (Basic client_id:client_secret, grant_type=client_credentials, ~60 min), then every call with
+// Authorization: Bearer + PartnerToken headers under /dpp/v1/gateway. The paths and the shape of a response are kept in one
+// place (DPP below) so a difference found against the sandbox is a one-line change.
+import { createClient } from "npm:@supabase/supabase-js@2.45.4";
+
+const cors = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type", "Access-Control-Allow-Methods": "POST, OPTIONS" };
+const json = (b: unknown, status = 200) => new Response(JSON.stringify(b), { status, headers: { ...cors, "Content-Type": "application/json" } });
+const r2 = (v: number) => Math.round((Number(v) || 0) * 100) / 100;
+const today = () => new Date().toISOString().slice(0, 10);
+
+type Acct = { tenant: string; provider: string; env: string; client_id: string | null; client_secret: string | null; partner_token: string | null; hpf_token: string | null; webhook_secret: string | null; status: Record<string, unknown> | null };
+
+/* ---------- the Deluxe adapter ---------- */
+const DPP = {
+  host: (env: string) => env === "production" ? "https://api.deluxe.com" : "https://sandbox.api.deluxe.com",
+  token: "/secservices/oauth2/v2/token",
+  base: "/dpp/v1/gateway",
+  health: "/",                       // GET  — the health check from the solution guide
+  payments: "/payments",             // POST — a sale with a token or a vaulted payment method
+  refunds: "/refunds",               // POST — {paymentId, amount}
+  customers: "/customers",           // POST — a vault customer
+  paymentMethods: "/paymentmethods", // POST — add a tokenized card / bank account to a customer's vault
+  hpfScript: "https://hostedform2.deluxe.com/V2/deluxe.js",
+};
+const tokens = new Map<string, { bearer: string; exp: number }>();   // per tenant, inside this instance
+async function bearerFor(a: Acct): Promise<string> {
+  const k = a.tenant + ":" + a.env, hit = tokens.get(k); if (hit && hit.exp > Date.now()) return hit.bearer;
+  if (!a.client_id || !a.client_secret) throw new Error("not configured: the Deluxe client id and secret are missing");
+  const res = await fetch(DPP.host(a.env) + DPP.token, { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded", Authorization: "Basic " + btoa(`${a.client_id}:${a.client_secret}`) }, body: "grant_type=client_credentials" });
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok || !body.access_token) throw new Error("Deluxe did not accept the credentials" + (body.error_description || body.error ? ": " + (body.error_description || body.error) : ` (HTTP ${res.status})`));
+  const ttl = Math.max(60, Math.min(3300, Number(body.expires_in) || 3300));
+  tokens.set(k, { bearer: body.access_token, exp: Date.now() + (ttl - 30) * 1000 }); return body.access_token;
+}
+async function dpp(a: Acct, method: string, path: string, body?: unknown): Promise<Record<string, unknown>> {
+  const bearer = await bearerFor(a);
+  const res = await fetch(DPP.host(a.env) + DPP.base + path, { method, headers: { Authorization: "Bearer " + bearer, PartnerToken: a.partner_token || "", "Content-Type": "application/json", Accept: "application/json" }, body: body === undefined ? undefined : JSON.stringify(body) });
+  const text = await res.text(); let data: Record<string, unknown> = {}; try { data = text ? JSON.parse(text) : {}; } catch { data = { raw: text }; }
+  if (res.status === 401) { tokens.delete(a.tenant + ":" + a.env); }
+  if (!res.ok) throw new Error(String(data.message || data.error_description || data.error || data.responseMessage || `Deluxe answered HTTP ${res.status}`));
+  return data;
+}
+/* what a sale answered: the processor's id, whether it was approved, the card on the slip, the vault ids when a card was kept */
+function readSale(r: Record<string, unknown>) {
+  const s = (k: string) => (r[k] == null ? "" : String(r[k]));
+  const code = s("responseCode").toUpperCase(), txt = (s("status") + " " + s("responseMessage") + " " + s("authResponse") + " " + s("message")).toLowerCase();
+  const approved = r.approved === true || ["0", "00", "A", "APPROVED", "SUCCESS"].includes(code) || (!code && /approv|success|complet|captur/.test(txt)) || (!code && !txt && !!(r.paymentId || r.id));
+  const card = (r.card || r.cardData || r.paymentMethod || {}) as Record<string, unknown>;
+  const brand = String(card.cardType || card.brand || r.cardType || ""), last4 = String(card.last4 || card.lastFour || r.last4 || (String(card.maskedPan || r.maskedPan || "").slice(-4)) || "");
+  const ach = /ach|bank|checking|savings/i.test(String(card.type || r.paymentType || r.type || ""));
+  return { approved, id: s("paymentId") || s("id") || s("transactionId"), customerId: s("customerId") || s("customerToken"), methodId: s("paymentMethodId") || s("vaultId"), method: ach ? "ach" : "card", label: ach ? `Bank ·${last4}` : brand ? `${brand} ·${last4}` : last4 ? `Card ·${last4}` : "Card", message: s("responseMessage") || s("message") || s("status") };
+}
+
+Deno.serve(async (req) => {
+  if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
+  try {
+    const url = Deno.env.get("SUPABASE_URL")!, svc = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!, anon = Deno.env.get("SUPABASE_ANON_KEY")!;
+    const admin = createClient(url, svc, { auth: { persistSession: false, autoRefreshToken: false } });
+    const b = await req.json(); const tenant = String(b.tenant || ""), action = String(b.action || "");
+    const { data: t } = await admin.from("tenants").select("slug, name, login_email").eq("slug", tenant).maybeSingle();
+    if (!t) return json({ error: "Unknown club" });
+    // who is calling: a signed-in login, or a register station with its key
+    const auth = req.headers.get("Authorization") || "", jwt = auth.replace(/^Bearer\s+/i, "");
+    let userId = "", email = "", staff = false, station: Record<string, unknown> | null = null;
+    if (b.key) { const { data: st } = await admin.rpc("pos_station", { p_key: String(b.key) }); const s = Array.isArray(st) ? st[0] : st; if (s && s.tenant === tenant) station = s; }
+    if (!station) {
+      const { data: me, error: e0 } = await admin.auth.getUser(jwt); if (e0 || !me?.user) return json({ error: "Not signed in" }, 401);
+      userId = me.user.id; email = (me.user.email || "").toLowerCase();
+      const { data: isAdmin } = await admin.from("flagstick_admins").select("user_id").eq("user_id", userId).maybeSingle();
+      const { data: g } = await admin.from("tenant_users").select("role").eq("user_id", userId).eq("tenant", tenant).maybeSingle();
+      staff = !!isAdmin || g?.role === "staff";
+    }
+    const who = station ? "station:" + String(station.name || station.id) : email || "member";
+    const { data: acct0 } = await admin.from("payment_accounts").select("*").eq("tenant", tenant).maybeSingle();
+    let acct = acct0 as Acct | null;
+    const redacted = (a: Acct | null) => a ? { provider: a.provider, env: a.env, client_id: a.client_id ? a.client_id.slice(0, 4) + "…" : "", has_secret: !!a.client_secret, partner_token: a.partner_token ? "…" + a.partner_token.slice(-6) : "", hpf_token: a.hpf_token ? "…" + a.hpf_token.slice(-6) : "", has_webhook_secret: !!a.webhook_secret, status: a.status || null } : null;
+    const saveStatus = async (st: Record<string, unknown>) => { await admin.from("payment_accounts").update({ status: st }).eq("tenant", tenant); await admin.from("tenants").update({ pay_status: { ok: !!st.ok, env: acct?.env, at: st.at, message: st.message || "" } }).eq("slug", tenant); };
+    const check = async (): Promise<Record<string, unknown>> => {
+      const st: Record<string, unknown> = { at: new Date().toISOString(), ok: false, message: "" };
+      try { if (!acct) throw new Error("not configured"); await bearerFor(acct); try { await dpp(acct, "GET", DPP.health); } catch (e) { st.health = String((e as Error).message); } st.ok = true; st.message = "Connected" + (st.health ? " (token ok; the health call answered: " + st.health + ")" : ""); }
+      catch (e) { st.message = String((e as Error).message || e); }
+      if (acct) await saveStatus(st); return st;
+    };
+    const log = async (row: Record<string, unknown>) => { const { data } = await admin.from("payments").insert({ tenant, provider: "deluxe", env: acct?.env, created_by: who, ...row }).select("id").maybeSingle(); return data?.id; };
+    const postPayment = async (member_id: string, amount: number, ref: string, descr: string, method: string, reference: string) => {
+      const { data: had } = await admin.from("acct_items").select("id").eq("tenant", tenant).eq("ref", ref).maybeSingle(); if (had) return had.id;
+      const { data } = await admin.from("acct_items").insert({ tenant, member_id, kind: "payment", source: "manual", item: "payment", ref, descr, amount: r2(amount), method, reference, posted: today(), created_by: who }).select("id").maybeSingle(); return data?.id;
+    };
+    const memberMe = async () => { const mine = createClient(url, anon, { global: { headers: { Authorization: auth } }, auth: { persistSession: false, autoRefreshToken: false } }); const { data } = await mine.rpc("member_me", { p_tenant: tenant }); return data?.member || null; };
+    const customerFor = async (member: { id: string; first?: string; last?: string; email?: string }, u: Record<string, unknown> | null) => {
+      if (u?.pay_customer) return String(u.pay_customer);
+      const r = await dpp(acct!, "POST", DPP.customers, { firstName: member.first || "", lastName: member.last || "", email: member.email || "", customData: { tenant, member_id: member.id } });
+      const id = String(r.customerId || r.id || ""); if (!id) throw new Error("Deluxe did not return a customer id");
+      await admin.from("member_users").upsert({ tenant, member_id: member.id, email: member.email || "", pay_provider: "deluxe", pay_customer: id }, { onConflict: "tenant,member_id" }); return id;
+    };
+    const keepCard = async (member_id: string, customerId: string, methodId: string, label: string) => {
+      await admin.from("member_users").update({ autopay: true, pay_provider: "deluxe", pay_customer: customerId, pay_method: methodId, pm_label: label }).eq("tenant", tenant).eq("member_id", member_id);
+    };
+    const sale = async (o: { token?: string; methodId?: string; customerId?: string; amount: number; descr: string; ref: string; member_id?: string; save?: boolean; customer?: Record<string, unknown> }) => {
+      if (!acct?.status?.ok) throw new Error("This club does not take payments online yet");
+      const amount = r2(o.amount); if (amount < 1) throw new Error("The minimum online payment is $1.00"); if (amount > 25000) throw new Error("That amount is too large for an online payment");
+      const body: Record<string, unknown> = { amount, currency: "USD", description: o.descr.slice(0, 120), orderData: { orderId: o.ref }, customData: { tenant, ref: o.ref, member_id: o.member_id || "" } };
+      if (o.methodId) { body.paymentMethodId = o.methodId; if (o.customerId) body.customerId = o.customerId; }
+      else if (o.token) { body.token = o.token; if (o.save) { body.isSavePaymentMethod = true; if (o.customerId) body.customerId = o.customerId; if (o.customer) body.customerData = o.customer; } }
+      else throw new Error("No card to charge");
+      let r: Record<string, unknown>; try { r = await dpp(acct, "POST", DPP.payments, body); } catch (e) { await log({ kind: "sale", amount, status: "error", member_id: o.member_id || null, ref: o.ref, descr: o.descr, response: { error: String((e as Error).message) } }); throw e; }
+      const s = readSale(r);
+      const logId = await log({ kind: "sale", payment_id: s.id || null, amount, status: s.approved ? "approved" : "declined", method: s.method, label: s.label, member_id: o.member_id || null, ref: o.ref, descr: o.descr, response: r });
+      if (!s.approved) throw new Error("The card was declined" + (s.message ? ": " + s.message : ""));
+      return { ...s, amount, logId };
+    };
+
+    if (action === "configure") {
+      if (!staff) return json({ error: "Only the club's staff may set up payments" }, 403);
+      const cur = acct || ({} as Partial<Acct>); const keep = (k: keyof Acct, v: unknown) => (v === undefined || v === null || v === "" ? (cur[k] ?? null) : String(v));
+      const row = { tenant, provider: "deluxe", env: b.env === "production" ? "production" : "sandbox", client_id: keep("client_id", b.client_id), client_secret: keep("client_secret", b.client_secret), partner_token: keep("partner_token", b.partner_token), hpf_token: keep("hpf_token", b.hpf_token), webhook_secret: keep("webhook_secret", b.webhook_secret), updated_at: new Date().toISOString(), updated_by: who };
+      const { error } = await admin.from("payment_accounts").upsert(row, { onConflict: "tenant" }); if (error) return json({ error: error.message });
+      tokens.delete(tenant + ":sandbox"); tokens.delete(tenant + ":production"); acct = { ...row, status: null } as Acct;
+      const st = await check(); acct.status = st; return json({ ok: true, account: redacted(acct), webhook: `${url}/functions/v1/payments-webhook?tenant=${encodeURIComponent(tenant)}` });
+    }
+    if (action === "status") {
+      if (!staff) return json({ error: "Staff only" }, 403);
+      if (!acct) return json({ ok: true, configured: false, account: null, webhook: `${url}/functions/v1/payments-webhook?tenant=${encodeURIComponent(tenant)}` });
+      const st = await check(); acct.status = st; return json({ ok: true, configured: true, account: redacted(acct), webhook: `${url}/functions/v1/payments-webhook?tenant=${encodeURIComponent(tenant)}` });
+    }
+    if (action === "transactions") {
+      if (!staff) return json({ error: "Staff only" }, 403);
+      const { data } = await admin.from("payments").select("id, kind, payment_id, parent_id, amount, status, method, label, member_id, ref, descr, created_at, created_by").eq("tenant", tenant).order("created_at", { ascending: false }).limit(Math.min(500, Number(b.limit) || 100));
+      return json({ ok: true, rows: data || [] });
+    }
+    if (!acct || !acct.status?.ok) return json({ error: acct ? "This club does not take payments online yet: " + String(acct.status?.message || "check the connection in Billing setup") : "not configured: set up Deluxe in Billing setup" });
+    if (action === "hpf") {
+      if (!acct.hpf_token) return json({ error: "The Hosted Payment Form token is missing — add it in Billing setup" });
+      return json({ ok: true, script: DPP.hpfScript, xtoken: acct.hpf_token, env: acct.env });
+    }
+    if (action === "pay" || action === "setup") {
+      const m = await memberMe(); if (!m) return json({ error: "Your e-mail is not on the club's directory" });
+      const { data: u } = await admin.from("member_users").select("*").eq("tenant", tenant).eq("member_id", m.id).maybeSingle();
+      const token = String(b.token || ""); if (!token) return json({ error: "The card was not tokenized" });
+      if (action === "setup") {
+        const customerId = await customerFor(m, u);
+        const r = await dpp(acct, "POST", DPP.paymentMethods, { customerId, token, nickname: "Autopay", isActive: true });
+        const s = readSale(r); const methodId = s.methodId || String(r.id || ""); if (!methodId) return json({ error: "Deluxe did not return a payment method id" });
+        await keepCard(m.id, customerId, methodId, s.label); await log({ kind: "vault", payment_id: methodId, amount: 0, status: "stored", method: s.method, label: s.label, member_id: m.id, ref: "autopay", descr: "Card kept for autopay", response: r });
+        return json({ ok: true, label: s.label });
+      }
+      const save = !!b.save; const customerId = save ? await customerFor(m, u) : "";
+      const s = await sale({ token, amount: Number(b.amount), save, customerId, customer: { firstName: m.first || "", lastName: m.last || "", email: m.email || "" }, descr: `${t.name} — member account payment`, ref: "acct", member_id: m.id });
+      const itemId = await postPayment(m.id, s.amount, "deluxe:" + s.id, save ? "Online payment (card saved for autopay)" : "Online payment", s.method, s.id);
+      if (itemId) await admin.from("payments").update({ acct_item: itemId }).eq("id", s.logId);
+      if (save && s.methodId) await keepCard(m.id, s.customerId || customerId, s.methodId, s.label);
+      return json({ ok: true, payment_id: s.id, amount: s.amount, label: s.label, autopay: save && !!s.methodId });
+    }
+    if (action === "sale") {
+      if (!staff && !station) return json({ error: "Staff or a register only" }, 403);
+      const ref = String(b.ref || "sale"), member_id = b.member_id ? String(b.member_id) : "";
+      const s = await sale({ token: String(b.token || ""), amount: Number(b.amount), descr: String(b.descr || t.name), ref, member_id });
+      return json({ ok: true, payment_id: s.id, amount: s.amount, label: s.label, method: s.method });
+    }
+    if (action === "charge_vault" || action === "autopay_run") {
+      if (!staff) return json({ error: "Staff only" }, 403);
+      const run = async (u: Record<string, unknown>, amount: number, descr: string) => {
+        const s = await sale({ methodId: String(u.pay_method), customerId: String(u.pay_customer || ""), amount, descr, ref: "autopay", member_id: String(u.member_id) });
+        const itemId = await postPayment(String(u.member_id), s.amount, "deluxe:" + s.id, descr, s.method, s.id); if (itemId) await admin.from("payments").update({ acct_item: itemId }).eq("id", s.logId); return s;
+      };
+      const balance = async (member_id: string) => { const { data: items } = await admin.from("acct_items").select("kind, amount").eq("tenant", tenant).eq("member_id", member_id).is("void_at", null); return r2((items || []).reduce((s: number, i: { kind: string; amount: number }) => s + (i.kind === "charge" ? Number(i.amount) : -Number(i.amount)), 0)); };
+      if (action === "charge_vault") {
+        const { data: u } = await admin.from("member_users").select("*").eq("tenant", tenant).eq("member_id", String(b.member_id)).maybeSingle();
+        if (!u?.pay_method) return json({ error: "No card on file for this member" });
+        const amount = Number(b.amount) || await balance(String(b.member_id)); const s = await run(u, amount, String(b.descr || "Card on file — charged by the office"));
+        return json({ ok: true, payment_id: s.id, amount: s.amount, label: s.label });
+      }
+      const { data: users } = await admin.from("member_users").select("*").eq("tenant", tenant).eq("autopay", true);
+      const out: { member_id: string; amount: number; ok: boolean; error?: string }[] = [];
+      for (const u of users || []) { if (!u.pay_method) continue; const bal = await balance(u.member_id); if (bal < 1) continue;
+        try { const s = await run(u, bal, "Autopay — card on file"); out.push({ member_id: u.member_id, amount: s.amount, ok: true }); } catch (e) { out.push({ member_id: u.member_id, amount: bal, ok: false, error: String((e as Error).message || e) }); } }
+      return json({ ok: true, results: out });
+    }
+    if (action === "refund") {
+      if (!staff) return json({ error: "Staff only" }, 403);
+      const pid = String(b.payment_id || ""); const { data: orig } = await admin.from("payments").select("*").eq("tenant", tenant).eq("kind", "sale").eq("payment_id", pid).maybeSingle();
+      if (!orig) return json({ error: "That payment is not in the log" });
+      const { data: prev } = await admin.from("payments").select("amount").eq("tenant", tenant).eq("kind", "refund").eq("parent_id", pid).eq("status", "approved");
+      const done = r2((prev || []).reduce((s: number, x: { amount: number }) => s + Number(x.amount), 0)); const amount = r2(Number(b.amount) || (Number(orig.amount) - done));
+      if (amount <= 0 || amount > Number(orig.amount) - done + 0.004) return json({ error: `Up to ${(Number(orig.amount) - done).toFixed(2)} can still be refunded` });
+      let r: Record<string, unknown>; try { r = await dpp(acct, "POST", DPP.refunds, { paymentId: pid, amount }); } catch (e) { await log({ kind: "refund", parent_id: pid, amount, status: "error", member_id: orig.member_id, ref: orig.ref, descr: String(b.reason || ""), response: { error: String((e as Error).message) } }); return json({ error: String((e as Error).message) }); }
+      const s = readSale(r); if (!s.approved) return json({ error: "The refund was not accepted" + (s.message ? ": " + s.message : "") });
+      await log({ kind: "refund", payment_id: s.id || null, parent_id: pid, amount, status: "approved", method: orig.method, label: orig.label, member_id: orig.member_id, ref: orig.ref, descr: String(b.reason || "Refund"), response: r });
+      if (orig.member_id && orig.acct_item) {   // the reversal on the member's account, once per refund
+        const ref = `refund:${pid}:${s.id || done + amount}`; const { data: had } = await admin.from("acct_items").select("id").eq("tenant", tenant).eq("ref", ref).maybeSingle();
+        if (!had) await admin.from("acct_items").insert({ tenant, member_id: orig.member_id, kind: "charge", source: "manual", item: "other", ref, descr: "Online payment refunded" + (b.reason ? " · " + String(b.reason) : ""), amount, posted: today(), created_by: who });
+      }
+      return json({ ok: true, refund_id: s.id, amount });
+    }
+    return json({ error: "Unknown action" });
+  } catch (e) { return json({ error: String((e as Error)?.message || e) }, 500); }
+});
