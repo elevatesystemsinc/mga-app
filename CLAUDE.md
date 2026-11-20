@@ -948,13 +948,15 @@ marks the sale's status, logs sales made outside Flagstick (`ref 'external'`), p
 account payment when the bank returns an ACH** (autopay off for that member); a *Merchant Loaded* payload is kept on the account row. **Verified against the
 sandbox the same night with Bushwood's credentials** (the shapes are in the function's header comment): `amount` is an object, a token rides as
 `paymentMethod.token {token, expiry 'MM/YY'}`, a vaulted card as `paymentMethod.vault {paymentMethodId, customerId (a number)}`,
-`paymentType` is 'Credit' | 'Debit', `customData` is an array of {name, value}; a sale answers `responseCode` 0 = approved (10 = error, with
-`responseMessage` as a list), `paymentId`, `customerId`, `paymentMethodId`; a refund the same day is refused ("not settled") so the function
+**`paymentType` is 'Sale' for a card sale** ('Credit' / 'Debit' are the ACH directions — the first probes sent 'Credit' and
+Deluxe answered "Merchant not enabled for Credit", which read as a merchant problem until the owner's virtual-terminal sale showed
+`paymentType: SALE` in `/payments/search`; a card, a form token and a vaulted card all approved with 'Sale' that night), `customData` is an
+array of {name, value}; a sale answers `responseCode` 0 = approved (10 = error, with `responseMessage` as a list), `paymentId`, `authResponse`
+(the approval code), `amountApproved`; `isSavePaymentMethod` on a sale returns no vault ids, so the wallet is filled through `/paymentmethods`; a refund the same day is refused ("not settled") so the function
 voids the whole payment through `/payments/cancel` instead and logs it as kind `void`; the hosted form renders with the **Partner Token** as
 `xtoken` (the function falls back to it when no HPF token is saved) and answers `{type:'Token', status:'success', data:{token, expDate,
 cardType, maskedPan, nameOnCard}}` — the browsers send that object on whole (`hpfToken`), the function reads it with `tokenOf`. Still
-unseen: an approved sale and ACH's `paymentType` — the sandbox merchant TMG set up is a fleet merchant ("Merchant not enabled for Credit"; the
-vault form shows odometer and driver's ID), so ask Deluxe to enable Credit and ACH on it. The fake (`_payments` in `_harness.py`) answers as the sandbox would (a token ending 0005
+unseen: an ACH sale (sent as 'Debit' with the form's aba / dda token) and the webhook's real payloads. The fake (`_payments` in `_harness.py`) answers as the sandbox would (a token ending 0005
 or `tok_decline` is declined) and `HPF_STUB` stands in for the hosted form (`.hpf-stub`, `#hpfGo`). docs/tenancy.md §8 has the per-client steps.
 **The member portal, second pass (`portal-wallet-setup.sql`; the owner, Nov 20: "every member should have a login… add payment information,
 settle open balances… see each month's statement and their full balance owed… set up autopay… I should also be able to masquerade as any
