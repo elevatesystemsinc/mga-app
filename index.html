@@ -8368,6 +8368,8 @@ async function refundPayment(item){ const pid=String(item.reference||item.ref.re
 async function chargeCardOnFile(p){ const bal=balanceOf(p.id); const amt=prompt(`Charge ${memberName(p)}’s card on file how much?`,bal>0?bal.toFixed(2):''); if(amt==null) return; const amount=n0(amt); if(!(amount>=1)){ toast('At least $1.00'); return; }
   const r=await payFn({action:'charge_vault',member_id:p.id,amount,descr:'Card on file — charged by the office'}); if(r.error){ toast(r.error); return; } toast(`${fmt2(r.amount)} charged to ${r.label||'the card on file'}`); ACCT.at=0; await acctLoad(true); render(); }
 /* ---------- the card sheet: Deluxe's hosted form in a modal, a token, then the sale through the function ---------- */
+/* what the hosted form hands back on success: {type:'Token', status:'success', data:{token, expDate, cardType, maskedPan, nameOnCard}} — sent on whole */
+const hpfToken=r=>{ const d=r&&r.data; if(!d) return null; if(typeof d==='string') return {token:d}; return d.token?d:null; };
 function loadHPF(src){ if(window.HostedForm) return Promise.resolve(); if(PAY.script) return PAY.script; PAY.script=new Promise((res,rej)=>{ const sc=document.createElement('script'); sc.src=src; sc.onload=()=>res(); sc.onerror=()=>{ PAY.script=null; rej(new Error('Couldn’t load the Deluxe payment form — check the connection')); }; document.head.appendChild(sc); }); return PAY.script; }
 /* cardSheet({amount, descr, ref, member_id}) → {payment_id, label, method, amount} once the sale is approved, null when closed */
 function cardSheet(o){ return new Promise(async resolve=>{ const cfg=await payFn({action:'hpf'}); if(cfg.error){ toast(payMsg(cfg.error)); resolve(null); return; }
@@ -8376,7 +8378,7 @@ function cardSheet(o){ return new Promise(async resolve=>{ const cfg=await payFn
   document.body.appendChild(d); let done=false; const finish=v=>{ if(done) return; done=true; try{ if(d._inst&&d._inst.destroy) d._inst.destroy(); }catch(_){ } d.remove(); resolve(v); }; d.querySelector('#payHpfX').onclick=()=>finish(null);
   try{ await loadHPF(cfg.script); d.querySelector('#payHpf').innerHTML='';
     const inst=await window.HostedForm.init({containerId:'payHpf',xtoken:cfg.xtoken,xrtype:'Generate Token',xpm:'0',xAmount:o.amount,xcheckSurcharge:true,xbtntext:'Pay '+fmt2(o.amount)},{
-      onSuccess:async r=>{ const token=r&&r.data&&(r.data.token||r.data); if(!token||typeof token!=='string'){ d.querySelector('#payHpfMsg').textContent='The form did not return a token — try again.'; return; } d.querySelector('#payHpfMsg').textContent='Charging…';
+      onSuccess:async r=>{ const token=hpfToken(r); if(!token){ d.querySelector('#payHpfMsg').textContent='The form did not return a token — try again.'; return; } d.querySelector('#payHpfMsg').textContent='Charging…';
         const s=await payFn({action:'sale',token,amount:o.amount,ref:o.ref||'sale',descr:o.descr||'',member_id:o.member_id||''}); if(s.error){ d.querySelector('#payHpfMsg').textContent=s.error; toast(s.error); return; } finish({payment_id:s.payment_id,label:s.label,method:s.method,amount:s.amount}); },
       onFailure:r=>{ d.querySelector('#payHpfMsg').textContent=(r&&r.errors&&r.errors.join(' ')||'The card was not accepted'); },
       onInvalid:r=>{ d.querySelector('#payHpfMsg').textContent=(r&&r.errors&&r.errors.join(' ')||'Check the card details'); }});
@@ -10268,7 +10270,7 @@ function wireSignupCard(t){
    page counts, and a reload is tried once per build — if the page that comes back is still the old one, the CDN
    hasn't caught up; wait a while before trying that build again. */
 (function(){
-  const ME='20261120021347', KEY='au_tried', RETRY=10*60*1000; let ready=false, lastCheck=0;
+  const ME='20261120022527', KEY='au_tried', RETRY=10*60*1000; let ready=false, lastCheck=0;
   const typing=()=>{ const a=document.activeElement; return a&&/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)&&a.value&&a.type!=='search'; };
   const safe=()=>!typing()&&(typeof window.__canReload!=='function'||window.__canReload());
   const tried=()=>{ try{ const [b,t]=(sessionStorage.getItem(KEY)||'').split('|'); return b?{build:b,at:+t||0}:null; }catch(_){ return null; } };
