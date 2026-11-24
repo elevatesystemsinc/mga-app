@@ -965,6 +965,10 @@ localStorage. `acctPost(o)` is the one way anything lands on an account.
   facility / lesson / guest from any path (a station, `member_book`, the payments function). `p.gender` M | F | X | '' (`GENDERS`; the editor's
   Gender select; `normalize` folds the seed's old `sex` in) — `personSet(p)` gives a player from the directory the W tee set when F. The fake
   mirrors `nocharge` and the refusals; `tests/test_family.py` checks 6 and 7. The Shady Valley seed gives Beckham Walls no charge privileges.
+  **Every member and family member carries a birthday** (the owner, Nov 24): `p.dob` (YYYY-MM-DD) — the editor's **Date of birth** beside
+  Gender (a hint when it is missing), the Directory's **No birthday** filter on the club tier (active people without one), the Family card
+  reads "born Nov 30, 2018 (7)" or flags *no birthday on file* (`ageOf(dob, on?)` in core.js). The seeds give everyone one (adults by class,
+  spouses near the holder, children 5–17; the Walls family's are fixed).
 - **Dues collection → the account**: *Put on account* posts the association's charge once (`acctPostDues`), *Collected* the
   matching payment once (`acctCollectDues`); the association is credited in its own books as before.
 - **The member portal** (`member_src.html` → `member.html`, markers `/*PDFFONTS*/` `/*BILLCORE*/` `/*AUTOUPDATE*/`): a member

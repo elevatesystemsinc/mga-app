@@ -188,7 +188,7 @@ async def main():
         # member accounts (local mode keeps the ledger in localStorage): dues put on account landed there; post, pay, void, statements
         r=await pg.evaluate("""async()=>{ go('accounts'); await new Promise(r=>setTimeout(r,300)); const nav=navItems().some(x=>x[0]==='accounts'); const dues=ACCT.items.filter(i=>i.source==='dues').length;
           const first=document.querySelector('[data-acct]'); const id=first.dataset.acct; first.click(); await acctPost({member_id:id,kind:'charge',source:'proshop',amount:25,descr:'Glove'}); await acctPost({member_id:id,kind:'payment',amount:100,method:'cash'}); render();
-          const rows=[...document.querySelectorAll('#main .lg .lr')].map(r=>r.querySelector('.lnet').textContent); const bal=balanceOf(id);
+          const rows=[...document.querySelectorAll('#main .lg:not(#acPays) .lr')].map(r=>r.querySelector('.lnet').textContent); const bal=balanceOf(id);
           go('accounts'); document.getElementById('acRun').click(); document.getElementById('rsEnd').value=todayISO(); document.getElementById('dSave').click(); await new Promise(r=>setTimeout(r,900));
           const st=ACCT.stmts.length, saved=JSON.parse(localStorage.getItem(acctKey())); return {nav, dues, rows, bal, st, saved:[saved.items.length,saved.stmts.length]}; }""")
         ok=r['nav'] and r['dues']==4 and len(r['rows'])==3 and r['st']>=1 and r['saved'][0]==r['dues']+2 and r['saved'][1]==r['st']

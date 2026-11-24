@@ -213,6 +213,8 @@ function canCharge(x){ const p=typeof x==='string'?personById(x):x; if(!p) retur
 const GENDERS=[['','— Not stated —'],['M','Male'],['F','Female'],['X','Nonbinary / other']];
 const GENDER_NAME=Object.fromEntries(GENDERS);
 const personSet=p=>p&&(p.gender||p.sex)==='F'?'W':'M';
+/* `p.dob` (YYYY-MM-DD) — every member and family member should carry one (the owner, Nov 24); the Directory's "No birthday" filter finds the gaps */
+function ageOf(dob,on){ if(!dob) return ''; const d=new Date(dob+'T00:00:00'), t=on?new Date(on+'T00:00:00'):new Date(); if(isNaN(d)) return ''; let a=t.getFullYear()-d.getFullYear(); if(t.getMonth()<d.getMonth()||(t.getMonth()===d.getMonth()&&t.getDate()<d.getDate())) a--; return a; }
 function memberView(p,ms){
   const v=Object.assign({},p);
   if(!isClub()) Object.assign(v,{status:ms?(ms.status||'Active'):'Inactive',joined:ms?(ms.joined||''):'',notes:ms?(ms.notes||''):''});
