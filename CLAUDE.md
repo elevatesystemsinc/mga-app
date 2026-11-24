@@ -910,6 +910,9 @@ localStorage. `acctPost(o)` is the one way anything lands on an account.
   the hub's account page (`#acPays`, after Statements: every payment newest first — method, reference, online / autopay chips, who paid on a
   family account, void state; received / in all / this year in the header; Record payment, Refund on a Deluxe payment, Void) and the
   member portal (between Statements and Activity: the last 36 with the same totals). The running ledger still shows them in order.
+  **The account page is tabbed under the KPIs** (the owner, Nov 24: "rather than scrolling to the end of the page these should be on the
+  top in tabs"): Account · Payments · Statements · Family (`view.aseg`, `data-aseg`; counts on the chips), every pane rendered and the
+  others `hidden`, so ids and handlers stay the same and a test may read any pane without switching.
 - **Pages**: Member accounts (`vAccounts`: outstanding, past due by bucket, charged / received this month; Owing · Past due ·
   In credit · With activity · Everyone; search; Post charge (item picker with the tax / service preview), Record payment,
   Run monthly billing, Run statements, Export balances (with aging columns), GL export, Billing setup), the account
