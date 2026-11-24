@@ -121,7 +121,7 @@ function vClient(m,slug){
   const addr=addrLine(t.address);
   m.innerHTML=`<div class="phead"><div><p style="margin:0 0 4px;font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--gold-dk,#7E5F1A);font-weight:700"><a href="#" id="ptBack" style="color:inherit;text-decoration:none">Clients</a> › ${esc(kindLabel(t.kind))} · ${esc(planLabel(t.plan))}</p><h1 class="h1">${esc(t.name)}</h1>
       <p class="sub"><a href="${esc(tenantURL(t.slug))}" target="_blank" rel="noopener">${esc(t.slug)}.${esc(BASE_DOMAIN)}</a>${(t.hosts||[]).length?' · '+(t.hosts||[]).map(esc).join(', '):''} · ${tStatusChip(t.status)}${t.started_on?' · client since '+fdate(t.started_on):''}</p></div>
-      <div class="actions">${btn('Open hub','ptOpen','',I.chev)}${btn('Status','ptStatus','')}${btn('Edit client','ptEdit','pri',I.edit)}</div></div><div class="rule"></div>
+      <div class="actions">${btn('Open hub','ptOpen','',I.chev)}${btn('Demo','ptDemo','','')}${btn('Status','ptStatus','')}${btn('Edit client','ptEdit','pri',I.edit)}</div></div><div class="rule"></div>
     ${PS.err?`<div class="banner">${esc(PS.err)}</div>`:''}
     <div class="grid g2" style="align-items:start">
       ${card('Subscription',`<div style="padding:0 22px 18px">${kv('Type of client',esc(kindLabel(t.kind)))}${kv('Plan',esc(planLabel(t.plan)))}${kv('Status',tStatusChip(t.status)+(t.ended_on?' <span class="muted" style="font-size:13px">since '+fdate(t.ended_on)+'</span>':''))}${kv('Client since',fdate(t.started_on))}${kv('Renews',fdate(t.renews_on))}${kv('Billing e-mail',t.billing_email?`<a href="mailto:${esc(t.billing_email)}">${esc(t.billing_email)}</a>`:'')}
@@ -139,7 +139,7 @@ function vClient(m,slug){
     ${card('Board logins <span class="muted" style="font-size:13px;font-weight:400">· managed by the club</span>',`<div class="t">${board.length?board.map(brow).join(''):'<div class="tr"><span class="muted">None yet — the club invites its boards from its hub.</span></div>'}</div>`)}
     ${card('Activity',`<div class="t">${events.length?events.map(erow).join(''):'<div class="tr"><span class="muted">Nothing yet.</span></div>'}</div>`)}`;
   $('ptBack').onclick=e=>{ e.preventDefault(); PS.view='clients'; PS.slug=null; portalNav(); vPortal(m); };
-  $('ptOpen').onclick=()=>openHub(t); $('ptStatus').onclick=()=>statusDrawer(t); $('ptEdit').onclick=()=>editClient(t); $('ptEdit2').onclick=()=>editClient(t);
+  $('ptOpen').onclick=()=>openHub(t); $('ptDemo').onclick=()=>openHub(t,'?demo=1'); $('ptStatus').onclick=()=>statusDrawer(t);   // Demo: the hub with the guided walkthrough running (tour.js) $('ptEdit').onclick=()=>editClient(t); $('ptEdit2').onclick=()=>editClient(t);
   $('ptCourses').onclick=()=>clientCoursesDrawer(t);
   $('ptAddC').onclick=()=>editContact(t,null); $('ptAddU').onclick=()=>staffDrawer(t,null); $('ptLink').onclick=()=>linkDrawer(t);
   wireModRows(m,'data-mod');
