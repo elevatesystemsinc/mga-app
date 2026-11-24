@@ -125,8 +125,9 @@ Deno.serve(async (req) => {
       const { data } = await admin.from("acct_items").insert({ tenant, member_id, kind: "payment", source: "manual", item: "payment", ref, descr, amount: r2(amount), method, reference, posted: today(), created_by: who }).select("id").maybeSingle(); return data?.id;
     };
     const memberMe = async () => { const mine = createClient(url, anon, { global: { headers: { Authorization: auth } }, auth: { persistSession: false, autoRefreshToken: false } });
-      if (b.as && staff) { const { data } = await mine.rpc("member_me_as", { p_tenant: tenant, p_member: String(b.as) }); return data?.member || null; }   // staff acting for a member from "View portal as member"
-      const { data } = await mine.rpc("member_me", { p_tenant: tenant }); return data?.member || null; };
+      const fam = (d: Record<string, unknown> | null) => d?.member ? { ...(d.member as Record<string, unknown>), canPay: d.canPay !== false } as { id: string; first?: string; last?: string; email?: string; canPay: boolean } : null;   // family accounts: the holder's account; a sub-account pays only when the holder allows it
+      if (b.as && staff) { const { data } = await mine.rpc("member_me_as", { p_tenant: tenant, p_member: String(b.as) }); return fam(data); }   // staff acting for a member from "View portal as member"
+      const { data } = await mine.rpc("member_me", { p_tenant: tenant }); return fam(data); };
     const customerFor = async (member: { id: string; first?: string; last?: string; email?: string }, u: Record<string, unknown> | null) => {
       if (u?.pay_customer) return String(u.pay_customer);
       const r = await dpp(acct!, "POST", DPP.customers, { firstName: member.first || "", lastName: member.last || "", email: member.email || "" });
@@ -190,6 +191,7 @@ Deno.serve(async (req) => {
     }
     if (["pay", "setup", "wallet_add", "wallet_remove", "wallet_default", "autopay_on", "autopay_off"].includes(action)) {
       const m = await memberMe(); if (!m) return json({ error: "Your e-mail is not on the club's directory" });
+      if (m.canPay === false) return json({ error: "Payments and cards on this account are managed by the account holder" });
       const { data: u } = await admin.from("member_users").select("*").eq("tenant", tenant).eq("member_id", m.id).maybeSingle();
       const tk = tokenOf(b.token), token = b.token;
       const vaultIn = async (nickname: string, makeDefault: boolean) => {   // a fresh token into the vault, then into the wallet

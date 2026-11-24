@@ -928,6 +928,29 @@ localStorage. `acctPost(o)` is the one way anything lands on an account.
   (`vAccount`: aging on the balance, Membership, running ledger with tax / service detail, void with a reason, statements,
   e-mail the latest), **Billing setup** (`vBillSetup`: Online payments & the member portal card, classes, items, Rates &
   accounts, Statement rules).
+- **Family accounts** (`family-setup.sql`, core.js, `tests/test_family.py`; the owner, Nov 24, 2026: "main account holders and sub-account
+  holders. For instance, I'm the main account holder… my children are Peyton, Camden and Beckham… my wife is Kelsey"): a person with
+  `p.account = {of:<the holder's id>, rel: spouse|partner|child|parent|other, pay:bool}` is a **sub-account holder** (`ACCT_RELS`,
+  `acctHolderId(p|id)` = the holder's id, `isSubAccount`, `familyOf(holderId)`, `subCanPay`, `familyLabel` "Spouse of Zach Walls"; a holder's
+  own `account` is ignored, so holders never nest). A sub-account has **no billing class** (`billable()` is false; the holder's class is the
+  family's) and its own member number (the editor keeps whatever is typed; the seed uses 1500-1, 1500-2…). **Every charge a family member
+  makes lands on the holder's account, named**: `acctPost` maps `member_id` → the holder, keeps the family member in **`by_member`** and
+  puts their name in front of the description ("Beckham Walls · Grill · Club sandwich"); the database trigger **`acct_items_family`** does the
+  same for every other path (a station's `pos_close` / `pos_pay`, a booking fee, the payments function), so a charge can never land on a
+  sub-account. Member accounts lists holders only ("family of 3" on the line; a search finds a family member's name); a sub-account's account
+  page is the holder's (`vAccount` redirects) with a **Family** card (members, relationship, number, portal rights, Add a family member →
+  `addFamilyMember` presets the editor through `FAM_PRESET`). The Directory editor's Billing block starts with **Account**: own account
+  (class, status, dates) or *Family member on someone else's account* (`membershipFields` / `wireMembershipFields` / `readMembership`: an
+  account-holder search over non-sub Active people, the relationship, "Can pay and manage the account in the portal"); the directory row and
+  the register pickers read "Child of Zach Walls" (the hub's `psM` picker; `pos_members` returns `family` and the holder's suspension).
+  **The portal**: `member_me` / `member_me_as` resolve a sub-account to the holder's document through `member_family(club, m)` and add
+  `sub` {id, first, last, rel}, `holderName`, `family` (names) and **`canPay`**; the page shows the holder's name, a banner "Zach Walls's
+  account — you are signed in as Kelsey Walls (spouse) · on this account: …", and hides Pay / Payment methods / autopay when `canPay` is
+  false ("Payments on this account are made by Zach Walls"); the payments function refuses `pay` / wallet / autopay for such a member
+  ("managed by the account holder"); the wallet and autopay are the holder's. The fake emulates the trigger (`_fam`), `member_family` and
+  the gate. The Shady Valley seed has 54 households (the Walls family — Zach the holder, Kelsey the spouse who may pay, Peyton, Camden and
+  Beckham —, the Smails and the Havercamps, generated spouses and children, the generated juniors re-homed as children) and 975 family
+  charges on holders' accounts; the tour's Membership chapter stops on the Walls account.
 - **Dues collection → the account**: *Put on account* posts the association's charge once (`acctPostDues`), *Collected* the
   matching payment once (`acctCollectDues`); the association is credited in its own books as before.
 - **The member portal** (`member_src.html` → `member.html`, markers `/*PDFFONTS*/` `/*BILLCORE*/` `/*AUTOUPDATE*/`): a member

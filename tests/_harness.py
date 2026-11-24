@@ -43,6 +43,16 @@ class FakeDB:
             if kind=='is' and not(val is None and v is None): return False
         return True
     # ---- other tables (hub_keys …): plain rows with column filters
+    def _fam(self,row):
+        """family-setup.sql's trigger: a sub-account's charge lands on the holder's account, named"""
+        try:
+            club=self.get('mga_hub','club',row.get('tenant','wccc')) or {}; ms=club.get('members',[]); me=next((x for x in ms if x.get('id')==row.get('member_id')),None)
+            hid=((me or {}).get('account') or {}).get('of')
+            if me and hid and hid!=me['id'] and any(x.get('id')==hid for x in ms):
+                nm=' '.join(filter(None,[me.get('first'),me.get('last')])); row['by_member']=me['id']; row['member_id']=hid
+                if nm and not (row.get('descr') or '').startswith(nm+' · '): row['descr']=(nm+' · '+(row.get('descr') or ''))[:180]
+        except Exception: pass
+        return row
     def _rows(self,t): return self.rows.setdefault(('_tbl',t),{'table':t,'id':t,'data':[]})['data']
     def _col_match(self,row,filters):
         def get(k): return row.get(k,'wccc' if k=='tenant' else None)
@@ -111,18 +121,27 @@ class FakeDB:
             if a.get('_as'): m=a['_as']
             else: m=next((x for x in club.get('members',[]) if str(x.get('email','')).lower()==em),None)
             if (not em and not a.get('_as')) or not m: return json.dumps({'data':{'member':None,'reason':'not a member' if em else 'not signed in','club':club.get('name')},'error':None})
-            rows=self._rows('member_users'); u=next((r for r in rows if r['tenant']==a['p_tenant'] and r['member_id']==m['id']),None)
+            # family accounts: a sub-account signs in to the holder's account (family-setup.sql's member_family)
+            hid=((m.get('account') or {}).get('of')) or m['id']; holder=next((x for x in club.get('members',[]) if x.get('id')==hid),None) if hid!=m['id'] else m
+            if holder is None: holder=m; hid=m['id']
+            fam_extra={'family':[' '.join(filter(None,[x.get('first'),x.get('last')])) for x in club.get('members',[]) if x.get('id')!=hid and ((x.get('account') or {}).get('of'))==hid and x.get('status','Active')!='Inactive'],
+                       'holderName':' '.join(filter(None,[holder.get('first'),holder.get('last')])),
+                       'sub':None if hid==m['id'] else {'id':m['id'],'first':m.get('first'),'last':m.get('last'),'rel':(m.get('account') or {}).get('rel')},
+                       'canPay':True if hid==m['id'] else bool((m.get('account') or {}).get('pay'))}
+            signer=m; m=holder
+            rows=self._rows('member_users'); u=next((r for r in rows if r['tenant']==a['p_tenant'] and r['member_id']==signer['id']),None)
             if not u:
                 if a.get('_as'): u={'autopay':False,'pm_label':None,'pay_method':None}
-                else: u={'tenant':a['p_tenant'],'member_id':m['id'],'email':em,'user_id':self.me,'autopay':False,'stripe_customer':None,'stripe_pm':None,'pm_label':None,'pay_method':None,'created_at':'2026-10-26T00:00:00Z','last_seen':None}; rows.append(u)
+                else: u={'tenant':a['p_tenant'],'member_id':signer['id'],'email':em,'user_id':self.me,'autopay':False,'stripe_customer':None,'stripe_pm':None,'pm_label':None,'pay_method':None,'created_at':'2026-10-26T00:00:00Z','last_seen':None}; rows.append(u)
             if not a.get('_as'): u['last_seen']='2026-10-26T12:00:00Z'
+            if signer is not m: u=next((r for r in rows if r['tenant']==a['p_tenant'] and r['member_id']==m['id']),None) or {'autopay':False,'pm_label':None,'pay_method':None}   # the wallet and autopay are the holder's
             wallet=[{k:w.get(k) for k in ('id','kind','label','nickname','exp','is_default','created_at')} for w in sorted([w for w in self._rows('member_payment_methods') if w['tenant']==a['p_tenant'] and w['member_id']==m['id'] and not w.get('removed_at')],key=lambda w:(not w.get('is_default'),w.get('created_at','')))]
             items=sorted([i for i in self._rows('acct_items') if i.get('tenant','wccc')==a['p_tenant'] and i['member_id']==m['id'] and not i.get('void_at')],key=lambda i:(i.get('posted',''),i.get('created_at','')))
             st=sorted([x for x in self._rows('acct_statements') if x.get('tenant','wccc')==a['p_tenant'] and x['member_id']==m['id']],key=lambda x:x['period_end'],reverse=True)
             t=next((t for t in self._rows('tenants') if t['slug']==a['p_tenant']),{})
             facs=[f for f in ((club.get('booking') or {}).get('facilities') or []) if f.get('members',True)]
             bks=sorted([b for b in self._rows('bookings') if b.get('tenant','wccc')==a['p_tenant'] and b['member_id']==m['id'] and b['status'] in ('booked','checked_in') and b['date']>=datetime.date.today().isoformat()],key=lambda b:(b['date'],b['time']))
-            return json.dumps({'data':{'member':{k:m.get(k) for k in ('id','first','last','memberNo','email','address1','city','state','zip','status')},'club':club.get('name'),'message':(club.get('billing') or {}).get('message'),'items':items,'statements':st,'facilities':facs,'bookings':bks,'events':sorted([e for e in (club.get('events') or []) if e.get('public',True) and (e.get('end') or e['date'])>=datetime.date.today().isoformat()],key=lambda e:(e['date'],e.get('start') or '')),'brand':(club.get('brand') or {}).get('logo'),'autopay':u.get('autopay',False),'pm_label':u.get('pm_label'),'autopay_method':u.get('pay_method'),'wallet':wallet,'online':bool((t.get('pay_status') or {}).get('ok')) or (bool(t.get('stripe_account')) and bool((t.get('stripe_status') or {}).get('charges_enabled')))},'error':None})
+            return json.dumps({'data':{'member':{k:m.get(k) for k in ('id','first','last','memberNo','email','address1','city','state','zip','status')},'club':club.get('name'),'message':(club.get('billing') or {}).get('message'),'items':items,'statements':st,'facilities':facs,'bookings':bks,'events':sorted([e for e in (club.get('events') or []) if e.get('public',True) and (e.get('end') or e['date'])>=datetime.date.today().isoformat()],key=lambda e:(e['date'],e.get('start') or '')),'brand':(club.get('brand') or {}).get('logo'),'autopay':u.get('autopay',False),'pm_label':u.get('pm_label'),'autopay_method':u.get('pay_method'),'wallet':wallet,'online':bool((t.get('pay_status') or {}).get('ok')) or (bool(t.get('stripe_account')) and bool((t.get('stripe_status') or {}).get('charges_enabled'))),**fam_extra},'error':None})
         if fn.startswith('pos_') or fn=='staff_clock':
             key=a.get('p_key') or ''; h=hashlib.sha256(key.encode()).hexdigest() if key else None
             st=next((r for r in self._rows('pos_stations') if r['key_hash']==h and not r.get('revoked_at')),None) if len(key)>=16 else None
@@ -187,7 +206,7 @@ class FakeDB:
                     if not m: return err('Unknown member')
                     if (m.get('billing') or {}).get('status')=='suspended': return err('This member is suspended — no charges to the account')
                     items=(club.get('billing') or {}).get('items') or []; it=next((x for x in items if x['id']==outlet.get('item','fnb')),{'id':outlet.get('item','fnb'),'source':'fnb','gl':''}); share=net/owed if owed else 1
-                    aid=str(uuid.uuid4()); self._rows('acct_items').append({'id':aid,'tenant':tn,'member_id':mid,'kind':'charge','source':it.get('source','fnb'),'item':it['id'],'gl':it.get('gl',''),'ref':'pos:%s:%s'%(r['id'],pay['id']),'descr':(outlet.get('name') or st['outlet'])+' · '+(d.get('label') or ', '.join(l['name'] for l in r['lines']))+((' · tip %s'%tip) if tip else ''),'amount':amt,'tax':round(r['tax']*share,2),'svc':round(r['svc']*share,2),'method':None,'reference':None,'posted':datetime.date.today().isoformat(),'void_at':None,'void_reason':None,'created_at':now,'created_by':r.get('server') or 'station'}); pay['acct_item']=aid
+                    aid=str(uuid.uuid4()); self._rows('acct_items').append(self._fam({'id':aid,'tenant':tn,'member_id':mid,'kind':'charge','source':it.get('source','fnb'),'item':it['id'],'gl':it.get('gl',''),'ref':'pos:%s:%s'%(r['id'],pay['id']),'descr':(outlet.get('name') or st['outlet'])+' · '+(d.get('label') or ', '.join(l['name'] for l in r['lines']))+((' · tip %s'%tip) if tip else ''),'amount':amt,'tax':round(r['tax']*share,2),'svc':round(r['svc']*share,2),'method':None,'reference':None,'posted':datetime.date.today().isoformat(),'void_at':None,'void_reason':None,'created_at':now,'created_by':r.get('server') or 'station'})); pay['acct_item']=aid
                 r['payments']=(r.get('payments') or [])+[pay]; paid=round(paid+net,2)
                 if paid>=owed-0.005:
                     tips=round(sum(float(p.get('tip') or 0) for p in r['payments']),2); pending=any(p['method'] in ('account','card') and p.get('tip') is None for p in r['payments'])
@@ -209,7 +228,7 @@ class FakeDB:
                     if not m: return err('Unknown member')
                     if (m.get('billing') or {}).get('status')=='suspended': return err('This member is suspended — no charges to the account')
                     items=(club.get('billing') or {}).get('items') or []; it=next((x for x in items if x['id']==outlet.get('item','fnb')),{'id':outlet.get('item','fnb'),'source':'fnb','gl':''})
-                    aid=str(uuid.uuid4()); self._rows('acct_items').append({'id':aid,'tenant':tn,'member_id':r['member_id'],'kind':'charge','source':it.get('source','fnb'),'item':it['id'],'gl':it.get('gl',''),'ref':'pos:'+r['id'],'descr':(outlet.get('name') or st['outlet'])+' · '+', '.join((str(l['qty'])+'× ' if l['qty']>1 else '')+l['name'] for l in r['lines']),'amount':r['total'],'tax':r['tax'],'svc':r['svc'],'method':None,'reference':None,'posted':datetime.date.today().isoformat(),'void_at':None,'void_reason':None,'created_at':now,'created_by':r.get('server') or 'station'}); r['acct_item']=aid
+                    aid=str(uuid.uuid4()); self._rows('acct_items').append(self._fam({'id':aid,'tenant':tn,'member_id':r['member_id'],'kind':'charge','source':it.get('source','fnb'),'item':it['id'],'gl':it.get('gl',''),'ref':'pos:'+r['id'],'descr':(outlet.get('name') or st['outlet'])+' · '+', '.join((str(l['qty'])+'× ' if l['qty']>1 else '')+l['name'] for l in r['lines']),'amount':r['total'],'tax':r['tax'],'svc':r['svc'],'method':None,'reference':None,'posted':datetime.date.today().isoformat(),'void_at':None,'void_reason':None,'created_at':now,'created_by':r.get('server') or 'station'})); r['acct_item']=aid
                 return json.dumps({'data':r,'error':None})
             if fn=='pos_settle':
                 if not r or r['status']!='slip': return err('Nothing to close out')
@@ -278,7 +297,7 @@ class FakeDB:
                 bid=str(uuid.uuid4()); aid=None; fee=float((f.get('fee') or {}).get('amount') or 0)
                 if fee>0:
                     per=(f.get('fee') or {}).get('per','booking'); it=next((x for x in ((club.get('billing') or {}).get('items') or []) if x['id']==(f.get('fee') or {}).get('item','facility')),{'id':'facility','source':'facility','gl':''})
-                    aid=str(uuid.uuid4()); self._rows('acct_items').append({'id':aid,'tenant':a['p_tenant'],'member_id':mid,'kind':'charge','source':it.get('source','facility'),'item':it['id'],'gl':it.get('gl',''),'ref':'bk:'+bid,'descr':f['name']+' · '+day+' '+t,'amount':round(fee*n if per=='player' else fee,2),'tax':0,'svc':0,'method':None,'reference':None,'posted':today.isoformat(),'void_at':None,'void_reason':None,'created_at':datetime.datetime.utcnow().isoformat()+'Z','created_by':'member'})
+                    aid=str(uuid.uuid4()); self._rows('acct_items').append(self._fam({'id':aid,'tenant':a['p_tenant'],'member_id':mid,'kind':'charge','source':it.get('source','facility'),'item':it['id'],'gl':it.get('gl',''),'ref':'bk:'+bid,'descr':f['name']+' · '+day+' '+t,'amount':round(fee*n if per=='player' else fee,2),'tax':0,'svc':0,'method':None,'reference':None,'posted':today.isoformat(),'void_at':None,'void_reason':None,'created_at':datetime.datetime.utcnow().isoformat()+'Z','created_by':'member'}))
                 rows.append({'id':bid,'tenant':a['p_tenant'],'facility':f['id'],'date':day,'time':t,'unit':a['p_unit'],'member_id':mid,'name':(m.get('first','')+' '+m.get('last','')).strip(),'players':players,'note':a.get('p_note') or '','status':'booked','source':'member','acct_item':aid,'created_by':'member','created_at':datetime.datetime.utcnow().isoformat()+'Z','cancelled_at':None})
                 return json.dumps({'data':{'ok':True,'id':bid},'error':None})
             b=next((b for b in rows if b['id']==a['p_id'] and b.get('tenant','wccc')==a['p_tenant'] and b['member_id']==mid),None)
@@ -538,8 +557,12 @@ class FakeDB:
             self._rows('acct_items').append(it); return it['id']
         def member():
             me=next((u for u in self.auth_users if u['id']==self.me),None); em=(me or {}).get('email','').lower(); club=self.get('mga_hub','club',tn) or {}
-            if b.get('as') and staff: return next((x for x in club.get('members',[]) if x.get('id')==b['as']),None)
-            return next((x for x in club.get('members',[]) if str(x.get('email','')).lower()==em),None) if em else None
+            ms=club.get('members',[])
+            m=next((x for x in ms if x.get('id')==b['as']),None) if (b.get('as') and staff) else (next((x for x in ms if str(x.get('email','')).lower()==em),None) if em else None)
+            if not m: return None
+            hid=((m.get('account') or {}).get('of')); h=next((x for x in ms if x.get('id')==hid),None) if hid and hid!=m['id'] else None   # family accounts: the holder's account, paying only when allowed
+            if h: h=dict(h); h['canPay']=bool((m.get('account') or {}).get('pay')); return h
+            m=dict(m); m['canPay']=True; return m
         def user_row(mid):
             rows=self._rows('member_users'); u=next((r for r in rows if r['tenant']==tn and r['member_id']==mid),None)
             if not u: u={'tenant':tn,'member_id':mid,'email':'','user_id':self.me,'autopay':False,'stripe_customer':None,'stripe_pm':None,'pm_label':None,'pay_provider':None,'pay_customer':None,'pay_method':None,'created_at':'2026-11-20T00:00:00Z','last_seen':None}; rows.append(u)
@@ -580,6 +603,7 @@ class FakeDB:
         if act in ('wallet_add','wallet_remove','wallet_default','autopay_on','autopay_off'):
             m=member()
             if not m: return er('Your e-mail is not on the club\'s directory')
+            if m.get('canPay') is False: return er('Payments and cards on this account are managed by the account holder')
             mid=m['id']; token=b.get('token'); token=(token.get('token') if isinstance(token,dict) else token) or ''
             if act=='wallet_add':
                 if not token: return er('The card was not tokenized')
@@ -608,6 +632,7 @@ class FakeDB:
             if act in ('pay','setup'):
                 m=member()
                 if not m: return er('Your e-mail is not on the club\'s directory')
+                if m.get('canPay') is False: return er('Payments and cards on this account are managed by the account holder')
                 u=user_row(m['id']); token=b.get('token'); token=(token.get('token') if isinstance(token,dict) else token) or ''
                 if act=='setup':
                     if not token: return er('The card was not tokenized')
