@@ -20,3 +20,15 @@ DEMO_PW=… python3 -I tools/demo/reseed_rest.py       # replace what is in the 
 ```
 Two things still take the SQL console afterwards (no RLS path for them): spreading `survey_responses.day` over the
 seeded dates, and dropping a `golf_side` row whose event no longer exists (`fixup2.sql`, written by the reseed).
+
+## Another prospect from the same seed
+
+`brands/<slug>.json` re-labels the generator for a prospect (ordered literal replacements over `seed_bushwood.js`; `must_not_remain`
+lists what must be gone afterwards). Shady Valley Country Club was the first:
+
+```
+cd tests && python3 ../tools/demo/run_seed.py --brand ../tools/demo/brands/shadyvalley.json --out ../tools/demo/seed-shadyvalley.json
+TENANT=shadyvalley DEMO_EMAIL=demo@shadyvalleycc.com DEMO_PW=… SEED=tools/demo/seed-shadyvalley.json python3 -I tools/demo/reseed_rest.py
+```
+Before the first load: the `tenants` row, four empty `mga_hub` rows (club, mga, lga, czerviks) and the demo staff login in SQL (see
+CLAUDE.md §6). The portal's **Demo** button on the client record opens the hub with the guided walkthrough (`src/tour.js`).

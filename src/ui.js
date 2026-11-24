@@ -132,6 +132,7 @@ function statusChip(t){ const d=daysOut(t); const st=t.status||'Planning';
 function render(){
   const ae=document.activeElement, keep=ae&&ae.id&&/^(INPUT|TEXTAREA|SELECT)$/.test(ae.tagName)&&!ae.closest('#drawer')?{id:ae.id,s:ae.selectionStart,e:ae.selectionEnd,v:ae.value}:null, sy=window.scrollY;
   renderInner();
+  if(typeof tourAfterRender==='function') tourAfterRender();
   if(keep){ const n=document.getElementById(keep.id); if(n){ if(n.value!==keep.v&&n.tagName!=='SELECT') n.value=keep.v; n.focus({preventScroll:true}); try{ n.setSelectionRange(keep.s,keep.e); }catch(_){} } }
   if(Math.abs(window.scrollY-sy)>2) window.scrollTo(0,sy);
   if(restoreY!==null&&db){ const y=restoreY; restoreY=null; requestAnimationFrame(()=>window.scrollTo(0,y)); }   // first render with the document open

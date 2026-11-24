@@ -58,6 +58,7 @@ src/
   payouts.js           Calcutta payouts math (calcPayouts, ties) + Results / Payouts sub-tabs
   surveys.js           Surveys: anonymous member surveys (sections → questions, public link, results, CSV)
   signup.js            Player registration: a tournament's public sign-up page (the Field tab's card, the published copy, entries → the field)
+  tour.js              The guided demo: ?demo=1 runs a chaptered walkthrough of the whole product on the club's own data (the portal's Demo button)   [loads last]
   crm.js               Contacts — the CRM layer: companies & households (CLUB.companies), people with a company / title / role / tags, sponsorships by
                        party (company, household or individual) with their cast, derived relationship tags, notes; the nonprofit's Contacts page
   billcore.js          the member statement PDF page (statementPage), shared by the hub and the member portal            [shared]
@@ -115,6 +116,7 @@ python3 tests/test_cartgame.py # a cart game: five players, no pots, one group, 
 python3 tests/test_sponsorteam.py # a sponsor tier that includes a team: TBD seats in the field, counted as players, named one by one, dropped with the package
 python3 tests/test_schedule.py # a tournament's schedule across the days before and after the golf, sorted by time, on the registration copy
 python3 tests/test_payments.py # online payments through Deluxe against the fake: credentials → connected, the portal's hosted form → a payment posted once, a declined card, autopay, refund, charge card on file, the hub register and a station's card sheet, the wallet, the staff view, the invitations
+python3 tests/test_tour.py    # the guided demo: every step on three hubs, the chapter picker, resume / restart / end, no tour without ?demo
 python3 tests/test_crm.py     # companies & contacts: a company and its people, a sponsor picked from the list (its contact onto the directory), the record, the MGA's link-by-name, one write, a scoped login reads only; a nonprofit's Contacts (household, individual sponsor, billing contact, named seats → golfers, tags, person record, vendor)
 git add -A && git commit && git push origin main  # Render deploys main to app.wcccmga.org
 ```
@@ -1285,6 +1287,30 @@ groups, printed scorecards — the printed cards include a live-scoring QR that 
   **The call-out's word for a failed validation is per game** (the Misfits, Oct 30: "say loser with exclamation marks"): `g.failWord`
   (the designer's "When a skin fails validation, the call-out says"; blank = "Didn’t validate"), published through `gameInfo` →
   `pub.game.failWord`, read by the hub's `skinsCallout` flash and the phones' `calloutStage`. Set on that day's game only.
+- **The guided demo (Nov 24, 2026; the owner: "a button inside each tenant… right next to Open Hub, there should be a demo button… a
+  guided, interactive walkthrough of the entire software… this is how we're going to sell and demo this software to each club"):**
+  `src/tour.js`. The portal's client record has **Demo** beside Open hub → `openHub(t,'?demo=1')`: the hub opens signed in with the
+  tour running. `tourScript()` is the script — chapters (Welcome · Membership and the month-end · Food & beverage · Golf · A
+  tournament, start to finish · Member games and live scoring · Pro shops, courts and the pool · Staff and the calendar · Reports and
+  the office · Wrap-up), each a list of steps `{t, say, go(), at(), qr(), link}`: `go` opens the real page (`go` / `navGo` with the
+  view keys), `at` finds the element to light (`card('Statements')` = the card whose heading says so, `first('.grid')`, an id), `say` is
+  the talking point, `qr` a link worth scanning (the portal as a member through `?as=`, the Grill register and the kitchen screen by
+  their station tokens from `STN.rows`, the registration page, live scoring joined to a group, GameCast). A chapter names the hub it
+  runs on — `club`, `assoc` (the club's first association) or `group` (its first member group, `tourOrgs()`); a step on another hub
+  hops there with `?demo=go` and resumes (the position is in localStorage `fs_tour_<tenant>`; `?demo=1` starts over). The engine:
+  `tourStart` / `tourGo` / `tourPaint` (finds the element for up to six seconds while a loader is in flight, scrolls to it) / `tourFrame`
+  (a fixed `.tour-box` with a 9999px box-shadow follows the element every frame, pointer-events none — **the page stays live**, the
+  presenter can click anything) / `tourCard` (the caption card: chapter ▾ picker, n of N, Back / Next, the QR, Esc / ← → keys);
+  `render()` calls `tourAfterRender()` so a rebuilt page is re-lit. The chapter order is what changes a club's day: the floor and
+  the month-end, the portal, golf out of Golf Genius, one roster, staff on the same PINs, reports. `tests/test_tour.py`.
+- **Prospect tenants from the Bushwood seed** (Shady Valley Country Club, Arlington TX, `shadyvalley.flagstickhub.com`, Nov 24, 2026 — a
+  full-club demo for a club on Club Essentials): `tools/demo/brands/<slug>.json` is an ordered list of literal replacements over
+  `seed_bushwood.js` (club name, short, courses, city / state / zip, phone prefix, e-mail domain, TODAY) plus `must_not_remain`;
+  `python3 tools/demo/run_seed.py --brand tools/demo/brands/shadyvalley.json --out tools/demo/seed-shadyvalley.json` (from `tests/`),
+  then `TENANT=shadyvalley DEMO_EMAIL=… DEMO_PW=… SEED=tools/demo/seed-shadyvalley.json python3 -I tools/demo/reseed_rest.py`. The tenant
+  row, the four empty `mga_hub` rows and the demo staff login (`auth.users` + `auth.identities` + `tenant_users`; the token columns
+  must be `''`, not null, or GoTrue answers "Database error querying schema") are made once in SQL; Bushwood's `payment_accounts` row
+  was copied so the Deluxe sandbox works there too. The Caddyshack cast stays; only the club's own names change.
 - **The demo tenant (Nov 2026):** `bushwood.flagstickhub.com` — Bushwood Country Club, a private club seeded with six months of
   activity across every module for presentations (`tools/demo/`: the generator runs inside the hub in local mode, the loader
   goes through the REST API as the demo staff login). Re-seed it from there rather than by hand. Found while seeding: group
