@@ -1,0 +1,286 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0F2A38">
+<meta name="robots" content="noindex">
+<title>My account · Flagstick</title>
+<link rel="icon" href="favicon.png?v=3">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@600;700&family=Public+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script src="config.js"></script>
+<style>
+:root{--navy:#0F2A38;--gold:#C7A13A;--goldl:#D8B75F;--golddk:#7E5F1A;--paper:#F4F0E6;--ivory:#FBFAF5;--line:#E3DCC9;--muted:#56626A;--ink:#14222B;--pos:#1F6B4A;--neg:#B5443A;
+  --serif:'Cormorant Garamond',Georgia,serif;--sans:'Public Sans',system-ui,-apple-system,'Segoe UI',sans-serif}
+*{box-sizing:border-box} html,body{margin:0} [hidden]{display:none!important}
+body{font-family:var(--sans);background:var(--paper);color:var(--ink);font-size:16px;line-height:1.4;-webkit-font-smoothing:antialiased;font-variant-numeric:lining-nums}
+button,input{font:inherit;color:inherit} button{cursor:pointer}
+.top{background:radial-gradient(circle at 10% 40%,#1B3D50,var(--navy) 65%);color:#fff;padding:calc(14px + env(safe-area-inset-top,0px)) 18px 14px;display:flex;align-items:center;gap:14px;border-bottom:4px solid var(--gold)}
+.top img{width:44px;height:44px;object-fit:contain}
+.top .t{flex:1;min-width:0} .top b{display:block;font-family:var(--serif);font-size:24px;line-height:1.05;white-space:nowrap;overflow:hidden;text-overflow:ellipsis} .top small{color:#C9CFD2;font-size:12.5px;display:block}
+.top button{background:none;border:1px solid rgba(255,255,255,.35);color:#fff;border-radius:8px;height:34px;padding:0 12px;font-size:13px;font-weight:600}
+main{max-width:720px;margin:0 auto;padding:16px 14px 60px}
+.card{background:#fff;border:1px solid var(--line);border-radius:14px;padding:18px 18px 16px;margin-bottom:14px}
+h1{font-family:var(--serif);font-size:30px;line-height:1.05;margin:0 0 8px;color:var(--navy)} h2{font-family:var(--serif);font-size:24px;line-height:1.05;margin:0 0 10px;color:var(--navy)}
+p{margin:0;color:#2B3940} .muted{color:var(--muted)} .hint{font-size:13.5px;color:var(--muted);margin-top:8px}
+.lbl{display:block;font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--golddk);margin-bottom:6px}
+.inp{width:100%;height:48px;border:1.5px solid #CFC6AE;border-radius:10px;padding:0 14px;background:#fff;font-size:16px} .inp:focus{outline:none;border-color:var(--gold);box-shadow:0 0 0 3px rgba(199,161,58,.2)}
+.btn{height:48px;padding:0 20px;border-radius:12px;border:1.5px solid #CFC6AE;background:#fff;font-weight:700;font-size:15px;display:inline-flex;align-items:center;justify-content:center;gap:8px;color:var(--navy)}
+.btn.pri{background:var(--navy);border-color:var(--navy);color:#fff} .btn.sm{height:38px;padding:0 14px;font-size:13.5px;border-radius:9px} .btn:disabled{opacity:.55;cursor:default} .btn.w{width:100%}
+.bal{display:flex;justify-content:space-between;align-items:flex-end;gap:12px;flex-wrap:wrap}
+.bal .v{font-family:var(--serif);font-size:46px;line-height:1;font-weight:700;color:var(--navy)} .bal .v.neg{color:var(--neg)} .bal .v.pos{color:var(--pos)}
+.bal small{display:block;color:var(--muted);font-size:13.5px;margin-top:6px}
+.acts{display:flex;gap:10px;flex-wrap:wrap;margin-top:16px}
+.row{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:4px 14px;align-items:center;padding:11px 0;border-top:1px solid var(--line)} .row:first-of-type{border-top:none}
+.row b{font-size:15px;color:var(--navy);grid-column:1} .row small{display:block;color:var(--muted);font-size:12.5px}
+.row .a{font-weight:600;text-align:right;white-space:nowrap} .row .a.pay{color:var(--pos)} .row .r{font-weight:800;text-align:right;white-space:nowrap;min-width:84px}
+.row.s{grid-template-columns:minmax(0,1fr) auto} .row.s button{height:36px}
+.chip{display:inline-flex;align-items:center;height:26px;padding:0 10px;border-radius:999px;background:var(--ivory);border:1px solid var(--line);font-size:12.5px;font-weight:600}
+.chip.ok{background:#E3F0E8;border-color:#BFDCCB;color:var(--pos)}
+.auto{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+.pv{background:#F6ECCF;border:1px solid #E5CF8E;color:#5C4410;border-radius:10px;padding:10px 14px;font-size:13.5px;margin-bottom:14px}
+.toast{position:fixed;left:50%;bottom:30px;transform:translateX(-50%);background:var(--navy);color:#fff;padding:12px 18px;border-radius:10px;font-weight:600;z-index:60;box-shadow:0 6px 20px rgba(0,0,0,.25);max-width:92vw;text-align:center}
+.fs{display:flex;align-items:center;justify-content:center;gap:8px;margin-top:30px;color:var(--muted);font-size:11px;letter-spacing:.14em;text-transform:uppercase;font-weight:800} .fs img{width:18px;height:18px}
+.chips{display:flex;gap:6px;flex-wrap:wrap;margin-top:4px} .chips button{height:34px;padding:0 12px;border-radius:999px;border:1px solid #CFC6AE;background:#fff;font-weight:600;font-size:13px} .chips button.on{background:var(--navy);border-color:var(--navy);color:#fff} .chips.days{margin-top:10px;flex-wrap:nowrap;overflow-x:auto;padding-bottom:4px}
+.slots{display:grid;gap:6px;margin-top:12px;align-items:stretch} .slots .uh,.slots .th{font-size:11.5px;font-weight:700;color:var(--muted);align-self:center;white-space:nowrap} .slots .uh{text-align:center}
+.slots .sl{min-height:44px;border:1.5px solid #CFC6AE;border-radius:10px;background:#fff;font-weight:700;font-size:13.5px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;padding:4px} .slots .sl small{font-size:10.5px;color:var(--muted);font-weight:600} .slots .sl.full{background:var(--ivory);color:var(--muted);border-style:dashed} .slots .sl.mine{background:var(--navy);border-color:var(--navy);color:#fff} .slots .sl.mine small{color:#D8B75F}
+.sheet{position:fixed;inset:0;background:rgba(15,42,56,.55);display:flex;align-items:flex-end;justify-content:center;z-index:50} .sheet>div{background:#fff;border-radius:16px 16px 0 0;padding:20px 18px calc(20px + env(safe-area-inset-bottom,0px));width:100%;max-width:560px}
+/* the tab bar: Home · Book · Account · Wallet — a sticky row under the header, a bottom bar on a phone */
+.tabs{position:sticky;top:0;z-index:20;background:var(--paper);padding:10px 0 12px;display:flex;gap:6px}
+.tabs button{flex:1;height:44px;border-radius:12px;border:1px solid #CFC6AE;background:#fff;font-weight:700;font-size:14px;display:flex;align-items:center;justify-content:center;gap:7px;color:var(--navy)}
+.tabs button svg{width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.tabs button.on{background:var(--navy);border-color:var(--navy);color:#fff} .tabs button small{font-size:11.5px;font-weight:600;opacity:.8}
+.pane[hidden]{display:none}
+.seg{display:flex;gap:4px;background:var(--ivory);border:1px solid var(--line);border-radius:10px;padding:3px;margin:0 0 12px} .seg button{flex:1;height:36px;border:none;background:none;border-radius:8px;font-weight:700;font-size:13.5px;color:var(--muted)} .seg button.on{background:#fff;color:var(--navy);box-shadow:0 1px 3px rgba(0,0,0,.12)}
+.up{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:12px;align-items:center;padding:10px 0;border-top:1px solid var(--line)} .up:first-of-type{border-top:none} .up .d{width:52px;text-align:center;background:var(--ivory);border:1px solid var(--line);border-radius:10px;padding:5px 0;line-height:1.1} .up .d b{display:block;font-size:17px;color:var(--navy)} .up .d small{font-size:10.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);font-weight:700}
+.up .w b{display:block;font-size:15px;color:var(--navy)} .up .w small{display:block;color:var(--muted);font-size:12.5px}
+.bk .lbl{margin-top:14px} .bk .chips{margin-top:0} .bk .chips.scroll{flex-wrap:nowrap;overflow-x:auto;padding-bottom:4px;-webkit-overflow-scrolling:touch} .bk .chips.scroll button{flex:0 0 auto}
+.stp{display:inline-flex;align-items:center;border:1px solid #CFC6AE;border-radius:999px;height:34px;overflow:hidden} .stp button{width:36px;height:34px;border:none;background:#fff;font-size:18px;font-weight:700;color:var(--navy)} .stp b{min-width:34px;text-align:center;font-size:14px}
+.pills{display:grid;grid-template-columns:repeat(auto-fill,minmax(92px,1fr));gap:6px;margin-top:10px}
+.pills .sl{min-height:48px;border:1.5px solid #CFC6AE;border-radius:10px;background:#fff;font-weight:700;font-size:14px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;padding:4px 2px;color:var(--navy)}
+.pills .sl small{font-size:10.5px;color:var(--muted);font-weight:600;line-height:1.15;text-align:center;max-width:100%} .pills .sl.full{background:var(--ivory);color:var(--muted);border-style:dashed;font-weight:600} .pills .sl.mine{background:var(--navy);border-color:var(--navy);color:#fff} .pills .sl.mine small{color:#D8B75F}
+.pills .sl.room{border-color:var(--gold)}
+.bkhead{display:flex;justify-content:space-between;align-items:baseline;gap:10px;margin-top:14px} .bkhead b{font-size:14px;color:var(--navy)} .bkhead small{color:var(--muted);font-size:12.5px}
+@media (max-width:640px){
+  main{padding-bottom:calc(84px + env(safe-area-inset-bottom,0px))}
+  .tabs{position:fixed;top:auto;bottom:0;left:0;right:0;margin:0;padding:8px 10px calc(8px + env(safe-area-inset-bottom,0px));border-top:1px solid var(--line);background:#fff;box-shadow:0 -4px 16px rgba(15,42,56,.08)}
+  .tabs button{flex-direction:column;gap:2px;height:52px;font-size:11.5px;border:none;background:none;border-radius:10px} .tabs button.on{background:var(--ivory);color:var(--navy)} .tabs button svg{width:22px;height:22px} .tabs button small{display:none}
+  .pills{grid-template-columns:repeat(auto-fill,minmax(84px,1fr))}
+}
+/* desktop (≥ 900px): the hub's rail on the left — the club, the member, the four pages, sign out — and a wide two-column page */
+.rail{display:none}
+.cols{display:grid;grid-template-columns:minmax(0,1fr);gap:14px;align-items:start} .cols>div{min-width:0}
+.kp{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-top:16px} .kp>div{background:var(--ivory);border:1px solid var(--line);border-radius:12px;padding:10px 12px} .kp .lbl{margin-bottom:2px;font-size:10.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis} .kp b{font-size:18px;color:var(--navy);display:block} .kp small{display:block;color:var(--muted);font-size:12px}
+.stt{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;align-items:center;padding:12px 0;border-top:1px solid var(--line)} .stt:first-of-type{border-top:none}
+@media (min-width:900px){
+  body{display:grid;grid-template-columns:260px minmax(0,1fr);min-height:100vh}
+  .top{display:none}
+  .rail{display:flex;flex-direction:column;position:sticky;top:0;height:100vh;background:radial-gradient(circle at 10% 20%,#1B3D50,var(--navy) 65%);color:#fff;padding:24px 18px calc(18px + env(safe-area-inset-bottom,0px));border-right:4px solid var(--gold)}
+  .rail .brand{display:flex;align-items:center;gap:12px;padding-bottom:18px;border-bottom:1px solid rgba(255,255,255,.14)} .rail .brand img{width:44px;height:44px;object-fit:contain} .rail .brand b{display:block;font-family:var(--serif);font-size:19px;line-height:1.1} .rail .brand small{display:block;color:#C9CFD2;font-size:11px;letter-spacing:.08em;text-transform:uppercase;font-weight:700;margin-top:3px}
+  .rail .who{padding:18px 4px 14px} .rail .who b{display:block;font-family:var(--serif);font-size:24px;line-height:1.05} .rail .who small{display:block;color:#C9CFD2;font-size:12.5px;margin-top:4px}
+  .rail nav{display:flex;flex-direction:column;gap:4px;margin-top:6px} .rail nav button{display:flex;align-items:center;gap:12px;height:44px;padding:0 12px;border-radius:10px;border:none;background:none;color:#D9DEE1;font-weight:600;font-size:15px;text-align:left} .rail nav button svg{width:20px;height:20px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round} .rail nav button.on{background:rgba(255,255,255,.12);color:#fff} .rail nav button:hover{color:#fff}
+  .rail .foot{margin-top:auto;padding-top:14px;border-top:1px solid rgba(255,255,255,.14)} .rail .foot button{width:100%;height:40px;border-radius:9px;border:1px solid rgba(255,255,255,.35);background:none;color:#fff;font-weight:600;font-size:13.5px}
+  main{max-width:1180px;margin:0;padding:30px 36px 60px;width:100%}
+  .tabs{display:none}
+  .cols{grid-template-columns:minmax(0,1.55fr) minmax(0,1fr);gap:18px} .cols.book{grid-template-columns:340px minmax(0,1fr)} .cols.one{grid-template-columns:minmax(0,1fr)}
+  .card{padding:22px 24px 20px;margin-bottom:18px} h2{font-size:26px} .bal .v{font-size:54px}
+  .pills{grid-template-columns:repeat(auto-fill,minmax(104px,1fr))}
+  .cols.book .chips.scroll{flex-wrap:wrap;overflow:visible} .cols.book .bk{position:sticky;top:30px}
+  .ph{display:flex;justify-content:space-between;align-items:flex-end;gap:16px;margin-bottom:18px} .ph h1{margin:0;font-size:34px} .ph small{color:var(--muted);font-size:14px}
+}
+.ph{display:none} @media (min-width:900px){ .ph{display:flex} }
+@media (max-width:400px){ h1{font-size:27px} .bal .v{font-size:40px} }
+</style>
+</head>
+<body>
+<aside class="rail" id="rail"><div class="brand"><img id="rLogo" src="flagstick-crest-light.svg" alt=""><div><b id="rClub">Member portal</b><small>Member portal</small></div></div><div class="who"><b id="rName">My account</b><small id="rSub"></small></div><nav id="rNav"></nav><div class="foot"><button id="hOut2" hidden>Sign out</button></div></aside>
+<header class="top"><img src="flagstick-crest-light.svg" alt="Flagstick"><div class="t"><b id="hTitle">My account</b><small id="hSub">Member account</small></div><button id="hOut" hidden>Sign out</button></header>
+<main id="main"><div class="card"><p class="muted">Loading…</p></div></main>
+<script>
+/*PDFFONTS*/
+/*BILLCORE*/
+const $=id=>document.getElementById(id);
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const CFG=window.MM_CONFIG||{}; const sb=(CFG.url&&CFG.anonKey&&window.supabase)?window.supabase.createClient(CFG.url,CFG.anonKey):null;
+const qs=new URLSearchParams(location.search); let TENANT=null, ME=null, BUSY=false;
+const fmt=bcFmt, dt=bcDate; const sign=i=>i.kind==='charge'?(parseFloat(i.amount)||0):-(parseFloat(i.amount)||0);
+function toast(m){ const d=document.createElement('div'); d.className='toast'; d.textContent=m; document.body.appendChild(d); setTimeout(()=>d.remove(),2800); }
+function msg(title,text,extra){ $('main').innerHTML=`<div class="card"><h1>${esc(title)}</h1><p class="muted">${esc(text)}</p>${extra||''}</div>`; }
+const here=()=>location.origin+location.pathname+(qs.get('tenant')?'?tenant='+encodeURIComponent(qs.get('tenant')):'');
+async function resolveTenant(){ try{ const {data,error}=await sb.rpc('tenant_lookup',{p_host:qs.get('tenant')||location.hostname}); if(!error&&data&&data.slug){ TENANT=data.slug; $('hSub').textContent=data.name+' · Member account'; $('rClub').textContent=data.name; document.title='My account · '+data.name; } }catch(_){} }
+async function boot(){
+  if(!sb) return msg('Not connected','The member portal is not available right now.');
+  await resolveTenant(); if(!TENANT) return msg('No club at this address','Open the member portal from your club’s own address.');
+  const {data:{session}}=await sb.auth.getSession();
+  if(qs.get('paid')) { history.replaceState(null,'',here()); toast('Thank you — your payment is in'); }
+  if(qs.get('autopay')) { history.replaceState(null,'',here()); toast('Autopay is set up'); }
+  if(!session) return signIn();
+  await load();
+}
+function signIn(sent){ $('hOut').hidden=true; $('hOut2').hidden=true; $('rNav').innerHTML='';
+  $('main').innerHTML=`<div class="card"><h1>Sign in</h1><p class="muted">Enter the e-mail address the club has for you. We’ll send a one-time link — no password to remember.</p>
+    <div style="margin-top:16px"><span class="lbl">E-mail</span><input class="inp" id="siE" type="email" inputmode="email" autocomplete="email" placeholder="you@example.com" ${sent?'disabled':''}></div>
+    <div class="acts"><button class="btn pri w" id="siGo" ${sent?'disabled':''}>${sent?'Link sent — check your e-mail':'Send me a sign-in link'}</button></div>
+    ${sent?'<p class="hint">Open the link on this device. It works once and expires in an hour. Nothing in your inbox? Check spam, or ask the club office which e-mail they have on file.</p>':''}</div><div class="fs"><img src="flagstick-crest.svg" alt="">Flagstick</div>`;
+  $('siGo').onclick=async()=>{ const email=$('siE').value.trim().toLowerCase(); if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)){ toast('Enter your e-mail address'); return; }
+    $('siGo').disabled=true; const {error}=await sb.auth.signInWithOtp({email,options:{emailRedirectTo:here(),shouldCreateUser:true}}); if(error){ $('siGo').disabled=false; toast(error.message||'Couldn’t send the link'); return; } signIn(true); };
+}
+const AS=qs.get('as')||'';
+async function load(){
+  const {data,error}=AS?await sb.rpc('member_me_as',{p_tenant:TENANT,p_member:AS}):await sb.rpc('member_me',{p_tenant:TENANT});
+  if(error){ if(/function|schema cache/i.test(error.message||'')) return msg('Not ready','The member portal is not switched on for this club yet.'); return msg('Something went wrong',error.message||''); }
+  if(!data||!data.member){ $('hOut').hidden=false; const {data:{session}}=await sb.auth.getSession(); return msg('We couldn’t find your account',`${(session&&session.user&&session.user.email)||'This e-mail'} isn’t on ${data&&data.club?data.club+'’s':'the club’s'} directory. Ask the club office to add it, then sign in again.`,'<div class="acts"><button class="btn" id="out2">Sign out</button></div>'),($('out2').onclick=signOut); }
+  ME=data; if(ME.online==null){ try{ const {data:on}=await sb.rpc('pay_online',{p_tenant:TENANT}); if(on===true) ME.online=true; }catch(_){ } } $('hOut').hidden=false; $('hOut2').hidden=false; $('hTitle').textContent=[ME.member.first,ME.member.last].filter(Boolean).join(' ')||'My account'; $('rName').textContent=$('hTitle').textContent; $('rSub').textContent=[ME.member.memberNo?'Member #'+ME.member.memberNo:'',ME.sub?'on '+(ME.holderName||'the family')+'’s account':''].filter(Boolean).join(' · ')||'Member account'; if(ME.brand){ const im=document.querySelector('.top img'); im.src=ME.brand; im.style.width='auto'; im.style.maxWidth='120px'; const rl=$('rLogo'); rl.src=ME.brand; rl.style.width='auto'; rl.style.maxWidth='110px'; } render();
+}
+async function signOut(){ await sb.auth.signOut(); ME=null; signIn(); }
+const UI={tab:(()=>{ try{ return localStorage.getItem('fs_portal_tab')||''; }catch(_){ return ''; } })(),acct:'activity'};
+function setTab(t){ UI.tab=t; try{ localStorage.setItem('fs_portal_tab',t); }catch(_){} document.querySelectorAll('[data-tab]').forEach(b=>b.classList.toggle('on',b.dataset.tab===t)); document.querySelectorAll('.pane').forEach(p=>p.hidden=p.dataset.pane!==t); window.scrollTo({top:0}); }
+const ICON={home:'<svg viewBox="0 0 24 24"><path d="M3 11l9-8 9 8v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></svg>',book:'<svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>',acct:'<svg viewBox="0 0 24 24"><path d="M4 4h16v16H4zM8 9h8M8 13h8M8 17h5"/></svg>',wallet:'<svg viewBox="0 0 24 24"><rect x="2" y="6" width="20" height="13" rx="2"/><path d="M2 10h20M6 15h3"/></svg>'};
+function render(){
+  const items=(ME.items||[]).slice(), bal=Math.round(items.reduce((t,i)=>t+sign(i),0)*100)/100, st=ME.statements||[], last=st[0];
+  let run=0; const ledger=items.map(i=>{ run=Math.round((run+sign(i))*100)/100; return Object.assign({},i,{run}); }).reverse().slice(0,40);
+  const due=last&&last.closing>0.004&&bal>0.004?`due ${dt(last.due)}`:'', RO=!!ME.staffView, W=ME.wallet||[], dflt=W.find(w=>w.is_default)||W[0], PAYOK=ME.online&&ME.canPay!==false;
+  // a statement is paid once the payments and credits after its period end cover its closing balance
+  const paidAfter=s=>Math.round(items.filter(i=>i.kind!=='charge'&&i.posted>s.period_end).reduce((t,i)=>t+(parseFloat(i.amount)||0),0)*100)/100;
+  const stStatus=s=>s.closing<=0.004?['Nothing due','ok']:paidAfter(s)>=s.closing-0.004?['Paid','ok']:(s.due&&s.due<new Date().toISOString().slice(0,10)?['Past due','neg']:['Open','']);
+  const pays=items.filter(i=>i.kind==='payment').slice().reverse(), canBook=(ME.facilities||[]).length>0, mine=(ME.bookings||[]).slice().sort((a,b)=>(a.date+a.time).localeCompare(b.date+b.time));
+  const tabs=[['home','Home',ICON.home],canBook?['book','Book',ICON.book]:null,['acct','Account',ICON.acct],PAYOK?['wallet','Wallet',ICON.wallet]:null].filter(Boolean);
+  if(!tabs.some(t=>t[0]===UI.tab)) UI.tab='home';
+  const upcoming=b=>{ const bf=(ME.facilities||[]).find(x=>x.id===b.facility)||{name:b.facility}; const d=new Date(b.date+'T12:00'); return `<div class="up"><div class="d"><b>${d.getDate()}</b><small>${d.toLocaleDateString('en-US',{month:'short'})}</small></div><div class="w"><b>${esc(bf.name)} · ${t12(b.time)}</b><small>${(+bf.units||1)>1?esc(unitName(bf,b.unit))+' · ':''}${(b.players||[]).map(p=>esc(p.name)).join(', ')}${b.status==='checked_in'?' · checked in':''}</small></div>${b.status==='booked'?`<button class="btn sm" data-bx="${b.id}">Cancel</button>`:'<span></span>'}</div>`; };
+  const balCard=`<div class="card"><div class="bal"><div><span class="lbl">${bal>0.004?'Balance due':bal<-0.004?'Credit on account':'Balance'}</span><div class="v ${bal>0.004?'neg':bal<-0.004?'pos':''}">${fmt(Math.abs(bal))}</div><small>${bal>0.004?(due||'owed to the club'):bal<-0.004?'the club owes you — it comes off your next charges':'nothing owed'}${ME.member.memberNo?' · member #'+esc(ME.member.memberNo):''}</small></div>
+      ${PAYOK?`<div class="acts" style="margin:0">${bal>0.004?`<button class="btn pri" id="pay">Pay ${fmt(bal)}</button>`:''}<button class="btn" id="payOther">${bal>0.004?'Other amount':'Make a payment'}</button></div>`:''}</div>
+      ${ME.online?(PAYOK?'':`<p class="hint">Payments on this account are made by ${esc(ME.holderName||'the account holder')}.</p>`):'<p class="hint">Pay the club the way you always have — the office records it here.</p>'}
+      <div class="kp"><div><span class="lbl">Last statement</span>${last?`<b>${fmt(last.closing)}</b><small>${dt(last.period_end)} · ${stStatus(last)[0]}</small>`:'<b>—</b><small>none yet</small>'}</div><div><span class="lbl">Since then</span><b>${fmt(items.filter(i=>i.kind==='charge'&&(!last||i.posted>last.period_end)).reduce((t,i)=>t+(parseFloat(i.amount)||0),0))}</b><small>${items.filter(i=>i.kind==='charge'&&(!last||i.posted>last.period_end)).length} charges</small></div><div><span class="lbl">Paid this year</span><b>${fmt(pays.filter(i=>(i.posted||'').startsWith(String(new Date().getFullYear()))).reduce((t,i)=>t+(parseFloat(i.amount)||0),0))}</b><small>${pays.filter(i=>(i.posted||'').startsWith(String(new Date().getFullYear()))).length} payments</small></div></div></div>`;
+  const stmtRows=st.length?st.slice(0,24).map(s=>{ const [txt,cls]=stStatus(s); return `<div class="row s"><div><b>${dt(s.period_start)} – ${dt(s.period_end)} <span class="chip ${cls==='ok'?'ok':''}"${cls==='neg'?' style="background:#F8E6DF;border-color:#EBC2B3;color:var(--neg)"':''}>${txt}</span></b><small>closing balance ${fmt(s.closing)}${s.closing>0.004?' · due '+dt(s.due):''} · charges ${fmt(s.charges)} · payments ${fmt(s.payments)}</small></div><div style="display:flex;gap:6px">${ME.online&&(txt==='Open'||txt==='Past due')?`<button class="btn sm pri" data-stpay="${esc(s.id)}">Pay ${fmt(Math.min(s.closing-paidAfter(s),Math.max(bal,0))||s.closing)}</button>`:''}<button class="btn sm" data-stmt="${esc(s.id)}">PDF</button></div></div>`; }).join(''):'<p class="muted">No statements yet — the first one comes at the end of the month.</p>';
+  const payRows=pays.length?`<p class="muted" style="margin:2px 0 10px">${pays.length} payment${pays.length===1?'':'s'} · ${fmt(pays.reduce((t,i)=>t+(parseFloat(i.amount)||0),0))} in all · ${fmt(pays.filter(i=>(i.posted||'').startsWith(String(new Date().getFullYear()))).reduce((t,i)=>t+(parseFloat(i.amount)||0),0))} this year</p>`+pays.slice(0,36).map(i=>`<div class="row s"><div><b>${esc(BC_METHOD[i.method]||'Payment')}${i.reference&&!/^pi_/.test(i.reference)?' · '+esc(i.reference):''}${/^deluxe:/.test(i.ref||'')?' <span class="chip">online</span>':''}${/autopay/i.test((i.ref||'')+(i.descr||''))?' <span class="chip">autopay</span>':''}</b><small>${dt(i.posted)}${i.descr&&i.descr!==(BC_METHOD[i.method]||'')?' · '+esc(i.descr):''}</small></div><span class="a pay">${fmt(i.amount)}</span></div>`).join('')+(pays.length>36?'<p class="hint">The last 36 payments — statements carry the rest.</p>':''):'<p class="muted">No payments yet.</p>';
+  const actRows=ledger.length?ledger.map(i=>`<div class="row"><b>${esc(i.descr||'')}</b><span class="a ${i.kind==='charge'?'':'pay'}">${i.kind==='charge'?'':'−'}${fmt(i.amount)}</span><span class="r">${fmt(i.run)}</span><small>${dt(i.posted)}${i.kind==='payment'&&i.method?' · '+(BC_METHOD[i.method]||i.method)+(i.reference&&!/^pi_/.test(i.reference)?' '+esc(i.reference):''):''}${i.slip?` · <a href="#" data-slip="${esc(i.slip)}">signed slip</a>`:''}</small></div>`).join('')+(items.length>40?'<p class="hint">The last 40 items — statements carry the rest.</p>':''):'<p class="muted">Nothing on your account yet.</p>';
+  const SUBS=[['activity','Activity'],['payments','Payments'],['statements','Statements']]; if(!SUBS.some(x=>x[0]===UI.acct)) UI.acct='activity';
+  $('main').innerHTML=`${ME.sub?`<div class="pv"><b>${esc(ME.holderName||'Family')}’s account</b> — you are signed in as ${esc([ME.sub.first,ME.sub.last].filter(Boolean).join(' '))}${ME.sub.rel?' ('+esc(ME.sub.rel)+')':''}${ME.family&&ME.family.length?' · on this account: '+esc(ME.family.join(', ')):''}</div>`:''}${RO?`<div class="pv"><b>Staff view</b> — this is ${esc([ME.member.first,ME.member.last].filter(Boolean).join(' '))}’s portal exactly as they see it${ME.signedIn?' · last signed in '+dt(ME.signedIn.slice(0,10)):' · has not signed in yet'}. Payments, cards and autopay you change here are made on their behalf.</div>`:''}
+    <nav class="tabs">${tabs.map(([k,l,ic])=>`<button data-tab="${k}" class="${UI.tab===k?'on':''}">${ic}<span>${l}</span></button>`).join('')}</nav>
+    <section class="pane" data-pane="home"${UI.tab==='home'?'':' hidden'}><div class="ph"><h1>Home</h1><small>${esc(ME.club||'')}${ME.member.memberNo?' · member #'+esc(ME.member.memberNo):''}</small></div><div class="cols"><div>${balCard}
+        <div class="card"><div class="auto"><h2 style="margin:0">Recent activity</h2><button class="btn sm" data-goto="acct" data-sub="activity">See all</button></div>${ledger.length?`<div style="margin-top:6px">${ledger.slice(0,6).map(i=>`<div class="row"><b>${esc(i.descr||'')}</b><span class="a ${i.kind==='charge'?'':'pay'}">${i.kind==='charge'?'':'−'}${fmt(i.amount)}</span><span class="r">${fmt(i.run)}</span><small>${dt(i.posted)}</small></div>`).join('')}</div>`:'<p class="muted" style="margin-top:10px">Nothing on your account yet.</p>'}</div></div>
+      <div>${canBook?`<div class="card"><div class="auto"><h2 style="margin:0">Up next</h2><button class="btn sm pri" data-goto="book">Book</button></div>${mine.length?`<div style="margin-top:8px">${mine.slice(0,5).map(upcoming).join('')}</div>${mine.length>5?`<p class="hint">${mine.length-5} more under Book.</p>`:''}`:'<p class="muted" style="margin-top:10px">Nothing booked — tee times, courts, the pool and lessons are under Book.</p>'}</div>`:''}
+      ${(ME.events||[]).length?`<div class="card"><h2>What’s on</h2>${ME.events.slice(0,8).map(e=>`<div class="row s"><div><b>${esc(e.name)}</b><small>${bcDate(e.date)}${e.end&&e.end!==e.date?' – '+bcDate(e.end):''}${e.start?' · '+t12(e.start)+(e.finish?'–'+t12(e.finish):''):''}${e.where?' · '+esc(e.where):''}${e.descr?'<br>'+esc(e.descr):''}</small></div></div>`).join('')}</div>`:''}
+      ${PAYOK?`<div class="card auto"><div><b style="font-size:16px;color:var(--navy)">Autopay</b><small style="display:block;color:var(--muted);font-size:13px;margin-top:3px">${ME.autopay&&dflt?`On · ${esc([dflt.nickname,dflt.label].filter(Boolean).join(' · '))}`:W.length?'Off · '+W.length+' payment method'+(W.length===1?'':'s')+' in the wallet':'Off'}</small></div><button class="btn sm" data-goto="wallet">${ME.autopay?'Manage':'Set up'}</button></div>`:''}</div></div></section>
+    ${canBook?`<section class="pane" data-pane="book"${UI.tab==='book'?'':' hidden'}><div class="ph"><h1>Book</h1><small>Tee times, courts, the pool and lessons</small></div><div class="cols book"><div>${bookCard()}</div><div id="bkTimes">${bookTimes()}</div></div>${mine.length?`<div class="card"><h2>My bookings</h2>${mine.map(upcoming).join('')}</div>`:''}</section>`:''}
+    <section class="pane" data-pane="acct"${UI.tab==='acct'?'':' hidden'}><div class="ph"><h1>Account</h1><small>${items.length} items on the account</small></div><div class="card"><div class="seg">${SUBS.map(([k,l])=>`<button data-asub="${k}" class="${UI.acct===k?'on':''}">${l}</button>`).join('')}</div>
+      <div data-asubpane="activity"${UI.acct==='activity'?'':' hidden'}><h2>Activity</h2>${actRows}</div>
+      <div data-asubpane="payments"${UI.acct==='payments'?'':' hidden'}><h2>Payments</h2>${payRows}</div>
+      <div data-asubpane="statements"${UI.acct==='statements'?'':' hidden'}><h2>Statements</h2>${stmtRows}</div></div></section>
+    ${PAYOK?`<section class="pane" data-pane="wallet"${UI.tab==='wallet'?'':' hidden'}><div class="ph"><h1>Wallet</h1><small>Cards and bank accounts in Deluxe’s vault</small></div><div class="cols"><div>
+      <div class="card"><div class="auto"><div><h2 style="margin:0">Payment methods</h2><small style="display:block;color:var(--muted);font-size:13px;margin-top:3px">Cards and bank accounts kept in Deluxe’s secure vault — the club and Flagstick never see the numbers</small></div><button class="btn sm pri" id="wAdd">Add</button></div>
+      ${W.length?W.map(w=>`<div class="row s" style="margin-top:8px"><div><b>${esc([w.nickname,w.label].filter(Boolean).join(' · ')||'Card')}${w.is_default?' <span class="chip ok">Default</span>':''}</b><small>${w.kind==='ach'?'Bank account':'Card'}${w.exp?' · expires '+esc(w.exp):''}</small></div><div style="display:flex;gap:6px">${w.is_default?'':`<button class="btn sm" data-wdef="${esc(w.id)}">Make default</button>`}<button class="btn sm" data-wdel="${esc(w.id)}">Remove</button></div></div>`).join(''):'<p class="muted" style="margin-top:10px">Nothing saved yet. Add a card or bank account to pay in one tap and to turn on autopay.</p>'}</div></div>
+      <div><div class="card"><h2>Autopay</h2><p class="muted">${ME.autopay&&dflt?`On · ${esc([dflt.nickname,dflt.label].filter(Boolean).join(' · '))} · each statement’s balance is paid for you on its due date`:W.length?'Off · turn it on and each statement’s balance is paid from your default payment method':'Off · add a payment method first, then each statement’s balance is paid for you'}</p><div class="acts">${ME.autopay?'<button class="btn" id="autoOff">Turn off</button>':`<button class="btn pri" id="autoOn">${W.length?'Turn on autopay':'Set up autopay'}</button>`}</div></div></div></div></section>`:''}
+    <div class="fs"><img src="flagstick-crest.svg" alt="">Flagstick</div>`;
+  $('hOut').onclick=RO?()=>window.close():signOut; if(RO) $('hOut').textContent='Close'; const p=$('pay'); if(p) p.onclick=()=>paySheet(bal,true); const po=$('payOther'); if(po) po.onclick=()=>paySheet(bal);
+  $('rNav').innerHTML=tabs.map(([k,l,ic])=>`<button data-tab="${k}" class="${UI.tab===k?'on':''}">${ic}<span>${l}</span></button>`).join(''); $('hOut2').onclick=$('hOut').onclick; if(RO) $('hOut2').textContent='Close';
+  document.querySelectorAll('[data-tab]').forEach(b=>b.onclick=()=>setTab(b.dataset.tab));
+  document.querySelectorAll('[data-goto]').forEach(b=>b.onclick=e=>{ e.preventDefault(); if(b.dataset.sub){ UI.acct=b.dataset.sub; document.querySelectorAll('[data-asub]').forEach(x=>x.classList.toggle('on',x.dataset.asub===UI.acct)); document.querySelectorAll('[data-asubpane]').forEach(x=>x.hidden=x.dataset.asubpane!==UI.acct); } setTab(b.dataset.goto); });
+  document.querySelectorAll('[data-asub]').forEach(b=>b.onclick=()=>{ UI.acct=b.dataset.asub; document.querySelectorAll('[data-asub]').forEach(x=>x.classList.toggle('on',x===b)); document.querySelectorAll('[data-asubpane]').forEach(x=>x.hidden=x.dataset.asubpane!==UI.acct); });
+  document.querySelectorAll('[data-stpay]').forEach(b=>b.onclick=()=>{ const s=st.find(x=>String(x.id)===b.dataset.stpay); paySheet(Math.min(Math.max(s.closing-paidAfter(s),0),Math.max(bal,0))||bal,true); });
+  const ao=$('autoOn'); if(ao) ao.onclick=()=>W.length?autopayOn():setupAutopay(); const af=$('autoOff'); if(af) af.onclick=autopayOff;
+  const wa=$('wAdd'); if(wa) wa.onclick=walletAdd; document.querySelectorAll('[data-wdef]').forEach(b=>b.onclick=async()=>{ const r=await fn({action:'wallet_default',id:b.dataset.wdef}); if(r){ await load(); toast('Default payment method changed'); } });
+  document.querySelectorAll('[data-wdel]').forEach(b=>b.onclick=async()=>{ if(!confirm('Remove this payment method?')) return; const r=await fn({action:'wallet_remove',id:b.dataset.wdel}); if(r){ await load(); toast('Removed'); } });
+  document.querySelectorAll('[data-stmt]').forEach(b=>b.onclick=()=>statementPDF(st.find(s=>String(s.id)===b.dataset.stmt)));
+  document.querySelectorAll('[data-slip]').forEach(a=>a.onclick=async e=>{ e.preventDefault(); try{ const {data,error}=await sb.storage.from('slips').createSignedUrl(a.dataset.slip,600); if(error) throw error; window.open(data.signedUrl,'_blank','noopener'); }catch(err){ toast('The signed slip is not available right now'); } });
+  wireBook();
+}
+/* ---- bookings: the tee sheet, courts, the pool — inside the club's rules (member_book checks them again) ---- */
+const BKV={fac:'',date:'',unit:'',part:'',party:1,slots:null,blocked:[],busy:false};
+const mins=t=>{ const [h,m]=String(t||'00:00').split(':').map(Number); return h*60+(m||0); }; const hhmm=n=>String(Math.floor(n/60)).padStart(2,'0')+':'+String(n%60).padStart(2,'0');
+const t12=t=>{ const n=mins(t), h=Math.floor(n/60), m=n%60; return `${((h+11)%12)+1}:${String(m).padStart(2,'0')} ${h<12?'am':'pm'}`; };
+const todayISO=()=>new Date().toISOString().slice(0,10); const isoPlus=(iso,n)=>{ const d=new Date(iso+'T12:00'); d.setDate(d.getDate()+n); return d.toISOString().slice(0,10); };
+const unitName=(f,u)=>(f.unitNames||[])[u-1]||(f.kind==='court'?'Court '+u:f.kind==='lesson'?'Instructor '+u:(f.units||1)>1?f.name+' '+u:f.name);
+/* the owner, Nov 24: "If they want to book a tee time or pickleball court it just needs to be smarter and cleaner" — one choice at a time:
+   what, the day, where (any court / course, or one), the part of the day, how many players (a tee time), then only the times that fit as
+   pills; full and closed times stay small and dashed so the sheet still reads. BKV.unit '' = any (a pill carries the first unit with room). */
+const PARTS=[['am','Morning',0,12],['mid','Midday',12,16],['pm','Afternoon',16,24]];
+function bookCard(){ const F=ME.facilities; if(!F.some(f=>f.id===BKV.fac)) BKV.fac=F[0].id; const f=F.find(x=>x.id===BKV.fac); if(!BKV.date) BKV.date=todayISO(); const lead=f.lead==null?7:+f.lead;
+  const days=Array.from({length:Math.min(lead+1,14)},(_,i)=>isoPlus(todayISO(),i)); if(!days.includes(BKV.date)) BKV.date=days[0];
+  const S=BKV.slots; const slots=[]; for(let n=mins(f.open); n<mins(f.close); n+=(+f.slot||60)) slots.push(hhmm(n));
+  const units=Array.from({length:+f.units||1},(_,i)=>i+1), many=units.length>1; if(BKV.unit&&!units.includes(+BKV.unit)) BKV.unit=''; const cap=+f.cap||1, tee=f.kind==='tee';
+  BKV.party=Math.min(Math.max(1,+BKV.party||1),cap);
+  const takenAt=(t,u)=>(S||[]).filter(x=>x.time===t&&x.unit===u), myAt=(t,u)=>takenAt(t,u).some(x=>x.mine);
+  const roomAt=(t,u)=>{ if(myAt(t,u)) return -1; if(blockedAt(t,u)) return 0; const T=takenAt(t,u); return tee?Math.max(0,cap-T.reduce((a,x)=>a+(+x.n||1),0)):(T.length?0:cap); };
+  // the parts of the day the sheet spans; the one on screen defaults to the first with an open time (today: the first still ahead)
+  const spanH=(mins(f.close)-mins(f.open))/60, parts=spanH>5?PARTS.filter(([k,l,a,b])=>slots.some(t=>mins(t)>=a*60&&mins(t)<b*60)):[];
+  const nowM=BKV.date===todayISO()?new Date().getHours()*60+new Date().getMinutes():0;
+  const openIn=([k,l,a,b])=>slots.filter(t=>mins(t)>=a*60&&mins(t)<b*60&&mins(t)>=nowM&&units.some(u=>(!BKV.unit||u===+BKV.unit)&&roomAt(t,u)>=BKV.party)).length;
+  if(parts.length&&!parts.some(p=>p[0]===BKV.part)) BKV.part=(parts.find(p=>openIn(p)>0)||parts[0])[0];
+  return `<div class="card bk"><h2>Find a time</h2><span class="lbl" style="margin-top:0">What</span><div class="chips scroll">${F.map(x=>`<button class="${x.id===f.id?'on':''}" data-bf="${x.id}">${esc(x.name)}</button>`).join('')}</div>
+    <span class="lbl">Day</span><div class="chips scroll">${days.map(d=>`<button class="${d===BKV.date?'on':''}" data-bd="${d}">${d===todayISO()?'Today':new Date(d+'T12:00').toLocaleDateString('en-US',{weekday:'short',day:'numeric'})}</button>`).join('')}</div>
+    ${many?`<span class="lbl">${tee?'Course':f.kind==='court'?'Court':f.kind==='lesson'?'With':'Where'}</span><div class="chips scroll"><button class="${BKV.unit?'':'on'}" data-bu="">Any</button>${units.map(u=>`<button class="${+BKV.unit===u?'on':''}" data-bu="${u}">${esc(unitName(f,u))}</button>`).join('')}</div>`:''}
+    <div style="display:flex;gap:18px;flex-wrap:wrap;align-items:flex-end">${parts.length?`<div><span class="lbl">When</span><div class="chips">${parts.map(p=>`<button class="${BKV.part===p[0]?'on':''}" data-bp="${p[0]}">${p[1]}${S===null?'':' · '+openIn(p)}</button>`).join('')}</div></div>`:''}
+    ${tee&&cap>1?`<div><span class="lbl">Players</span><div class="stp"><button data-bn="-1" aria-label="Fewer">−</button><b id="bkParty">${BKV.party}</b><button data-bn="1" aria-label="More">+</button></div></div>`:''}</div>
+    <p class="hint">${tee?`Up to ${cap} players a tee time · `:''}book up to ${lead} days ahead${f.fee&&+f.fee.amount?` · ${bcFmt(f.fee.amount)} ${f.fee.per==='player'?'per player':''} to your account`:''}.</p></div>`; }
+/* the times for the choices above — its own card, beside the choices on a desktop */
+function bookTimes(){ const F=ME.facilities, f=F.find(x=>x.id===BKV.fac); const S=BKV.slots; if(S===null) return '<div class="card"><p class="muted">Loading…</p></div>';
+  const slots=[]; for(let n=mins(f.open); n<mins(f.close); n+=(+f.slot||60)) slots.push(hhmm(n)); const units=Array.from({length:+f.units||1},(_,i)=>i+1), many=units.length>1, cap=+f.cap||1, tee=f.kind==='tee';
+  const takenAt=(t,u)=>(S||[]).filter(x=>x.time===t&&x.unit===u), myAt=(t,u)=>takenAt(t,u).some(x=>x.mine);
+  const roomAt=(t,u)=>{ if(myAt(t,u)) return -1; if(blockedAt(t,u)) return 0; const T=takenAt(t,u); return tee?Math.max(0,cap-T.reduce((a,x)=>a+(+x.n||1),0)):(T.length?0:cap); };
+  const nowM=BKV.date===todayISO()?new Date().getHours()*60+new Date().getMinutes():0; const P=PARTS.find(p=>p[0]===BKV.part)||['all','',0,24]; const show=slots.filter(t=>mins(t)>=P[2]*60&&mins(t)<P[3]*60&&mins(t)>=nowM);
+  const pill=(t,u,room,k)=>{ const mine=room<0, full=room>=0&&room<BKV.party, label=many&&!BKV.unit?unitName(f,u):'';
+    return `<button class="sl${mine?' mine':full?' full':room>=cap&&tee?' room':''}" data-bs="${t}|${u}"${full&&!mine?' disabled':''}${k&&k.reason?` title="${esc(k.reason)}"`:''}>${t12(t)}<small>${mine?'yours':k?esc(k.reason||'closed'):full?(tee?'full':'taken'):tee?room+' open'+(label?' · '+label:''):label||'open'}</small></button>`; };
+  const pills=show.map(t=>{ if(BKV.unit){ const u=+BKV.unit; return pill(t,u,roomAt(t,u),!myAt(t,u)&&blockedAt(t,u)); }
+    const mineU=units.find(u=>myAt(t,u)); if(mineU) return pill(t,mineU,-1,null);
+    const best=units.map(u=>[u,roomAt(t,u)]).sort((a,b)=>b[1]-a[1])[0]; const k=best[1]<=0?units.map(u=>blockedAt(t,u)).find(Boolean):null; return pill(t,best[0],best[1],k&&units.every(u=>blockedAt(t,u))?k:null); }).join('');
+  const nOpen=show.filter(t=>units.some(u=>(!BKV.unit||u===+BKV.unit)&&roomAt(t,u)>=BKV.party)).length;
+  return `<div class="card"><div class="bkhead" style="margin-top:0"><b style="font-size:17px">${esc(f.name)} · ${BKV.date===todayISO()?'today':bcDate(BKV.date)}${P[1]?' · '+P[1].toLowerCase():''}</b><small>${nOpen?`${nOpen} open time${nOpen===1?'':'s'}`:'nothing open'}${tee?` for ${BKV.party} player${BKV.party===1?'':'s'}`:''}${BKV.unit?' · '+esc(unitName(f,+BKV.unit)):many?' · any '+(tee?'course':f.kind==='court'?'court':'one'):''}</small></div>
+    <div class="pills">${pills||'<p class="muted">No times in this part of the day.</p>'}</div><p class="hint">Tap a time to book it.</p></div>`; }
+async function loadSlots(){ const {data,error}=await sb.rpc('member_slots',{p_tenant:TENANT,p_facility:BKV.fac,p_date:BKV.date}); BKV.slots=error?[]:((data&&data.taken)||[]); BKV.blocked=error?[]:((data&&data.blocked)||[]); if(data&&data.mine) ME.bookings=data.mine; render(); }
+const blockedAt=(t,u)=>(BKV.blocked||[]).find(k=>t>=k.from&&t<k.to&&(!k.units||k.units.includes(u)));
+function wireBook(){ if(!(ME.facilities||[]).length) return; if(BKV.slots===null) loadSlots();
+  document.querySelectorAll('[data-bf]').forEach(b=>b.onclick=()=>{ BKV.fac=b.dataset.bf; BKV.unit=''; BKV.part=''; BKV.slots=null; render(); }); document.querySelectorAll('[data-bd]').forEach(b=>b.onclick=()=>{ BKV.date=b.dataset.bd; BKV.part=''; BKV.slots=null; render(); });
+  document.querySelectorAll('[data-bu]').forEach(b=>b.onclick=()=>{ BKV.unit=b.dataset.bu; render(); }); document.querySelectorAll('[data-bp]').forEach(b=>b.onclick=()=>{ BKV.part=b.dataset.bp; render(); }); document.querySelectorAll('[data-bn]').forEach(b=>b.onclick=()=>{ BKV.party=(+BKV.party||1)+(+b.dataset.bn); render(); });
+  document.querySelectorAll('[data-bs]').forEach(b=>b.onclick=()=>{ const [t,u]=b.dataset.bs.split('|'); if(b.classList.contains('mine')){ toast('That one is yours — cancel it below to change it'); return; } bookSheet(ME.facilities.find(x=>x.id===BKV.fac),t,+u); });
+  document.querySelectorAll('[data-bx]').forEach(b=>b.onclick=async()=>{ if(!confirm('Cancel this booking?')) return; const {error}=await sb.rpc('member_cancel',{p_tenant:TENANT,p_id:b.dataset.bx}); if(error){ toast(error.message); return; } toast('Cancelled'); BKV.slots=null; await load(); }); }
+function bookSheet(f,t,u){ const me=[ME.member.first,ME.member.last].filter(Boolean).join(' '); const cap=+f.cap||1; const d=document.createElement('div'); d.className='sheet';
+  d.innerHTML=`<div><h2>${esc(f.name)} · ${bcDate(BKV.date)} ${t12(t)}</h2>${(+f.units||1)>1?`<p class="muted">${esc(unitName(f,u))}</p>`:''}${cap>1?`<span class="lbl" style="margin-top:12px">${f.kind==='tee'?'Players':'Who is coming'} · up to ${cap}</span><div id="bkP">${Array.from({length:cap},(_,i)=>`<input class="inp" data-pn="${i}" value="${i?'':esc(me)}" placeholder="${i?(i<(+BKV.party||1)?'Player '+(i+1):'Name (optional)'):'You'}" ${i?'':'readonly'} style="margin-bottom:8px">`).join('')}</div>`:''}<span class="lbl" style="margin-top:4px">Note</span><input class="inp" id="bkN" placeholder="Cart, walking, anything the club should know">
+    <div class="acts"><button class="btn pri" id="bkGo">Book it</button><button class="btn" id="bkX">Cancel</button></div>${f.fee&&+f.fee.amount?`<p class="hint">${bcFmt(f.fee.amount)} ${f.fee.per==='player'?'per player ':''}goes on your account.</p>`:''}</div>`;
+  document.body.appendChild(d); d.querySelector('#bkX').onclick=()=>d.remove();
+  d.querySelector('#bkGo').onclick=async()=>{ if(BKV.busy) return; BKV.busy=true; const players=[...d.querySelectorAll('[data-pn]')].map(i=>i.value.trim()).filter(Boolean).map((n,i)=>i===0?{member_id:ME.member.id,name:n}:{name:n}); if(!players.length) players.push({member_id:ME.member.id,name:me});
+    const {data,error}=await sb.rpc('member_book',{p_tenant:TENANT,p_facility:f.id,p_date:BKV.date,p_time:t,p_unit:u,p_players:players,p_note:d.querySelector('#bkN').value.trim()}); BKV.busy=false;
+    if(error){ toast(error.message.replace(/^.*?: /,'')); return; } d.remove(); toast('Booked'); BKV.slots=null; await load(); }; }
+/* the pay sheet: the amount, then Deluxe's hosted payment form (the card goes straight to Deluxe as a token; the `payments` function charges it) */
+/* Deluxe's deluxe.js declares `const HostedForm` at the top level — a global binding, not a window property — so it is read bare */
+const hpfLib=()=>typeof HostedForm!=='undefined'?HostedForm:window.HostedForm;
+let HPF=null, LASTERR=''; function loadHPF(src){ if(hpfLib()) return Promise.resolve(); if(HPF) return HPF; HPF=new Promise((res,rej)=>{ const sc=document.createElement('script'); sc.src=src; sc.onload=()=>res(); sc.onerror=()=>{ HPF=null; rej(new Error('Couldn’t load the secure payment form — check the connection')); }; document.head.appendChild(sc); }); return HPF; }
+async function hostedForm(d,o){ const cfg=await fn({action:'hpf'}); if(!cfg) return; const box=d.querySelector('#payHpf'); box.innerHTML='<p class="muted">Loading the secure form…</p>';
+  try{ await loadHPF(cfg.script); box.innerHTML=''; const inst=await hpfLib().init({containerId:'payHpf',xtoken:cfg.xtoken,xrtype:'Generate Token',xpm:'0',xAmount:o.amount||0,xcheckSurcharge:!!o.amount,xbtntext:o.button},{
+      onSuccess:r=>{ const dd=r&&r.data; const token=dd&&typeof dd==='string'?{token:dd}:dd&&dd.token?dd:null; if(!token){ d.querySelector('#payMsg').textContent='The form did not return a token — try again.'; return; } o.onToken(token); },
+      onFailure:r=>{ d.querySelector('#payMsg').textContent=(r&&r.errors&&r.errors.join(' '))||'The card was not accepted'; }, onInvalid:r=>{ d.querySelector('#payMsg').textContent=(r&&r.errors&&r.errors.join(' '))||'Check the card details'; }});
+    d._inst=inst; if(inst&&inst.renderHpf) inst.renderHpf(); }catch(e){ toast(e.message||String(e)); } }
+function paySheet(bal,fixed){ const W=ME.wallet||[], dflt=W.find(w=>w.is_default)||W[0]; const d=document.createElement('div'); d.className='sheet'; d.innerHTML=`<div><h2>Make a payment</h2><span class="lbl">Amount $</span><input class="inp" id="payA" inputmode="decimal" value="${bal>0.004?bal.toFixed(2):''}">
+    ${W.length?`<span class="lbl" style="margin-top:14px">Pay with</span><div class="chips" id="payW">${W.map(w=>`<button type="button" data-pm="${esc(w.id)}" class="${dflt&&w.id===dflt.id?'on':''}">${esc([w.nickname,w.label].filter(Boolean).join(' · '))}</button>`).join('')}<button type="button" data-pm="" class="">New card or bank account</button></div>`:''}
+    <div id="payNewOpts"${dflt?' hidden':''}><label style="display:flex;gap:8px;align-items:center;margin-top:12px;font-size:14px"><input type="checkbox" id="payAuto">Keep this card in my wallet${ME.autopay?'':' and turn on autop'}ay</label></div>
+    <div class="acts"><button class="btn pri" id="payGo">${dflt?'Pay now':'Continue to payment'}</button><button class="btn" id="payX">Cancel</button></div><p class="hint" id="payHint">${dflt?'Charged to the payment method chosen above.':'Card or bank account, entered on Deluxe’s secure form — never on this page.'}</p></div>`;
+  document.body.appendChild(d); let pm=dflt?dflt.id:''; const opts=d.querySelector('#payNewOpts'); d.querySelectorAll('[data-pm]').forEach(b=>b.onclick=()=>{ pm=b.dataset.pm; d.querySelectorAll('[data-pm]').forEach(x=>x.classList.toggle('on',x===b)); opts.hidden=!!pm; d.querySelector('#payGo').textContent=pm?'Pay now':'Continue to payment'; d.querySelector('#payHint').textContent=pm?'Charged to the payment method chosen above.':'Card or bank account, entered on Deluxe’s secure form — never on this page.'; });
+  d.querySelector('#payX').onclick=()=>d.remove(); d.querySelector('#payGo').onclick=async()=>{ const a=Math.round(parseFloat(d.querySelector('#payA').value)*100)/100; if(!(a>=1)){ toast('Enter an amount of at least $1.00'); return; }
+    if(pm){ const w=W.find(x=>x.id===pm); d.querySelector('#payGo').disabled=true; const r=await fn({action:'pay',amount:a,method_id:pm}); if(r){ d.remove(); await load(); toast(`Thank you — ${fmt(r.amount)} paid with ${[w.nickname,w.label].filter(Boolean).join(' · ')}`); } else d.querySelector('#payGo').disabled=false; return; }
+    const save=d.querySelector('#payAuto').checked, auto=save&&!ME.autopay;
+    d.querySelector('div').innerHTML=`<h2>Pay ${fmt(a)}</h2><p class="muted" style="margin:4px 0 10px">Card or bank account — the details go straight to Deluxe, never through the club or Flagstick.${save?' It is kept in your wallet.':''}</p><div id="payHpf" style="min-height:120px"></div><p class="hint" id="payMsg"></p><div class="acts"><button class="btn" id="payX2">Cancel</button></div>`; d.querySelector('#payX2').onclick=()=>d.remove();
+    await hostedForm(d,{amount:a,button:'Pay '+fmt(a),onToken:async token=>{ d.querySelector('#payMsg').textContent='Charging…'; const r=await fn({action:'pay',amount:a,save,make_default:save,token}); if(r){ if(auto&&r.kept) await fn({action:'autopay_on'}); d.remove(); await load(); toast(`Thank you — ${fmt(r.amount)} is on your account${auto&&r.kept?' and autopay is on':''}`); } else d.querySelector('#payMsg').textContent=LASTERR||''; }}); }; }
+function walletAdd(){ const d=document.createElement('div'); d.className='sheet'; d.innerHTML=`<div><h2>Add a payment method</h2><span class="lbl">Nickname (optional)</span><input class="inp" id="wNick" placeholder="Personal Visa, Business Amex, Checking…"><p class="muted" style="margin:12px 0 10px">The card or bank account is kept in Deluxe’s vault; the club and Flagstick never see the numbers.</p><div id="payHpf" style="min-height:120px"></div><p class="hint" id="payMsg"></p><div class="acts"><button class="btn" id="payX2">Cancel</button></div></div>`; document.body.appendChild(d); d.querySelector('#payX2').onclick=()=>d.remove();
+  hostedForm(d,{amount:0,button:'Save',onToken:async token=>{ d.querySelector('#payMsg').textContent='Saving…'; const r=await fn({action:'wallet_add',token,nickname:d.querySelector('#wNick').value.trim()}); if(r){ d.remove(); await load(); toast('Saved · '+(r.label||'')); } else d.querySelector('#payMsg').textContent=LASTERR||''; }}); }
+async function autopayOn(){ const r=await fn({action:'autopay_on'}); if(r){ await load(); toast('Autopay is on'); } }
+async function fn(body){ if(BUSY) return null; BUSY=true; try{ const {data,error}=await sb.functions.invoke('payments',{body:Object.assign({tenant:TENANT},AS?{as:AS}:{},body)}); if(error) throw new Error(error.message||'failed'); if(data&&data.error) throw new Error(data.error); return data; }catch(e){ LASTERR=e.message; toast(/not configured|does not take/i.test(e.message)?'Online payments aren’t set up for this club yet':e.message); return null; } finally{ BUSY=false; } }
+function setupAutopay(){ const d=document.createElement('div'); d.className='sheet'; d.innerHTML=`<div><h2>Set up autopay</h2><p class="muted" style="margin:4px 0 10px">Your card or bank account is kept in Deluxe’s vault — never by the club or Flagstick — and each statement’s balance is paid on its due date.</p><div id="payHpf" style="min-height:120px"></div><p class="hint" id="payMsg"></p><div class="acts"><button class="btn" id="payX2">Cancel</button></div></div>`; document.body.appendChild(d); d.querySelector('#payX2').onclick=()=>d.remove();
+  hostedForm(d,{amount:0,button:'Save for autopay',onToken:async token=>{ d.querySelector('#payMsg').textContent='Saving…'; const r=await fn({action:'setup',token}); if(r){ d.remove(); await load(); toast('Autopay is on · '+(r.label||'card saved')); } else d.querySelector('#payMsg').textContent=LASTERR||''; }}); }
+async function autopayOff(){ if(!confirm('Turn autopay off? Your payment methods stay in your wallet; you pay each statement yourself.')) return; const r=await fn({action:'autopay_off'}); if(!r){ const {error}=await sb.rpc('member_autopay_off',{p_tenant:TENANT}); if(error){ toast(error.message); return; } } await load(); toast('Autopay is off'); }
+function loadJsPDF(){ if(window.jspdf) return Promise.resolve(); return new Promise((res,rej)=>{ const sc=document.createElement('script'); sc.src='https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js'; sc.onload=()=>res(); sc.onerror=()=>rej(new Error('Couldn’t load the PDF maker — check the connection')); document.head.appendChild(sc); }); }
+async function crestPNG(){ if(ME&&ME.brand) return ME.brand; try{ const r=await fetch('flagstick-crest-light.png'); const b=await r.blob(); return await new Promise(ok=>{ const fr=new FileReader(); fr.onload=()=>ok(fr.result); fr.readAsDataURL(b); }); }catch(_){ return null; } }
+async function statementPDF(s){ if(!s) return; try{ await loadJsPDF(); }catch(e){ toast(e.message); return; }
+  const doc=new window.jspdf.jsPDF({unit:'pt',format:'letter'}); bcFonts(doc); const m=ME.member, items=(ME.items||[]).filter(i=>i.posted>=s.period_start&&i.posted<=s.period_end);
+  statementPage(doc,{club:ME.club,name:[m.first,m.last].filter(Boolean).join(' '),lines:[m.memberNo?'Member #'+m.memberNo:'',m.address1||'',[m.city,m.state,m.zip].filter(Boolean).join(', '),m.email||''],s,items,msg:ME.message||'',crest:await crestPNG(),idx:0,n:1});
+  const name=`statement-${s.period_end}.pdf`, blob=doc.output('blob'), file=new File([blob],name,{type:'application/pdf'});
+  if(navigator.canShare&&navigator.canShare({files:[file]})&&navigator.share&&/iPhone|iPad|Android/i.test(navigator.userAgent)){ try{ await navigator.share({files:[file],title:'Statement'}); return; }catch(e){ if(e&&e.name==='AbortError') return; } }
+  const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download=name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(url),4000); }
+if(sb) sb.auth.onAuthStateChange((ev)=>{ if(ev==='SIGNED_IN'&&!ME&&TENANT) load(); });
+boot();
+/*AUTOUPDATE*/
+</script>
+</body>
+</html>

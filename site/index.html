@@ -1,0 +1,196 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Flagstick · Golf, club management and fundraising in one system</title>
+<meta name="description" content="Flagstick runs the golf, the club and the fundraiser: tournaments with live scoring on every phone, associations and member games with hubs of their own, member accounts and billing, point of sale, bookings, and the nonprofit's gala, auction and raffle.">
+<link rel="icon" href="favicon.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,600;0,700;1,500&family=Public+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="site.css">
+<style>
+.hero-art{display:flex;flex-direction:column;gap:0;position:relative}
+.hero-art .phone{position:absolute;right:-10px;bottom:-30px;width:190px}
+@media (max-width:760px){.hero-art .phone{display:none}}
+.strip{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:18px}
+.strip figure{margin:0;display:flex;flex-direction:column;gap:10px}
+.strip figcaption{font-size:14px;color:#C9CFD2;line-height:1.45}
+.strip figcaption b{display:block;color:#fff;font-size:15px}
+@media (max-width:760px){.strip{grid-template-columns:minmax(0,1fr)}}
+</style>
+</head>
+<body>
+<header>
+  <div class="wrap">
+    <a class="brand" href="index.html" aria-label="Flagstick home"><img src="flagstick-crest-light.svg" alt=""><span><b>FLAGSTICK</b><small>GOLF SOFTWARE</small></span></a>
+    <nav class="nav" aria-label="Site"><a href="golf.html">Golf</a><a href="club.html">Club management</a><a href="nonprofits.html">Nonprofits</a><a href="about.html">About</a><a href="https://app.flagstickhub.com" style="color:#D8B75F">Sign in</a></nav>
+    <a class="btn gold top" href="#demo" style="height:44px;padding:0 20px;font-size:15px">Book a demo</a>
+    <button class="burger" type="button" aria-label="Open menu" aria-expanded="false" aria-controls="mnav" onclick="var m=document.getElementById('mnav');var o=m.classList.toggle('open');this.setAttribute('aria-expanded',o);this.classList.toggle('x',o)"><span></span><span></span><span></span></button>
+  </div>
+  <nav id="mnav" class="mnav" aria-label="Menu"><a href="golf.html">Golf</a><a href="club.html">Club management</a><a href="nonprofits.html">Nonprofits</a><a href="about.html">About</a><a href="#demo">Book a demo</a><a href="https://app.flagstickhub.com">Sign in</a></nav>
+</header>
+
+<section class="hero dark">
+  <div class="wrap two" style="grid-template-columns:minmax(0,.95fr) minmax(0,1.05fr)">
+    <div class="stack" style="gap:24px">
+      <span class="kicker">Golf · club management · fundraising</span>
+      <h1>The golf, the club,<br>the fundraiser.<br><span style="color:#D8B75F">One system.</span></h1>
+      <p class="lede">Tournaments with live scoring on every phone. A hub of their own for every association and Friday game. Member accounts, the register and the tee sheet for the club. The gala, the auction and the raffle for the nonprofit. Run by whoever is on shift.</p>
+      <div style="display:flex;gap:12px;flex-wrap:wrap"><a class="btn gold" href="#demo">Book a demo</a><a class="btn ghost" href="golf.html">See it run a tournament</a></div>
+    </div>
+    <div class="hero-art">
+      <div class="shot"><img src="img/t-board.jpg" alt="The hub's live leaderboard for a four-player scramble: teams ranked by net score with holes played" width="1600" height="1000"></div>
+      <div class="phone"><img src="img/p-score.jpg" alt="The scoring page on a phone: hole 16, one score per team, save and next hole" width="600" height="1299"></div>
+    </div>
+  </div>
+</section>
+
+<section style="background:#fff;border-bottom:1px solid var(--line);padding:44px 0">
+  <div class="wrap nums">
+    <div class="num"><b>20,000+</b><span>courses in the library with cards, tees and ratings. Pick yours or any course you travel to.</span></div>
+    <div class="num"><b>Mobile app</b><span>A Flagstick app for iOS and Android: one for members, one for management. Players can still score from a link or the QR on the card.</span></div>
+    <div class="num"><b>Every format</b><span>Scramble to match play, skins to quota, with the handicap math done for you.</span></div>
+    <div class="num"><b>One record</b><span>The field feeds the groups, the cards, the phones, the boards and the books. Nothing keyed twice.</span></div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap stack" style="gap:36px">
+    <div class="stack" style="gap:12px;max-width:760px"><span class="kicker">Three offerings</span><h2>Start with the golf. Switch on the rest when you are ready.</h2><p class="lede">Each module runs on the same directory and the same logins. A municipal course takes the golf and a register. A private club takes the whole club. A nonprofit takes the golf day and the gala.</p></div>
+    <div class="grid3">
+      <a class="offer" href="golf.html"><span class="chip gold">Golf management</span><h3>Tournaments, live scoring and every group’s own hub</h3><p>Registration, flights and pairings, printed cards, scoring from the carts, leaderboards on the TV and GameCast for the gallery. Associations run their season, budget and dues; member games run themselves from a link.</p><span class="more">See the golf →</span></a>
+      <a class="offer" href="club.html"><span class="chip gold">Club management</span><h3>Member accounts, the register and every sheet</h3><p>Monthly billing, statements and online payment. Restaurants with registers, kitchen screens and signed slips. The tee sheet, courts, pool and lessons, booked by members from their phones. Staff schedules and the time clock.</p><span class="more">See the club →</span></a>
+      <a class="offer" href="nonprofits.html"><span class="chip gold">Nonprofits</span><h3>The golf day and the gala, with the books kept</h3><p>Sponsor tiers with teams inside them, a public registration page, the silent and live auction from the guests’ phones, raffles drawn from a locked list, checkout with acknowledgements, and a thermometer for every event.</p><span class="more">See the fundraising →</span></a>
+    </div>
+  </div>
+</section>
+
+<section class="dark">
+  <div class="wrap stack" style="gap:32px">
+    <div class="stack" style="gap:10px"><span class="kicker">A tournament day</span><h2>From the first sponsor to the final board</h2><p class="lede">Every picture is the product running a sixty-player scramble.</p></div>
+    <div class="strip">
+      <figure><div class="shot"><img src="img/t-register.jpg" alt="The public registration page: the day, how it is played, payouts, Enter" loading="lazy" width="1600" height="1000"></div><figcaption><b>Players enter themselves</b>One link shows the day as it will run and takes a player and their partners into the field.</figcaption></figure>
+      <figure><div class="shot"><img src="img/t-groups.jpg" alt="The Groups tab: shotgun groups with a group ID, starting hole and players" loading="lazy" width="1600" height="1000"></div><figcaption><b>Pair and print</b>Shotgun groups in one tap, a group ID per cart, scorecards with a QR that opens live scoring.</figcaption></figure>
+      <figure><div class="shot"><img src="img/t-gamecast.jpg" alt="GameCast: every cart on its hole, a live feed of birdies and eagles, the leaderboard" loading="lazy" width="1600" height="1000"></div><figcaption><b>Boards everywhere</b>The TV in the clubhouse, GameCast for the gallery, the staff’s board with every card a tap away.</figcaption></figure>
+    </div>
+    <div><a class="btn gold" href="golf.html">The whole day, screen by screen</a></div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap two">
+    <div class="stack" style="gap:20px">
+      <span class="kicker">Nobody else does this</span>
+      <h2>The pro shop runs the club.<br>Everyone else runs their own.</h2>
+      <p class="lede" style="font-size:17px">Tournament software is sold to the pro shop, so the associations and the regulars wait for staff, or go without. Flagstick gives every group at the club a hub of its own inside the club’s system.</p>
+      <ul class="checks">
+        <li><span class="ck">✓</span>Associations run their season, budget and dues</li>
+        <li><span class="ck">✓</span>A Friday game sets itself up on a phone and scores from a link</li>
+        <li><span class="ck">✓</span>A cart plays wolf, hammer or banker with the money settled hole by hole</li>
+        <li><span class="ck">✓</span>Nobody gets the keys to the pro shop’s system</li>
+      </ul>
+      <a class="btn navy" href="golf.html#groups" style="align-self:flex-start">How a group’s hub works</a>
+    </div>
+    <div class="tree" aria-hidden="true">
+      <div class="tnode club"><span class="ticon club"><img src="flagstick-crest-light.svg" alt="" style="width:26px;height:26px"></span><div class="tbody"><b>The club</b><small>Directory · accounts · tee sheet · register · every event on one calendar</small></div><div class="chips"><span class="chip gold">Staff</span></div></div>
+      <div class="tkids">
+        <div class="tnode"><span class="ticon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.6 3.4-5.5 6.5-5.5s5.7 1.9 6.5 5.5"/><circle cx="17" cy="9" r="2.5"/><path d="M15.5 14.5c2.5 0 4.5 1.5 5.5 4.5"/></svg></span><div class="tbody"><b>Men’s association</b><small>Member-Member · Calcutta · 50/50 · season budget · dues</small></div><div class="chips"><span class="chip">Board</span></div></div>
+        <div class="tnode"><span class="ticon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.6 3.4-5.5 6.5-5.5s5.7 1.9 6.5 5.5"/><circle cx="17" cy="9" r="2.5"/><path d="M15.5 14.5c2.5 0 4.5 1.5 5.5 4.5"/></svg></span><div class="tbody"><b>Ladies’ association</b><small>Invitational · weekly games · treasury</small></div><div class="chips"><span class="chip">Board</span></div></div>
+        <div class="tnode"><span class="ticon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><ellipse cx="12" cy="6" rx="7" ry="3"/><path d="M5 6v12c0 1.7 3.1 3 7 3s7-1.3 7-3V6"/><path d="M5 12c0 1.7 3.1 3 7 3s7-1.3 7-3"/></svg></span><div class="tbody"><b>The Thursday game</b><small>12 players · skins, stroke play, best ball · a season ledger</small></div><div class="chips"><span class="chip live">Live</span><span class="chip">Organizer link</span></div></div>
+        <div class="tnode"><span class="ticon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 21V4"/><path d="M6 4h11l-2 4 2 4H6"/></svg></span><div class="tbody"><b>A cart of five</b><small>Just a cart game · wolf, hammer, banker, flip, the robin</small></div><div class="chips"><span class="chip">Any phone</span></div></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="dark">
+  <div class="wrap stack" style="gap:32px">
+    <div style="display:flex;justify-content:space-between;align-items:flex-end;gap:20px;flex-wrap:wrap"><div class="stack" style="gap:8px"><h2>Everything a club needs, already connected.</h2><p class="lede">The directory feeds the field, the field feeds the scoring, the scoring feeds the results, the results feed the books.</p></div></div>
+    <div class="grid4">
+      <a class="tile" href="golf.html#tournaments"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 21V4"/><path d="M6 4h11l-2 4 2 4H6"/></svg><b>Tournaments</b><span>Registration, flights, pairings, cards, sponsors</span></a>
+      <a class="tile" href="golf.html#scoring"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="2" width="14" height="20" rx="2"/><path d="M9 18h6"/></svg><b>Live scoring</b><span>Phones in the carts, the TV, GameCast</span></a>
+      <a class="tile" href="golf.html#formats"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h10"/></svg><b>Every format</b><span>Scramble to match play, scored for you</span></a>
+      <a class="tile" href="golf.html#courses"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 21s-7-4.5-7-10a7 7 0 0114 0c0 5.5-7 10-7 10z"/><circle cx="12" cy="11" r="2.5"/></svg><b>Course library</b><span>20,000 cards, your own on top</span></a>
+      <a class="tile" href="golf.html#groups"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><ellipse cx="12" cy="6" rx="7" ry="3"/><path d="M5 6v12c0 1.7 3.1 3 7 3s7-1.3 7-3V6"/><path d="M5 12c0 1.7 3.1 3 7 3s7-1.3 7-3"/></svg><b>Member games</b><span>Pots, skins, cart games, a season ledger</span></a>
+      <a class="tile" href="club.html#billing"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/></svg><b>Member accounts</b><span>Billing, statements, online payment</span></a>
+      <a class="tile" href="club.html#pos"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18l-2 13H5z"/><path d="M9 10v5M15 10v5"/></svg><b>Point of sale</b><span>Restaurants, shops, kitchen screens, slips</span></a>
+      <a class="tile" href="club.html#bookings"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18M9 4v16"/></svg><b>Bookings</b><span>Tee sheet, courts, pool, lessons, the portal</span></a>
+    </div>
+  </div>
+</section>
+
+<section class="cta">
+  <div class="wrap">
+    <span class="kicker">Member experience</span>
+    <p class="serif quote">Members score on their phones.<br>The lounge TV keeps up.<br>Payouts are done before dessert.</p>
+    <p class="lede" style="text-align:center">A group ID gets a foursome scoring; the leaderboard, by flight and by competition, updates on every phone and the board in the clubhouse. A name on any board opens the full card.</p>
+    <div class="phones" style="margin-top:12px"><div class="phone"><img src="img/p-join.jpg" alt="The scoring page's join screen" loading="lazy" width="600" height="1299"></div><div class="phone"><img src="img/p-score.jpg" alt="Scoring a hole on a phone" loading="lazy" width="600" height="1299"></div><div class="phone"><img src="img/p-board.jpg" alt="The leaderboard on a phone" loading="lazy" width="600" height="1299"></div><div class="phone"><img src="img/p-wolf.jpg" alt="A cart's wolf on the scoring page: the wolf named, the bet, the money so far" loading="lazy" width="600" height="1299"></div></div>
+  </div>
+</section>
+
+<section style="background:#fff;border-top:1px solid var(--line);border-bottom:1px solid var(--line)">
+  <div class="wrap stack" style="gap:32px">
+    <div style="display:flex;justify-content:space-between;align-items:flex-end;gap:24px;flex-wrap:wrap">
+      <div class="stack" style="gap:12px;max-width:620px"><span class="kicker">What’s next</span><h2>Built with the clubs running it.</h2></div>
+      <p class="lede" style="max-width:420px;font-size:16px">Every screen exists because a pro, a treasurer or a committee chair needed it on a Saturday. The next ones come from the clubs on it today.</p>
+    </div>
+    <div class="grid3">
+      <div class="card"><span class="chip">Planned</span><h3>Handicap posting</h3><p>Scores from live rounds posted to the handicap system when the event closes, so nobody keys a card twice.</p></div>
+      <div class="card"><span class="chip">Planned</span><h3>Event tickets online</h3><p>Gala tickets and auction bids paid on the page, settled to the same checkout the cashier runs today.</p></div>
+      <div class="card" style="background:var(--navy);border-color:var(--navy);color:#fff;justify-content:center;align-items:flex-start"><span class="kicker" style="color:#D8B75F">Have a say</span><h3 style="color:#fff">Early clubs shape the roadmap.</h3><p style="color:#C9CFD2">Tell us what your season needs.</p><a class="btn gold" href="#demo" style="height:44px;padding:0 20px;font-size:15px">Talk to us</a></div>
+    </div>
+  </div>
+</section>
+
+<section id="demo" class="dark">
+  <div class="wrap two">
+    <div class="stack" style="gap:16px">
+      <span class="kicker">Book a demo</span>
+      <h2 style="font-size:56px">See your member-guest run on it.</h2>
+      <p class="lede">Thirty minutes. Your event, your formats. Bring the pro and a board member, or the gala chair.</p>
+    </div>
+    <form id="demoForm" class="form">
+      <div class="row">
+        <div class="fld"><label for="dName">Name</label><input class="inp" id="dName" name="name" type="text" required></div>
+        <div class="fld"><label for="dRole">Role</label><select class="inp" id="dRole" name="role"><option>Head professional</option><option>General manager</option><option>Association board</option><option>Group organizer</option><option>Nonprofit director</option><option>Other</option></select></div>
+      </div>
+      <div class="fld"><label for="dClub">Club or organization</label><input class="inp" id="dClub" name="club" type="text" required></div>
+      <div class="fld"><label for="dEmail">E-mail</label><input class="inp" id="dEmail" name="email" type="email" required></div>
+      <div class="fld"><label for="dMsg">Anything we should know? <span style="color:#8FA0AA;font-weight:400">(optional)</span></label><textarea class="inp" id="dMsg" name="message" rows="3" style="resize:vertical"></textarea></div>
+      <div class="fld" style="position:absolute;left:-9999px" aria-hidden="true"><label for="dWeb">Website</label><input id="dWeb" name="website" type="text" tabindex="-1" autocomplete="off"></div>
+      <button type="submit" class="btn gold" id="demoBtn" style="margin-top:4px">Request a demo</button>
+      <p id="demoNote" style="font-size:12.5px;color:#56626A">We answer the same day.</p>
+    </form>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <a class="brand" href="index.html" aria-label="Flagstick home"><img src="flagstick-crest-light.svg" alt="" style="width:30px;height:30px"><span><b style="font-size:14px">FLAGSTICK</b><small style="font-size:8px">GOLF SOFTWARE</small></span></a>
+    <nav aria-label="Footer"><a href="golf.html">Golf</a><a href="club.html">Club management</a><a href="nonprofits.html">Nonprofits</a><a href="about.html">About</a><a href="#demo">Book a demo</a><a href="https://app.flagstickhub.com">Sign in</a></nav>
+    <span style="font-size:13px;color:#8FA0AA">© 2026 Flagstick</span>
+  </div>
+</footer>
+<script>
+/* Demo requests go to the demo-request function (Resend → DEMO_TO); if it cannot be reached, the visitor's mail client opens addressed to DEMO_TO instead. */
+const DEMO_TO='info@flagstickhub.com', DEMO_FN='https://yofqgrualjziexkfumkb.supabase.co/functions/v1/demo-request';
+document.getElementById('demoForm').addEventListener('submit',async function(e){ e.preventDefault();
+  const v=id=>document.getElementById(id).value.trim(), note=document.getElementById('demoNote'), btn=document.getElementById('demoBtn');
+  const d={name:v('dName'),role:v('dRole'),club:v('dClub'),email:v('dEmail'),message:v('dMsg'),website:v('dWeb')};
+  btn.disabled=true; note.textContent='Sending…';
+  try{
+    const r=await fetch(DEMO_FN,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(d)}); const out=await r.json();
+    if(!out.ok) throw new Error(out.error||'not sent');
+    this.reset(); note.textContent='Thanks — we have your request and will answer the same day. A copy is on its way to '+d.email+'.';
+  }catch(err){
+    const body=['Name: '+d.name,'Role: '+d.role,'Club: '+d.club,'E-mail: '+d.email,d.message?'\n'+d.message:'','','Please book me a Flagstick demo.'].join('\n');
+    location.href='mailto:'+DEMO_TO+'?subject='+encodeURIComponent('Flagstick demo — '+d.club)+'&body='+encodeURIComponent(body);
+    note.textContent='Your mail app should open with the request filled in. If it did not, e-mail '+DEMO_TO+'.';
+  }
+  btn.disabled=false;
+});
+</script>
+</body>
+</html>

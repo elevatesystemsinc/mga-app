@@ -1,0 +1,79 @@
+{
+ "slug": "shadyvalley",
+ "name": "Shady Valley Country Club",
+ "email": "demo@shadyvalleycc.com",
+ "replace": [
+  [
+   "TODAY='2026-11-10'",
+   "TODAY='2026-11-25'"
+  ],
+  [
+   "TENANT_SLUG='bushwood'",
+   "TENANT_SLUG='shadyvalley'"
+  ],
+  [
+   "bushwoodcc.com",
+   "shadyvalleycc.com"
+  ],
+  [
+   "Bushwood Country Club",
+   "Shady Valley Country Club"
+  ],
+  [
+   "mkCourse('bushwood','Bushwood Course'",
+   "mkCourse('shadyvalley','Shady Valley Course'"
+  ],
+  [
+   "mkCourse('glen','The Glen'",
+   "mkCourse('creek','The Creek'"
+  ],
+  [
+   "'bushwood'",
+   "'shadyvalley'"
+  ],
+  [
+   "'glen'",
+   "'creek'"
+  ],
+  [
+   "'Bushwood','The Glen'",
+   "'Shady Valley','The Creek'"
+  ],
+  [
+   "Bushwood Course",
+   "Shady Valley Course"
+  ],
+  [
+   "The Glen",
+   "The Creek"
+  ],
+  [
+   "Should the Glen keep",
+   "Should the Creek keep"
+  ],
+  [
+   "CLUB.short='Bushwood'",
+   "CLUB.short='Shady Valley'"
+  ],
+  [
+   "city:'Bushwood',state:'IL',zip:'60045'",
+   "city:'Arlington',state:'TX',zip:'76013'"
+  ],
+  [
+   "312-555-",
+   "817-555-"
+  ],
+  [
+   "Bushwood",
+   "Shady Valley"
+  ]
+ ],
+ "must_not_remain": [
+  "bushwood",
+  "Bushwood",
+  "'glen'",
+  "The Glen",
+  "60045",
+  "312-555"
+ ]
+}

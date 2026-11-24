@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Flagstick · Club management: member accounts, point of sale, bookings, staff</title>
+<meta name="description" content="Run the whole club on Flagstick: member accounts with monthly billing, statements and online payment; restaurants and shops with registers, kitchen screens and signed slips; the tee sheet, courts, pool and lessons booked from the member portal; staff schedules and the time clock.">
+<link rel="icon" href="favicon.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,600;0,700;1,500&family=Public+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="site.css">
+<style>.jump{display:flex;gap:10px;flex-wrap:wrap}.jump a{text-decoration:none;font-weight:700;font-size:14px;color:#fff;border:1px solid rgba(255,255,255,.25);border-radius:999px;padding:8px 16px}.jump a:hover{border-color:#D8B75F;color:#D8B75F}</style>
+</head>
+<body>
+<header>
+  <div class="wrap">
+    <a class="brand" href="index.html" aria-label="Flagstick home"><img src="flagstick-crest-light.svg" alt=""><span><b>FLAGSTICK</b><small>GOLF SOFTWARE</small></span></a>
+    <nav class="nav" aria-label="Site"><a href="golf.html">Golf</a><a href="club.html" class="on">Club management</a><a href="nonprofits.html">Nonprofits</a><a href="about.html">About</a><a href="https://app.flagstickhub.com" style="color:#D8B75F">Sign in</a></nav>
+    <a class="btn gold top" href="index.html#demo" style="height:44px;padding:0 20px;font-size:15px">Book a demo</a>
+    <button class="burger" type="button" aria-label="Open menu" aria-expanded="false" aria-controls="mnav" onclick="var m=document.getElementById('mnav');var o=m.classList.toggle('open');this.setAttribute('aria-expanded',o);this.classList.toggle('x',o)"><span></span><span></span><span></span></button>
+  </div>
+  <nav id="mnav" class="mnav" aria-label="Menu"><a href="index.html">Home</a><a href="golf.html">Golf</a><a href="club.html">Club management</a><a href="nonprofits.html">Nonprofits</a><a href="about.html">About</a><a href="index.html#demo">Book a demo</a><a href="https://app.flagstickhub.com">Sign in</a></nav>
+</header>
+
+<section class="phero dark hero">
+  <div class="wrap">
+    <span class="kicker">Club management</span>
+    <h1>The whole club,<br>from the first tee to the front desk.</h1>
+    <p class="lede">Member accounts and billing, the restaurants and the golf shop, the tee sheet and the courts, the staff and their hours. One directory, one set of logins, one calendar. Switched on when you are ready, on the golf you already run.</p>
+    <div class="jump"><a href="#billing">Member accounts</a><a href="#portal">Member portal</a><a href="#pos">Point of sale</a><a href="#floor">On the floor</a><a href="#bookings">Bookings</a><a href="#staff">Staff</a><a href="#reports">Reports</a></div>
+  </div>
+</section>
+
+<div class="wrap">
+  <section class="feat" id="billing" style="border-top:none">
+    <div class="copy"><span class="kicker">Member accounts &amp; billing</span><h2>The club’s billing system, not a bolt-on.</h2>
+      <ul><li>Membership classes with their monthly, quarterly and annual charges; proration for a mid-month join</li><li>Run monthly billing: dues, cart, locker, trail, capital, unspent food &amp; beverage minimums</li><li>Run statements: finance charges and late fees posted, one branded PDF with a page per member, e-mailed</li><li>Aging current to 90+, FIFO settlement, a void with a reason, an adjustment that never edits the original</li><li>A GL export the accountant can take straight into the ledger</li><li>Association dues collected on the member’s club account and credited back</li></ul></div>
+    <div class="shot"><img src="img/c-accounts.jpg" alt="Member accounts: outstanding, past due, charged and received this month, and the members owing" loading="lazy" width="1600" height="1000"></div>
+  </section>
+
+  <section class="feat flip">
+    <div class="copy"><span class="kicker">The account</span><h2>Every charge with its receipt.</h2>
+      <p>A running ledger with tax and service broken out. A register charge carries the register’s own ticket; a signed slip is a tap away. Adjust a charge with a reason and the difference posts as a credit; the original row stays. Statements and the e-mail of the latest one sit on the same page.</p></div>
+    <div class="shot"><img src="img/c-account.jpg" alt="A member's account: aging on the balance, membership, the running ledger with receipts and statements" loading="lazy" width="1600" height="1000"></div>
+  </section>
+
+  <section class="feat" id="portal">
+    <div class="copy"><span class="kicker">Member portal</span><h2>Members see their account and book from their phone.</h2>
+      <ul><li>On the web or in the Flagstick app for iOS and Android; sign in with a one-time e-mail link, no password to forget</li><li>Balance, activity, statements as PDFs, a signed slip behind a charge</li><li>Pay online or set up autopay through the club’s own merchant account; the money never passes through Flagstick</li><li>Book a tee time, a court, a cabana or a lesson under the rules the club sets</li><li>What’s on: the club’s public events</li></ul></div>
+    <div class="stack" style="gap:14px"><div class="card"><span class="chip gold">Online payments</span><h3>Built in, processed by Deluxe</h3><p>Payments are fully integrated into Flagstick and processed by Deluxe on the club’s own merchant account, set up through Trinity Merchant Group. Members pay by card or bank account without leaving the club’s portal; each payment posts to the account once, refunds post back, autopay charges the balance due when statements run.</p></div><div class="card"><span class="chip gold">Rules, enforced</span><h3>Bookings the database checks</h3><p>Hours, the slot grid, how far ahead members may book, capacity, one a day, office-only facilities, closed times, suspended members, a facility fee posted to the account. The portal cannot bend them.</p></div></div>
+  </section>
+
+  <section class="feat flip" id="pos">
+    <div class="copy"><span class="kicker">Point of sale</span><h2>The grill knows the member. The statement knows the grill.</h2>
+      <ul><li>Restaurants, the golf shop and the racket shop as outlets, each with its products, categories and menus</li><li>Item libraries to start from: the club menu with modifiers, the shop with sizes, stringing with tension</li><li>Charge to account, cash or card; split a check evenly, by seat or by item, each portion its own tip and method</li><li>A mandatory service charge on every food &amp; beverage check, prices all-in, no tip asked in the app</li><li>Tickets by day with a shift report per outlet: sales, tax, service, tips by server, voids, top items</li><li>Receipts on 80 mm thermal printers, black only, the club’s logo</li></ul></div>
+    <div class="shot"><img src="img/c-register.jpg" alt="The register: The Grill Room's products by category and the ticket with charge to account, cash or card" loading="lazy" width="1600" height="1000"></div>
+  </section>
+
+  <section class="feat" id="floor">
+    <div class="copy"><span class="kicker">On the floor</span><h2>Registers, kitchen screens, servers with PINs.</h2>
+      <ul><li>A register station on any tablet: PIN lock, the floor with tables and tabs, the check, Send to the kitchen, Pay</li><li>A salad fires to one prep station and a steak to another; drinks rung at the bar fire nowhere; courses fire in order</li><li>Kitchen expo screens that update the moment a course is sent; bump and recall</li><li>Servers see their own tables; a manager’s PIN voids, transfers, reopens or leaves the station</li><li>Every check gets a check number with a check digit; the printed slip carries a QR; the daily close-out scans the signed slips, reads the tips and locks the day</li></ul></div>
+    <div class="shot"><img src="img/c-fnb.jpg" alt="Settings for food and beverage: the service charge, The Grill Room's register stations, prep stations, tables and menus" loading="lazy" width="1600" height="1000"></div>
+  </section>
+
+  <section class="feat flip">
+    <div class="copy"><span class="kicker">Tickets &amp; the shift</span><h2>Closed, counted, reported.</h2>
+      <p>Every ticket of the day by outlet, with the shift’s numbers: net sales, service, tax, tips by server, by payment type, voids. A closed check can be reopened from the station the same day and from the hub after. Slips out for a signature close with the tip written on them, and the tip goes to the server’s line for payroll.</p></div>
+    <div class="shot"><img src="img/c-tickets.jpg" alt="Tickets and shift report: by payment, tips by server, top items, the day's tickets" loading="lazy" width="1600" height="1000"></div>
+  </section>
+
+  <section class="feat" id="bookings">
+    <div class="copy"><span class="kicker">Bookings</span><h2>Every sheet in one place. Each department sees its own.</h2>
+      <ul><li>The tee sheet by course, tennis and pickleball courts, the pool and cabanas, lessons for every department</li><li>Tap a slot to book, check in, add guests, or charge a fee to the account</li><li>Block times by drag; close the course for a day or a range with the reason on the sheet</li><li>Portal bookings marked on the sheet; the printed sheet for the starter</li><li>The club calendar: every sheet, closure, event and shift, by department, on one month</li></ul></div>
+    <div class="shot"><img src="img/c-teesheet.jpg" alt="The tee sheet for a Tuesday: booked, checked in and open counts, the time grid across two courses" loading="lazy" width="1600" height="1000"></div>
+  </section>
+
+  <section class="feat flip" id="staff">
+    <div class="copy"><span class="kicker">Staff &amp; schedule</span><h2>Who works where, and when they were here.</h2>
+      <ul><li>One staff list across golf, racket sports, aquatics, food &amp; beverage and the club, with departments and roles</li><li>The same PIN unlocks a register and clocks in</li><li>A week-at-a-time schedule builder: repeat a shift, copy last week, hours per person, print the week</li><li>A time clock kiosk per department and clock-in from a register’s lock screen</li><li>Who is on now, hours this week, a timesheet CSV for payroll</li></ul></div>
+    <div class="shot"><img src="img/c-staff.jpg" alt="Food and beverage staff: on the clock now, scheduled and worked this week, the week's schedule by person" loading="lazy" width="1600" height="1000"></div>
+  </section>
+
+  <section class="feat" id="reports">
+    <div class="copy"><span class="kicker">Reports</span><h2>The year and the quarter, on one page.</h2>
+      <p>Billed, net revenue, received and receivable at the period end. Revenue by billing item with tax and service, receipts by method, the registers by outlet, by month, against the year’s budget. A CSV for the spreadsheet and a branded PDF for the board.</p></div>
+    <div class="shot"><img src="img/c-reports.jpg" alt="Reports for the year: billed, net revenue, received, receivable, and revenue by item" loading="lazy" width="1600" height="1000"></div>
+  </section>
+
+  <section class="feat flip">
+    <div class="copy"><span class="kicker">The directory</span><h2>One member record, club-wide.</h2>
+      <p>Import the club’s roster once; member numbers, GHIN, e-mail and names matched, the rest created. The club owns the record. An association’s membership is a view of it; a group draws from it; billing classes and status sit on it. Staff see the whole club; a board login sees its board; an organizer link sees its group.</p></div>
+    <div class="shot"><img src="img/c-directory.jpg" alt="The club directory: every member with contact, handicap, member number and GHIN" loading="lazy" width="1600" height="1000"></div>
+  </section>
+</div>
+
+<section class="cta dark">
+  <div class="wrap"><h2>Bring us a month of statements.</h2><p class="lede" style="text-align:center">We will show you the same month run on Flagstick.</p><a class="btn gold" href="index.html#demo">Book a demo</a></div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <a class="brand" href="index.html" aria-label="Flagstick home"><img src="flagstick-crest-light.svg" alt="" style="width:30px;height:30px"><span><b style="font-size:14px">FLAGSTICK</b><small style="font-size:8px">GOLF SOFTWARE</small></span></a>
+    <nav aria-label="Footer"><a href="golf.html">Golf</a><a href="club.html">Club management</a><a href="nonprofits.html">Nonprofits</a><a href="about.html">About</a><a href="index.html#demo">Book a demo</a><a href="https://app.flagstickhub.com">Sign in</a></nav>
+    <span style="font-size:13px;color:#8FA0AA">© 2026 Flagstick</span>
+  </div>
+</footer>
+</body>
+</html>

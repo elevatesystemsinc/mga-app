@@ -3,3 +3,4 @@ tests/node_modules/
 __MACOSX/
 *.pyc
 __pycache__/
+tools/courses/catalogue/
