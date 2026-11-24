@@ -922,6 +922,10 @@ localStorage. `acctPost(o)` is the one way anything lands on an account.
   when the charge came from one, `ticketOfCharge` by the `pos:` ref — a split portion gets its own slip —, else a slip built from the
   charge itself) and a live charge has **Adjust** (`adjustDrawer`: "it should have been" + a reason → the difference posted as a credit
   or a further charge, ref `adj:<charge id>`, descr "Adjustment · <original> · <reason>"; the original row is never edited) besides Void.
+- **A Payments card on both billing pages** (the owner, Nov 24: "a payments section that lists all payments… rather than… just statements"):
+  the hub's account page (`#acPays`, after Statements: every payment newest first — method, reference, online / autopay chips, who paid on a
+  family account, void state; received / in all / this year in the header; Record payment, Refund on a Deluxe payment, Void) and the
+  member portal (between Statements and Activity: the last 36 with the same totals). The running ledger still shows them in order.
 - **Pages**: Member accounts (`vAccounts`: outstanding, past due by bucket, charged / received this month; Owing · Past due ·
   In credit · With activity · Everyone; search; Post charge (item picker with the tax / service preview), Record payment,
   Run monthly billing, Run statements, Export balances (with aging columns), GL export, Billing setup), the account
