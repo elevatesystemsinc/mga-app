@@ -146,6 +146,7 @@ function tourCard(st){
 function tourAfterRender(){ if(TOUR.on) tourPaint(false); }
 function tourAuto(){
   if(TOUR.ready||!tourWanted()) return; if(typeof db==='undefined'||!db||typeof view==='undefined'||view.page==='pick'||!document.getElementById('main')) return;
+  if(typeof CLOUD!=='undefined'&&CLOUD&&!(typeof cloudReady!=='undefined'&&cloudReady&&typeof sessionOK!=='undefined'&&sessionOK)) return;   // on a live hub, only once the sign-in is done and the document is open
   TOUR.ready=true; const mode=tourMode(); let at=0;
   if(mode!=='1'){ try{ const s=JSON.parse(localStorage.getItem(TOUR_KEY())||'null'); if(s&&Date.now()-s.at<6*3600*1000) at=s.i; }catch(_){} }
   else { try{ localStorage.removeItem(TOUR_KEY()); }catch(_){} }
