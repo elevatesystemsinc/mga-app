@@ -77,6 +77,21 @@
     const cls=clsPick(); const base=sex==='M'?(cls==='junior'?8:14):22; const hcp=Math.max(-1.5,base+(R()+R()+R()-1.5)*14); const hs=hcp<0?'+'+(-hcp).toFixed(1):hcp.toFixed(1);
     const o={}; if(i<4) o.status='Inactive'; else if(i<6){ o.bstatus='loa'; } else if(i<9){ o.bstatus='resigned'; o.until='2026-0'+rint(6,9)+'-30'; }
     mkPerson(f,l,sex,hs,cls,o); }
+  // ---- families: a main account holder with sub-account holders (the owner, Nov 24, 2026: "main account holders and sub-account
+  // holders… my children… and my wife"). A sub-account has no class of its own; what they charge lands on the holder's account.
+  const famCount={}; const asSub=(p,holder,rel,pay)=>{ p.account={of:holder.id,rel,pay:!!pay}; p.billing={class:'',status:'active',since:'',until:''}; famCount[holder.id]=(famCount[holder.id]||0)+1; p.memberNo=holder.memberNo+'-'+famCount[holder.id]; if(rel==='child') p.memberType='J'; return p; };
+  const subOf=(holder,first,sex,hcp,rel,pay,o)=>asSub(mkPerson(first,holder.last,sex,hcp,'',Object.assign({since:holder.billing.since},o||{})),holder,rel,pay);
+  // the owner's own family, as the worked example
+  const zach=mkPerson('Zach','Walls','M','+0.4','full',{no:'1500',since:'2015-03-01',group:true}); zach._o={group:true}; cast['Zach Walls']=zach;
+  subOf(zach,'Kelsey','F','18.4','spouse',true); subOf(zach,'Peyton','M','9.1','child',false); subOf(zach,'Camden','M','16.0','child',false); subOf(zach,'Beckham','M','24.3','child',false);
+  // the cast's households
+  asSub(cast['Judith Smails'],cast['Elihu Smails'],'spouse',true); asSub(cast['Spalding Smails'],cast['Elihu Smails'],'child',false); asSub(cast['Gloria Havercamp'],cast['Harold Havercamp'],'spouse',true);
+  // generated households: spouses and children for a share of the account holders; the generated juniors become children of a family
+  const holders=shuffle(persons.filter(p=>!p.account&&p.status==='Active'&&p.billing.status==='active'&&['full','senior'].includes(p.billing.class)&&!p._o));
+  const KIDS_M=['Jack','Liam','Owen','Henry','Mason','Luke','Eli','Cole','Wyatt','Reid'], KIDS_F=['Ava','Mia','Emma','Harper','Ella','Nora','Lily','Zoe','Ruby','Sadie'];
+  holders.slice(0,44).forEach((h,i)=>{ if(R()<.7){ const sx=h.sex==='M'?'F':'M'; subOf(h,pick(sx==='M'?FIRST_M:FIRST_F),sx,(10+R()*22).toFixed(1),'spouse',true); }
+    const nk=i%3===0?0:rint(1,3); for(let k=0;k<nk;k++){ const sx=R()<.5?'M':'F'; subOf(h,pick(sx==='M'?KIDS_M:KIDS_F),sx,chance(.6)?(8+R()*26).toFixed(1):'','child',false); } });
+  persons.filter(p=>!p.account&&p.billing.class==='junior'&&!p._o).forEach(j=>{ const h=pick(holders); if(!h) return; j.last=h.last; usedNames.add(j.first+' '+j.last); asSub(j,h,'child',false); });
   CLUB.members=persons;
   const men=persons.filter(p=>p.sex==='M'&&p.status==='Active'), women=persons.filter(p=>p.sex==='F'&&p.status==='Active');
   const pname=p=>p.first+' '+p.last;
@@ -285,12 +300,15 @@
   for(const s of stations){ s.token=newToken(); s.key_hash=await sha256hex(s.token); s.created_at=ts('2026-05-01','10:00'); s.revoked_at=null; s.last_seen=ts(TODAY,'10:12'); }
   const stationOf=o=>stations.find(s=>s.outlet===o&&s.kind==='register');
   const acct=[], tickets=[], counters={}, posDays=[], bookings=[], blocks=[];
-  const acctRow=(o)=>{ const row=Object.assign({id:uuid(),kind:'charge',source:'manual',ref:null,descr:'',amount:0,tax:0,svc:0,tip:null,item:null,gl:null,method:null,reference:null,posted:TODAY,void_at:null,void_reason:null,created_at:ts(TODAY,'12:00'),created_by:STAFF_EMAIL,slip:null},o); row.amount=r2(row.amount); acct.push(row); return row; };
+  const holderOf=id=>{ const p=persons.find(x=>x.id===id); const of=p&&p.account&&p.account.of; return of&&persons.some(x=>x.id===of)?of:id; };
+  const acctRow=(o)=>{ const row=Object.assign({id:uuid(),kind:'charge',source:'manual',ref:null,descr:'',amount:0,tax:0,svc:0,tip:null,item:null,gl:null,method:null,reference:null,posted:TODAY,void_at:null,void_reason:null,created_at:ts(TODAY,'12:00'),created_by:STAFF_EMAIL,slip:null,by_member:null},o); row.amount=r2(row.amount);
+    const h=holderOf(row.member_id); if(h!==row.member_id){ const who=persons.find(x=>x.id===row.member_id); row.by_member=row.member_id; row.member_id=h; row.descr=(pname(who)+' · '+row.descr).slice(0,180); }   // a family member's charge → the holder's account, named (family-setup.sql's trigger does the same live)
+    acct.push(row); return row; };
   const servers={grill:['Maggie O’Hooligan','Dana Whitfield','Kyle Brennan','Marcus Bell'],turn:['Priya Natarajan','Kyle Brennan'],proshop:['Lou Loomis','Jack Hartigan','Tony D’Annunzio'],racket:['Owen Marsh','Elena Rossi']};
   const WEIGHT={grill:{'Entrées':3,'Sandwiches & burgers':4,'Salads':2,'Starters':2,'Beer':4,'Wine':2,'Cocktails':3,'Non-alcoholic':2,'Desserts':1,'Sides':1,'Kids':1,'Breakfast':2},turn:{'The turn':5,'Beer':4,'Non-alcoholic':3,'Sandwiches & burgers':2}};
   const prodPick=(o)=>{ const ps=prodsOf(o); const W=WEIGHT[o]; if(!W) return pick(ps); const pool=[]; ps.forEach(p=>{ const w=W[p.cat]||0; for(let i=0;i<w;i++) pool.push(p); }); return pool.length?pick(pool):pick(ps); };
   const lineOf=(p,fnb)=>{ const mods=[]; (p.mods||[]).forEach(m=>{ if(m.required||chance(.3)){ const o=pick(m.options||[]); if(o) mods.push({name:o.name,price:o.price||0}); } }); return {id:uuid(),pid:p.id,qty:chance(.2)?2:1,svc:fnb,mods,name:p.name,seat:0,fired:fnb,price:p.price,route:p.route||null,course:p.course||0,taxable:true}; };
-  const memberPool=billableMembers.filter(p=>p.billing.status==='active');
+  const memberPool=billableMembers.filter(p=>p.billing.status==='active').concat(persons.filter(p=>p.account&&p.status!=='Inactive'&&billableMembers.some(h=>h.id===p.account.of&&h.billing.status==='active')));   // the family charges too
   let acctFnbByMember={};
   for(const d of DAYS){ const wd=dow(d), wknd=wd===0||wd===6;
     for(const o of ['grill','turn','proshop','racket']){ let n=o==='grill'?rint(5,9)+(wknd?3:0):o==='turn'?(wknd?rint(5,9):rint(2,5)):o==='proshop'?rint(1,3)+(wknd?2:0):(chance(.5)?1:0); if(o==='turn'&&(d<'2026-05-15'||d>'2026-11-02')) n=Math.max(0,n-3);

@@ -190,7 +190,20 @@ const initials=m=>m?((m.first||'?')[0]+((m.last||'')[0]||'')).toUpperCase():'—
 const isClub=()=>!!db&&db===CLUB;
 const persons=()=>CLUB?CLUB.members:[];
 const personById=id=>persons().find(p=>p.id===id);
-const PERSON_KEYS=['first','last','email','phone','hcp','hcpAt','ghin','memberNo','ggId','address1','address2','city','state','zip','dob','memberType','gender','source','company','title','ctypes'];   // company = CLUB.companies id, title + ctypes (contact types) — crm.js
+const PERSON_KEYS=['first','last','email','phone','hcp','hcpAt','ghin','memberNo','ggId','address1','address2','city','state','zip','dob','memberType','gender','source','company','title','ctypes','account'];   // company = CLUB.companies id, title + ctypes (contact types) — crm.js; account = family accounts, below
+/* ---------- family accounts (the owner, Nov 24, 2026: "main account holders and sub-account holders… my children… and my wife") ----------
+   A person with `account = {of:<the holder's id>, rel:'spouse'|'partner'|'child'|'parent'|'other', pay:bool}` is a sub-account holder:
+   everything they charge — a register, a booking, a lesson — posts to the holder's account (acctPost maps it; the database trigger
+   `acct_items_family` does the same for the station and portal paths), the holder gets the statement, and the sub-account signs in to
+   the family account in the portal (paying only when `pay` is on — a spouse yes, a child no). A sub-account has no billing class of its
+   own: the holder's class is the family's. Holders never nest: a holder's own `account` is ignored. */
+const ACCT_RELS=[['spouse','Spouse'],['partner','Partner'],['child','Child'],['parent','Parent'],['other','Other']];
+const ACCT_REL_NAME=Object.fromEntries(ACCT_RELS);
+function acctHolderId(x){ const p=typeof x==='string'?personById(x):x; if(!p) return typeof x==='string'?x:''; const of=p.account&&p.account.of; if(!of||of===p.id) return p.id; const h=personById(of); return h&&!(h.account&&h.account.of&&h.account.of!==h.id)?h.id:p.id; }
+const isSubAccount=p=>!!(p&&acctHolderId(p)!==p.id);
+const familyOf=hid=>persons().filter(x=>x.id!==hid&&acctHolderId(x)===hid);
+const subCanPay=p=>!p||!isSubAccount(p)||!!(p.account&&p.account.pay);
+const familyLabel=p=>{ if(!isSubAccount(p)) return ''; const h=personById(acctHolderId(p)); return (ACCT_REL_NAME[(p.account||{}).rel]||'Family')+(h?' of '+memberName(h):''); };
 function memberView(p,ms){
   const v=Object.assign({},p);
   if(!isClub()) Object.assign(v,{status:ms?(ms.status||'Active'):'Inactive',joined:ms?(ms.joined||''):'',notes:ms?(ms.notes||''):''});

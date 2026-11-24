@@ -79,7 +79,7 @@ async function reopenTicket(t){ if(!await dayLockOK(t,'reopen this check')) retu
 async function closeTicket(t,paid){
   const o=outletOf(t.outlet), m=ticketTotals(t); if(!t.lines.length){ toast('Nothing on the ticket'); return false; }
   Object.assign(t,m,{paid,status:'closed',closed_at:new Date().toISOString()});
-  if(paid==='account'){ if(!t.member_id){ toast('Pick the member'); return false; } if(!acctOn()){ toast('Member billing is off — take cash or card'); return false; } const p=personById(t.member_id); if(p&&pBilling(p).status==='suspended'){ toast(`${memberName(p)} is suspended — no charges to the account`); return false; }
+  if(paid==='account'){ if(!t.member_id){ toast('Pick the member'); return false; } if(!acctOn()){ toast('Member billing is off — take cash or card'); return false; } const p=personById(t.member_id), hp=p?personById(acctHolderId(p)):null; if(hp&&pBilling(hp).status==='suspended'){ toast(`${memberName(hp)} is suspended — no charges to the account`); return false; }
     const bi=itemOf(o.item)||{id:o.item,source:o.kind==='fnb'?'fnb':'proshop',gl:''};
     const it=await acctPost({member_id:t.member_id,kind:'charge',source:bi.source,item:bi.id,gl:bi.gl,ref:'pos:'+t.id,descr:`${o.name} · ${ticketText(t)}`.slice(0,180),amount:m.total,tax:m.tax,svc:m.svc,posted:todayISO()}); if(!it){ t.status='open'; return false; } t.acct_item=it.id; }
   for(const l of t.lines){ const pr=productOf(l.pid); if(pr&&pr.track) pr.stock=n0(pr.stock)-n0(l.qty); }
@@ -126,7 +126,7 @@ function vPos(m){
   const pc=$('psClear'); if(pc) pc.onclick=()=>{ if(confirm('Clear this ticket?')){ POS.cur=newTicket(o.id); render(); } }; const ap=$('psAddP'); if(ap) ap.onclick=()=>go('possetup'); const al=$('psLib'); if(al) al.onclick=()=>posLibraryDrawer(o.id);
   const pw=$('psWho'); if(pw) pw.onclick=()=>{ t.member_id=null; t.guest=''; render(); };
   const pm=$('psM'); if(pm){ const L=$('psML'); const list=()=>{ const s=pm.value.toLowerCase().trim(); if(!s){ L.style.display='none'; return; } const hits=persons().filter(p=>p.status!=='Inactive'&&[memberName(p),p.memberNo||'',p.email||''].join(' ').toLowerCase().includes(s)).slice(0,8);
-      L.innerHTML=hits.map(p=>`<button type="button" data-pk="${p.id}"><span class="av">${initials(p)}</span><b>${esc(memberName(p))}</b><span class="muted" style="margin-left:auto;font-size:12.5px">${p.memberNo?'#'+esc(p.memberNo):''}</span></button>`).join('')+`<button type="button" data-pg="1"><span class="av">G</span><b>Walk-in: “${esc(pm.value.trim())}”</b></button>`; L.style.display='';
+      L.innerHTML=hits.map(p=>`<button type="button" data-pk="${p.id}"><span class="av">${initials(p)}</span><b>${esc(memberName(p))}</b><span class="muted" style="margin-left:auto;font-size:12.5px">${isSubAccount(p)?esc(familyLabel(p)):p.memberNo?'#'+esc(p.memberNo):''}</span></button>`).join('')+`<button type="button" data-pg="1"><span class="av">G</span><b>Walk-in: “${esc(pm.value.trim())}”</b></button>`; L.style.display='';
       L.querySelectorAll('[data-pk]').forEach(x=>x.onclick=()=>{ t.member_id=x.dataset.pk; t.guest=''; render(); }); L.querySelector('[data-pg]').onclick=()=>{ t.guest=pm.value.trim(); t.member_id=null; render(); }; }; pm.oninput=list; }
   m.querySelectorAll('[data-lq]').forEach(x=>x.onclick=()=>{ const l=t.lines.find(y=>y.id===x.dataset.lq); l.qty=Math.max(0,n0(l.qty)+(+x.dataset.d)); if(!l.qty) t.lines=t.lines.filter(y=>y!==l); render(); });
   m.querySelectorAll('[data-lx]').forEach(x=>x.onclick=()=>{ t.lines=t.lines.filter(y=>y.id!==x.dataset.lx); render(); });
