@@ -974,8 +974,12 @@ localStorage. `acctPost(o)` is the one way anything lands on an account.
   spouses near the holder, children 5–17; the Walls family's are fixed).
 - **The member portal is tabbed — Home · Book · Account · Wallet** (the owner, Nov 24: "one massive scroll… optimized for web and mobile with
   some kind of tab structure… if they want to book a tee time or pickleball court it just needs to be smarter and cleaner"): `UI.tab` /
-  `setTab` in member_src.html (remembered in localStorage `fs_portal_tab`), a sticky row under the header on a desktop and a fixed bottom bar
-  with icons on a phone (≤640px); every pane is rendered and the others `hidden`, so the existing ids and selectors still work. **Home**: the
+  `setTab` in member_src.html (remembered in localStorage `fs_portal_tab`); **on a desktop (≥ 900px) the portal is laid out like the hub** —
+  the owner, Nov 24: "still a half hearted attempt at desktop optimized" — a navy rail on the left (`.rail`: the club's logo and name, the
+  member and number, the four pages, Sign out; the `.top` header hides), a page heading row (`.ph`) and **two-column panes** (`.cols`: Home =
+  balance with three KPI tiles + Recent activity | Up next, What's on, Autopay; Book = the choices card, sticky, | the times card
+  (`bookTimes`); Wallet = methods | autopay); on a phone (≤ 640px) the top bar stays and the tabs are a fixed bottom bar with icons. Every
+  pane is rendered and the others `hidden`, so the existing ids and selectors still work. **Home**: the
   balance and Pay, *Up next* (the member's upcoming bookings, Cancel), What's on, the autopay state. **Book** (`bookCard`, `BKV`): one choice
   at a time — What (the facilities), Day, *Course / Court / With* (**Any** or one unit, `BKV.unit`), When (Morning · Midday · Afternoon with the
   open count each, `PARTS` / `BKV.part`, only when the sheet spans more than five hours; today drops the times already gone), Players (a
