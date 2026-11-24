@@ -78,7 +78,7 @@ function normalize(d,meta){
   if(!d||typeof d!=='object') return emptyOrg(meta);
   d.v=d.v||HUB_VERSION; if(meta){ d.id=d.id||meta.id; d.kind=d.kind||meta.kind; if(!d.name) d.name=meta.name||''; if(!d.short) d.short=meta.short||''; }
   d.kind=d.kind||'association'; d.memberships=d.memberships||[]; d.board=d.board||[]; d.seasons=d.seasons||{}; d.tournaments=d.tournaments||[];
-  if(d.kind==='club'){ d.members=d.members||[]; d.orgs=d.orgs||[]; d.members.forEach(p=>{ if(!p.status) p.status='Active'; }); d.orgs.forEach(o=>{ if(o.id==='mga'&&o.hubRow===undefined) o.hubRow='main'; }); }
+  if(d.kind==='club'){ d.members=d.members||[]; d.orgs=d.orgs||[]; d.members.forEach(p=>{ if(!p.status) p.status='Active'; if(!p.gender&&p.sex){ p.gender=p.sex; delete p.sex; } }); d.orgs.forEach(o=>{ if(o.id==='mga'&&o.hubRow===undefined) o.hubRow='main'; }); }
   if(!d.activeSeason) d.activeSeason=String(new Date().getFullYear());
   if(!d.seasons[d.activeSeason]) d.seasons[d.activeSeason]=newSeason();
   for(const s of Object.values(d.seasons)){ s.dues=s.dues||{amount:90,installments:2}; s.duesPayments=s.duesPayments||[]; s.duesCharges=s.duesCharges||[]; s.lines=s.lines||[]; s.txns=s.txns||[]; s.bank=s.bank||[]; s.bankBatches=s.bankBatches||[]; s.bankOpening=s.bankOpening||{amount:0,date:''}; }
@@ -204,6 +204,15 @@ const isSubAccount=p=>!!(p&&acctHolderId(p)!==p.id);
 const familyOf=hid=>persons().filter(x=>x.id!==hid&&acctHolderId(x)===hid);
 const subCanPay=p=>!p||!isSubAccount(p)||!!(p.account&&p.account.pay);
 const familyLabel=p=>{ if(!isSubAccount(p)) return ''; const h=personById(acctHolderId(p)); return (ACCT_REL_NAME[(p.account||{}).rel]||'Family')+(h?' of '+memberName(h):''); };
+/* charge privileges, per member (the owner, Nov 24: "turn on and off charge privileges on a per member basis"): `account.charge === false` takes
+   the registers, the tee sheet, lessons and guest fees off the account for that person — and, on a holder, for the whole family; dues, a
+   posted charge from the office and payments are never gated. The database trigger `acct_items_family` refuses the same sources. */
+const chargeOff=p=>!!(p&&p.account&&p.account.charge===false);
+function canCharge(x){ const p=typeof x==='string'?personById(x):x; if(!p) return true; if(chargeOff(p)) return false; const hid=acctHolderId(p); return hid===p.id||!chargeOff(personById(hid)); }
+/* gender (the owner, Nov 24: "a gender selector of each member"): `p.gender` M | F | X | '' — the tee set a player starts on (M | W ratings) follows it */
+const GENDERS=[['','— Not stated —'],['M','Male'],['F','Female'],['X','Nonbinary / other']];
+const GENDER_NAME=Object.fromEntries(GENDERS);
+const personSet=p=>p&&(p.gender||p.sex)==='F'?'W':'M';
 function memberView(p,ms){
   const v=Object.assign({},p);
   if(!isClub()) Object.assign(v,{status:ms?(ms.status||'Active'):'Inactive',joined:ms?(ms.joined||''):'',notes:ms?(ms.notes||''):''});
