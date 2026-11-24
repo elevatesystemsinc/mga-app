@@ -1,9 +1,9 @@
 """Replace the Bushwood rows through the REST API as the demo staff login: documents updated in place, tables cleared and
 reloaded, the wolf row replaced through its compare-and-swap function. No SQL console needed."""
 import json, os, re, sys, urllib.request
-HERE=os.path.dirname(os.path.abspath(__file__)); d=json.load(open(os.path.join(HERE,'seed.json')))
+HERE=os.path.dirname(os.path.abspath(__file__)); d=json.load(open(os.environ.get('SEED') or os.path.join(HERE,'seed.json')))   # SEED, TENANT, DEMO_EMAIL, DEMO_PW re-point it at another demo tenant
 cfg=open(os.path.join(HERE,'..','..','config.js')).read(); URL=re.search(r'url:\s*"([^"]+)"',cfg).group(1); KEY=re.search(r'anonKey:\s*"([^"]+)"',cfg).group(1)
-T='bushwood'
+T=os.environ.get('TENANT','bushwood')
 def req(path, body, headers, method='POST'):
     r=urllib.request.Request(URL+path, data=json.dumps(body,ensure_ascii=False).encode() if body is not None else None, headers=dict(headers, **{'Content-Type':'application/json'}), method=method)
     try:
