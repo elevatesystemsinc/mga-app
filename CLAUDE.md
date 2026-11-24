@@ -972,6 +972,17 @@ localStorage. `acctPost(o)` is the one way anything lands on an account.
   Gender (a hint when it is missing), the Directory's **No birthday** filter on the club tier (active people without one), the Family card
   reads "born Nov 30, 2018 (7)" or flags *no birthday on file* (`ageOf(dob, on?)` in core.js). The seeds give everyone one (adults by class,
   spouses near the holder, children 5–17; the Walls family's are fixed).
+- **The member portal is tabbed — Home · Book · Account · Wallet** (the owner, Nov 24: "one massive scroll… optimized for web and mobile with
+  some kind of tab structure… if they want to book a tee time or pickleball court it just needs to be smarter and cleaner"): `UI.tab` /
+  `setTab` in member_src.html (remembered in localStorage `fs_portal_tab`), a sticky row under the header on a desktop and a fixed bottom bar
+  with icons on a phone (≤640px); every pane is rendered and the others `hidden`, so the existing ids and selectors still work. **Home**: the
+  balance and Pay, *Up next* (the member's upcoming bookings, Cancel), What's on, the autopay state. **Book** (`bookCard`, `BKV`): one choice
+  at a time — What (the facilities), Day, *Course / Court / With* (**Any** or one unit, `BKV.unit`), When (Morning · Midday · Afternoon with the
+  open count each, `PARTS` / `BKV.part`, only when the sheet spans more than five hours; today drops the times already gone), Players (a
+  stepper for a tee time, `BKV.party`) — then only the times that fit as **pills** (`.pills .sl`, `data-bs="time|unit"`; with Any a pill
+  carries the unit with the most room and names it; full and closed times stay small and dashed, yours navy), the open count on top, then
+  My bookings. **Account**: a segmented Activity · Payments · Statements (`UI.acct`, `data-asub`). **Wallet** (only when the member may pay
+  online): Payment methods and Autopay. The Book and Wallet tabs only appear when there is something to book / a way to pay.
 - **Dues collection → the account**: *Put on account* posts the association's charge once (`acctPostDues`), *Collected* the
   matching payment once (`acctCollectDues`); the association is credited in its own books as before.
 - **The member portal** (`member_src.html` → `member.html`, markers `/*PDFFONTS*/` `/*BILLCORE*/` `/*AUTOUPDATE*/`): a member
