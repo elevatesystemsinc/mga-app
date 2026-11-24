@@ -67,7 +67,7 @@
   const STREETS=['Fairway Lane','Clubhouse Drive','Gopher Hill Road','Spruce Court','Lakeside Terrace','Old Mill Road','Bunker Way','Country Club Lane','Hawthorne Avenue','Ridge Road','Willow Creek Drive','Pine Valley Court'];
   const persons=[]; const usedNames=new Set();
   const mkPerson=(first,last,sex,hcp,cls,o)=>{ o=o||{}; const id=uuid(); const email=(first+'.'+last).toLowerCase().replace(/[^a-z.]/g,'')+'@example.com';
-    const p={id,first,last,email,phone:'312-555-'+String(rint(100,999)).padStart(3,'0')+String(rint(0,9)),hcp,hcpAt:new Date('2026-11-0'+rint(1,9)).getTime(),ghin:String(rint(1000000,9999999)),memberNo:o.no||String(1700+persons.length),ggId:'',address1:rint(1,999)+' '+pick(STREETS),address2:'',city:'Bushwood',state:'IL',zip:'60045',dob:'',source:'roster',status:o.status||'Active',memberType:cls==='social'?'S':cls==='junior'?'J':cls==='senior'?'SR':'R',sex,gender:sex,
+    const p={id,first,last,email,phone:'312-555-'+String(rint(100,999)).padStart(3,'0')+String(rint(0,9)),hcp,hcpAt:new Date('2026-11-0'+rint(1,9)).getTime(),ghin:String(rint(1000000,9999999)),memberNo:o.no||String(1700+persons.length),ggId:'',address1:rint(1,999)+' '+pick(STREETS),address2:'',city:'Bushwood',state:'IL',zip:'60045',dob:(cls==='junior'?2009+rint(0,8):cls==='senior'?1946+rint(0,15):1962+rint(0,34))+'-'+String(rint(1,12)).padStart(2,'0')+'-'+String(rint(1,28)).padStart(2,'0'),source:'roster',status:o.status||'Active',memberType:cls==='social'?'S':cls==='junior'?'J':cls==='senior'?'SR':'R',sex,gender:sex,
       billing:{class:cls,status:o.bstatus||'active',since:o.since||('20'+rint(12,25)+'-'+String(rint(1,12)).padStart(2,'0')+'-01'),until:o.until||''}};
     persons.push(p); usedNames.add(first+' '+last); return p; };
   const cast={}; CAST.forEach(([f,l,s,h,c,o])=>{ cast[f+' '+l]=mkPerson(f,l,s,h,c,o); cast[f+' '+l]._o=o; });
@@ -79,11 +79,11 @@
     mkPerson(f,l,sex,hs,cls,o); }
   // ---- families: a main account holder with sub-account holders (the owner, Nov 24, 2026: "main account holders and sub-account
   // holders… my children… and my wife"). A sub-account has no class of its own; what they charge lands on the holder's account.
-  const famCount={}; const asSub=(p,holder,rel,pay)=>{ p.account={of:holder.id,rel,pay:!!pay}; p.billing={class:'',status:'active',since:'',until:''}; famCount[holder.id]=(famCount[holder.id]||0)+1; p.memberNo=holder.memberNo+'-'+famCount[holder.id]; if(rel==='child') p.memberType='J'; return p; };
+  const famCount={}; const asSub=(p,holder,rel,pay)=>{ p.account={of:holder.id,rel,pay:!!pay}; p.dob=(rel==='child'?2009+rint(0,12):rel==='spouse'?Math.max(1946,+holder.dob.slice(0,4)+rint(-4,4)):1950+rint(0,40))+'-'+String(rint(1,12)).padStart(2,'0')+'-'+String(rint(1,28)).padStart(2,'0'); p.billing={class:'',status:'active',since:'',until:''}; famCount[holder.id]=(famCount[holder.id]||0)+1; p.memberNo=holder.memberNo+'-'+famCount[holder.id]; if(rel==='child') p.memberType='J'; return p; };
   const subOf=(holder,first,sex,hcp,rel,pay,o)=>asSub(mkPerson(first,holder.last,sex,hcp,'',Object.assign({since:holder.billing.since},o||{})),holder,rel,pay);
   // the owner's own family, as the worked example
   const zach=mkPerson('Zach','Walls','M','+0.4','full',{no:'1500',since:'2015-03-01',group:true}); zach._o={group:true}; cast['Zach Walls']=zach;
-  subOf(zach,'Kelsey','F','18.4','spouse',true); subOf(zach,'Peyton','M','9.1','child',false); subOf(zach,'Camden','M','16.0','child',false); subOf(zach,'Beckham','M','24.3','child',false).account.charge=false;   // the youngest: no charge privileges (the owner, Nov 24)
+  zach.dob='1987-06-14'; subOf(zach,'Kelsey','F','18.4','spouse',true).dob='1989-02-03'; subOf(zach,'Peyton','M','9.1','child',false).dob='2012-09-21'; subOf(zach,'Camden','M','16.0','child',false).dob='2015-04-08'; const beck=subOf(zach,'Beckham','M','24.3','child',false); beck.dob='2018-11-30'; beck.account.charge=false;   // the youngest: no charge privileges (the owner, Nov 24)
   // the cast's households
   asSub(cast['Judith Smails'],cast['Elihu Smails'],'spouse',true); asSub(cast['Spalding Smails'],cast['Elihu Smails'],'child',false); asSub(cast['Gloria Havercamp'],cast['Harold Havercamp'],'spouse',true);
   // generated households: spouses and children for a share of the account holders; the generated juniors become children of a family
