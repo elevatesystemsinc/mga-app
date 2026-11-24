@@ -45,7 +45,7 @@ async def main():
       const onAccount=view.page==='account'&&view.acctId==='p2'; const bal1=document.querySelector('#main .kpi .v').textContent;
       document.getElementById('acCharge2').click(); document.getElementById('apA').value='30'; document.getElementById('apI').value='fnb'; document.getElementById('apN').value='Grill · Oct 12'; document.getElementById('dSave').click(); await new Promise(r=>setTimeout(r,400));
       document.getElementById('acPay2').click(); document.getElementById('apA').value='50'; document.getElementById('apS').value='check'; document.getElementById('apR').value='#4471'; document.getElementById('dSave').click(); await new Promise(r=>setTimeout(r,400));
-      const rows=[...document.querySelectorAll('#main .lg .lr')].map(r=>[r.querySelector('.ln').textContent.trim(), r.querySelector('.lnet').textContent]);
+      const rows=[...document.querySelectorAll('#main .lg:not(#acPays) .lr')].map(r=>[r.querySelector('.ln').textContent.trim(), r.querySelector('.lnet').textContent]);
       return {nav, empty, kpis, onAccount, bal1, rows, bal:document.querySelector('#main .kpi .v').textContent}; }""")
     bad+=check('staff: Member accounts in the nav, empty page, a charge lands on the member’s account','accounts' in r['nav'] and 'billsetup' in r['nav'] and r['empty']=='Nothing here' and r['kpis'][0]=='$0.00' and r['onAccount'] and r['bal1']=='$48.50 owing' and not e1,r,e1)
     bad+=check('account page: newest first with a running balance, the payment with its check number',r['rows']==[['Payment','$33.90'],['Grill · Oct 12','$83.90'],['Dozen Pro V1','$48.50']] and r['bal']=='$33.90 owing',r['rows'])
@@ -54,7 +54,7 @@ async def main():
     # ---- 2. void needs a reason and stays on the record; the balance moves
     ANS={'v':'Charged twice'}; p1.on('dialog',lambda d:asyncio.ensure_future(d.accept(ANS['v'])))
     r=await p1.evaluate("""async()=>{ const b=[...document.querySelectorAll('[data-void]')].find(x=>document.querySelectorAll('[data-void]').length&&x); const grill=[...document.querySelectorAll('#main .lr')].find(r=>r.textContent.includes('Grill')); grill.querySelector('[data-void]').click(); await new Promise(r=>setTimeout(r,400));
-      const v=[...document.querySelectorAll('#main .lr.void')].map(r=>r.querySelector('.ls').textContent); return {v, bal:document.querySelector('#main .kpi .v').textContent, left:document.querySelectorAll('[data-void]').length}; }""")
+      const v=[...document.querySelectorAll('#main .lr.void')].map(r=>r.querySelector('.ls').textContent); return {v, bal:document.querySelector('#main .kpi .v').textContent, left:document.querySelectorAll('#main .lg:not(#acPays) [data-void]').length}; }""")
     row=next(x for x in ledger(fdb) if 'Grill' in x['descr'])
     bad+=check('void: a reason, the row stays struck through, the balance moves, the database row keeps it',len(r['v'])==1 and 'Charged twice' in r['v'][0] and r['bal']=='$1.50 credit' and r['left']==2 and row['void_at'] and row['void_reason']=='Charged twice',r)
     # ---- 3. dues collection → the account, once
