@@ -355,7 +355,7 @@ function editGroup(ev,grp){
         r.querySelectorAll('[data-team]').forEach(s=>s.onchange=()=>{ players[+s.dataset.team].team=s.value; }); };
       const redraw=()=>{ r.querySelector('#ggRows').innerHTML=rows(); r.querySelector('#ggTeams').innerHTML=teamsHTML(); bind(); }; bind();
       r.querySelector('#ggPick').onchange=e=>{ const m=memberById(e.target.value); e.target.value=''; if(!m) return; if(players.some(p=>p.memberId===m.id)) return;
-        players.push({id:uid(),memberId:m.id,name:memberName(m),tee:ev.defaultTee||'White',set:'M',team:fieldTeam.get(m.id)||''}); redraw(); };
+        players.push({id:uid(),memberId:m.id,name:memberName(m),tee:ev.defaultTee||'White',set:personSet(m),team:fieldTeam.get(m.id)||''}); redraw(); };
       r.querySelector('#ggGuest').onclick=()=>{ players.push({id:uid(),memberId:'',name:'',tee:ev.defaultTee||'White',set:'M'}); redraw(); const ins=r.querySelectorAll('[data-k=name]'); ins[ins.length-1].focus(); };
       r.querySelector('#ggC').onchange=redraw;
       const sc=r.querySelector('#ggScores'); if(sc) sc.onclick=()=>{ closeDrawer(); scoreSheet(ev,grp); };
@@ -512,7 +512,7 @@ function importFieldToEvent(ev,t){
       ${gone.length?`<label class="check" style="align-items:flex-start"><input type="checkbox" id="ifRm" checked><span>Remove the ${gone.length} player${gone.length===1?'':'s'} no longer in the ${esc(t.name)} field <span class="muted">(${esc(gone.slice(0,5).map(x=>x.p.name).join(', '))}${gone.length>5?'…':''})</span></span></label>`:''}
       ${ev.flights.count&&add.length?'<div class="banner">Flights are already set. New players come in without a flight — re-run flights afterward.</div>':''}`,
     save:()=>{ if(!add.length&&!gone.length&&!teamChange) return;
-      add.forEach(fp=>{ const m=memberById(fp.memberId); ev.pool.push({id:uid(),memberId:fp.memberId,name:m?memberName(m):'Player',tee:ev.defaultTee||'White',set:'M',team:'T'+(fp.team||0),index:'',flight:''}); });
+      add.forEach(fp=>{ const m=memberById(fp.memberId); ev.pool.push({id:uid(),memberId:fp.memberId,name:m?memberName(m):'Player',tee:ev.defaultTee||'White',set:personSet(m),team:'T'+(fp.team||0),index:'',flight:''}); });
       t.field.forEach(fp=>{ const x=inEv.get(fp.memberId); if(x) x.p.team='T'+(fp.team||0); });
       if(gone.length&&$('ifRm').checked){ const rm=new Set(gone.map(x=>x.p.id)); ev.pool=ev.pool.filter(p=>!rm.has(p.id)); ev.groups.forEach(grp=>{ grp.players=grp.players.filter(p=>!rm.has(p.id)); }); }
       golfSave(ev); toast(`${add.length} player${add.length===1?'':'s'} imported`); }});

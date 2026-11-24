@@ -40,7 +40,7 @@ const bkName=b=>b.member_id?memberName(personById(b.member_id)||{})||b.name||'Me
 const bkCount=b=>Math.max(1,(b.players||[]).length);
 /* a staff booking: the row, and the fee on the member's account when the facility charges one */
 async function bkSave(b,isNew){ const f=facOf(b.facility); const row=Object.assign({},b);
-  if(isNew&&f.fee&&n0(f.fee.amount)>0&&b.member_id&&acctOn()){ const it=itemOf(f.fee.item)||{id:'facility',source:'facility',gl:''}; const amt=f.fee.per==='player'?n0(f.fee.amount)*bkCount(b):n0(f.fee.amount);
+  if(isNew&&f.fee&&n0(f.fee.amount)>0&&b.member_id&&acctOn()){ if(!canCharge(b.member_id)){ toast(`${memberName(personById(b.member_id)||{})} has no charge privileges — the fee can’t go on the account`); return false; } const it=itemOf(f.fee.item)||{id:'facility',source:'facility',gl:''}; const amt=f.fee.per==='player'?n0(f.fee.amount)*bkCount(b):n0(f.fee.amount);
     const a=await acctPost({member_id:b.member_id,kind:'charge',source:it.source,item:it.id,gl:it.gl,ref:'bk:'+b.id,descr:`${f.name} · ${dateTxt(b.date)} ${t12(b.time)}${f.fee.per==='player'?' · '+bkCount(b)+' players':''}`,amount:amt,posted:todayISO()}); if(a){ b.acct_item=a.id; row.acct_item=a.id; } }
   if(acctCloud()){ const {error}=await (isNew?sb.from('bookings').insert(trow(row)):sb.from('bookings').update(row).eq('id',b.id)); if(error){ toast('Couldn’t save: '+error.message); return false; } }
   BK.rows=(BK.rows||[]).filter(x=>x.id!==b.id).concat([row]); bkLocalWrite(); return true; }

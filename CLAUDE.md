@@ -935,6 +935,16 @@ localStorage. `acctPost(o)` is the one way anything lands on an account.
   the gate. The Shady Valley seed has 54 households (the Walls family — Zach the holder, Kelsey the spouse who may pay, Peyton, Camden and
   Beckham —, the Smails and the Havercamps, generated spouses and children, the generated juniors re-homed as children) and 975 family
   charges on holders' accounts; the tour's Membership chapter stops on the Walls account.
+- **Charge privileges per member and a gender on every person** (the owner, Nov 24: "a gender selector of each member… turn on and off charge
+  privileges on a per member basis"): `p.account.charge === false` (the editor's Billing block and the Membership drawer: **Charge privileges**
+  checkbox, on by default; on an own account `account` carries only that switch — `readMembership`) takes the registers, the tee sheet, lessons
+  and guest fees off the account for that person, and on a holder for the whole family (`chargeOff`, `canCharge(p|id)` in core.js); dues, a
+  charge posted by the office and payments are never gated. The hub register refuses (`closeTicket`, the picker reads "no charging"), a
+  booking fee refuses (`bkSave`), the account page shows a *No charge privileges* chip and the Family card marks the member; `pos_members`
+  returns `nocharge` (the station greys the name) and the trigger `acct_items_family` raises on a charge with source fnb / proshop / tee /
+  facility / lesson / guest from any path (a station, `member_book`, the payments function). `p.gender` M | F | X | '' (`GENDERS`; the editor's
+  Gender select; `normalize` folds the seed's old `sex` in) — `personSet(p)` gives a player from the directory the W tee set when F. The fake
+  mirrors `nocharge` and the refusals; `tests/test_family.py` checks 6 and 7. The Shady Valley seed gives Beckham Walls no charge privileges.
 - **Dues collection → the account**: *Put on account* posts the association's charge once (`acctPostDues`), *Collected* the
   matching payment once (`acctCollectDues`); the association is credited in its own books as before.
 - **The member portal** (`member_src.html` → `member.html`, markers `/*PDFFONTS*/` `/*BILLCORE*/` `/*AUTOUPDATE*/`): a member

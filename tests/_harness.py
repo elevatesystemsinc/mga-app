@@ -53,6 +53,12 @@ class FakeDB:
                 if nm and not (row.get('descr') or '').startswith(nm+' · '): row['descr']=(nm+' · '+(row.get('descr') or ''))[:180]
         except Exception: pass
         return row
+    def _nocharge(self,club,mid):
+        """charge privileges (family-setup.sql): account.charge === false on the member or on their holder keeps the registers, the tee sheet and lessons off the account"""
+        ms=club.get('members',[]); me=next((x for x in ms if x.get('id')==mid),None)
+        if not me: return False
+        hid=((me.get('account') or {}).get('of')) or mid; hm=next((x for x in ms if x.get('id')==hid),None) or me
+        return (me.get('account') or {}).get('charge') is False or (hm.get('account') or {}).get('charge') is False
     def _rows(self,t): return self.rows.setdefault(('_tbl',t),{'table':t,'id':t,'data':[]})['data']
     def _col_match(self,row,filters):
         def get(k): return row.get(k,'wccc' if k=='tenant' else None)
@@ -169,7 +175,7 @@ class FakeDB:
                 return json.dumps({'data':{'id':x['id'],'name':x['name'],'role':x.get('role','server')} if x else None,'error':None})
             if fn=='pos_members':
                 q=str(a.get('p_q') or '').lower(); L=[m for m in club.get('members',[]) if m.get('status','Active')!='Inactive' and len(q)>=2 and (q in (m.get('first','')+' '+m.get('last','')).lower() or m.get('memberNo','')==q)][:8]
-                return json.dumps({'data':[{'id':m['id'],'name':(m.get('first','')+' '+m.get('last','')).strip(),'memberNo':m.get('memberNo'),'suspended':(m.get('billing') or {}).get('status')=='suspended'} for m in L],'error':None})
+                return json.dumps({'data':[{'id':m['id'],'name':(m.get('first','')+' '+m.get('last','')).strip(),'memberNo':m.get('memberNo'),'suspended':(m.get('billing') or {}).get('status')=='suspended','nocharge':self._nocharge(club,m['id'])} for m in L],'error':None})
             if fn=='pos_checks': return json.dumps({'data':[t for t in tix if t.get('tenant','wccc')==tn and t['outlet']==st['outlet'] and t['status'] in ('open','slip')],'error':None})
             if fn=='pos_check_put':
                 c=dict(a['p_check']); cid=c.get('id') or str(uuid.uuid4()); ex=next((t for t in tix if t['id']==cid),None)
@@ -205,6 +211,7 @@ class FakeDB:
                     m=next((x for x in club.get('members',[]) if x['id']==mid),None)
                     if not m: return err('Unknown member')
                     if (m.get('billing') or {}).get('status')=='suspended': return err('This member is suspended — no charges to the account')
+                    if self._nocharge(club,mid): return err('No charge privileges — %s cannot charge to the account'%(m.get('first','')+' '+m.get('last','')).strip())
                     items=(club.get('billing') or {}).get('items') or []; it=next((x for x in items if x['id']==outlet.get('item','fnb')),{'id':outlet.get('item','fnb'),'source':'fnb','gl':''}); share=net/owed if owed else 1
                     aid=str(uuid.uuid4()); self._rows('acct_items').append(self._fam({'id':aid,'tenant':tn,'member_id':mid,'kind':'charge','source':it.get('source','fnb'),'item':it['id'],'gl':it.get('gl',''),'ref':'pos:%s:%s'%(r['id'],pay['id']),'descr':(outlet.get('name') or st['outlet'])+' · '+(d.get('label') or ', '.join(l['name'] for l in r['lines']))+((' · tip %s'%tip) if tip else ''),'amount':amt,'tax':round(r['tax']*share,2),'svc':round(r['svc']*share,2),'method':None,'reference':None,'posted':datetime.date.today().isoformat(),'void_at':None,'void_reason':None,'created_at':now,'created_by':r.get('server') or 'station'})); pay['acct_item']=aid
                 r['payments']=(r.get('payments') or [])+[pay]; paid=round(paid+net,2)
@@ -227,6 +234,7 @@ class FakeDB:
                     m=next((x for x in club.get('members',[]) if x['id']==r['member_id']),None)
                     if not m: return err('Unknown member')
                     if (m.get('billing') or {}).get('status')=='suspended': return err('This member is suspended — no charges to the account')
+                    if self._nocharge(club,r['member_id']): return err('No charge privileges — %s cannot charge to the account'%(m.get('first','')+' '+m.get('last','')).strip())
                     items=(club.get('billing') or {}).get('items') or []; it=next((x for x in items if x['id']==outlet.get('item','fnb')),{'id':outlet.get('item','fnb'),'source':'fnb','gl':''})
                     aid=str(uuid.uuid4()); self._rows('acct_items').append(self._fam({'id':aid,'tenant':tn,'member_id':r['member_id'],'kind':'charge','source':it.get('source','fnb'),'item':it['id'],'gl':it.get('gl',''),'ref':'pos:'+r['id'],'descr':(outlet.get('name') or st['outlet'])+' · '+', '.join((str(l['qty'])+'× ' if l['qty']>1 else '')+l['name'] for l in r['lines']),'amount':r['total'],'tax':r['tax'],'svc':r['svc'],'method':None,'reference':None,'posted':datetime.date.today().isoformat(),'void_at':None,'void_reason':None,'created_at':now,'created_by':r.get('server') or 'station'})); r['acct_item']=aid
                 return json.dumps({'data':r,'error':None})
@@ -280,6 +288,7 @@ class FakeDB:
                 if not f: return err('Unknown facility')
                 if not f.get('members',True): return err('This facility is booked by the club office')
                 if (m.get('billing') or {}).get('status')=='suspended': return err('Your account is suspended — please see the club office')
+                if f.get('fee') and float((f.get('fee') or {}).get('amount') or 0)>0 and self._nocharge(club,mid): return err('No charge privileges — this booking’s fee cannot go on your account; please see the club office')
                 day=str(a['p_date']); today=datetime.date.today()
                 if day<today.isoformat(): return err('That day has passed')
                 if day>(today+datetime.timedelta(days=int(f.get('lead',7)))).isoformat(): return err('Members may book up to %s days ahead'%f.get('lead',7))

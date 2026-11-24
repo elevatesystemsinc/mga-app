@@ -6,6 +6,9 @@
 -- (pos_close / pos_pay), a booking fee (member_book), the payments function — so no caller has to know. The charge keeps the family
 -- member's id in `by_member` and their name in front of the description. In the portal a sub-account signs in to the holder's account
 -- (member_me), paying only when `pay` is on.
+-- Charge privileges (the owner, Nov 24: "turn on and off charge privileges on a per member basis"): `account.charge = false` on a
+-- person — or on their account holder — refuses a register, tee, facility, lesson or guest charge for them on every path; dues, a
+-- charge posted by the office and payments are never gated. The register's search marks such a member `nocharge`.
 
 alter table public.acct_items add column if not exists by_member text;
 
@@ -19,14 +22,20 @@ $$;
 
 create or replace function public.acct_items_family() returns trigger
 language plpgsql as $$
-declare club jsonb; h text; nm text;
+declare club jsonb; h text; nm text; me jsonb; hm jsonb;
 begin
   if new.member_id is null then return new; end if;
   select data into club from mga_hub where tenant = new.tenant and id = 'club';
   if club is null then return new; end if;
   h := account_holder(club, new.member_id);
+  select x into me from jsonb_array_elements(club -> 'members') x where x ->> 'id' = new.member_id;
+  select x into hm from jsonb_array_elements(club -> 'members') x where x ->> 'id' = h;
+  nm := trim(coalesce(me ->> 'first', '') || ' ' || coalesce(me ->> 'last', ''));
+  if new.kind = 'charge' and coalesce(new.source, '') in ('fnb', 'proshop', 'tee', 'facility', 'lesson', 'guest')
+     and (coalesce((me -> 'account' ->> 'charge')::boolean, true) = false or coalesce((hm -> 'account' ->> 'charge')::boolean, true) = false) then
+    raise exception 'No charge privileges — % cannot charge to the account', coalesce(nullif(nm, ''), new.member_id);
+  end if;
   if h <> new.member_id then
-    select trim(coalesce(x ->> 'first', '') || ' ' || coalesce(x ->> 'last', '')) into nm from jsonb_array_elements(club -> 'members') x where x ->> 'id' = new.member_id;
     new.by_member := new.member_id; new.member_id := h;
     if nm <> '' and coalesce(new.descr, '') not like nm || ' · %' then new.descr := left(nm || ' · ' || coalesce(new.descr, ''), 180); end if;
   end if;
@@ -34,11 +43,12 @@ begin
 end $$;
 create or replace trigger acct_items_family before insert on public.acct_items for each row execute function public.acct_items_family();
 
--- the register's member search: family members show their holder, and carry the holder's suspension
+-- the register's member search: family members show their holder, carry the holder's suspension, and say when they may not charge
 create or replace function public.pos_members(p_key text, p_q text) returns jsonb
 language sql stable security definer set search_path = public as $$
   select coalesce(jsonb_agg(jsonb_build_object('id', m ->> 'id', 'name', trim(coalesce(m ->> 'first', '') || ' ' || coalesce(m ->> 'last', '')), 'memberNo', m ->> 'memberNo',
            'suspended', (coalesce(hm, m) -> 'billing' ->> 'status') = 'suspended',
+           'nocharge', coalesce((m -> 'account' ->> 'charge')::boolean, true) = false or coalesce((hm -> 'account' ->> 'charge')::boolean, true) = false,
            'family', case when hm is null then null else trim(coalesce(hm ->> 'first', '') || ' ' || coalesce(hm ->> 'last', '')) end)), '[]'::jsonb)
   from (select m, (select h from jsonb_array_elements(club -> 'members') h where h ->> 'id' = account_holder(club, m ->> 'id') and h ->> 'id' <> m ->> 'id') hm
         from (select h.data club, m from pos_station(p_key) s, mga_hub h, jsonb_array_elements(h.data -> 'members') m
