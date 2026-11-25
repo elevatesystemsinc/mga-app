@@ -118,6 +118,7 @@ python3 tests/test_schedule.py # a tournament's schedule across the days before 
 python3 tests/test_payments.py # online payments through Deluxe against the fake: credentials → connected, the portal's hosted form → a payment posted once, a declined card, autopay, refund, charge card on file, the hub register and a station's card sheet, the wallet, the staff view, the invitations
 python3 tests/test_tour.py    # the guided demo: every step on three hubs, the chapter picker, resume / restart / end, no tour without ?demo
 python3 tests/test_crm.py     # companies & contacts: a company and its people, a sponsor picked from the list (its contact onto the directory), the record, the MGA's link-by-name, one write, a scoped login reads only; a nonprofit's Contacts (household, individual sponsor, billing contact, named seats → golfers, tags, person record, vendor)
+python3 tests/test_allow.py   # a game at 90% with its skins at 85%: the day's allowance and a competition's exception on the hub and a phone; a game that sets neither reads 100%
 git add -A && git commit && git push origin main  # Render deploys main to app.wcccmga.org
 ```
 Tests need `pip install playwright && playwright install chromium` and `cd tests && npm i xlsx@0.18.5`.
@@ -483,7 +484,14 @@ Tournament = { id, name, season, days, startDate, field:[{id,memberId,team,paid,
   - **Handicaps are 100% across the board** in a group's game (`g.hcp` 'full', the default; 'usga' switches the USGA
     table back on — designer, "Handicaps"): `syncGameEvent` sets `ev.allow={'*':100}`, `pctFor` honours `'*'` for every
     player format (never the per-player scramble tables), `compPub` keeps it, so stroke play, best ball, skins and the
-    matches all play full handicaps on the hub and the phones.
+    matches all play full handicaps on the hub and the phones. **The day's allowance and a competition's exception** (the owner,
+    Nov 25, 2026: "a handicap allowance for that particular day… I should be able to make an exception… the particular game within
+    the day"): `g.allowPct` (the designer's "% allowance for the day" box beside Handicaps; blank = 100, `dayAllow(g)`) is the `'*'`
+    figure on the event; `pot.rules.allow` (the "% handicap allowance for this competition only" box on every scored competition;
+    blank follows the day) rides to the phones as `comp.allow` (`'allow'` is in `COMP_KEYS`, `potComp` sets it, `compPub` applies it
+    over the event's) and the hub's skins / dots / payout math reads the same figure through `potPubBase(g,pot)`; the sheet says
+    "Handicaps at 85% for this one." and the band "90% handicaps". A game that sets neither reads exactly as before.
+    `tests/test_allow.py`.
   - **Small-group games never have flights** (the owner, Oct 2026): a game's event page has no Flights tab (Players ·
     Groups · Leaderboard), `syncGameEvent` leaves `flight` empty, and the boards / GameCast only speak of flights when
     an event carries them (tournament rounds, Golf events).
