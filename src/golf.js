@@ -148,12 +148,24 @@ function publicEvent(ev){
 
 /* ---------- publishing + scores ---------- */
 const golfScores={}; let golfSub=null;
-async function publishEvent(ev){
-  if(!CLOUD||!sessionOK) return; try{ PUB_SIG[ev.id]=JSON.stringify(publicEvent(ev)); }catch(_){}
+async function publishEvent(ev,retry){
+  if(!CLOUD||!sessionOK) return; let sig=''; try{ sig=JSON.stringify(publicEvent(ev)); }catch(_){}
   const codes=Object.fromEntries(ev.groups.map(g=>[String(g.code).toUpperCase(),g.id]));
   const {error}=KEYMODE?await keyRPC('hub_key_golf_event',{p_id:ev.id,p_slug:ev.slug.toLowerCase(),p_public:publicEvent(ev),p_codes:codes})
     :await sb.from('golf_events').upsert(trow({id:ev.id,slug:ev.slug.toLowerCase(),public:publicEvent(ev),codes,updated_at:new Date().toISOString()}));
-  if(error) toast(/duplicate|unique/i.test(error.message)?'That link is already used by another event — pick a different one':/relation|does not exist/i.test(error.message)?'Run golf-setup.sql in Supabase to turn on live scoring':'Couldn’t publish the event: '+error.message);
+  if(!error){ PUB_SIG[ev.id]=sig; return true; }   // the signature is only remembered once the copy is on the server, so a failed publish is retried on the next render
+  /* the link is held by another row. A game deleted while its row delete did not land (offline, a closed tab) leaves an ORPHAN
+     holding the slug; the next game of the day takes the same slug and every publish then fails silently while the phones keep
+     reading the orphan's old group IDs ("That group ID isn't in this event" — the Shitbirds, Nov 25, 2026). An orphan is a row of
+     this organization whose id no open document knows: take it out and publish again, once. */
+  if(/duplicate|unique/i.test(error.message)&&!retry&&!KEYMODE){
+    try{ const {data:row}=await tq(sb.from('golf_events').select('id, public').eq('slug',ev.slug.toLowerCase())).maybeSingle();
+      const known=new Set(orgDocs().flatMap(o=>(((o.db||{}).golf||{}).events||[]).map(e=>e.id)).concat((golfData().events||[]).map(e=>e.id)));
+      if(row&&row.id!==ev.id&&!known.has(row.id)&&(!row.public||!row.public.org||row.public.org===ORG_ID)){ await deleteEventRow(row.id); return publishEvent(ev,true); }
+    }catch(_){}
+  }
+  toast(/duplicate|unique/i.test(error.message)?'That link is already used by another event — pick a different one':/relation|does not exist/i.test(error.message)?'Run golf-setup.sql in Supabase to turn on live scoring':'Couldn’t publish the event: '+error.message);
+  return false;
 }
 function golfSave(ev){ persist(); publishEvent(ev); }
 /* The published copy carries derived data (handicaps, competitions, the format fields), so a change in how those are

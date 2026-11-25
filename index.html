@@ -4262,12 +4262,24 @@ function publicEvent(ev){
 
 /* ---------- publishing + scores ---------- */
 const golfScores={}; let golfSub=null;
-async function publishEvent(ev){
-  if(!CLOUD||!sessionOK) return; try{ PUB_SIG[ev.id]=JSON.stringify(publicEvent(ev)); }catch(_){}
+async function publishEvent(ev,retry){
+  if(!CLOUD||!sessionOK) return; let sig=''; try{ sig=JSON.stringify(publicEvent(ev)); }catch(_){}
   const codes=Object.fromEntries(ev.groups.map(g=>[String(g.code).toUpperCase(),g.id]));
   const {error}=KEYMODE?await keyRPC('hub_key_golf_event',{p_id:ev.id,p_slug:ev.slug.toLowerCase(),p_public:publicEvent(ev),p_codes:codes})
     :await sb.from('golf_events').upsert(trow({id:ev.id,slug:ev.slug.toLowerCase(),public:publicEvent(ev),codes,updated_at:new Date().toISOString()}));
-  if(error) toast(/duplicate|unique/i.test(error.message)?'That link is already used by another event — pick a different one':/relation|does not exist/i.test(error.message)?'Run golf-setup.sql in Supabase to turn on live scoring':'Couldn’t publish the event: '+error.message);
+  if(!error){ PUB_SIG[ev.id]=sig; return true; }   // the signature is only remembered once the copy is on the server, so a failed publish is retried on the next render
+  /* the link is held by another row. A game deleted while its row delete did not land (offline, a closed tab) leaves an ORPHAN
+     holding the slug; the next game of the day takes the same slug and every publish then fails silently while the phones keep
+     reading the orphan's old group IDs ("That group ID isn't in this event" — the Shitbirds, Nov 25, 2026). An orphan is a row of
+     this organization whose id no open document knows: take it out and publish again, once. */
+  if(/duplicate|unique/i.test(error.message)&&!retry&&!KEYMODE){
+    try{ const {data:row}=await tq(sb.from('golf_events').select('id, public').eq('slug',ev.slug.toLowerCase())).maybeSingle();
+      const known=new Set(orgDocs().flatMap(o=>(((o.db||{}).golf||{}).events||[]).map(e=>e.id)).concat((golfData().events||[]).map(e=>e.id)));
+      if(row&&row.id!==ev.id&&!known.has(row.id)&&(!row.public||!row.public.org||row.public.org===ORG_ID)){ await deleteEventRow(row.id); return publishEvent(ev,true); }
+    }catch(_){}
+  }
+  toast(/duplicate|unique/i.test(error.message)?'That link is already used by another event — pick a different one':/relation|does not exist/i.test(error.message)?'Run golf-setup.sql in Supabase to turn on live scoring':'Couldn’t publish the event: '+error.message);
+  return false;
 }
 function golfSave(ev){ persist(); publishEvent(ev); }
 /* The published copy carries derived data (handicaps, competitions, the format fields), so a change in how those are
@@ -5060,7 +5072,7 @@ function newPot(game,g,extra){
   return Object.assign(pot,extra||{});
 }
 /* a game and its scoring event go together */
-function deleteGame(g){ const ev=gameEvent(g); if(ev){ golfData().events=golfData().events.filter(e=>e!==ev); if(CLOUD&&sessionOK) deleteEventRow(ev.id); } db.games=db.games.filter(x=>x!==g); }
+function deleteGame(g){ const ev=gameEvent(g); if(ev){ golfData().events=golfData().events.filter(e=>e!==ev); if(CLOUD&&sessionOK) Promise.resolve(deleteEventRow(ev.id)).then(r=>{ if(r&&r.error) toast('The scoring page could not be taken down: '+r.error.message); }).catch(e=>toast('The scoring page could not be taken down: '+(e.message||e))); } db.games=db.games.filter(x=>x!==g); }   // a row left behind would hold the link for the next game of the day (publishEvent clears such an orphan, but say so)
 function addPlayer(g,o){ const p={id:uid(),memberId:o.memberId||'',name:o.name||'',paid:false,extraIn:0,gpid:''}; g.players.push(p); g.pots.forEach(pot=>{ if(pot.kind!=='manual') pot.inn[p.id]=true; }); return p; }
 /* out of the game completely: every competition, the payouts, the teams, the scoring event and their scores (so the
    leaderboard and the phones drop them too). The designer passes {keepEvent:true} — its draft only touches the event
@@ -10435,7 +10447,7 @@ if(tourWanted()) setInterval(tourAuto,500);
    page counts, and a reload is tried once per build — if the page that comes back is still the old one, the CDN
    hasn't caught up; wait a while before trying that build again. */
 (function(){
-  const ME='20261124142151', KEY='au_tried', RETRY=10*60*1000; let ready=false, lastCheck=0;
+  const ME='20261125233040', KEY='au_tried', RETRY=10*60*1000; let ready=false, lastCheck=0;
   const typing=()=>{ const a=document.activeElement; return a&&/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)&&a.value&&a.type!=='search'; };
   const safe=()=>!typing()&&(typeof window.__canReload!=='function'||window.__canReload());
   const tried=()=>{ try{ const [b,t]=(sessionStorage.getItem(KEY)||'').split('|'); return b?{build:b,at:+t||0}:null; }catch(_){ return null; } };

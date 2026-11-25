@@ -387,6 +387,12 @@ Tournament = { id, name, season, days, startDate, field:[{id,memberId,team,paid,
     "Validated", with what the player made on N), then "Show hole N" shows N's own result — the verdict is never skipped
     past, and the list never shows "held"/"lost" before the flash (the owner, Oct 2026). A skin's dollar value (pot ÷
     skins won) only shows once all 18 are called. The phone's `calloutStage` (Finish tab) runs the same sequence.
+  - **A failed publish is retried, and an orphaned row never holds the link** (the Shitbirds, Nov 25, 2026: a game deleted while
+    its `golf_events` row delete did not land left a row holding `shitbirds-2026-11-25`; the next game of the day took the same slug,
+    every publish hit the unique-slug error and `PUB_SIG` was already set so nothing retried, and the phones kept reading the orphan's
+    old group IDs — "That group ID isn't in this event"): `publishEvent` remembers `PUB_SIG` only once the upsert succeeds, and on a
+    duplicate-slug error looks the row up — a row of this organization whose id no open document knows is deleted and the publish
+    retried once. `deleteGame` reports a row delete that fails. The orphan that day was renamed by hand in SQL.
   - **Published copy stays current**: `publishIfChanged(ev)` (golf.js) runs on every render of a game page, a Golf
     event page and a tournament's Rounds tab — it republishes when `publicEvent(ev)` differs from what this session
     last sent (`PUB_SIG`), so a new build that changes derived data (competitions, handicaps, `matchBy`…) reaches the

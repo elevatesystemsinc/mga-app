@@ -97,7 +97,7 @@ function newPot(game,g,extra){
   return Object.assign(pot,extra||{});
 }
 /* a game and its scoring event go together */
-function deleteGame(g){ const ev=gameEvent(g); if(ev){ golfData().events=golfData().events.filter(e=>e!==ev); if(CLOUD&&sessionOK) deleteEventRow(ev.id); } db.games=db.games.filter(x=>x!==g); }
+function deleteGame(g){ const ev=gameEvent(g); if(ev){ golfData().events=golfData().events.filter(e=>e!==ev); if(CLOUD&&sessionOK) Promise.resolve(deleteEventRow(ev.id)).then(r=>{ if(r&&r.error) toast('The scoring page could not be taken down: '+r.error.message); }).catch(e=>toast('The scoring page could not be taken down: '+(e.message||e))); } db.games=db.games.filter(x=>x!==g); }   // a row left behind would hold the link for the next game of the day (publishEvent clears such an orphan, but say so)
 function addPlayer(g,o){ const p={id:uid(),memberId:o.memberId||'',name:o.name||'',paid:false,extraIn:0,gpid:''}; g.players.push(p); g.pots.forEach(pot=>{ if(pot.kind!=='manual') pot.inn[p.id]=true; }); return p; }
 /* out of the game completely: every competition, the payouts, the teams, the scoring event and their scores (so the
    leaderboard and the phones drop them too). The designer passes {keepEvent:true} — its draft only touches the event
