@@ -332,6 +332,11 @@ class FakeDB:
             have={m.get('id') for m in r['data'].get('members',[])}; add=[p for p in a['p_people'] if isinstance(p,dict) and p.get('id') and p['id'] not in have]
             if add: r['data']['members']=r['data'].get('members',[])+copy.deepcopy(add); r['data']['_rev']=int(r['data'].get('_rev') or 0)+1; self.writes[('club' if a['p_tenant']=='wccc' else a['p_tenant']+'/club')]+=1
             return json.dumps({'data':True,'error':None})
+        if fn=='fs_next_number':   # flagstick-office-setup.sql: one counter per document kind
+            base={'lead':2000,'estimate':1000,'contract':7000,'invoice':9000}.get(a.get('p_kind'),1); C=self._rows('fs_counters'); c=next((x for x in C if x['kind']==a.get('p_kind')),None)
+            if not c: c={'kind':a.get('p_kind'),'n':base}; C.append(c)
+            else: c['n']+=1
+            return json.dumps({'data':c['n'],'error':None})
         if fn=='admin_users_info':
             return json.dumps({'data':[{k:u.get(k) for k in ('id','email','created_at','last_sign_in_at','confirmed','name')} for u in self.auth_users if u['id'] in a['p_ids']],'error':None})
         if fn=='admin_user_by_email':
@@ -762,7 +767,7 @@ class FakeDB:
             rows=self._rows(t); hits=[r for r in rows if self._col_match(r,a['filters'])]
             if op=='select': return json.dumps({'data':(copy.deepcopy(hits[0]) if hits else None) if a['single'] else copy.deepcopy(hits),'error':None})
             if op=='upsert':
-                row=dict(a['payload']); key=('user_id','tenant') if 'user_id' in row and 'tenant' in row else ('user_id',) if 'user_id' in row else ('slug',) if 'slug' in row else ('sid',) if 'sid' in row else ('fid',) if 'fid' in row and 'doc' in row else ('tid',) if 'tid' in row and 'doc' in row else ('tenant','org') if 'org' in row and 'id' not in row else ('id',)
+                row=dict(a['payload']); key=('user_id','tenant') if 'user_id' in row and 'tenant' in row else ('user_id',) if 'user_id' in row else ('slug',) if 'slug' in row else ('sid',) if 'sid' in row else ('fid',) if 'fid' in row and 'doc' in row else ('tid',) if 'tid' in row and 'doc' in row else ('tenant','org') if 'org' in row and 'id' not in row else ('key',) if 'key' in row and 'id' not in row else ('id',)
                 old=next((r for r in rows if all(r.get(k)==row.get(k) for k in key)),None)
                 if old: old.update(copy.deepcopy(row))
                 else: row.setdefault('created_at',datetime.datetime.utcnow().isoformat()+'Z'); rows.append(copy.deepcopy(row))
