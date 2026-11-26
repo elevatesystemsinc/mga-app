@@ -30,7 +30,7 @@ async def main():
   fdb.seed('mga_hub','club',club_doc('Walnut Creek Country Club',[{'id':'mga','kind':'association','name':'Men’s Golf Association','short':'MGA'},{'id':'misfits','kind':'group','name':'The Misfits','short':'Misfits'}]))
   fdb.seed('mga_hub','mga',org_doc('mga','Men’s Golf Association','MGA')); fdb.seed('mga_hub','misfits',org_doc('misfits','The Misfits','Misfits','group'))
   fdb.seed('mga_hub','club',club_doc('The Pines Golf Club',[{'id':'mga','kind':'association','name':'Pines Men’s Club','short':'PMC'}]),tenant='pines')
-  fdb.seed_login('pro@wccc.org','wccc','staff',name='Head Pro'); fdb.seed_login('gm@pines.org','pines','staff',name='GM')
+  fdb.seed_login('pro@wccc.org','wccc','staff',name='Head Pro'); fdb.seed_login('gm@pines.org','pines','staff',name='GM'); fdb.seed_login('ops@pines.org','pines','staff',name='Pines Ops')
   fdb.seed_login('mgaboard@x.org','wccc','org',['mga'],manage=True,name='MGA President'); fdb.seed_login('member@x.org','wccc','org',['mga'],name='MGA Treasurer')
   fdb.seed_login('zach@flagstick.test',admin=True,name='Zach')
   async with async_playwright() as pw:
@@ -63,6 +63,29 @@ async def main():
     await p1.wait_for_function("()=>document.getElementById('dTitle').textContent==='Invite sent'",timeout=8000)
     u=next((x for x in fdb._rows('tenant_users') if x['email']=='dave@x.org'),None)
     bad+=check('staff invite a board administrator for a small group through the function',u and u['role']=='org' and u['orgs']==['misfits'] and u['manage'] and u['tenant']=='wccc' and any(a['email']=='dave@x.org' and a.get('invited') for a in fdb.auth_users),u)
+    body=await p1.evaluate("()=>document.getElementById('dBody').textContent"); lnk=await p1.evaluate("()=>(document.getElementById('lrL')||{}).value||''")
+    m=fdb.mails[-1] if fdb.mails else None
+    bad+=check('the invitation went through the club’s mailer with a 7-day link the drawer also shows to copy',m and m['to']=='dave@x.org' and m['kind']=='invite' and '#invite=' in lnk and lnk==m['link'] and 'works for 7 days' in body,(m,lnk))
+    await p1.evaluate("()=>closeDrawer()")
+    # resend from the login's drawer: a fresh token and e-mail, the grant untouched
+    await p1.wait_for_function("""()=>document.querySelector('[data-lu="u-dave@x.org"]')""",timeout=8000)
+    await p1.evaluate("""()=>{ document.querySelector('[data-lu="u-dave@x.org"]').click(); document.getElementById('lgResend').click(); }""")
+    await p1.wait_for_function("()=>document.getElementById('lgMsg').textContent.includes('will receive')",timeout=8000)
+    bad+=check('Resend the invite: a second token and e-mail, the grant untouched',len([m for m in fdb.mails if m['to']=='dave@x.org'])==2 and len([i for i in fdb.invites if i['user_id']=='u-dave@x.org'])==2 and next(x for x in fdb._rows('tenant_users') if x['email']=='dave@x.org')['orgs']==['misfits'],len(fdb.mails))
+    await p1.evaluate("()=>closeDrawer()")
+    # the mailer not set up: the login and the invitation still exist and the link is handed over to copy
+    fdb.mail_ok=False
+    await p1.evaluate("""()=>{ document.getElementById('lgInv_misfits').click(); document.getElementById('lgE').value='eve@x.org'; document.getElementById('lgN').value='Eve'; document.getElementById('dSave').click(); }""")
+    await p1.wait_for_function("()=>document.getElementById('dTitle').textContent.startsWith('Invite ready')",timeout=8000)
+    r=await p1.evaluate("()=>({body:document.getElementById('dBody').textContent,link:(document.getElementById('lrL')||{}).value||''})")
+    bad+=check('without a mailer the drawer says so and hands over the link','could not go out' in r['body'] and 'RESEND_API_KEY' in r['body'] and '#invite=' in r['link'] and any(x['email']=='eve@x.org' for x in fdb._rows('tenant_users')),r)
+    fdb.mail_ok=True; await p1.evaluate("()=>closeDrawer()")
+    # an existing login (another club's staff) invited to a board: linked, never duplicated
+    n_auth=len(fdb.auth_users)
+    await p1.evaluate("""()=>{ document.getElementById('lgInv_misfits').click(); document.getElementById('lgE').value='ops@pines.org'; document.getElementById('lgN').value='Pines Ops'; document.getElementById('dSave').click(); }""")
+    await p1.wait_for_function("()=>document.getElementById('dTitle').textContent==='Invite sent'",timeout=8000)
+    u=next((x for x in fdb._rows('tenant_users') if x['email']=='ops@pines.org' and x['tenant']=='wccc'),None)
+    bad+=check('an existing login elsewhere is linked to the board, not duplicated',u and u['role']=='org' and u['orgs']==['misfits'] and len(fdb.auth_users)==n_auth and fdb.mails[-1]['to']=='ops@pines.org',u)
     await p1.evaluate("()=>closeDrawer()")
     # ---- 3. a board login: lands on its own hub, cut-down club document, no club hub, the Board page invites
     fdb.me='u-mgaboard@x.org'
@@ -178,6 +201,21 @@ async def main():
     await pl.wait_for_function("()=>cloudReady",timeout=10000)
     r=await pl.evaluate("()=>({shown:document.getElementById('login').classList.contains('show'), name:CLUB&&CLUB.name})")
     bad+=check('after saving the password the hub opens',not r['shown'] and r['name']=='Walnut Creek Country Club',r)
+    # ---- 7. arriving by an invitation link: accepted once, the password screen, their own hub; a second use is refused
+    tok=next(i['token'] for i in fdb.invites if i['user_id']=='u-dave@x.org' and not i['used'])
+    fdb.me='u-dave@x.org'; fdb.admin=False
+    c8=await b.new_context(); await cloud(c8,fdb)
+    pi,ei=await open_page(c8,'?org=club&tenant=app.wcccmga.org',ready="()=>document.getElementById('loginPw2')&&!document.getElementById('loginPw2').hidden",hash='#invite='+tok)
+    r=await pi.evaluate("()=>({sub:document.getElementById('loginSub').textContent, pw2:document.getElementById('loginPw2').hidden, hash:location.hash})")
+    bad+=check('an invitation link is accepted and asks for a password first; the token leaves the address bar',r['sub'].startswith('Welcome') and not r['pw2'] and r['hash']=='' and next(i for i in fdb.invites if i['token']==tok)['used'] and not ei,r,ei)
+    await pi.evaluate("()=>{ document.getElementById('loginPw').value='Dave-Pass-33'; document.getElementById('loginPw2').value='Dave-Pass-33'; document.getElementById('loginBtn').click(); }")
+    await pi.wait_for_function("()=>cloudReady&&db&&db.id==='misfits'",timeout=10000)
+    r=await pi.evaluate("()=>({shown:document.getElementById('login').classList.contains('show'), org:db&&db.id, scoped:SCOPED})")
+    bad+=check('after the password the board administrator lands on their own hub',not r['shown'] and r['org']=='misfits' and r['scoped'],r)
+    c9=await b.new_context(); await cloud(c9,fdb,no_session=True)   # the e-mail link clicked again, in a browser with no session
+    pj,ej=await open_page(c9,'?org=club&tenant=app.wcccmga.org',ready="()=>document.getElementById('loginErr').textContent.length>0",hash='#invite='+tok)
+    r=await pj.evaluate("()=>({err:document.getElementById('loginErr').textContent, show:document.getElementById('login').classList.contains('show')})")
+    bad+=check('a used invitation link is refused with a word about why, on the sign-in card','already been used' in r['err'] and r['show'] and not ej,r,ej)
     await b.close()
   print('ALL OK' if not bad else f'{bad} FAILED'); sys.exit(1 if bad else 0)
 asyncio.run(main())

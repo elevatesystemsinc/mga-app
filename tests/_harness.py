@@ -16,7 +16,7 @@ async def local(pg):
 def page(name): return 'file://'+os.path.join(ROOT,name)
 
 class FakeDB:
-    def __init__(self): self.rows={}; self.writes=collections.Counter(); self.reads=0; self.tenancy=False; self.admin=False; self.user_tenants=['wccc']; self.grants=None; self.me='u-board'; self.auth_users=[]; self.fn=True; self.mails=[]; self.payaccts={}; self.paylog=[]; self.payn=0; self.deluxe_decline=False
+    def __init__(self): self.rows={}; self.writes=collections.Counter(); self.reads=0; self.tenancy=False; self.admin=False; self.user_tenants=['wccc']; self.grants=None; self.me='u-board'; self.auth_users=[]; self.fn=True; self.mails=[]; self.payaccts={}; self.paylog=[]; self.payn=0; self.deluxe_decline=False; self.invites=[]; self.mail_ok=True
     # portal-setup.sql: a login (auth user + tenant_users row). role 'staff' | 'org'; orgs; manage
     def seed_login(self,email,tenant=None,role='staff',orgs=(),manage=False,name='',admin=False):
         uid='u-'+email; self.auth_users.append({'id':uid,'email':email,'password':'pw','created_at':'2026-01-01T00:00:00Z','last_sign_in_at':None,'confirmed':True,'name':name})
@@ -700,11 +700,19 @@ class FakeDB:
         if name=='payments' and self.fn: return self._payments(b)
         if name!='admin-users' or not self.fn: return json.dumps({'data':None,'error':{'name':'FunctionsFetchError','message':'Failed to send a request to the Edge Function'}})
         act=b.get('action'); email=str(b.get('email','')).strip().lower()
+        if act=='accept':   # no sign-in: an invite token → a one-time sign-in (login-invites-setup.sql + the function)
+            inv=next((i for i in self.invites if i['token']==b.get('token')),None)
+            if not inv: return json.dumps({'data':{'error':'That invitation link is not valid'},'error':None})
+            if inv.get('used'): return json.dumps({'data':{'error':'That invitation link has already been used — sign in with your password, or ask for a new invitation'},'error':None})
+            inv['used']=True; u=next(u for u in self.auth_users if u['id']==inv['user_id'])
+            return json.dumps({'data':{'ok':True,'data':{'token_hash':'tok-'+u['id'],'email':u['email'],'fresh':not u.get('last_sign_in_at'),'tenant':inv['tenant'],'role':inv['role']}},'error':None})
         is_admin=self.admin; g=self._my_grant(b.get('tenant')) if b.get('tenant') else None
         role='org' if b.get('role')=='org' else 'staff'; orgs=[str(x) for x in (b.get('orgs') or [])]
+        target=next((r for r in self._rows('tenant_users') if r['user_id']==b.get('user_id') and r['tenant']==b.get('tenant')),None) if b.get('tenant') and act in ('set_password','reinvite') else None
         may=is_admin
-        if not may and b.get('tenant') and not b.get('admin') and act in ('create','invite','set_password'):
-            if g and g['role']=='staff': may=True
+        if not may and b.get('tenant') and not b.get('admin') and act in ('create','invite','set_password','reinvite'):
+            if act in ('set_password','reinvite'): may=bool(target) and bool(g) and (g['role']=='staff' or bool(g['role']=='org' and g.get('manage') and target['role']=='org' and set(target['orgs'])<=set(g['orgs'])))
+            elif g and g['role']=='staff': may=True
             elif g and g['role']=='org' and g.get('manage') and role=='org' and orgs and set(orgs)<=set(g['orgs']): may=True
         if not may: return json.dumps({'data':{'error':'Your login may not manage these logins'},'error':None})
         def link(uid):
@@ -712,10 +720,29 @@ class FakeDB:
                 rows=self._rows('tenant_users'); rows[:]=[r for r in rows if not(r['user_id']==uid and r['tenant']==b['tenant'])]
                 rows.append({'user_id':uid,'tenant':b['tenant'],'role':role,'orgs':orgs,'manage':role=='org' and bool(b.get('manage')),'email':email,'name':b.get('name') or '','invited_at':('2026-10-20T00:00:00Z' if act=='invite' else None),'created_at':'2026-10-20T00:00:00Z'})
             if b.get('admin'): self._rows('flagstick_admins').append({'user_id':uid,'email':email,'created_at':'2026-10-20T00:00:00Z'})
-        if act in ('create','invite'):
+        def invite(uid,to,signed_in):   # a 7-day token + the e-mail through the mailer; the link comes back whatever happened
+            tok=('invite-%d-%s-token'%(len(self.invites)+1,uid)).replace('@','-').replace('.','-'); self.invites.append({'token':tok,'user_id':uid,'tenant':b.get('tenant'),'role':'admin' if b.get('admin') else role,'used':False})
+            base=b.get('redirect') or ('https://%s.flagstickhub.com/'%b['tenant'] if b.get('tenant') else 'https://app.flagstickhub.com/'); lnk=base+'#invite='+tok
+            if self.mail_ok: self.mails.append({'to':to,'subject':('You now have access' if signed_in else "You're invited")+' · '+str(b.get('tenant') or 'flagstick'),'link':lnk,'kind':'invite'})
+            return {'sent':self.mail_ok,'link':lnk,'mailError':None if self.mail_ok else 'not configured: set RESEND_API_KEY','from':'resend' if self.mail_ok else None,'signedIn':signed_in}
+        if act=='create':
             if any(u['email']==email for u in self.auth_users): return json.dumps({'data':{'error':'A user with this email address has already been registered'},'error':None})
-            uid='u-'+email; self.auth_users.append({'id':uid,'email':email,'password':b.get('password'),'created_at':'2026-10-20T00:00:00Z','last_sign_in_at':None,'confirmed':act=='create','name':b.get('name') or '','invited':act=='invite'})
+            uid='u-'+email; self.auth_users.append({'id':uid,'email':email,'password':b.get('password'),'created_at':'2026-10-20T00:00:00Z','last_sign_in_at':None,'confirmed':True,'name':b.get('name') or ''})
             link(uid); return json.dumps({'data':{'ok':True,'data':{'id':uid,'email':email}},'error':None})
+        if act=='invite':
+            u=next((u for u in self.auth_users if u['email']==email),None); existed=bool(u)
+            if not u: u={'id':'u-'+email,'email':email,'password':None,'created_at':'2026-10-20T00:00:00Z','last_sign_in_at':None,'confirmed':True,'name':b.get('name') or '','invited':True}; self.auth_users.append(u)
+            link(u['id']); r=invite(u['id'],email,bool(u.get('last_sign_in_at')))
+            return json.dumps({'data':{'ok':True,'data':dict({'id':u['id'],'email':email,'existed':existed},**r)},'error':None})
+        if act=='reinvite':
+            u=next((u for u in self.auth_users if u['id']==b.get('user_id')),None)
+            if not u: return json.dumps({'data':{'error':'That login no longer exists'},'error':None})
+            if b.get('tenant'):
+                if not target: return json.dumps({'data':{'error':'No such login here'},'error':None})
+                role=target['role']; orgs=list(target['orgs']); target['invited_at']='2026-10-21T00:00:00Z'
+            elif not is_admin: return json.dumps({'data':{'error':'Not allowed'},'error':None})
+            r=invite(u['id'],u['email'],bool(u.get('last_sign_in_at')))
+            return json.dumps({'data':{'ok':True,'data':dict({'id':u['id'],'email':u['email'],'existed':True},**r)},'error':None})
         if act=='set_password':
             u=next((u for u in self.auth_users if u['id']==b.get('user_id')),None)
             if not u: return json.dumps({'data':{'error':'User not found'},'error':None})
