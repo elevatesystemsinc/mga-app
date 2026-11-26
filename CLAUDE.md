@@ -120,7 +120,7 @@ python3 tests/test_schedule.py # a tournament's schedule across the days before 
 python3 tests/test_payments.py # online payments through Deluxe against the fake: credentials → connected, the portal's hosted form → a payment posted once, a declined card, autopay, refund, charge card on file, the hub register and a station's card sheet, the wallet, the staff view, the invitations
 python3 tests/test_tour.py    # the guided demo: every step on three hubs, the chapter picker, resume / restart / end, no tour without ?demo
 python3 tests/test_crm.py     # companies & contacts: a company and its people, a sponsor picked from the list (its contact onto the directory), the record, the MGA's link-by-name, one write, a scoped login reads only; a nonprofit's Contacts (household, individual sponsor, billing contact, named seats → golfers, tags, person record, vendor)
-python3 tests/test_office.py  # Flagstick's back office in the portal against the fake: a lead through the pipeline, an estimate (PDF, sent, accepted, converted), the contract's billing cycle (idempotent), a payment, a void, review mode
+python3 tests/test_office.py  # Flagstick's back office in the portal against the fake: a club through the pipeline, a proposal from its modules (PDF, sent, accepted, subscribed → the hub's modules switched on), the contract's billing cycle (idempotent), a payment, a void, the hub paused for non-payment, review mode
 python3 tests/test_allow.py   # a game at 90% with its skins at 85%: the day's allowance and a competition's exception on the hub and a phone; a game that sets neither reads 100%
 git add -A && git commit && git push origin main  # Render deploys main to app.wcccmga.org
 ```
@@ -1366,37 +1366,50 @@ groups, printed scorecards — the printed cards include a live-scoring QR that 
   `pub.game.failWord`, read by the hub's `skinsCallout` flash and the phones' `calloutStage`. Set on that day's game only.
 - **Built Nov 26, 2026 (the back office in the portal; the owner: "build invoicing, clients, estimating, and some kind of lead pipeline / CRM
   for us to be selling to these clubs out of, as well as a contracts section for automated billing and invoicing… model the automated
-  invoicing and billing off of the PSA app"):** `src/office.js` + `flagstick-office-setup.sql` (applied), modelled on the Elevate PSA's
-  Lead → Estimate → Contract → Invoice → Payment. The portal's rail is sectioned — **Sales** (Pipeline, Estimates) · **Clients** (Clients,
-  Contracts, Invoices) · **Library** (Courses) · **Flagstick** (Catalog & billing, Team, Activity); `vOffice(m)` answers the dispatcher
-  first, `loadOffice()` rides `loadPortal()` and ends with `ofRunBilling({quiet:true})`. `OF` is the state (every fs_ table loaded whole —
-  Flagstick's own volume). Numbers come from `fs_next_number(kind)` (L-2000, Q-1000, C-7000, INV-9000; the fake emulates it). **Pipeline**
-  (`vPipeline`, `leadDrawer`): a board of New · Contacted · Qualified · Proposal sent with a Closed list; a lead carries the club, its kind,
-  the contact, recurring / one-time value, owner, source, expected close, a `log` of dated notes (stage changes logged); **Won — set the club up
-  as a client** opens `editClient(null, preset)` prefilled (portal.js takes a preset now; `officeClientCreated` links the lead to the new
-  tenant and puts the contact on the record), or *Link an existing client*. **Estimates** (`vEstimates` / `vEstimate` / `estimateDrawer`): the
-  shared lines editor (`itemsEditor` / `ofWireItems` / `readItems`: catalog pick or a typed line, qty, unit price, a per-line and a
-  document-wide discount, Monthly / Yearly / One-time), `estSplit(e)` = the monthly recurring money and the one-time money; PDF
-  (`estimatePDF`), **Send** (`sendEstimate` → `ofMail`: the `mail` function with `tenant ''` → Flagstick's own MAIL_FROM, the PDF attached),
-  Accepted / Declined, **Convert** (`convertDrawer`: the client must be a tenant; recurring lines → a contract — a yearly line on a monthly
-  contract becomes a twelfth per cycle, a monthly line on a quarterly contract three months —, one-time lines → an invoice; the estimate is
-  `converted`, the lead won). **Contracts** (`vContracts` / `vContract` / `contractDrawer`): lines per cycle, `start_on`, `billing_day`
-  (1–28), `frequency` monthly | quarterly | semiannual | annual, `timing` advance | arrears, `terms_days`, `lead_days`, `escalator_pct`
-  (every line × (1+pct)^years on the anniversary), `discount_pct`, `end_on`, `last_period`; the cycle engine is the PSA's (`cycleFor`,
-  `kForNow`, `billableCycle`, `nextCycle`, `periodCovered` = a non-void invoice for the period or `last_period` ≥ it — never bill a covered
-  period); `genInvoice(c, cy)` makes the period's invoice once (items × the escalator, the period label in the detail, due = invoice date +
-  terms) and moves `last_period` forward; **`ofRunBilling`** runs every active contract: mode **auto** (Catalog & billing → Billing) generates
-  on the invoice date whenever the portal loads or Run billing is pressed, optionally e-mailing it at once (`autosend`); mode **review**
-  lists what is due on the Contracts page and waits for Generate. Activate / Pause / End / Run next invoice on the record. **Invoices**
-  (`vInvoices` / `vInvoice` / `invoiceDrawer`): status draft → sent (Send e-mails the PDF to the client's billing e-mail; asks for an address
-  when there is none) → partial / paid as payments land (`paymentDrawer` → `fs_payments`, `recalcPaid`) · void with a reason (the row stays);
-  Overdue = sent past `due_on`; filters Open · Overdue · Paid · Draft · Void; `invoicePDF`. The **client record** carries a Billing card
-  (`officeClientCard`: contracts with the next invoice, invoices with the open balance, estimates; New estimate / contract / invoice). **Catalog
-  & billing** (`vCatalog`): the items (`fs_catalog`: kind, price, monthly / yearly / one-time, taxable), the billing settings (`fs_settings`
-  'billing': mode, autosend, terms, tax rate, estimate terms) and the remit-to block (`fs_settings` 'company': name, address, e-mail, phone,
-  how to pay — on every PDF and e-mail). Not built: a public accept link for estimates (the PSA has one), online payment of a Flagstick
-  invoice, a scheduled run outside the portal (the run happens when the portal is open — `ofRunBilling` is idempotent, so a cron calling the
-  same logic is the next step if needed).
+  invoicing and billing off of the PSA app" — then: "this shouldn't be a direct copy of the PSA, just guidelines… tailor what you're building
+  to be specific to the industry we're working in and the types of product we're selling"):** `src/office.js` + `flagstick-office-setup.sql`
+  (applied). The shape is the PSA's (lead → proposal → contract → recurring invoices → payments); the words, fields and actions are this
+  industry's. The portal's rail is sectioned — **Sales** (Pipeline, Proposals) · **Clients** (Clients, Contracts, Invoices) · **Library**
+  (Courses) · **Flagstick** (Catalog & billing, Team, Activity); `vOffice(m)` answers the dispatcher first, `loadOffice()` rides `loadPortal()`
+  and ends with `ofRunBilling({quiet:true})`. `OF` is the state (every fs_ table loaded whole — Flagstick's own volume). Numbers come from
+  `fs_next_number(kind)` (L-2000, P-1000, C-7000, INV-9000; the fake emulates it). **Pipeline** (`vPipeline`, `leadDrawer`): **a lead is a
+  club** — its type (`CLIENT_KINDS`), holes, members, what it runs on today (`SYSTEMS`: Golf Genius, Club Essentials, Jonas…), the modules it
+  is after (`l.modules`, the chips on the card), the contact and their role (`CONTACT_ROLES`: head pro, GM, board president…), when it wants
+  to be live (`live_by`, the season), the subscription value per month and the set-up money, a `log` of dated notes. **The stages are our
+  motion**: New · Contacted · **Demo given** (`demo_at`) · Proposal sent · **Trial hub** · Won / Lost. From the lead: **Set up a trial hub**
+  (`editClient(null, preset)` with status trial, the lead's modules and plan, the contact onto the record — `officeClientCreated` links the
+  lead and leaves it on Trial), **Won — set the club up as a client**, or link an existing one. KPIs: clubs in the pipeline (with the top
+  current systems), pipeline MRR, demos & trials, won this year with the win rate. **Proposals** (`vEstimates` / `vEstimate` /
+  `estimateDrawer`, table `fs_estimates`): **built from the product** — the drawer's product block (`offeringsBlock` / `wireOfferings`) lists
+  the catalog items that are modules (`fs_catalog.module` golf | pos | club | events, with a monthly price and a `price_year`) as tick boxes,
+  **Subscription billed Monthly | Yearly** (`e.billing`; `offerPrice`) reprices them; a new proposal starts from the modules the lead asked
+  for (or the client has), each line's detail = the module's description so the PDF says what is included; set-up, the roster import, course
+  cards and training come from the catalog list under the lines (`itemsEditor` / `ofWireItems` / `readItems`, per-line and whole-document
+  discounts). `estSplit(e)` = the subscription per month and the one-time money. PDF (`estimatePDF`: "The subscription · billed monthly",
+  "Set-up & training"), **Send** (`sendEstimate` → `ofMail`: the `mail` function with `tenant ''` → Flagstick's MAIL_FROM, the PDF attached),
+  Accepted / Declined, **Subscribe** (`convertDrawer`: the club must have a hub — a client or a trial; the subscription lines → a contract
+  titled after its modules, frequency annual when the proposal was billed yearly; the one-time lines → the first invoice "Set-up and training";
+  the proposal reads Subscribed, the lead is won). **Contracts** (`vContracts` / `vContract` / `contractDrawer`): **the subscription is the
+  club's modules** — `ctModules(c)` from the lines' catalog items, and `applySubscription(c)` on activation (and on Subscribe) writes
+  `tenants.modules` / `plan` (club includes pos + billing), `started_on`, `renews_on` (a year from the start), and makes a prospect, trial or
+  suspended tenant **active** — the hub picks it up on its next load. Lines per cycle, `start_on`, `billing_day` (1–28), `frequency` monthly |
+  quarterly | semiannual | annual, `timing` advance | arrears, `terms_days`, `lead_days`, `escalator_pct` (the price rise on each anniversary),
+  `discount_pct`, `end_on`, `last_period`; the cycle engine is the PSA's (`cycleFor`, `kForNow`, `billableCycle`, `nextCycle`, `periodCovered`
+  = a non-void invoice for the period or `last_period` ≥ it — never bill a covered period); `genInvoice(c, cy)` makes the period's invoice once
+  and moves `last_period` forward; **`ofRunBilling`** runs every active contract: mode **auto** (Catalog & billing → Billing) generates on the
+  invoice date whenever the portal loads or Run billing is pressed, optionally e-mailing it at once (`autosend`); mode **review** lists what is
+  due on the Contracts page and waits for Generate. **Pause** can pause the club's hub too (`pauseHub` → status suspended, the paused notice,
+  data kept); **End** can mark the club inactive on the last day; Run next invoice on the record. **Invoices** (`vInvoices` / `vInvoice` /
+  `invoiceDrawer`): draft → sent (Send e-mails the PDF to the club's billing e-mail; asks for an address when there is none) → partly paid /
+  paid as payments land (`paymentDrawer` → `fs_payments`, `recalcPaid`) · void with a reason (the row stays); Overdue = sent past `due_on`, and
+  an overdue invoice offers **Pause the hub** (non-payment, logged); the PDF reads "Subscription invoice" for a contract's and carries the hub
+  address. The **client record** carries a Billing card (`officeClientCard`: the subscription with its next invoice, invoices with the open
+  balance, proposals; New proposal / contract / invoice). **Catalog & billing** (`vCatalog`): the items (`fs_catalog`: kind, price, monthly /
+  yearly / one-time, the module it switches on, the yearly price, taxable — seeded with the four modules, set-up and migration off Golf Genius,
+  the member data import, course card builds and training days), the billing settings (`fs_settings` 'billing': mode, autosend, terms, tax rate,
+  proposal terms) and the remit-to block (`fs_settings` 'company': on every PDF and e-mail). Not built: a public accept link for proposals, online
+  payment of a Flagstick invoice, a scheduled run outside the portal (`ofRunBilling` is idempotent, so a cron calling the same logic is the next
+  step if needed). `tests/test_office.py` runs it against the fake.
 - **The guided demo (Nov 24, 2026; the owner: "a button inside each tenant… right next to Open Hub, there should be a demo button… a
   guided, interactive walkthrough of the entire software… this is how we're going to sell and demo this software to each club"):**
   `src/tour.js`. The portal's client record has **Demo** beside Open hub → `openHub(t,'?demo=1')`: the hub opens signed in with the
