@@ -19,7 +19,7 @@ async def main():
       t['billing_email']='ap@pines.org'; t['address']={'line1':'1 Pine Way','city':'Dallas','state':'TX','zip':'75001'}
   fdb.seed('mga_hub','club',{'v':2,'id':'club','kind':'club','name':'The Pines Golf Club','short':'Pines','members':[],'orgs':[],'activeSeason':'2026','seasons':{'2026':{}},'tournaments':[],'_rev':2,'_w':'x','_at':1},tenant='pines')
   fdb.seed_login('zach@flagstick.test',admin=True,name='Zach'); fdb.me='u-zach@flagstick.test'; fdb.admin=True
-  fdb._rows('fs_catalog').extend([{'id':'cat-club','name':'Club management','descr':'The full club','kind':'subscription','recurring':True,'every':'month','unit_price':799,'unit':'club','taxable':False,'active':True,'sort':1},
+  fdb._rows('fs_catalog').extend([{'id':'cat-club','name':'Club management','descr':'The full club','kind':'subscription','recurring':True,'every':'month','unit_price':799,'unit':'club','taxable':False,'active':True,'sort':1,'module':'club','price_year':8400},
                                   {'id':'cat-setup','name':'Set-up and data migration','descr':'','kind':'setup','recurring':False,'every':'month','unit_price':1500,'unit':'','taxable':False,'active':True,'sort':2}])
   async with async_playwright() as pw:
     b=await pw.chromium.launch(); c=await b.new_context(); await cloud(c,fdb)
@@ -29,36 +29,41 @@ async def main():
     bad+=check('the rail: Sales · Clients · Library · Flagstick, the office loaded with the catalog',r['nav']==['pipeline','estimates','clients','contracts','invoices','courses','catalog','team','activity'] and r['secs']==['Sales','Clients','Library','Flagstick'] and r['cat']==2 and not errs,r,errs)
     # ---- 1. the pipeline
     await pg.evaluate("()=>{ document.querySelector('[data-pv=pipeline]').click(); }"); await pg.wait_for_timeout(200)
-    await pg.evaluate("""()=>{ document.getElementById('ofNewLead').click(); olC.value='Shady Valley Country Club'; olT.value='Club management for 2027'; olN.value='Pat Pro'; olE.value='pat@shadyvalley.org'; olCity.value='Arlington'; olSt.value='TX'; olR.value='799'; olOne.value='1500'; document.getElementById('dSave').click(); }""")
+    await pg.evaluate("""()=>{ document.getElementById('ofNewLead').click(); olC.value='Shady Valley Country Club'; olT.value='Club management for 2027'; olN.value='Pat Pro'; olE.value='pat@shadyvalley.org'; olCity.value='Arlington'; olSt.value='TX'; olR.value='799'; olOne.value='1500'; olH.value='18'; olM.value='450'; olSys.value='Club Essentials'; olTitle.value='General manager'; document.querySelector('[data-olm=club]').checked=true; document.getElementById('dSave').click(); }""")
     await pg.wait_for_timeout(500)
     r=await pg.evaluate("()=>({h1:document.querySelector('#main h1').textContent,cards:[...document.querySelectorAll('[data-lead]')].map(x=>x.querySelector('b').textContent),no:OF.leads[0].number,kpi:[...document.querySelectorAll('.kpi .v')].map(x=>x.textContent)})")
-    bad+=check('a new lead: numbered from 2000, on the New column, the pipeline KPIs',r['h1']=='Pipeline' and r['cards']==['Shady Valley Country Club'] and r['no']==2000 and r['kpi'][0]=='1' and r['kpi'][1]=='$799.00',r)
-    await pg.evaluate("""()=>{ document.querySelector('[data-lead]').click(); document.querySelector('#olS [data-v=qualified]').click(); document.getElementById('dSave').click(); }"""); await pg.wait_for_timeout(400)
     l=fdb._rows('fs_leads')[0]
-    bad+=check('stage → Qualified, logged on the lead',l['stage']=='qualified' and any('Qualified' in x['text'] for x in l['log']) and any(e['kind']=='lead' for e in fdb._rows('tenant_events')),[l['stage'],[x['text'] for x in l['log']]])
+    bad+=check('a new lead: numbered from 2000, on the New column with the club’s facts, the pipeline KPIs',r['h1']=='Pipeline' and r['cards']==['Shady Valley Country Club'] and r['no']==2000 and r['kpi'][0]=='1' and r['kpi'][1]=='$799.00' and l['holes']==18 and l['members_n']==450 and l['current_system']=='Club Essentials' and l['modules']=={'club':True} and l['contact_title']=='General manager',(r,l['holes'],l['modules']))
+    await pg.evaluate("""()=>{ document.querySelector('[data-lead]').click(); document.querySelector('#olS [data-v=demo]').click(); document.getElementById('dSave').click(); }"""); await pg.wait_for_timeout(400)
+    l=fdb._rows('fs_leads')[0]
+    bad+=check('stage → Demo given, logged on the lead, the demo dated',l['stage']=='demo' and l['demo_at'] and any('Demo given' in x['text'] for x in l['log']) and any(e['kind']=='lead' for e in fdb._rows('tenant_events')),[l['stage'],[x['text'] for x in l['log']]])
     # ---- 2. an estimate from the lead: a recurring line from the catalog, a one-time line, 10% off
     await pg.evaluate("""()=>{ document.querySelector('[data-lead]').click(); document.getElementById('olEst').click(); }"""); await pg.wait_for_timeout(300)
-    r=await pg.evaluate("()=>({title:document.getElementById('dTitle').textContent,company:oeC.value,contact:oeN.value,email:oeE.value})")
-    bad+=check('New estimate from the lead is prefilled',r['company']=='Shady Valley Country Club' and r['contact']=='Pat Pro' and r['email']=='pat@shadyvalley.org',r)
-    await pg.evaluate("""()=>{ const p=document.getElementById('oiPick'); p.value='cat-club'; p.dispatchEvent(new Event('change')); p.value='cat-setup'; p.dispatchEvent(new Event('change')); document.getElementById('oiWide').value='10'; document.getElementById('oiWide').dispatchEvent(new Event('input')); }""")
+    r=await pg.evaluate("()=>({title:document.getElementById('dTitle').textContent,company:oeC.value,contact:oeN.value,email:oeE.value,rows:[...document.querySelectorAll('#oiList .oi [data-k=descr]')].map(x=>x.value),ticked:[...document.querySelectorAll('[data-offer]:checked')].map(x=>x.dataset.offer)})")
+    bad+=check('New proposal from the lead is prefilled — the club, the contact, and Club management as a line from the modules it is after',r['company']=='Shady Valley Country Club' and r['contact']=='Pat Pro' and r['email']=='pat@shadyvalley.org' and r['rows']==['Club management'] and r['ticked']==['cat-club'],r)
+    await pg.evaluate("""()=>{ const p=document.getElementById('oiPick'); p.value='cat-setup'; p.dispatchEvent(new Event('change')); document.getElementById('oiWide').value='10'; document.getElementById('oiWide').dispatchEvent(new Event('input')); }""")
     r=await pg.evaluate("()=>({rows:document.querySelectorAll('#oiList .oi').length,tot:document.getElementById('oiTot').textContent})")
-    bad+=check('the lines editor: two catalog lines, the running total with 10% off',r['rows']==2 and r['tot']=='$719.10 / month recurring · $1,350.00 one-time',r)
+    bad+=check('the lines editor: the module line plus set-up from the catalog, the running total with 10% off',r['rows']==2 and r['tot']=='$719.10 / month recurring · $1,350.00 one-time',r)
+    r=await pg.evaluate("""()=>{ document.querySelector('#oeBill [data-v=year]').click(); const a=document.getElementById('oiTot').textContent, p=document.querySelector('#oiList .oi[data-cat=cat-club] [data-k=unit_price]').value; document.querySelector('#oeBill [data-v=month]').click(); return {a,p,b:document.getElementById('oiTot').textContent}; }""")
+    bad+=check('billed yearly reprices the module line from the catalog’s yearly price and back',r['p']=='8400' and r['a']=='$630.00 / month recurring · $1,350.00 one-time' and r['b']=='$719.10 / month recurring · $1,350.00 one-time',r)
     await pg.evaluate("()=>document.getElementById('dSave').click()"); await pg.wait_for_timeout(500)
     e=fdb._rows('fs_estimates')[0]
     r=await pg.evaluate("()=>({view:PS.view,h1:document.querySelector('#main h1').textContent,chips:[...document.querySelectorAll('#main .sub .chip')].map(x=>x.textContent),lead:OF.leads[0].value_recurring})")
-    bad+=check('estimate Q-1000 saved, drafted, on its page; the lead keeps its own value',e['number']==1000 and e['status']=='draft' and e['lead_id']==l['id'] and len(e['items'])==2 and e['discount_pct']==10 and r['view']=='estimate' and r['h1']=='Q-1000 · Shady Valley Country Club' and r['chips']==['Draft'],(e['number'],e['status'],r))
+    bad+=check('proposal P-1000 saved, drafted, on its page; the lead keeps its own value',e['number']==1000 and e['status']=='draft' and e['lead_id']==l['id'] and len(e['items'])==2 and e['discount_pct']==10 and r['view']=='estimate' and r['h1']=='P-1000 · Shady Valley Country Club' and r['chips']==['Draft'],(e['number'],e['status'],r))
     # the PDF and the e-mail (the fake's mail function records what it got)
     r=await pg.evaluate("async()=>{ const d=await estimatePDF(OF.estimates[0]); return {pages:d.getNumberOfPages(),len:d.output('datauristring').length}; }")
     bad+=check('the proposal PDF renders',r['pages']==1 and r['len']>20000,r)
     await pg.evaluate("()=>document.getElementById('oeSend').click()"); await pg.wait_for_function("()=>OF.estimates[0].status==='sent'",timeout=8000); await pg.wait_for_timeout(200)
     m=fdb.mails[-1]
-    bad+=check('Send: the mail function got the PDF, the estimate is Sent',m['to']=='pat@shadyvalley.org' and 'Q-1000' in m['subject'] and m['attachments'][0]['filename']=='Q-1000.pdf' and len(m['attachments'][0]['content'])>10000 and m['tenant']=='' and e['status']=='sent',(m['to'],m['subject'],e['status']))
+    bad+=check('Send: the mail function got the PDF, the estimate is Sent',m['to']=='pat@shadyvalley.org' and 'P-1000' in m['subject'] and m['attachments'][0]['filename']=='P-1000.pdf' and len(m['attachments'][0]['content'])>10000 and m['tenant']=='' and e['status']=='sent',(m['to'],m['subject'],e['status']))
     # accepted, then converted — needs a client; link the lead's club to the Pines tenant through the convert drawer
     await pg.evaluate("()=>{ document.getElementById('oeAcc').click(); document.getElementById('dSave').click(); }"); await pg.wait_for_function("()=>OF.estimates[0].status==='accepted'",timeout=8000); await pg.wait_for_timeout(200)
     await pg.evaluate("""()=>{ document.getElementById('oeConv').click(); ocT.value='pines'; ocStart.value='2026-11-01'; ocDay.value='1'; ocTerms.value='15'; ocInvTerms.value='15'; document.getElementById('dSave').click(); }""")
     await pg.wait_for_function("()=>PS.view==='contract'",timeout=8000); await pg.wait_for_timeout(500)
     ct=fdb._rows('fs_contracts')[0]; invs=fdb._rows('fs_invoices'); e=fdb._rows('fs_estimates')[0]; l=fdb._rows('fs_leads')[0]
     bad+=check('convert: an active contract from the recurring line, an invoice from the one-time line, the estimate converted, the lead won',ct['number']==7000 and ct['status']=='active' and ct['tenant']=='pines' and len(ct['items'])==1 and ct['items'][0]['unit_price']==799 and ct['discount_pct']==10 and ct['terms_days']==15 and e['status']=='converted' and e['contract_id']==ct['id'] and l['stage']=='won' and l['tenant']=='pines',(ct['status'],e['status'],l['stage'],[ (i['number'],i['period'],i['total']) for i in invs]))
+    pt=next(t for t in fdb._rows('tenants') if t['slug']=='pines')
+    bad+=check('the subscription switched the modules on for the club: plan club, club + pos + billing, renews a year from the start',pt['plan']=='club' and pt['modules'].get('club') and pt['modules'].get('pos') and pt['modules'].get('billing') and pt['renews_on']=='2027-11-01' and pt['started_on']=='2026-11-01' and any(e['kind']=='modules' for e in fdb._rows('tenant_events')),(pt['plan'],pt['modules'],pt.get('renews_on')))
     one=[i for i in invs if not i['contract_id']][0]
     bad+=check('the one-time invoice: numbered from 9000, 10% off, due Net 15',one['number']==9000 and one['total']==1350 and one['discount']==150 and one['status']=='draft' and one['due_on']==(datetime.date.today()+datetime.timedelta(days=15)).isoformat(),(one['number'],one['total'],one['due_on']))
     # ---- 3. the billing cycle: the contract started 2026-11-01, billed in advance on the 1st → every period up to now has an invoice
@@ -93,6 +98,12 @@ async def main():
     await pg.evaluate("(id)=>{ const i=OF.invoices.find(x=>x.id===id); i.due_on='2026-01-01'; i.status='sent'; i.void_at=null; }",first['id'])
     r=await pg.evaluate("()=>{ ofGo('invoices'); OF.iseg='overdue'; vInvoices(document.getElementById('main')); return {rows:document.querySelectorAll('[data-inv]').length,chips:[...document.querySelectorAll('[data-inv] .chip')].map(x=>x.textContent),kpi:document.querySelectorAll('.kpi .v')[1].textContent}; }")
     bad+=check('Invoices page: the Overdue filter and KPI',r['rows']==1 and r['chips']==['Overdue'] and r['kpi']=='$1,350.00',r)
+    await pg.evaluate("(id)=>ofGo('invoice',id)",first['id']); await pg.wait_for_timeout(200)
+    pg.on('dialog',lambda d:asyncio.ensure_future(d.accept()))
+    await pg.evaluate("()=>document.getElementById('oiPauseHub').click()"); await pg.wait_for_function("()=>tenantOf('pines').status==='suspended'",timeout=8000)
+    bad+=check('an overdue invoice can pause the club’s hub (status Suspended, logged)',pt['status']=='suspended' and any('non-payment' in e['text'] for e in fdb._rows('tenant_events')),pt['status'])
+    await pg.evaluate("async()=>{ const c=OF.contracts[0]; await applySubscription(c); }")
+    bad+=check('activating the subscription again lifts the pause',pt['status']=='active' and pt['ended_on'] is None,pt['status'])
     # ---- 4. the client record's Billing card
     await pg.evaluate("()=>openClient('pines')"); await pg.wait_for_timeout(300)
     r=await pg.evaluate("()=>({cards:[...document.querySelectorAll('#main h2')].map(h=>h.textContent.trim()),ct:document.querySelectorAll('[data-oct]').length,inv:document.querySelectorAll('[data-oinv]').length,est:document.querySelectorAll('[data-oest]').length,head:document.querySelector('#ptBilling h2').textContent.replace(/\\s+/g,' ')})")

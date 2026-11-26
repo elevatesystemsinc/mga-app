@@ -185,3 +185,29 @@ select * from (values
   ('On-site training day', 'A Flagstick person at the club for a day', 'service', false, 'month', 950.00, 'day', 5)
 ) as v(name, descr, kind, recurring, every, unit_price, unit, sort)
 where not exists (select 1 from public.fs_catalog);
+
+-- ---------------------------------------------------------------- the industry pass (Nov 26, 2026)
+-- A lead is a club: what it runs today, its size, the modules it is after, when it wants to be live, and the sales
+-- motion is ours — demo, a trial hub, then the subscription. A catalog item may be one of the product's modules
+-- (`module` = golf | pos | club | events) so a contract built from it switches that module on for the club.
+alter table public.fs_leads add column if not exists current_system text not null default '';   -- Golf Genius, Club Essentials, Jonas, paper…
+alter table public.fs_leads add column if not exists holes          integer;                      -- 9 / 18 / 27 / 36
+alter table public.fs_leads add column if not exists members_n      integer;                      -- members (or rounds a year for a muni)
+alter table public.fs_leads add column if not exists modules        jsonb not null default '{}'::jsonb;   -- the modules they are after
+alter table public.fs_leads add column if not exists contact_title  text not null default '';     -- head golf professional, GM, board…
+alter table public.fs_leads add column if not exists live_by        date;                         -- wants to be live by (the season)
+alter table public.fs_leads add column if not exists demo_at        timestamptz;                  -- the demo given
+alter table public.fs_catalog add column if not exists module     text not null default '';       -- golf | pos | club | events | ''
+alter table public.fs_catalog add column if not exists price_year numeric(12,2);                  -- the yearly price when billed annually
+alter table public.fs_estimates add column if not exists billing text not null default 'month';   -- the subscription billed month | year
+update public.fs_catalog set module = 'golf'   where module = '' and name = 'Golf management';
+update public.fs_catalog set module = 'pos'    where module = '' and name = 'Point of sale';
+update public.fs_catalog set module = 'club'   where module = '' and name = 'Club management';
+insert into public.fs_catalog (name, descr, kind, recurring, every, unit_price, unit, sort, module)
+select * from (values
+  ('Fundraising events', 'For a nonprofit: galas with tickets and tables, sponsors, the silent and live auctions, raffles, checkout', 'subscription', true, 'month', 199.00, 'organization', 4, 'events'),
+  ('Course card build', 'A course’s scorecard in the library: par, handicaps, every tee’s ratings and yardages, the hole lines for GameCast', 'setup', false, 'month', 150.00, 'course', 7, ''),
+  ('Member data import', 'The roster from the club’s current system (Club Essentials, Jonas, a spreadsheet) with numbers, GHINs and classes', 'setup', false, 'month', 500.00, '', 8, '')
+) as v(name, descr, kind, recurring, every, unit_price, unit, sort, module)
+where not exists (select 1 from public.fs_catalog c where c.name = v.name);
+update public.fs_catalog set descr = 'The roster, the course cards, the first season’s tournaments, staff training — moving off Golf Genius' where name = 'Set-up and data migration' and descr = 'The roster, the course cards, the first season, staff training';

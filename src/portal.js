@@ -40,7 +40,7 @@ function portalBoot(){
   $('btnSignOut').hidden=false; $('who').textContent='Signed in as '+((ACCESS&&ACCESS.email)||'Flagstick admin'); $('who').hidden=false; portalNav(); vPortal($('main')); loadPortal();
 }
 function portalNav(){
-  const secs=[['Sales',[['pipeline','Pipeline',I.users],['estimates','Estimates',I.survey]]],['Clients',[['clients','Clients',I.org],['contracts','Contracts',I.shield],['invoices','Invoices',I.coins]]],['Library',[['courses','Courses',I.flag]]],['Flagstick',[['catalog','Catalog & billing',I.gear],['team','Team',I.users],['activity','Activity',I.ledger]]]];
+  const secs=[['Sales',[['pipeline','Pipeline',I.users],['estimates','Proposals',I.survey]]],['Clients',[['clients','Clients',I.org],['contracts','Contracts',I.shield],['invoices','Invoices',I.coins]]],['Library',[['courses','Courses',I.flag]]],['Flagstick',[['catalog','Catalog & billing',I.gear],['team','Team',I.users],['activity','Activity',I.ledger]]]];
   const on=k=>PS.view===k||(k==='clients'&&PS.view==='client')||(k==='estimates'&&PS.view==='estimate')||(k==='contracts'&&PS.view==='contract')||(k==='invoices'&&PS.view==='invoice');
   $('nav').innerHTML=secs.map(([title,items])=>`<div class="navsec" style="cursor:default"><span>${esc(title)}</span></div>`+items.map(([k,l,ic])=>`<button class="nav${on(k)?' on':''}" data-pv="${k}">${ic}<span>${l}</span></button>`).join('')).join('');
   $('nav').querySelectorAll('[data-pv]').forEach(b=>b.onclick=()=>{ PS.view=b.dataset.pv; PS.slug=null; OF.id=null; OF.q=''; $('side').classList.remove('open'); portalNav(); vPortal($('main')); window.scrollTo(0,0); });
@@ -165,7 +165,7 @@ function editClient(t,preset){
       pair(field('Name','ptN',d.name||'',{ph:'e.g. Walnut Creek Country Club'}),field('Short name','ptS',d.short||'',{ph:'e.g. WCCC'}))+
       (t?'':field('Address (subdomain)','ptSlug','',{ph:'e.g. wccc  →  wccc.'+BASE_DOMAIN})+'<p class="hint">Lower-case letters, digits and dashes. It becomes the club’s address and can’t change later.</p>')+
       `<div class="fld"><span class="lbl">Plan</span>${seg('ptPlan',[['golf','Golf management'],['club','Club management']],d.plan||'golf')}<p class="hint">Golf management is the package; Point of sale is its add-on for a golf-only client. Club management is the full club — billing, point of sale, bookings and the member portal.</p></div>`+moduleBoxes(modulesOf(t))+
-      (t?'':`<div class="fld"><span class="lbl">Status</span>${seg('ptSt0',[['prospect','Prospect'],['trial','Trial'],['active','Active']],'active')}</div>`)+
+      (t?'':`<div class="fld"><span class="lbl">Status</span>${seg('ptSt0',[['prospect','Prospect'],['trial','Trial'],['active','Active']],d.status||'active')}</div>`)+
       pair(field('Client since','ptFrom',d.started_on||'',{type:'date'}),field('Renews on','ptRen',d.renews_on||'',{type:'date'}))+
       '<div class="fld"><span class="lbl">Address</span></div>'+field('','ptA1',a.line1||'',{ph:'Street'})+field('','ptA2',a.line2||'',{ph:'Suite, building (optional)'})+
       `<div class="frow2" style="grid-template-columns:2fr 1fr 1fr">${field('','ptCity',a.city||'',{ph:'City'})}${field('','ptState',a.state||'',{ph:'State'})}${field('','ptZip',a.zip||'',{ph:'ZIP'})}</div>`+
