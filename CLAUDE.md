@@ -58,6 +58,8 @@ src/
   payouts.js           Calcutta payouts math (calcPayouts, ties) + Results / Payouts sub-tabs
   surveys.js           Surveys: anonymous member surveys (sections → questions, public link, results, CSV)
   signup.js            Player registration: a tournament's public sign-up page (the Field tab's card, the published copy, entries → the field)
+  office.js            Flagstick's back office in the portal (app.flagstickhub.com): the sales pipeline, estimates, contracts that bill themselves,
+                       invoices and payments, the catalog — flagstick-office-setup.sql, tests/test_office.py                 [after portal]
   tour.js              The guided demo: ?demo=1 runs a chaptered walkthrough of the whole product on the club's own data (the portal's Demo button)   [loads last]
   crm.js               Contacts — the CRM layer: companies & households (CLUB.companies), people with a company / title / role / tags, sponsorships by
                        party (company, household or individual) with their cast, derived relationship tags, notes; the nonprofit's Contacts page
@@ -118,6 +120,7 @@ python3 tests/test_schedule.py # a tournament's schedule across the days before 
 python3 tests/test_payments.py # online payments through Deluxe against the fake: credentials → connected, the portal's hosted form → a payment posted once, a declined card, autopay, refund, charge card on file, the hub register and a station's card sheet, the wallet, the staff view, the invitations
 python3 tests/test_tour.py    # the guided demo: every step on three hubs, the chapter picker, resume / restart / end, no tour without ?demo
 python3 tests/test_crm.py     # companies & contacts: a company and its people, a sponsor picked from the list (its contact onto the directory), the record, the MGA's link-by-name, one write, a scoped login reads only; a nonprofit's Contacts (household, individual sponsor, billing contact, named seats → golfers, tags, person record, vendor)
+python3 tests/test_office.py  # Flagstick's back office in the portal against the fake: a lead through the pipeline, an estimate (PDF, sent, accepted, converted), the contract's billing cycle (idempotent), a payment, a void, review mode
 python3 tests/test_allow.py   # a game at 90% with its skins at 85%: the day's allowance and a competition's exception on the hub and a phone; a game that sets neither reads 100%
 git add -A && git commit && git push origin main  # Render deploys main to app.wcccmga.org
 ```
@@ -641,6 +644,7 @@ the app (`docs/tenancy.md`): `flagstickhub.com` and `www` point at wherever this
 | `booking_blocks` | closed times on a sheet (`blocks-setup.sql`, which also teaches `member_slots` / `member_book` about them and `member_me` about events). |
 | `staff_clock`, `pos_stations.dept` + RPC `staff_clock`, `club_staff`, `station_dept`, `staff_fits` | the time clock and the club-wide staff list behind the registers (`staff-setup.sql`). |
 | `crm-setup.sql` | `scoped_read` with `companies` — a board login's cut-down club document carries the company list (read-only). |
+| `fs_leads`, `fs_catalog`, `fs_estimates`, `fs_contracts`, `fs_invoices`, `fs_payments`, `fs_settings`, `fs_counters` + RPC `fs_next_number(p_kind)` | Flagstick's own back office (`flagstick-office-setup.sql`): RLS `is_flagstick_admin()` on every one; `tenant` on a row = the client. |
 | `hub_keys` (org_id, key_hash, label, revoked_at) + RPC `hub_key_org/read/write/people/golf_event/golf_delete/score/share` | admin links (`admin-links-setup.sql`): security-definer functions that act for exactly one organization. |
 | `mm_tournament` | the retired Member-Member app's row (`supabase-setup.sql`). Archive only — no hub code reads or writes it. |
 | `service-role-grants.sql` | the service role's select / insert / update / delete on every public table (and on tables created later). The Edge Functions run as the service role; on Nov 19, 2026 it had lost those rights on every table, so `admin-users` could not read `flagstick_admins` and the portal said "Your login may not manage these logins" (and Open hub's one-click sign-in failed the same way). Run it again if a function starts answering 403 / empty reads. |
@@ -1344,6 +1348,39 @@ groups, printed scorecards — the printed cards include a live-scoring QR that 
   **The call-out's word for a failed validation is per game** (the Misfits, Oct 30: "say loser with exclamation marks"): `g.failWord`
   (the designer's "When a skin fails validation, the call-out says"; blank = "Didn’t validate"), published through `gameInfo` →
   `pub.game.failWord`, read by the hub's `skinsCallout` flash and the phones' `calloutStage`. Set on that day's game only.
+- **Built Nov 26, 2026 (the back office in the portal; the owner: "build invoicing, clients, estimating, and some kind of lead pipeline / CRM
+  for us to be selling to these clubs out of, as well as a contracts section for automated billing and invoicing… model the automated
+  invoicing and billing off of the PSA app"):** `src/office.js` + `flagstick-office-setup.sql` (applied), modelled on the Elevate PSA's
+  Lead → Estimate → Contract → Invoice → Payment. The portal's rail is sectioned — **Sales** (Pipeline, Estimates) · **Clients** (Clients,
+  Contracts, Invoices) · **Library** (Courses) · **Flagstick** (Catalog & billing, Team, Activity); `vOffice(m)` answers the dispatcher
+  first, `loadOffice()` rides `loadPortal()` and ends with `ofRunBilling({quiet:true})`. `OF` is the state (every fs_ table loaded whole —
+  Flagstick's own volume). Numbers come from `fs_next_number(kind)` (L-2000, Q-1000, C-7000, INV-9000; the fake emulates it). **Pipeline**
+  (`vPipeline`, `leadDrawer`): a board of New · Contacted · Qualified · Proposal sent with a Closed list; a lead carries the club, its kind,
+  the contact, recurring / one-time value, owner, source, expected close, a `log` of dated notes (stage changes logged); **Won — set the club up
+  as a client** opens `editClient(null, preset)` prefilled (portal.js takes a preset now; `officeClientCreated` links the lead to the new
+  tenant and puts the contact on the record), or *Link an existing client*. **Estimates** (`vEstimates` / `vEstimate` / `estimateDrawer`): the
+  shared lines editor (`itemsEditor` / `ofWireItems` / `readItems`: catalog pick or a typed line, qty, unit price, a per-line and a
+  document-wide discount, Monthly / Yearly / One-time), `estSplit(e)` = the monthly recurring money and the one-time money; PDF
+  (`estimatePDF`), **Send** (`sendEstimate` → `ofMail`: the `mail` function with `tenant ''` → Flagstick's own MAIL_FROM, the PDF attached),
+  Accepted / Declined, **Convert** (`convertDrawer`: the client must be a tenant; recurring lines → a contract — a yearly line on a monthly
+  contract becomes a twelfth per cycle, a monthly line on a quarterly contract three months —, one-time lines → an invoice; the estimate is
+  `converted`, the lead won). **Contracts** (`vContracts` / `vContract` / `contractDrawer`): lines per cycle, `start_on`, `billing_day`
+  (1–28), `frequency` monthly | quarterly | semiannual | annual, `timing` advance | arrears, `terms_days`, `lead_days`, `escalator_pct`
+  (every line × (1+pct)^years on the anniversary), `discount_pct`, `end_on`, `last_period`; the cycle engine is the PSA's (`cycleFor`,
+  `kForNow`, `billableCycle`, `nextCycle`, `periodCovered` = a non-void invoice for the period or `last_period` ≥ it — never bill a covered
+  period); `genInvoice(c, cy)` makes the period's invoice once (items × the escalator, the period label in the detail, due = invoice date +
+  terms) and moves `last_period` forward; **`ofRunBilling`** runs every active contract: mode **auto** (Catalog & billing → Billing) generates
+  on the invoice date whenever the portal loads or Run billing is pressed, optionally e-mailing it at once (`autosend`); mode **review**
+  lists what is due on the Contracts page and waits for Generate. Activate / Pause / End / Run next invoice on the record. **Invoices**
+  (`vInvoices` / `vInvoice` / `invoiceDrawer`): status draft → sent (Send e-mails the PDF to the client's billing e-mail; asks for an address
+  when there is none) → partial / paid as payments land (`paymentDrawer` → `fs_payments`, `recalcPaid`) · void with a reason (the row stays);
+  Overdue = sent past `due_on`; filters Open · Overdue · Paid · Draft · Void; `invoicePDF`. The **client record** carries a Billing card
+  (`officeClientCard`: contracts with the next invoice, invoices with the open balance, estimates; New estimate / contract / invoice). **Catalog
+  & billing** (`vCatalog`): the items (`fs_catalog`: kind, price, monthly / yearly / one-time, taxable), the billing settings (`fs_settings`
+  'billing': mode, autosend, terms, tax rate, estimate terms) and the remit-to block (`fs_settings` 'company': name, address, e-mail, phone,
+  how to pay — on every PDF and e-mail). Not built: a public accept link for estimates (the PSA has one), online payment of a Flagstick
+  invoice, a scheduled run outside the portal (the run happens when the portal is open — `ofRunBilling` is idempotent, so a cron calling the
+  same logic is the next step if needed).
 - **The guided demo (Nov 24, 2026; the owner: "a button inside each tenant… right next to Open Hub, there should be a demo button… a
   guided, interactive walkthrough of the entire software… this is how we're going to sell and demo this software to each club"):**
   `src/tour.js`. The portal's client record has **Demo** beside Open hub → `openHub(t,'?demo=1')`: the hub opens signed in with the
